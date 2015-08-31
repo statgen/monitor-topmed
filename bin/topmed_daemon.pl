@@ -194,13 +194,15 @@ sub ProcessGet {
         else {
             foreach my $f (qw(
                 topmed_init.log
-                topmed_monitor_failures.log
+                topmed_failures.log
                 topmed_monitor_arrive.log
                 topmed_monitor_verify.log
                 topmed_monitor_backup.log
                 topmed_monitor_bai.log
                 topmed_monitor_qplot.log
+                topmed_monitor_cram.log
                 )) {
+                
                 print "Show $f\n";
                 $s .= "<b>$f</b>\n" . `tail -6 $f`;
             }
