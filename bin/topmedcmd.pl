@@ -297,7 +297,7 @@ sub Show {
                 #   See if this has arrived. Few states possible
                 if (defined($href->{datearrived}) && ($href->{datearrived} ne '')) {
                     if ($href->{datearrived} =~ /\D/) { next; }  # Not numeric
-                    if ($href->{datearrived} < 10) { next; }     # Already arrived
+                    if ($href->{datearrived} < 10) { next; }     # Not arrived
                 }
                 #   Run the command
                 print "$href->{bamid} $centername $dirname $f\n";
