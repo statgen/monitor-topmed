@@ -26,9 +26,9 @@ my($me, $mepath, $mesuffix) = fileparse($0, '\.pl');
 #--------------------------------------------------------------
 my %opts = (
     samtools => '/net/mario/gotcloud/bin/samtools',
-    lookuptable => '/incoming/study.reference/study.reference/nhlbi.463.initial.lookup.table.tab',
-    topdir => '/incoming/topmed',
-    qcresults => '/incoming/qc.results',
+    lookuptable => '/net/topmed/incoming/study.reference/study.reference/nhlbi.463.initial.lookup.table.tab',
+    topdir => '/net/topmed/incoming/topmed',
+    qcresults => '/net/topmed/incoming/qc.results',
     topmedcmd => '/usr/cluster/monitor/bin/topmedcmd.pl',
     verbose => 0,
 );
@@ -109,6 +109,10 @@ if ($opts{bamid}) {
     system($cmd);
     $cmd = "$opts{topmedcmd} set $opts{bamid} studyname $study";
     system($cmd);
+    $cmd = "$opts{topmedcmd} set $opts{bamid} expt_sampleid $smvalue";
+    system($cmd);
+    #$cmd = "$opts{topmedcmd} set $opts{bamid} nwdid $nwdid";
+    #system($cmd);
 }
 
 #--------------------------------------------------------------
