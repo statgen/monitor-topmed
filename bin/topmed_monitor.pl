@@ -55,7 +55,7 @@ my %opts = (
 my ($dbc);                      # For access to DB
 Getopt::Long::GetOptions( \%opts,qw(
     help realm=s verbose topdir=s center=s runs=s maxjobs=i
-    memory=s partition=s qos=s dryrun
+    memory=s partition=s qos=s dryrun suberr
     )) || die "Failed to parse options\n";
 
 #   Simple help if requested
@@ -168,6 +168,7 @@ if ($fcn eq 'verify') {
                 if ($href->{datearrived} =~ /\D/) { next; }  # Not numeric
                 if ($href->{datearrived} < 10) { next; }     # Not arrived, avoid verify
                 if (defined($href->{datemd5ver}) && ($href->{datemd5ver} ne '')) {
+                    if ($opts{suberr} && $href->{datemd5ver} == -1) { $href->{datemd5ver} = 0; }
                     if ($href->{datemd5ver} =~ /\D/) { next; }  # Not numeric
                     if ($href->{datemd5ver} < 0) { next; }  # Already started
                     if ($href->{datemd5ver} == 2) { next; } # Already queued to be run
@@ -210,6 +211,7 @@ if ($fcn eq 'bai') {
                 if ($href->{datearrived} =~ /\D/) { next; }  # Not numeric
                 if ($href->{datearrived} < 10) { next; }     # Not arrived, avoid bai
                 if (defined($href->{datebai}) && ($href->{datebai} ne '')) {
+                    if ($opts{suberr} && $href->{datebai} == -1) { $href->{datebai} = 0; }
                     if ($href->{datebai} =~ /\D/) { next; }  # Not numeric
                     if ($href->{datebai} < 0) { next; }  # Already started
                     if ($href->{datebai} == 2) { next; } # Already queued to be run
@@ -252,6 +254,7 @@ if ($fcn eq 'backup') {
                 if ($href->{datearrived} =~ /\D/) { next; }  # Not numeric
                 if ($href->{datearrived} < 10) { next; }     # Not arrived, avoid backup
                 if (defined($href->{datebackup}) && ($href->{datebackup} ne '')) {
+                    if ($opts{suberr} && $href->{datebackup} == -1) { $href->{datebackup} = 0; }
                     if ($href->{datebackup} =~ /\D/) { next; }  # Not numeric
                     if ($href->{datebackup} < 0) { next; }  # Already started
                     if ($href->{datebackup} == 2) { next; } # Already queued to be run
@@ -298,6 +301,7 @@ if ($fcn eq 'cram') {
                     if ($href->{datebackup} <= 10) { next; } # Not done
                 }
                 if (defined($href->{datecram}) && ($href->{datecram} ne '')) {
+                    if ($opts{suberr} && $href->{datecram} == -1) { $href->{datecram} = 0; }
                     if ($href->{datecram} =~ /\D/) { next; }  # Not numeric
                     if ($href->{datecram} < 0) { next; }  # Already started
                     if ($href->{datecram} == 2) { next; } # Already queued to be run
@@ -340,6 +344,7 @@ if ($fcn eq 'qplot') {
                 if ($href->{datebai} eq '') { next; }
                 if ($href->{datebai} < 10) { next; }
                 if (defined($href->{dateqplot}) && ($href->{dateqplot} ne '')) {
+                    if ($opts{suberr} && $href->{dateqplot} == -1) { $href->{dateqplot} = 0; }
                     if ($href->{dateqplot} =~ /\D/) { next; }  # Not numeric
                     if ($href->{dateqplot} < 0) { next; }  # Already started
                     if ($href->{dateqplot} == 2) { next; } # Already queued to be run
@@ -507,83 +512,6 @@ if ($fcn eq 'check') {
            }
         }
     }
-    exit;
-}
-
-#--------------------------------------------------------------
-#   Hack here to redo nwdid again
-#--------------------------------------------------------------
-if ($fcn eq 'unused-nwdid') {
-    #   Get all the known centers in the database
-    my $centersref = GetCenters();
-    foreach my $cid (keys %{$centersref}) {
-        my $centername = $centersref->{$cid};
-        my $runsref = GetRuns($cid) || next;
-        #   For each run, see if there are bamfiles that arrived
-        foreach my $runid (keys %{$runsref}) {
-            my $dirname = $runsref->{$runid};
-            #   Get list of all bams that have not yet arrived properly
-            my $sql = "SELECT bamid,bamname,datearrived FROM $opts{bamfiles_table} " .
-                "WHERE runid='$runid'";
-            my $sth = DoSQL($sql);
-            my $rowsofdata = $sth->rows();
-            if (! $rowsofdata) { next; }
-            for (my $i=1; $i<=$rowsofdata; $i++) {
-                my $href = $sth->fetchrow_hashref;
-                my $f = $opts{topdir} . "/$centername/$dirname/" .
-                    $href->{bamname};
-                my @stats = stat($f);
-                if (! @stats) { next; }
-                #   See if we should mark this as arrived. Few states possible
-                if ($href->{datearrived} > 10) {
-                    #   Run the command
-                    print "Doing $href->{bamid} $f\n";
-                    BatchSubmit("/usr/cluster/monitor/bin/topmed_nwdid.pl -nonwdid -bamid $href->{bamid} $f");
-                }
-            }
-        }
-    }
-    if ($opts{jobcount}) { print "$opts{jobcount} $fcn processed\n"; }
-    exit;
-}
-
-#--------------------------------------------------------------
-#   Report on QPLOT output
-#--------------------------------------------------------------
-if ($fcn eq 'report-unused') {
-    #   Get all the known centers in the database
-    my $centersref = GetCenters();
-    $opts{jobcount} = 0;
-    foreach my $cid (keys %{$centersref}) {
-        my $centername = $centersref->{$cid};
-        my $runsref = GetRuns($cid) || next;
-        #   For each run, see if there are bamfiles that need a report
-        foreach my $runid (keys %{$runsref}) {
-            my $dirname = $runsref->{$runid};
-            #   Get list of all bams that have not yet arrived properly
-            my $sql = "SELECT bamid,bamname,dateqplot,datereport FROM " .
-                $opts{bamfiles_table} . " WHERE runid='$runid'";
-            my $sth = DoSQL($sql);
-            my $rowsofdata = $sth->rows();
-            if (! $rowsofdata) { next; }
-            for (my $i=1; $i<=$rowsofdata; $i++) {
-                my $href = $sth->fetchrow_hashref;
-                my $f = $opts{topdir} . "/$centername/$dirname/" . $href->{bamname};
-                #   Only do report collection if qplot was run
-                if (! defined($href->{dateqplot})) { next; }
-                if ($href->{dateqplot} < 10) { next; }    # No qplot
-                if (defined($href->{datereport})) {
-                    if ($href->{datereport} !~ /^\d+$/) { next; }  # Not numeric
-                    if ($href->{datereport} < 0) { next; }  # Already started
-                    if ($href->{datereport} == 2) { next; } # Already queued to be run
-                    if ($href->{datereport} > 10) { next; } # Already done
-                }
-                #   Run the command
-                BatchSubmit("$opts{topmedreport} -submit $href->{bamid} $f");
-            }
-        }
-    }
-    if ($opts{jobcount}) { print "$nowdate  Submitted $opts{jobcount} jobs\n"; }
     exit;
 }
 
@@ -815,6 +743,11 @@ Specifies a specific set of runs on which to run the action,
 e.g. B<2015jun05.weiss.02,2015jun05.weiss.03>.
 This is useful for testing.
 The default is to run against all runs for the center.
+
+=item B<-suberr>
+
+Submit the job if the state is B<error>. Normally tasks in this state
+are not submitted to be run.
 
 =item B<-topdir PATH>
 
