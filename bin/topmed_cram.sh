@@ -74,17 +74,6 @@ fi
 s=`hostname`
 echo "#========= '$d' host=$s $SLURM_JOB_ID $0 bamid=$bamid bamfile=$bamfile dest=$backupdir/$dest ========="
 
-#   Reading $ref fails too often so make a local copy
-t=`basename $ref`
-t=/tmp/$t
-for n in 1 2 3 4 5; do
-  if [ ! -r $t ]; then
-    cp $ref $t
-    sleep 20
-  fi
-done
-ref=$t 
-
 #   Mark this as started
 $topmedcmd mark $bamid cramed started
 stime=`date +%s`
@@ -170,9 +159,9 @@ etime=`date +%s`
 etime=`expr $etime - $stime`
 here=`pwd`
 echo "BAM to CRAM backup completed in $etime seconds, created $here/$newname"
-$topmedcmd set $bamid nwdid $nwdid
+$topmedcmd set $bamid expl_sampleid $nwdid
 if [ "$?" != "0" ]; then
-  echo "Command failed: $topmedcmd set $bamid nwdid $nwdid"
+  echo "Command failed: $topmedcmd set $bamid expl_sampleid $nwdid"
   $topmedcmd mark $bamid cramed failed
   exit 3
 fi
