@@ -201,6 +201,7 @@ sub ProcessGet {
                 topmed_monitor_bai.log
                 topmed_monitor_qplot.log
                 topmed_monitor_cram.log
+                topmed_monitor_phs.log
                 )) {
                 
                 print "Show $f\n";
