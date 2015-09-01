@@ -110,9 +110,7 @@ if ($opts{bamid}) {
     $cmd = "$opts{topmedcmd} set $opts{bamid} studyname $study";
     system($cmd);
     $cmd = "$opts{topmedcmd} set $opts{bamid} expt_sampleid $smvalue";
-    system($cmd);
-    #$cmd = "$opts{topmedcmd} set $opts{bamid} nwdid $nwdid";
-    #system($cmd);
+    system($cmd);               # Update NWDID
 }
 
 #--------------------------------------------------------------

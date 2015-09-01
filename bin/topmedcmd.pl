@@ -265,6 +265,7 @@ sub Set {
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$me$mesuffix - BAM '$bamid' is unknown\n"; }
 
+    if ($col eq 'nwdid') { $col = 'expt_sampleid'; }
     DoSQL("UPDATE $opts{bamfiles_table} SET $col='$val' WHERE bamid=$bamid");
 }
 
