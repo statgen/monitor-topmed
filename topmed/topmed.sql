@@ -1,5 +1,7 @@
 #---------------------------------------------------------------
 #       NHLBI TopMed tracking entries
+#
+#   Do not delete columns without telling Chris so he can fix mapping
 #---------------------------------------------------------------
 DROP TABLE IF EXISTS centers;
 CREATE TABLE centers (
@@ -53,8 +55,10 @@ CREATE TABLE bamfiles (
   bamname      VARCHAR(96) NOT NULL,
   studyname    VARCHAR(96) NOT NULL,
   piname       VARCHAR(96),
-  nwdid        VARCHAR(32),
   phs          VARCHAR(12),
+  phs_consent_short_name VARCHAR(24),
+  phs_sra_sample_id VARCHAR(24),
+  phs_sra_data_details VARCHAR(255),
   checksum     VARCHAR(96) NOT NULL,
   refname      VARCHAR(96) NOT NULL,
   expt_refname VARCHAR(96) NOT NULL,
@@ -98,53 +102,3 @@ CREATE TABLE requestfiles (
   PRIMARY KEY  (reqid)
 );
 CREATE INDEX index_reqid ON requestfiles(centerid);
-
-
-# Remove everything in database for testing
-#delete from centers;
-#delete from runs;
-#delete from studies;
-#delete from bamfiles;
-#delete from requestfiles;
-#delete from reportdata;
-#alter table bamfiles add column datereport  VARCHAR(12) after dateqplot
-
-#   Irina chose to generate report data with her own code and process   2015 June
-#DROP TABLE IF EXISTS reportdata;
-#CREATE TABLE reportdata (
-#  reportid     INT         NOT NULL AUTO_INCREMENT,
-#  bamid        INT         NOT NULL,
-#  vcfname      VARCHAR(96),
-#  bamfile_remapped    VARCHAR(96),
-#  vcffile_harmonized  VARCHAR(96),
-#  qplotfile    VARCHAR(96),
-#  totalreads   INT,
-#  mappingrate  FLOAT,
-#  maprate_mqpass FLOAT,
-#  targetmapping  FLOAT,
-#  zeromapqual  FLOAT,
-#  mapqual      FLOAT,
-#  pairedreads  FLOAT,
-#  properpair   FLOAT,
-#  mappedbases  FLOAT,
-#  q20bases     FLOAT,
-#  q20basespct  FLOAT,
-#  meandepth    FLOAT,
-#  genomecover  FLOAT,
-#  eps_mse      FLOAT,
-#  eps_cycle_mean FLOAT,
-#  gcbiasmse    FLOAT,
-#  isize_mode   FLOAT,
-#  isize_medium FLOAT,
-#  duptate      FLOAT,
-#  qcfailrate   FLOAT,
-#  base_comp_a  FLOAT,
-#  base_comp_c  FLOAT,
-#  base_comp_g  FLOAT,
-#  base_comp_t  FLOAT,
-#  base_comp_o  FLOAT,
-#  PRIMARY KEY  (reportid)
-#);
-#CREATE INDEX index_reportid ON reportdata(reportid);
-#CREATE INDEX index_bamid ON reportdata(bamid,reportid);
-
