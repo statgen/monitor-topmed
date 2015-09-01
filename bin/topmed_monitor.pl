@@ -60,7 +60,7 @@ Getopt::Long::GetOptions( \%opts,qw(
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$me$mesuffix [options] arrive|verify|backup|bai|qplot|mapping|cp2ncbi\n" .
+    warn "$me$mesuffix [options] arrive|verify|backup|bai|qplot|cram|mapping|cp2ncbi\n" .
         "\nVersion $version\n" .
         "Find runs which need some action and queue a request to do it.\n" .
         "More details available by entering: perldoc $0\n\n";
