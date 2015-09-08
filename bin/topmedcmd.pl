@@ -57,7 +57,9 @@ my %opts = (
     bamfiles_table => 'bamfiles',
     centers_table => 'centers',
     runs_table => 'runs',
-    topdir => '/net/topmed/incoming/topmed',
+    netdir => '/net/topmed',
+    incomingdir => 'incoming/topmed',
+    backupsdir => 'working/backups/incoming/topmed',
     verbose => 0,
 );
 
@@ -76,7 +78,11 @@ if ($#ARGV < 0 || $opts{help}) {
         "  or\n" .
         "$m show arrived\n" .
         "  or\n" .
+        "$m show bamid colname\n" .
+        "  or\n" .
         "$m export\n" .
+        "  or\n" .
+        "$m where bamid\n" .
         "\nVersion $version\n" .
         "Update the topmed database\n" .
         "More details available by entering: perldoc $0\n\n";
@@ -97,6 +103,7 @@ if ($fcn eq 'unmark')   { UnMark(@ARGV); exit; }
 if ($fcn eq 'set')      { Set(@ARGV); exit; }
 if ($fcn eq 'show')     { Show(@ARGV); exit; }
 if ($fcn eq 'export')   { Export(@ARGV); exit; }
+if ($fcn eq 'where')    { Where(@ARGV); exit; }
 
 die "$me$mesuffix  - Invalid function '$fcn'\n";
 exit;
@@ -214,7 +221,7 @@ sub Export {
             if (! $rowsofdata) { next; }
             for (my $i=1; $i<=$rowsofdata; $i++) {
                 my $href = $sth->fetchrow_hashref;
-                my $f = $opts{topdir} . "/$centername/$dirname/" .
+                my $f = "$opts{netdir}/$opts{incomingdir}/$centername/$dirname/" .
                     $href->{bamname};
                 #   See if this has arrived. Few states possible
                 if (defined($href->{datearrived}) && ($href->{datearrived} ne '')) {
@@ -244,8 +251,55 @@ sub Export {
             }
         }
     }
+}
 
+#==================================================================
+# Subroutine:
+#   Where($bamid)
+#
+#   Print path to bamid, path to the backup directory and the bamname
+#==================================================================
+sub Where {
+    my ($bamid) = @_;
 
+    #   Reconstruct partial path to BAM
+    my $sth = DoSQL("SELECT runid,bamname from $opts{bamfiles_table} WHERE bamid=$bamid", 0);
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { die "$me$mesuffix - BAM '$bamid' is unknown\n"; }
+    my $href = $sth->fetchrow_hashref;
+    my $bamname = $href->{bamname};
+    my $runid = $href->{runid};
+    $sth = DoSQL("SELECT centerid,dirname from $opts{runs_table} WHERE runid=$runid", 0);
+    $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { die "$me$mesuffix - BAM '$bamid' run '$runid' is unknown\n"; }
+    $href = $sth->fetchrow_hashref;
+    my $rundir = $href->{dirname};
+    my $centerid = $href->{centerid};
+    $sth = DoSQL("SELECT centername from $opts{centers_table} WHERE centerid=$centerid", 0);
+    $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { die "$me$mesuffix - BAM '$bamid' center '$centerid' is unknown\n"; }
+    $href = $sth->fetchrow_hashref;
+    my $centername = $href->{centername};
+
+    #   The BAM is in one of those $opts{netdir} trees where center is not a symlink
+    my $bamfdir = '';
+    foreach ('', '2', '3') {
+        $bamfdir = "$opts{netdir}$_/$opts{incomingdir}/$centername";
+        if (! -l $bamfdir) { last; }        # Found non-symlink to center directory
+    }
+    if (! $bamfdir) { die "BAMID=$bamid Unable to find real directory for '$centername'\n"; }
+    $bamfdir .= '/' . $rundir;
+
+    #   The backup for the BAM is in another tree, also not a symlink
+    my $bakbamfdir = '';
+    if ($bamfdir =~ /$opts{netdir}\//)  { $bakbamfdir = $opts{netdir} . '2'; }
+    if ($bamfdir =~ /$opts{netdir}2\//) { $bakbamfdir = $opts{netdir} . '';  }
+    if (! $bakbamfdir) { die "BAMID=$bamid Unable to figure out backup for '$bamfdir'\n"; }
+    $bakbamfdir = "$bakbamfdir/$opts{backupsdir}/$centername";
+    if (-l $bakbamfdir) { die "BAMID=$bamid bamdir=$bamfdir Backup directory may not be a symlink for '$bakbamfdir'\n"; }
+    $bakbamfdir .= '/' . $rundir;
+
+    print "$bamfdir $bakbamfdir $bamname\n";
 }
 
 #==================================================================
@@ -271,11 +325,34 @@ sub Set {
 
 #==================================================================
 # Subroutine:
-#   Show($fcn)
+#   Show($fcn|$bamid, $col)
+#
+#   Generate list of information from the database
+#   or show the value for a column
+#==================================================================
+sub Show {
+    my ($bamid, $col) = @_;
+    if ($bamid eq 'arrived') { return ShowArrived($bamid); }
+
+    if ($bamid !~ /^\d+$/){
+        die "$me$mesuffix Invalid 'show' syntax. Try '$me$mesuffix -help'\n";
+    }
+
+    #   Make sure this is a bam we know
+    my $sth = DoSQL("SELECT bamid,$col from $opts{bamfiles_table} WHERE bamid=$bamid", 0);
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { die "$me$mesuffix - BAM '$bamid' or column '$col' is unknown\n"; }
+    my $href = $sth->fetchrow_hashref;
+    print $href->{$col} . "\n";
+}
+
+#==================================================================
+# Subroutine:
+#   ShowArrived($fcn)
 #
 #   Generate list of information from the database
 #==================================================================
-sub Show {
+sub ShowArrived {
     my ($fcn) = @_;
     #   Get all the known centers in the database
     my $centersref = GetCenters();
@@ -444,6 +521,8 @@ topmedcmd.pl - Update the database for NHLBI TopMed
   topmedcmd.pl unmark 33 arrived           # Reset BAM has arrived
 
   topmedcmd.pl set 33 jobidqplot 123445    # set jobidqplot in bamfiles
+ 
+  topmedcmd.pl where 2199                  # returns path to bam, path to backup, bamname
 
 =head1 DESCRIPTION
 
@@ -525,9 +604,17 @@ Note that this database field can have some surprising values.
 =item B<set bamid columnname value>
 Use this to set the value for a column for a particular BAM file.
 
+=item B<show arrived>
+Use this to show the bamids for all BAMs that are marked arrived.
+
 =item B<unmark bamid [verb]>
 Use this to reset the state for a particular BAM file to NULL, the default
 database value.
+
+=item B<where bamid>
+Use this to display the directory of the bam file, 
+the path to the backup direcotry,
+and the name of the bam without any path.
 
 =back
 
