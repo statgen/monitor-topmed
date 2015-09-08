@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-#   topmed_cram.sh -submit bamid bamfile
+#   topmed_cram.sh -submit|-squeezed bamid bamfile
 #
 #	Backup the original BAM as a CRAM file
 #
@@ -13,13 +13,24 @@ mem=${TOPMED_MEM:-8G}
 console=/net/topmed/working/topmed-output
 slurmp=${TOPMED_PARTITION:-nomosix}
 slurmqos=topmed-cram
+squeezed=n
 
 if [ "$1" = "-submit" ]; then
-  shift  
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-cram --output=$console/$1-cram.out $0 $*`)
+  shift
+  #  Is this squeezed or not?
+  sq=''
+  center=`echo $2 | grep /topmed/broad/`
+  if [ "$center" = "" ]; then
+    #slurmp=topmed2-incoming
+    #slurmqos=topmed-bai
+    sq='-squeezed'
+  fi
+
+  #  Submit this script to be run
+  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-cram --output=$console/$1-cram.out $0 $sq $*`)
   if [ "$?" != "0" ]; then
     echo "Failed to submit command to SLURM"
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-cram --output=$console/$1-cram.out $0 $*"
+    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-cram --output=$console/$1-cram.out $0 $sq $*"
     exit 1
   fi
   $topmedcmd mark $1 cramed submitted
@@ -29,11 +40,17 @@ if [ "$1" = "-submit" ]; then
   exit
 fi
 
+#   Watch for additional options
+if [ "$1" = "-squeezed" ]; then
+  squeezed=y
+  shift
+fi
+
 if [ "$2" = "" ]; then
   me=`basename $0`
-  echo "Usage: $me [-submit] bamid bamfile"
+  echo "Usage: $me [-submit|-squeezed] bamid bamfile"
   echo ""
-  echo "Backup a bam file and update database"
+  echo "Backup the original BAM as a CRAM file and update database"
   exit 1
 fi
 bamid=$1
@@ -52,27 +69,32 @@ if [ "$homehost" != "" ]; then
   backupdir=/net/$homehost/working/backups
 fi
 
-#   Mark this as started  Calc dest directory in a poor manner
-d=`echo $bamfile | sed -e s:/net/topmed/::`
-d=`echo $d | sed -e s:/net/topmed2/::`
-d=`echo $d | sed -e s:/net/topmed3/::`
-dest=`dirname $d`
+#   Now calc destination directory
+l=(`$topmedcmd where $bamid`)           # Get bampath backuppath bamname
+bampath="${l[0]}"
+backupdir="${l[1]}"
+bamname="${l[2]}"
+
+if [ "$bampath/$bamname" != "$bamfile" ]; then
+  echo ""
+  echo ""
+  echo "This sure looks wrong - the input is not where I think it should be. Continuing anyway"
+  echo "  input    bamfile=$bamfile"
+  echo "  expected bamfile=$bampath/$bamname"
+  echo ""
+  echo ""
+fi
+
 d=`date +%Y/%m/%d`
+mkdir -p $backupdir
 cd $backupdir
 if [ "$?" != "0" ]; then
   echo "Unable to CD $backupdir"
   $topmedcmd mark $bamid cramed failed
   exit 2
 fi
-mkdir -p $dest
-cd $dest
-if [ "$?" != "0" ]; then
-  echo "Unable to CD $backupdir/$dest"
-  $topmedcmd mark $bamid cramed failed
-  exit 2
-fi
 s=`hostname`
-echo "#========= '$d' host=$s $SLURM_JOB_ID $0 bamid=$bamid bamfile=$bamfile dest=$backupdir/$dest ========="
+echo "#========= '$d' host=$s $SLURM_JOB_ID squeezed=$squeezed $0 bamid=$bamid bamfile=$bamfile backupdir=$backupdir ========="
 
 #   Mark this as started
 $topmedcmd mark $bamid cramed started
@@ -87,7 +109,7 @@ chmod 555 $bamfile 2> /dev/null
 #   does.  (And, 'samtools flagstat' does accept .sam input.)
 #
 #   All this code used to be just a simple
-#       cp -p $bamfile $backupdir/$dest
+#       cp -p $bamfile $backupdir
 #
 chkname=`basename $bamfile .bam`
 nwdid=`$samtools view -H $bamfile | grep '^@RG' | grep -o 'SM:\S*' | sort -u | cut -d \: -f 2`
@@ -108,7 +130,11 @@ fi
 s=`date +%s`; s=`expr $s - $now`; echo "samtools flagstat completed in $s seconds"
 
 now=`date +%s`
-$bindir/bam squeeze  --in $bamfile  --out - --rmTags "BI:Z;BD:Z;PG:Z"  --keepDups --binMid  --binQualS  2,3,10,20,25,30,35,40,50 | $samtools view  -C -T  $ref  -  >  $newname
+if [ "$squeezed" = "n" ]; then
+  $bindir/bam squeeze  --in $bamfile  --out - --rmTags "BI:Z;BD:Z;PG:Z"  --keepDups --binMid  --binQualS  2,3,10,20,25,30,35,40,50 | $samtools view  -C -T  $ref  -  >  $newname
+else 
+  $samtools view  -C -T $ref  $bamfile  >  $newname
+fi
 if [ "$?" != "0" ]; then
   echo "Command failed: $bindir/bam squeeze  --in $bamfile ..."
   $topmedcmd mark $bamid cramed failed
@@ -126,7 +152,7 @@ fi
 s=`date +%s`; s=`expr $s - $now`; echo "samtools index completed in $s seconds"
 
 now=`date +%s`
-$samtools view  -h -T  $ref $newname | $samtools flagstat  - >  ${chkname}.cram.stat
+$samtools view  -u -T  $ref $newname | $samtools flagstat  - >  ${chkname}.cram.stat
 if [ "$?" != "0" ]; then
   echo "Command failed: $samtools view  -h -T  $ref $newname ..."
   $topmedcmd mark $bamid cramed failed
@@ -159,9 +185,9 @@ etime=`date +%s`
 etime=`expr $etime - $stime`
 here=`pwd`
 echo "BAM to CRAM backup completed in $etime seconds, created $here/$newname"
-$topmedcmd set $bamid expl_sampleid $nwdid
+$topmedcmd set $bamid expt_sampleid $nwdid
 if [ "$?" != "0" ]; then
-  echo "Command failed: $topmedcmd set $bamid expl_sampleid $nwdid"
+  echo "Command failed: $topmedcmd set $bamid expt_sampleid $nwdid"
   $topmedcmd mark $bamid cramed failed
   exit 3
 fi
