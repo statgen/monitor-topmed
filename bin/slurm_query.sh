@@ -128,11 +128,13 @@ if [ "$1" = "-squeue" ]; then
     s=`grep bai $tmpfile|wc -l`
     r=`grep bai $tmpfile|grep ' R '|wc -l`
     echo "<br/>bai jobs: $s   ($r running)"
+    s=`grep cram $tmpfile|wc -l`
+    r=`grep cram $tmpfile|grep ' R '|wc -l`
+    echo "<br/>cram jobs: $s   ($r running)"
   fi
   echo "<br/>Last $lastn queued jobs are:</p><pre>"
   grep backup $tmpfile | tail -$lastn
   grep cram $tmpfile | tail -$lastn
-  grep topmed $tmpfile | tail -$lastn
   echo "</pre>"
   rm -f $tmpfile
   exit
