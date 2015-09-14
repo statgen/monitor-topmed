@@ -15,16 +15,17 @@
 ###################################################################
 use strict;
 use warnings;
-use File::Basename;
+use FindBin qw($Bin $Script);
+use lib "$FindBin::Bin";
+use lib "$FindBin::Bin/../lib";
+use lib "$FindBin::Bin/../lib/perl5";
 use Getopt::Long;
-
-my($me, $mepath, $mesuffix) = fileparse($0, '\.pl');
-(my $version = '$Revision: 1.0 $ ') =~ tr/[0-9].//cd;
+use File::Basename;
 
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
-my %opts = (
+our %opts = (
     samtools => '/net/mario/gotcloud/bin/samtools',
     lookuptable => '/net/topmed/incoming/study.reference/study.reference/nhlbi.463.initial.lookup.table.tab',
     topdir => '/net/topmed/incoming/topmed',
@@ -39,9 +40,8 @@ Getopt::Long::GetOptions( \%opts,qw(
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    my $m = "$me$mesuffix [options]";
+    my $m = "$Script [options]";
     warn "$m bamfile\n" .
-        "\nVersion $version\n" .
         "Create the NWD id file for this bam\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
@@ -152,6 +152,7 @@ topmed_nwdid.pl - Create the NWD id file
 =head1 SYNOPSIS
 
   topmed_nwdid.pl  /incoming/topmed/uw/2015may11.hapmap/89497.bam
+  topmed_nwdid.pl  -bamid 7622 /incoming/topmed/uw/2015may11.hapmap/89497.bam
 
 =head1 DESCRIPTION
 

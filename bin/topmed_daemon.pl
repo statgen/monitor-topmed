@@ -21,8 +21,9 @@
 ###################################################################
 use strict;
 use warnings;
-use File::Basename;
+use FindBin qw($Script);
 use Getopt::Long;
+
 use HTTP::Daemon;
 use HTTP::Response;
 use HTTP::Status;
@@ -50,10 +51,7 @@ Getopt::Long::GetOptions( \%opts,qw(
 
 #   Simple help if requested
 if ($opts{help}) {
-    my ($me, $mepath, $mesuffix) = fileparse($0, '\.pl');
-    (my $version = '$Revision: 1.0 $ ') =~ tr/[0-9].//cd;
-    warn "$me$mesuffix [options]\n" .
-        "\nVersion $version\n" .
+    warn "$Script [options]\n" .
         "This is a daemon to run SLURM squeue commands.\n";
     exit 1;
 }

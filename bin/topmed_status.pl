@@ -17,13 +17,13 @@
 ###################################################################
 use strict;
 use warnings;
-use File::Basename;
-use Cwd;
+use FindBin qw($Bin $Script);
+use lib "$FindBin::Bin";
+use lib "$FindBin::Bin/../lib";
+use lib "$FindBin::Bin/../lib/perl5";
+use My_DB;
+use TopMed_Get;
 use Getopt::Long;
-use DBIx::Connector;
-
-my($me, $mepath, $mesuffix) = fileparse($0, '\.pl');
-(my $version = '$Revision: 1.0 $ ') =~ tr/[0-9].//cd;
 
 #   These represent states the run can be in. column name to letter
 my %attributes2letter = (
@@ -40,23 +40,20 @@ my %attributes2letter = (
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
-my %opts = (
+our %opts = (
     realm => '/usr/cluster/monitor/etc/.db_connections/topmed',
     centers_table => 'centers',
     runs_table => 'runs',
     bamfiles_table => 'bamfiles',
-    topdir => '/net/topmed/incoming/topmed',
     verbose => 0,
 );
-my ($dbc);                      # For access to DB
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose topdir=s center=s runs=s
+    help realm=s verbose center=s runs=s
     )) || die "Failed to parse options\n";
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$me$mesuffix [options] runstatus\n" .
-        "\nVersion $version\n" .
+    warn "$Script [options] runstatus\n" .
         "Update the status fields in the database.\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
@@ -65,7 +62,6 @@ if ($#ARGV < 0 || $opts{help}) {
 my $fcn = shift(@ARGV);
 
 my $dbh = DBConnect($opts{realm});
-if ($opts{verbose}) { print "$me$mesuffix Version $version, realm=$opts{realm}\n"; }
 
 #--------------------------------------------------------------
 #   dateXXXX columns are either a time when something was done
@@ -90,7 +86,7 @@ if ($fcn eq 'runstatus') {
     foreach my $cid (keys %{$centersref}) {
         my $centername = $centersref->{$cid};
         #   For each run, calculate a status for all the bam files in the run
-        my $runsref = GetRuns($cid);
+        my $runsref = GetRunsCount($cid);
         if (! %$runsref) { next; }          # No directories we want
         foreach my $runid (keys %{$runsref}) {
             my $numberbams = $runsref->{$runid};
@@ -152,129 +148,8 @@ if ($fcn eq 'runstatus') {
     exit;
 }
 
-die "Invalid request '$fcn'. Try '$me$mesuffix --help'\n";
+die "Invalid request '$fcn'. Try '$Script --help'\n";
 
-#==================================================================
-# Subroutine:
-#   GetCenters - Get list of centers
-#
-# Arguments:
-#   none
-#
-# Returns:
-#   Reference to hash of center ids  to center names
-#==================================================================
-sub GetCenters {
-#    my ($d) = @_;
-    my %center2name = ();
-
-    #   Get all the known centers in the database
-    my $sql = "SELECT centerid,centername FROM $opts{centers_table}";
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { warn "$me$mesuffix No centers found\n"; }
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        if ($opts{center} && $href->{centername} ne $opts{center}) { next; }
-        $center2name{$href->{centerid}} = $href->{centername};
-    }
-    if ($opts{center}) {            # Only do one center
-        if (! %center2name) { die "$me$mesuffix Center '$opts{center}' unknown\n"; }
-        print "$me$mesuffix - Running on center '$opts{center}' only\n";
-    }
-    return \%center2name;
-}
-
-#==================================================================
-# Subroutine:
-#   GetRuns - Get list of runs for a center and the BAM count
-#
-# Arguments:
-#   cid = center id
-#
-# Returns:
-#   Reference to hash of run ids  to run dirnames
-#==================================================================
-sub GetRuns {
-    my ($cid) = @_;
-    my %runs2count = ();
-
-    my $sql = "SELECT runid,dirname,bamcount FROM $opts{runs_table} WHERE centerid=$cid";
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) {
-        if ($opts{verbose}) { warn "$me$mesuffix Found no runs for center '$cid'\n"; }
-        return \%runs2count;
-    }
-    my %theseruns = ();
-    if ($opts{runs}) {              # We only want some runs
-        $opts{runs} =~ s/,/ /g;
-        foreach my $r (split(' ', $opts{runs})) {
-            $theseruns{$r} = 1;
-            if (! $opts{onlyrun}) { 
-                print "$me$mesuffix - Using only run '$r'\n";
-                $opts{onlyrun}++;
-            }
-        }
-    }
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        if ($opts{runs} && (! exists($theseruns{$href->{dirname}}))) { next; }
-        $runs2count{$href->{runid}} = $href->{bamcount};
-    }
-    return \%runs2count;
-}
-
-#==================================================================
-# Subroutine:
-#   DBConnect($realm)
-#
-#   Connect to our database using realm '$realm'. Return a DB handle.
-#   Get the connection information from DBIx::Connector
-#   Fully qualified realm file may be provided
-#==================================================================
-sub DBConnect {
-    my ($realm) = @_;
-    if (! $realm) { return 0; }
-    #   Get the connection information FROM DBIx::Connector
-    #   Fully qualified realm file may be provided
-    if ($realm =~ /^(\/.+)\/([^\/]+)$/) {
-        my $d = $1;
-        $realm = $2;
-        $dbc = new DBIx::Connector(-realm => $realm, -connection_dir => $d,
-            -dbi_options => {RaiseError => 1, PrintError => 1});
-    }
-    else {
-        $dbc = new DBIx::Connector(-realm => $realm,
-            -dbi_options => {RaiseError => 1, PrintError => 1});
-    }
-    return $dbc->connect();
-}
-
-#==================================================================
-# Subroutine:
-#   DoSQL - Execute an SQL command
-#
-# Arguments:
-#   sql - String of SQL to run
-#   die - boolean if we should die on error
-#
-# Returns:
-#   SQL handle for subsequent MySQL actions
-#   Does not return if error detected
-#==================================================================
-sub DoSQL {
-    my ($sql, $die) = @_;
-    if (! defined($die)) { $die = 1; }
-    if ($opts{verbose}) { warn "DEBUG: SQL=$sql\n"; }
-    my $sth = $dbh->prepare($sql);
-    $sth->execute();
-    if ($DBI::err) {
-        if (! $die) { return 0; }
-        die "$me$mesuffix SQL failure: $DBI::errstr\n  SQL=$sql\n";
-    }
-    return $sth;
-}
 #==================================================================
 #   Perldoc Documentation
 #==================================================================
@@ -282,36 +157,30 @@ __END__
 
 =head1 NAME
 
-topmed_monitor.pl - Find runs that need some action
+topmed_status.pl - automatically update the states for runs
 
 =head1 SYNOPSIS
 
-  topmed_monitor.pl verify
+  topmed_status.pl runstatus
 
 =head1 DESCRIPTION
 
-Use program as a crontab job to find runs that have not had certain
-steps completed. When one is found a request is queued to
-complete the step.
-
-This process will be most successful if this program is run
-after one might expect the previous step has completed.
-For instance for verifying a run, run this in the early morning when you
-might expect all the data has arrived.
+Use this program as a crontab job to update the database for runs
+with an overall status of the BAMs for a particular run.
 
 =head1 OPTIONS
 
 =over 4
 
-=item B<-center NAME>
-
-Specifies a specific center name, e.g. B<uw>.
-This is useful for testing.
-The default is to run against all centers.
-
 =item B<-help>
 
 Generates this output.
+
+=item B<-realm NAME>
+
+Specifies the realm name to be used.
+This defaults to B<$opts{realm}> in the same directory as
+where this program is to be found.
 
 =item B<-runs NAME[,NAME,...]>
 
@@ -330,13 +199,11 @@ Provided for developers to see additional information.
 
 =over 4
 
-=item B<arrive | verify | backup | qplot | report | cp2ncbi>
+=item B<runstatus>
 
-Directs this program to look for runs that have not been through the process name
-you provided and to queue a request they be verified.
+Directs this program to update the status for all centers.
 
 =back
-
 
 =head1 EXIT
 

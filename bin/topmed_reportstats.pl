@@ -1,7 +1,7 @@
 #!/usr/bin/perl -I/usr/cluster/lib/perl5/site_perl
 ###################################################################
 #
-# Name: topmed_reportstats.pl
+# Name: topmed_reportstats.pl   - completely unused
 #
 # Description:
 #   Use this program to automatically request actions on data

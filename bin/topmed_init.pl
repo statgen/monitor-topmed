@@ -18,21 +18,22 @@
 ###################################################################
 use strict;
 use warnings;
-use File::Basename;
+use FindBin qw($Bin $Script);
+use lib "$FindBin::Bin";
+use lib "$FindBin::Bin/../lib";
+use lib "$FindBin::Bin/../lib/perl5";
+use My_DB;
+use TopMed_Get;
 use Getopt::Long;
-use DBIx::Connector;
-use XML::Simple;
+
 use POSIX qw(strftime);
-
-
-my($me, $mepath, $mesuffix) = fileparse($0, '\.pl');
-(my $version = '$Revision: 1.6 $ ') =~ tr/[0-9].//cd;
-my $dbc;
+use XML::Simple;
+use File::Basename;
 
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
-my %opts = (
+our %opts = (
     realm => '/usr/cluster/monitor/etc/.db_connections/topmed',
     centers_table => 'centers',
     runs_table => 'runs',
@@ -46,13 +47,12 @@ my %opts = (
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose=i topdir=s center=s
+    help realm=s verbose=i center=s
     )) || die "Failed to parse options\n";
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$me$mesuffix [options] updatedb\n" .
-        "\nVersion $version\n" .
+    warn "$Script [options] updatedb\n" .
         "Monitor NHLBI data arriving in a directory (default=$opts{topdir}').\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
@@ -61,36 +61,23 @@ if ($#ARGV < 0 || $opts{help}) {
 my $fcn = shift @ARGV;
 
 my $dbh = DBConnect($opts{realm});
-if ($opts{verbose}) { print "$me$mesuffix Version $version, realm=$opts{realm}\n"; }
+if ($opts{verbose}) { print "$Script realm=$opts{realm}\n"; }
 
 my $nowdate = time();
 
-if ($fcn ne 'updatedb') { die "$me$mesuffix  - Invalid function '$fcn'\n"; }
+if ($fcn ne 'updatedb') { die "$Script  - Invalid function '$fcn'\n"; }
 chdir($opts{topdir}) ||
-    die "$me$mesuffix Unable to CD to '$opts{topdir}': $!\n";
-
-#--------------------------------------------------------------
-#   Get all the known centers in the database
-#--------------------------------------------------------------
-my $centersref = GetCenters();
-if ($opts{center}) {            # Debugging hook, only do one center
-    foreach my $cid (keys %{$centersref}) { # Remove all but center we want
-        if ($centersref->{$cid} ne $opts{center}) {
-            delete($centersref->{$cid});
-        }
-    }
-    if (! %$centersref) { die "$me$mesuffix Center '$opts{center}' unknown\n"; }
-    print "$me$mesuffix - Running on center '$opts{center}' only\n";
-}
+    die "$Script Unable to CD to '$opts{topdir}': $!\n";
 
 #--------------------------------------------------------------
 #   For each center watch for a new run to arrive
 #--------------------------------------------------------------
+my $centersref = GetCenters();
 foreach my $centerid (keys %{$centersref}) {
     my $c = $centersref->{$centerid};
     my $d = $opts{topdir} . '/' . $c;
     if (! chdir($d)) {
-        warn "$me$mesuffix Unable to CD to '$d': $!\n";
+        warn "$Script Unable to CD to '$d': $!\n";
         next;
     }
     #   Get all the known batch runs for this center
@@ -391,168 +378,32 @@ my $cid = 0;
 }
 
 #==================================================================
-# Subroutine:
-#   DBConnect($realm)
-#
-#   Connect to our database using realm '$realm'. Return a DB handle.
-#   Get the connection information from DBIx::Connector
-#   Fully qualified realm file may be provided
-#==================================================================
-sub DBConnect {
-    my ($realm) = @_;
-    if (! $realm) { return 0; }
-    #   Get the connection information FROM DBIx::Connector
-    #   Fully qualified realm file may be provided
-    if ($realm =~ /^(\/.+)\/([^\/]+)$/) {
-        my $d = $1;
-        $realm = $2;
-        $dbc = new DBIx::Connector(-realm => $realm, -connection_dir => $d,
-            -dbi_options => {RaiseError => 1, PrintError => 1});
-    }
-    else {
-        $dbc = new DBIx::Connector(-realm => $realm,
-            -dbi_options => {RaiseError => 1, PrintError => 1});
-    }
-    return $dbc->connect();
-}
-
-#==================================================================
-# Subroutine:
-#   GetCenters - Get list of centers
-#
-# Arguments:
-#   none
-#
-# Returns:
-#   Reference to hash of center ids  to center names
-#==================================================================
-sub GetCenters {
-#    my ($d) = @_;
-    my %centers = ();
-
-    #   Get all the known centers in the database
-    my $sql = "SELECT centerid,centername FROM $opts{centers_table}";
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { warn "$me$mesuffix No centers in '$opts{topdir}'\n"; }
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        $centers{$href->{centerid}} = $href->{centername};
-    }
-    return \%centers;
-}
-
-#==================================================================
-# Subroutine:
-#   GetDirs - Get list of non-dotted directories
-#
-# Arguments:
-#   dirname
-#
-# Returns:
-#   Reference to array of dir names
-#==================================================================
-sub GetDirs {
-    my ($d) = @_;
-
-    opendir(DIR, $d) ||
-        die "Unable to read directory '$d': $!";
-    my @dirlist = grep { (/^\w/ && -d "$d/$_") } readdir(DIR);
-    closedir DIR;
-    return \@dirlist;
-}
-
-#==================================================================
-# Subroutine:
-#   GetFiles - Get list of files (non-dotted)
-#
-# Arguments:
-#   dirname
-#
-# Returns:
-#   Reference to array of file names
-#==================================================================
-sub GetFiles {
-    my ($d) = @_;
-
-    opendir(DIR, $d) ||
-        die "Unable to read directory '$d': $!";
-    my @filelist = grep { (/^\w/ && -f "$d/$_") } readdir(DIR);
-    closedir DIR;
-    return \@filelist;
-}
-
-#==================================================================
-# Subroutine:
-#   DoSQL - Execute an SQL command
-#
-# Arguments:
-#   sql - String of SQL to run
-#   die - boolean if we should die on error
-#
-# Returns:
-#   SQL handle for subsequent MySQL actions
-#   Does not return if error detected
-#==================================================================
-sub DoSQL {
-    my ($sql, $die) = @_;
-    if (! defined($die)) { $die = 1; }
-    if ($opts{verbose} > 1) { warn "DEBUG: SQL=$sql\n"; }
-    my $sth = $dbh->prepare($sql);
-    $sth->execute();
-    if ($DBI::err) {
-        if (! $die) { return 0; }
-        die "$me$mesuffix SQL failure: $DBI::errstr\n  SQL=$sql\n";
-    }
-    return $sth;
-}
-
-#==================================================================
 #   Perldoc Documentation
 #==================================================================
 __END__
 
 =head1 NAME
 
-monitor.pl - Monitor
+topmed_init.pl - Monitor
 
 =head1 SYNOPSIS
 
-  monitor.pl monitor            # Check directories, runs once
-  monitor.pl -daemon monitor    # Check directories, runs repeatedly
+  topmed_init.pl updatedb
 
 =head1 DESCRIPTION
 
 This program monitors directories for incoming data and then
 updates a database with various status values.
-The program B<moncmd.pl> supports simple commands to set key elements of the database.
-
-The typical mode is to run this in 'daemon mode' by launching
-it with a crontab entry, perhaps like this:
-
-  01 06 * * * /usr/local/bin/monitor.pl -daemon monitor 2>&1 /dev/null
-
-This will run for some time, checking the status of the directory specified
-in by the B<-dir> option and updating the status in a database every
-once in a while.
-
-The queue of tasks is kept in a MySQL database.
-See B<perldoc DBIx::Connector> for details defining the database.
 
 =head1 OPTIONS
 
 =over 4
 
-=item B<-daemon>
+=item B<-center NAME>
 
-Specifies the script should not exit after checking the directory.
-It will wait for B<waitsecs> seconds and then relook at the directory again.
-The program exits only after running for B<timeup>.
-
-=item B<-dir>
-
-Specifies the directory to be monitored.
-This defaults to /data/CoreDump
+Specifies a specific center name on which to run the action, e.g. B<uw>.
+This is useful for testing.
+The default is to run against all centers.
 
 =item B<-help>
 
@@ -563,22 +414,9 @@ Generates this output.
 Specifies the realm name to be used.
 This defaults to B<webcd>.
 
-=item B<-timeup nnn[MH]>
-
-Specifies how long this program will remain running before exitting.
-The number may have 'M' (minutes) or 'H' (hours) appended.
-This defaults to B<6H>.
-This is only used if B<daemon> is specified.
-
 =item B<-verbose N>
 
 Provided for developers to see additional information.
-
-=item B<-waitsecs nnn>
-
-Specifies how many seconds this program will wait before checking the database queue.
-This defaults to B<300>.
-This is only used if B<daemon> is specified.
 
 =back
 
@@ -600,7 +438,7 @@ return code of 0. Any error will set a non-zero return code.
 
 =head1 AUTHOR
 
-Written by Terry Gliedt I<E<lt>tpg@umich.eduE<gt>> in 2010 and is
+Written by Terry Gliedt I<E<lt>tpg@umich.eduE<gt>> in 2015 and is
 is free software; you can redistribute it and/or modify it under the
 terms of the GNU General Public License as published by the Free Software
 Foundation; See http://www.gnu.org/copyleft/gpl.html

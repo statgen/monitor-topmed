@@ -15,19 +15,19 @@
 ###################################################################
 use strict;
 use warnings;
-use File::Basename;
+use FindBin qw($Bin $Script);
+use lib "$FindBin::Bin";
+use lib "$FindBin::Bin/../lib";
+use lib "$FindBin::Bin/../lib/perl5";
+use My_DB;
 use Getopt::Long;
-use DBIx::Connector;
 use XML::Simple;
 use POSIX qw(strftime);
-
-my($me, $mepath, $mesuffix) = fileparse($0, '\.pl');
-(my $version = '$Revision: 1.0 $ ') =~ tr/[0-9].//cd;
 
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
-my %opts = (
+our %opts = (
     realm => '/usr/cluster/monitor/etc/.db_connections/topmed',
     bamfiles_table => 'bamfiles',
     phsconfig => '/net/topmed/incoming/study.reference/study.reference/study.phs.numbers.tab',
@@ -39,14 +39,13 @@ my %opts = (
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help verbose filelist=s
+    help verbose=i filelist=s dryrun
     )) || die "Failed to parse options\n";
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    my $m = "$me$mesuffix [options]";
+    my $m = "$Script [options]";
     warn "$m fetch|nofetch\n" .
-        "\nVersion $version\n" .
         "Manage the PHS files and database\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
@@ -58,9 +57,8 @@ s/,/ /g;
 my @filelist = split(' ', $_);
 my $filelist_ref = \@filelist;
 
-my ($dbc);                      # For access to DB
 my $dbh = DBConnect($opts{realm});
-if ($opts{verbose}) { print "$me$mesuffix Version $version, realm=$opts{realm}\n"; }
+if ($opts{verbose}) { print "$Script realm=$opts{realm}\n"; }
 
 #--------------------------------------------------------------
 #   Execute the subcommands requested
@@ -74,7 +72,7 @@ foreach my $fcn (@ARGV) {
         Update($filelist_ref);
         next;
     }
-    die "$me$mesuffix - Unknown directive '$fcn'\n";
+    die "$Script - Unknown directive '$fcn'\n";
 }
 
 exit;
@@ -171,69 +169,19 @@ sub Update {
             my $href = $sth->fetchrow_hashref;
 
             #   Update with new information
-            DoSQL("UPDATE $opts{bamfiles_table} SET phs='$phs'," .
+            my $updsql = "UPDATE $opts{bamfiles_table} SET phs='$phs'," .
                 "phs_consent_short_name='$consent'," .
                 "phs_sra_sample_id='$sra_sample'," .
                 "phs_sra_data_details='$sra_details' " .
-                "WHERE bamid=$href->{bamid}");
+                "WHERE bamid=$href->{bamid}";
+            if ($opts{dryrun}) { print "Did not update with: $updsql\n"; }
+            else { DoSQL($updsql); }
             $changes++;
         }
         if ($f ne $file) { unlink($f); }
         print "Updated $changes entries from $file\n";  
     }      
-
 } 
-
-#==================================================================
-# Subroutine:
-#   DBConnect($realm)
-#
-#   Connect to our database using realm '$realm'. Return a DB handle.
-#   Get the connection information from DBIx::Connector
-#   Fully qualified realm file may be provided
-#==================================================================
-sub DBConnect {
-    my ($realm) = @_;
-    if (! $realm) { return 0; }
-    #   Get the connection information FROM DBIx::Connector
-    #   Fully qualified realm file may be provided
-    if ($realm =~ /^(\/.+)\/([^\/]+)$/) {
-        my $d = $1;
-        $realm = $2;
-        $dbc = new DBIx::Connector(-realm => $realm, -connection_dir => $d,
-            -dbi_options => {RaiseError => 1, PrintError => 1});
-    }
-    else {
-        $dbc = new DBIx::Connector(-realm => $realm,
-            -dbi_options => {RaiseError => 1, PrintError => 1});
-    }
-    return $dbc->connect();
-}
-
-#==================================================================
-# Subroutine:
-#   DoSQL - Execute an SQL command
-#
-# Arguments:
-#   sql - String of SQL to run
-#   die - boolean if we should die on error
-#
-# Returns:
-#   SQL handle for subsequent MySQL actions
-#   May not return if error detected
-#==================================================================
-sub DoSQL {
-    my ($sql, $die) = @_;
-    if (! defined($die)) { $die = 1; }
-    if ($opts{verbose}) { warn "DEBUG: SQL=$sql\n";  if ($sql =~ /UPDATE/) { return; } }
-    my $sth = $dbh->prepare($sql);
-    $sth->execute();
-    if ($DBI::err) {
-        if (! $die) { return 0; }
-        die "$me$mesuffix SQL failure: $DBI::errstr\n  SQL=$sql\n";
-    }
-    return $sth;
-}
 
 #==================================================================
 #   Perldoc Documentation
@@ -242,33 +190,40 @@ __END__
 
 =head1 NAME
 
-topmed_nwdid.pl - Create the NWD id file
+topmed_phs.pl -  manage the PHS files and database
 
 =head1 SYNOPSIS
 
-  topmed_nwdid.pl  /incoming/topmed/uw/2015may11.hapmap/89497.bam
+  topmed_phs.pl  fetch update
+  topmed_phs.pl  fetch
+  topmed_phs.pl  -filelist '/tmp/Cleveland.xml.gz /tmp/Jackson.xml.gz' update
 
 =head1 DESCRIPTION
 
-This program creates the NWD id file.
-The one-line file will be found in 
-/incoming/qc.results/CENTER/RUN/BAMFILE_BASENAME.nwdid
+This program fetches the PHS files from http://www.ncbi.nlm.nih.gov/projects/...
+and extracts information for each NWDID entry.
+The files are saved in $opts{phsdir} for update to use.
+
+The files are read and parsed and certain data is saved in our
+database to be used later in creating the 
+XML files used when data is delivered to NCBI for archiving.
 
 =head1 OPTIONS
 
 =over 4
 
-=item B<-bamid id>
+=item B<-dryrun>
 
-If specified the PI name and study will be set in the database for this bam.
+Do everything except actually update the database. Useful for debugging.
 
 =item B<-help>
 
 Generates this output.
 
-=item B<-nonwdid>
+=item B<-filelist file>
 
-If specified, the nwdid file is not created. This can be useful when redoing other parts of the processing.
+If specified this is the file of PHS information from fetch.
+This option allows one to separate the normal sequence of fetch and update.
 
 =item B<-verbose>
 
@@ -280,8 +235,13 @@ Provided for developers to see additional information.
 
 =over 4
 
-=item B<bamfilepath>
-This is the fully  qualified path to a bamfile.
+=item B<fetch>
+
+Fetch the PHS files from NCBI. This is normally followed by B<update>
+
+=item B<update>
+
+Read the PHS files and update the database.
 
 =back
 

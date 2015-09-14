@@ -1,7 +1,7 @@
 #!/usr/bin/perl -I/usr/cluster/lib/perl5/site_perl
 ###################################################################
 #
-# Name: topmed_failures.pl
+# Name: topmed_failures.pl     WARNING: This has not been used much
 #
 # Description:
 #   Use this program to automatically find jobs which have
@@ -18,20 +18,20 @@
 ###################################################################
 use strict;
 use warnings;
-use File::Basename;
-use Cwd;
+use FindBin qw($Bin $Script);
+use lib "$FindBin::Bin";
+use lib "$FindBin::Bin/../lib";
+use lib "$FindBin::Bin/../lib/perl5";
+use My_DB;
+use TopMed_Get;
 use Getopt::Long;
-use DBIx::Connector;
 use POSIX qw(strftime);
-
-my($me, $mepath, $mesuffix) = fileparse($0, '\.pl');
-(my $version = '$Revision: 1.0 $ ') =~ tr/[0-9].//cd;
 
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
 my $topmedbin = '/usr/cluster/monitor/bin';
-my %opts = (
+our %opts = (
     topmedcmd => "$topmedbin/topmedcmd.pl",
     sacct => '/usr/cluster/bin/sacct',
     realm => '/usr/cluster/monitor/etc/.db_connections/topmed',
@@ -62,7 +62,6 @@ my $sqlors = '';                    # Build OR string for SQL
 foreach my $c (@colnames) { $sqlors .= 'date' . $c . '=-1 OR '; }
 $sqlors = substr($sqlors,0,-4);     # Drop ' OR '
 
-my ($dbc);                      # For access to DB
 Getopt::Long::GetOptions( \%opts,qw(
     help realm=s verbose=n center=s runs=s resubmit maxjobs=n
     memory=s partition=s qos=s noprompt
@@ -70,10 +69,9 @@ Getopt::Long::GetOptions( \%opts,qw(
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$me$mesuffix [options] look4failures\n" .
+    warn "$Script [options] look4failures\n" .
         "or\n" .
-        "$me$mesuffix [options] resubmit\n" .
-        "\nVersion $version\n" .
+        "$Script [options] resubmit\n" .
         "Find runs which were cancelled and we do not know about them.\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
@@ -82,7 +80,6 @@ if ($#ARGV < 0 || $opts{help}) {
 my $fcn = shift(@ARGV);
 
 my $dbh = DBConnect($opts{realm});
-if ($opts{verbose}) { print "$me$mesuffix Version $version, realm=$opts{realm}\n"; }
 
 my $nowdate = strftime('%Y/%m/%d %H:%M', localtime);
 
@@ -154,7 +151,7 @@ if ($fcn eq 'resubmit') {
     exit;
 }
 
-die "Invalid request '$fcn'. Try '$me$mesuffix --help'\n";
+die "Invalid request '$fcn'. Try '$Script --help'\n";
 
 #--------------------------------------------------------------
 #   dateXXXX columns are either a time when something was done
@@ -265,128 +262,6 @@ sub Resubmit_Failure {
 }
 
 #==================================================================
-# Subroutine:
-#   GetCenters - Get list of centers
-#
-# Arguments:
-#   none
-#
-# Returns:
-#   Reference to hash of center ids  to center names
-#==================================================================
-sub GetCenters {
-#    my ($d) = @_;
-    my %center2name = ();
-
-    #   Get all the known centers in the database
-    my $sql = "SELECT centerid,centername FROM $opts{centers_table}";
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { warn "$me$mesuffix No centers found\n"; }
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        if ($opts{center} && $href->{centername} ne $opts{center}) { next; }
-        $center2name{$href->{centerid}} = $href->{centername};
-    }
-    if ($opts{center}) {            # Only do one center
-        if (! %center2name) { die "$me$mesuffix Center '$opts{center}' unknown\n"; }
-        print "$me$mesuffix - Running on center '$opts{center}' only\n";
-    }
-    return \%center2name;
-}
-
-#==================================================================
-# Subroutine:
-#   GetRuns - Get list of runs for a center
-#
-# Arguments:
-#   cid = center id
-#
-# Returns:
-#   Reference to hash of run ids  to run dirnames
-#==================================================================
-sub GetRuns {
-    my ($cid) = @_;
-    my %run2dir = ();
-
-    my $sql = "SELECT runid,dirname FROM $opts{runs_table} WHERE centerid=$cid";
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if ((! $rowsofdata) && $opts{verbose}) {
-        warn "$me$mesuffix Found no runs for center '$cid'\n";
-        return \%run2dir;
-    }
-    my %theseruns = ();
-    if ($opts{runs}) {              # We only want some runs
-        $opts{runs} =~ s/,/ /g;
-        foreach my $r (split(' ', $opts{runs})) {
-            $theseruns{$r} = 1;
-            if (! $opts{onlyrun}) { 
-                print "$me$mesuffix - Using only run '$r'\n";
-                $opts{onlyrun}++;
-            }
-        }
-    }
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        if ($opts{runs} && (! exists($theseruns{$href->{dirname}}))) { next; }
-        $run2dir{$href->{runid}} = $href->{dirname};
-    }
-    return \%run2dir;
-}
-
-#==================================================================
-# Subroutine:
-#   DBConnect($realm)
-#
-#   Connect to our database using realm '$realm'. Return a DB handle.
-#   Get the connection information from DBIx::Connector
-#   Fully qualified realm file may be provided
-#==================================================================
-sub DBConnect {
-    my ($realm) = @_;
-    if (! $realm) { return 0; }
-    #   Get the connection information FROM DBIx::Connector
-    #   Fully qualified realm file may be provided
-    if ($realm =~ /^(\/.+)\/([^\/]+)$/) {
-        my $d = $1;
-        $realm = $2;
-        $dbc = new DBIx::Connector(-realm => $realm, -connection_dir => $d,
-            -dbi_options => {RaiseError => 1, PrintError => 1});
-    }
-    else {
-        $dbc = new DBIx::Connector(-realm => $realm,
-            -dbi_options => {RaiseError => 1, PrintError => 1});
-    }
-    return $dbc->connect();
-}
-
-#==================================================================
-# Subroutine:
-#   DoSQL - Execute an SQL command
-#
-# Arguments:
-#   sql - String of SQL to run
-#   die - boolean if we should die on error
-#
-# Returns:
-#   SQL handle for subsequent MySQL actions
-#   Does not return if error detected
-#==================================================================
-sub DoSQL {
-    my ($sql, $die) = @_;
-    if (! defined($die)) { $die = 1; }
-    if ($opts{verbose} > 1) { warn "DEBUG: SQL=$sql\n"; }
-    my $sth = $dbh->prepare($sql);
-    $sth->execute();
-    if ($DBI::err) {
-        if (! $die) { return 0; }
-        die "$me$mesuffix SQL failure: $DBI::errstr\n  SQL=$sql\n";
-    }
-    return $sth;
-}
-
-#==================================================================
 #   Perldoc Documentation
 #==================================================================
 __END__
@@ -398,6 +273,7 @@ topmed_failures.pl - Find runs that had a failure
 =head1 SYNOPSIS
 
   topmed_failures.pl look
+  topmed_failures.pl resubmit
 
 =head1 DESCRIPTION
 

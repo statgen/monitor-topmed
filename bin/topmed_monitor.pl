@@ -17,20 +17,21 @@
 ###################################################################
 use strict;
 use warnings;
-use File::Basename;
-use Cwd;
+use FindBin qw($Bin $Script);
+use lib "$FindBin::Bin";
+use lib "$FindBin::Bin/../lib";
+use lib "$FindBin::Bin/../lib/perl5";
+use My_DB;
+use TopMed_Get;
 use Getopt::Long;
-use DBIx::Connector;
-use POSIX qw(strftime);
 
-my($me, $mepath, $mesuffix) = fileparse($0, '\.pl');
-(my $version = '$Revision: 1.0 $ ') =~ tr/[0-9].//cd;
+use POSIX qw(strftime);
 
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
 my $topmedbin = '/usr/cluster/monitor/bin';
-my %opts = (
+our %opts = (
     topmedcmd => "$topmedbin/topmedcmd.pl",
     topmedarrive => "$topmedbin/topmed_arrive.sh",
     topmedverify => "$topmedbin/topmed_verify.sh",
@@ -52,7 +53,6 @@ my %opts = (
     verbose => 0,
     maxjobs => 100,
 );
-my ($dbc);                      # For access to DB
 Getopt::Long::GetOptions( \%opts,qw(
     help realm=s verbose topdir=s center=s runs=s maxjobs=i
     memory=s partition=s qos=s dryrun suberr
@@ -60,8 +60,7 @@ Getopt::Long::GetOptions( \%opts,qw(
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$me$mesuffix [options] arrive|verify|backup|bai|qplot|cram|mapping|cp2ncbi\n" .
-        "\nVersion $version\n" .
+    warn "$Script [options] arrive|verify|backup|bai|qplot|cram|cp2ncbi\n" .
         "Find runs which need some action and queue a request to do it.\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
@@ -70,7 +69,6 @@ if ($#ARGV < 0 || $opts{help}) {
 my $fcn = shift(@ARGV);
 
 my $dbh = DBConnect($opts{realm});
-if ($opts{verbose}) { print "$me$mesuffix Version $version, realm=$opts{realm}\n"; }
 
 my $nowdate = strftime('%Y/%m/%d %H:%M', localtime);
 
@@ -197,7 +195,7 @@ if ($fcn eq 'bai') {
         foreach my $runid (keys %{$runsref}) {
             my $dirname = $runsref->{$runid};
             #   Get list of all bams that have not yet arrived properly
-            my $sql = "SELECT bamid,bamname,datearrived,datebai FROM " .
+            my $sql = "SELECT bamid,bamname,datemd5ver,datebai FROM " .
                 $opts{bamfiles_table} . " WHERE runid='$runid'";
             my $sth = DoSQL($sql);
             my $rowsofdata = $sth->rows();
@@ -206,10 +204,10 @@ if ($fcn eq 'bai') {
                 my $href = $sth->fetchrow_hashref;
                 my $f = $opts{topdir} . "/$centername/$dirname/" . $href->{bamname};
                 #   Only do bai if file has arrived
-                if (! defined($href->{datearrived})) { next; }
-                if ($href->{datearrived} eq '') { next; }    # Not here
-                if ($href->{datearrived} =~ /\D/) { next; }  # Not numeric
-                if ($href->{datearrived} < 10) { next; }     # Not arrived, avoid bai
+                if (! defined($href->{datemd5ver})) { next; }
+                if ($href->{datemd5ver} eq '') { next; }    # Not here
+                if ($href->{datemd5ver} =~ /\D/) { next; }  # Not numeric
+                if ($href->{datemd5ver} < 10) { next; }     # Not arrived, avoid bai
                 if (defined($href->{datebai}) && ($href->{datebai} ne '')) {
                     if ($opts{suberr} && $href->{datebai} == -1) { $href->{datebai} = 0; }
                     if ($href->{datebai} =~ /\D/) { next; }  # Not numeric
@@ -515,7 +513,7 @@ if ($fcn eq 'check') {
     exit;
 }
 
-die "Invalid request '$fcn'. Try '$me$mesuffix --help'\n";
+die "Invalid request '$fcn'. Try '$Script --help'\n";
 
 
 #==================================================================
@@ -527,83 +525,12 @@ die "Invalid request '$fcn'. Try '$me$mesuffix --help'\n";
 #==================================================================
 sub BatchSubmit {
     my ($cmd) = @_;
-    if ($opts{dryrun}) { print "=> $cmd\n"; return; }
     $opts{maxjobs}--;
     if ($opts{maxjobs} < 0) { return; }
     if ($opts{maxjobs} == 0) { print "Maximum limit of jobs that can be submitted has been reached\n"; }
+    if ($opts{dryrun}) { print "dryrun => $cmd\n"; return; }
     system("$cmd 2>&1") || $opts{jobcount}++;
 } 
-
-#==================================================================
-# Subroutine:
-#   GetCenters - Get list of centers
-#
-# Arguments:
-#   none
-#
-# Returns:
-#   Reference to hash of center ids  to center names
-#==================================================================
-sub GetCenters {
-#    my ($d) = @_;
-    my %center2name = ();
-
-    #   Get all the known centers in the database
-    my $sql = "SELECT centerid,centername FROM $opts{centers_table}";
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { warn "$me$mesuffix No centers found\n"; }
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        if ($opts{center} && $href->{centername} ne $opts{center}) { next; }
-        $center2name{$href->{centerid}} = $href->{centername};
-    }
-    if ($opts{center}) {            # Only do one center
-        if (! %center2name) { die "$me$mesuffix Center '$opts{center}' unknown\n"; }
-        print "$me$mesuffix - Running on center '$opts{center}' only\n";
-    }
-    return \%center2name;
-}
-
-#==================================================================
-# Subroutine:
-#   GetRuns - Get list of runs for a center
-#
-# Arguments:
-#   cid = center id
-#
-# Returns:
-#   Reference to hash of run ids  to run dirnames
-#==================================================================
-sub GetRuns {
-    my ($cid) = @_;
-    my %run2dir = ();
-
-    my $sql = "SELECT runid,dirname FROM $opts{runs_table} WHERE centerid=$cid";
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if ((! $rowsofdata) && $opts{verbose}) {
-        warn "$me$mesuffix Found no runs for center '$cid'\n";
-        return \%run2dir;
-    }
-    my %theseruns = ();
-    if ($opts{runs}) {              # We only want some runs
-        $opts{runs} =~ s/,/ /g;
-        foreach my $r (split(' ', $opts{runs})) {
-            $theseruns{$r} = 1;
-            if (! $opts{onlyrun}) { 
-                print "$me$mesuffix - Using only run '$r'\n";
-                $opts{onlyrun}++;
-            }
-        }
-    }
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        if ($opts{runs} && (! exists($theseruns{$href->{dirname}}))) { next; }
-        $run2dir{$href->{runid}} = $href->{dirname};
-    }
-    return \%run2dir;
-}
 
 #==================================================================
 # Subroutine:
@@ -621,57 +548,6 @@ sub FindPrefix {
         if (-f "$opts{$pfx}/$f") { return $opts{$pfx}; }
     }
     return '';
-}
-
-#==================================================================
-# Subroutine:
-#   DBConnect($realm)
-#
-#   Connect to our database using realm '$realm'. Return a DB handle.
-#   Get the connection information from DBIx::Connector
-#   Fully qualified realm file may be provided
-#==================================================================
-sub DBConnect {
-    my ($realm) = @_;
-    if (! $realm) { return 0; }
-    #   Get the connection information FROM DBIx::Connector
-    #   Fully qualified realm file may be provided
-    if ($realm =~ /^(\/.+)\/([^\/]+)$/) {
-        my $d = $1;
-        $realm = $2;
-        $dbc = new DBIx::Connector(-realm => $realm, -connection_dir => $d,
-            -dbi_options => {RaiseError => 1, PrintError => 1});
-    }
-    else {
-        $dbc = new DBIx::Connector(-realm => $realm,
-            -dbi_options => {RaiseError => 1, PrintError => 1});
-    }
-    return $dbc->connect();
-}
-
-#==================================================================
-# Subroutine:
-#   DoSQL - Execute an SQL command
-#
-# Arguments:
-#   sql - String of SQL to run
-#   die - boolean if we should die on error
-#
-# Returns:
-#   SQL handle for subsequent MySQL actions
-#   Does not return if error detected
-#==================================================================
-sub DoSQL {
-    my ($sql, $die) = @_;
-    if (! defined($die)) { $die = 1; }
-    if ($opts{verbose}) { warn "DEBUG: SQL=$sql\n"; }
-    my $sth = $dbh->prepare($sql);
-    $sth->execute();
-    if ($DBI::err) {
-        if (! $die) { return 0; }
-        die "$me$mesuffix SQL failure: $DBI::errstr\n  SQL=$sql\n";
-    }
-    return $sth;
 }
 
 #==================================================================
@@ -763,7 +639,7 @@ Provided for developers to see additional information.
 
 =over 4
 
-=item B<arrive | verify | backup | bai | qplot | cram | mapping | cp2ncbi>
+=item B<arrive | verify | backup | bai | qplot | cram | cp2ncbi>
 
 Directs this program to look for runs that have not been through the process name
 you provided and to queue a request they be verified.

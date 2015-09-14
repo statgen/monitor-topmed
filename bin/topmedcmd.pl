@@ -16,20 +16,12 @@
 ###################################################################
 use strict;
 use warnings;
-use File::Basename;
-use Cwd;
+use FindBin qw($Bin $Script);
+use lib "$FindBin::Bin";
+use lib "$FindBin::Bin/../lib";
+use lib "$FindBin::Bin/../lib/perl5";
+use My_DB;
 use Getopt::Long;
-use DBIx::Connector;
-
-my($me, $mepath, $mesuffix) = fileparse($0, '\.pl');
-(my $version = '$Revision: 1.6 $ ') =~ tr/[0-9].//cd;
-if (substr($mepath,0,1) ne '/') {
-    my $d = getcwd();
-    chdir($mepath) ||
-        die "$me$mesuffix Unable to CD to '$d': $!\n";
-    $mepath = getcwd();
-    chdir($d);
-}
 
 my %VALIDVERBS = (                  # Valid verbs to database colum
     arrived => 'datearrived',
@@ -52,7 +44,7 @@ my %VALIDSTATUS = (                 # Valid status for the verbs
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
-my %opts = (
+our %opts = (
     realm => '/usr/cluster/monitor/etc/.db_connections/topmed',
     bamfiles_table => 'bamfiles',
     centers_table => 'centers',
@@ -69,7 +61,7 @@ Getopt::Long::GetOptions( \%opts,qw(
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    my $m = "$me$mesuffix [options]";
+    my $m = "$Script [options]";
     warn "$m mark bamid arrived|md5verified|baid|qploted|backedup|cramed|cp2ncbi requested|submitted|completed|started|failed|cancelled\n" .
         "  or\n" .
         "$m unmark bamid [same list as mark]\n" .
@@ -83,7 +75,6 @@ if ($#ARGV < 0 || $opts{help}) {
         "$m export\n" .
         "  or\n" .
         "$m where bamid\n" .
-        "\nVersion $version\n" .
         "Update the topmed database\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
@@ -91,9 +82,7 @@ if ($#ARGV < 0 || $opts{help}) {
 }
 my $fcn = shift @ARGV;
 
-my ($dbc);                      # For access to DB
 my $dbh = DBConnect($opts{realm});
-if ($opts{verbose}) { print "$me$mesuffix Version $version, realm=$opts{realm}\n"; }
 
 #--------------------------------------------------------------
 #   Execute the command provided
@@ -105,7 +94,7 @@ if ($fcn eq 'show')     { Show(@ARGV); exit; }
 if ($fcn eq 'export')   { Export(@ARGV); exit; }
 if ($fcn eq 'where')    { Where(@ARGV); exit; }
 
-die "$me$mesuffix  - Invalid function '$fcn'\n";
+die "$Script  - Invalid function '$fcn'\n";
 exit;
 
 #==================================================================
@@ -117,13 +106,13 @@ exit;
 sub Mark {
     my ($bamid, $op, $state) = @_;
     if (($bamid !~ /^\d+$/) || (! exists($VALIDVERBS{$op})) || (! exists($VALIDSTATUS{$state}))) {
-        die "$me$mesuffix Invalid 'mark' syntax. Try '$me$mesuffix -help'\n";
+        die "$Script Invalid 'mark' syntax. Try '$Script -help'\n";
     }
 
     #   Make sure this is a bam we know
     my $sth = DoSQL("SELECT bamid from $opts{bamfiles_table} WHERE bamid=$bamid", 0);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "$me$mesuffix - BAM '$bamid' is unknown\n"; }
+    if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
 
     #   Set time for the verb based on this algorithm
     #   $t > 0     Task completed
@@ -162,9 +151,9 @@ sub Mark {
         $done++;
     }
     if ($done) {
-        if ($opts{verbose}) { print "$me$mesuffix  'mark $bamid $op $state'  successful\n"; } 
+        if ($opts{verbose}) { print "$Script  'mark $bamid $op $state'  successful\n"; } 
     }
-    else { die "$me$mesuffix Invalid state '$state' for '$op'. Try '$me$mesuffix -help'\n"; }
+    else { die "$Script Invalid state '$state' for '$op'. Try '$Script -help'\n"; }
 }
 
 #==================================================================
@@ -176,17 +165,17 @@ sub Mark {
 sub UnMark {
     my ($bamid, $op) = @_;
     if (($bamid !~ /^\d+$/) || (! exists($VALIDVERBS{$op}))) {
-        die "$me$mesuffix Invalid 'unmark' syntax. Try '$me$mesuffix -help'\n";
+        die "$Script Invalid 'unmark' syntax. Try '$Script -help'\n";
     }
 
     #   Make sure this is a bam we know
     my $sth = DoSQL("SELECT bamid from $opts{bamfiles_table} WHERE bamid=$bamid", 0);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "$me$mesuffix - BAM '$bamid' is unknown\n"; }
+    if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
 
     my $col = $VALIDVERBS{$op};
     DoSQL("UPDATE $opts{bamfiles_table} SET $col=NULL WHERE bamid=$bamid");
-    if ($opts{verbose}) { print "$me$mesuffix  'unmark $bamid $op'  successful\n"; }
+    if ($opts{verbose}) { print "$Script  'unmark $bamid $op'  successful\n"; }
 }
 
 #==================================================================
@@ -265,19 +254,19 @@ sub Where {
     #   Reconstruct partial path to BAM
     my $sth = DoSQL("SELECT runid,bamname from $opts{bamfiles_table} WHERE bamid=$bamid", 0);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "$me$mesuffix - BAM '$bamid' is unknown\n"; }
+    if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
     my $href = $sth->fetchrow_hashref;
     my $bamname = $href->{bamname};
     my $runid = $href->{runid};
     $sth = DoSQL("SELECT centerid,dirname from $opts{runs_table} WHERE runid=$runid", 0);
     $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "$me$mesuffix - BAM '$bamid' run '$runid' is unknown\n"; }
+    if (! $rowsofdata) { die "$Script - BAM '$bamid' run '$runid' is unknown\n"; }
     $href = $sth->fetchrow_hashref;
     my $rundir = $href->{dirname};
     my $centerid = $href->{centerid};
     $sth = DoSQL("SELECT centername from $opts{centers_table} WHERE centerid=$centerid", 0);
     $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "$me$mesuffix - BAM '$bamid' center '$centerid' is unknown\n"; }
+    if (! $rowsofdata) { die "$Script - BAM '$bamid' center '$centerid' is unknown\n"; }
     $href = $sth->fetchrow_hashref;
     my $centername = $href->{centername};
 
@@ -311,13 +300,13 @@ sub Where {
 sub Set {
     my ($bamid, $col, $val) = @_;
     if ($bamid !~ /^\d+$/){
-        die "$me$mesuffix Invalid 'set' syntax. Try '$me$mesuffix -help'\n";
+        die "$Script Invalid 'set' syntax. Try '$Script -help'\n";
     }
 
     #   Make sure this is a bam we know
     my $sth = DoSQL("SELECT bamid from $opts{bamfiles_table} WHERE bamid=$bamid", 0);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "$me$mesuffix - BAM '$bamid' is unknown\n"; }
+    if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
 
     if ($col eq 'nwdid') { $col = 'expt_sampleid'; }
     DoSQL("UPDATE $opts{bamfiles_table} SET $col='$val' WHERE bamid=$bamid");
@@ -335,13 +324,13 @@ sub Show {
     if ($bamid eq 'arrived') { return ShowArrived($bamid); }
 
     if ($bamid !~ /^\d+$/){
-        die "$me$mesuffix Invalid 'show' syntax. Try '$me$mesuffix -help'\n";
+        die "$Script Invalid 'show' syntax. Try '$Script -help'\n";
     }
 
     #   Make sure this is a bam we know
     my $sth = DoSQL("SELECT bamid,$col from $opts{bamfiles_table} WHERE bamid=$bamid", 0);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "$me$mesuffix - BAM '$bamid' or column '$col' is unknown\n"; }
+    if (! $rowsofdata) { die "$Script - BAM '$bamid' or column '$col' is unknown\n"; }
     my $href = $sth->fetchrow_hashref;
     print $href->{$col} . "\n";
 }
@@ -385,128 +374,6 @@ sub ShowArrived {
 }
 
 #==================================================================
-# Subroutine:
-#   DBConnect($realm)
-#
-#   Connect to our database using realm '$realm'. Return a DB handle.
-#   Get the connection information from DBIx::Connector
-#   Fully qualified realm file may be provided
-#==================================================================
-sub DBConnect {
-    my ($realm) = @_;
-    if (! $realm) { return 0; }
-    #   Get the connection information FROM DBIx::Connector
-    #   Fully qualified realm file may be provided
-    if ($realm =~ /^(\/.+)\/([^\/]+)$/) {
-        my $d = $1;
-        $realm = $2;
-        $dbc = new DBIx::Connector(-realm => $realm, -connection_dir => $d,
-            -dbi_options => {RaiseError => 1, PrintError => 1});
-    }
-    else {
-        $dbc = new DBIx::Connector(-realm => $realm,
-            -dbi_options => {RaiseError => 1, PrintError => 1});
-    }
-    return $dbc->connect();
-}
-
-#==================================================================
-# Subroutine:
-#   DoSQL - Execute an SQL command
-#
-# Arguments:
-#   sql - String of SQL to run
-#   die - boolean if we should die on error
-#
-# Returns:
-#   SQL handle for subsequent MySQL actions
-#   Does not return if error detected
-#==================================================================
-sub DoSQL {
-    my ($sql, $die) = @_;
-    if (! defined($die)) { $die = 1; }
-    if ($opts{verbose}) { warn "DEBUG: SQL=$sql\n"; }
-    my $sth = $dbh->prepare($sql);
-    $sth->execute();
-    if ($DBI::err) {
-        if (! $die) { return 0; }
-        die "$me$mesuffix SQL failure: $DBI::errstr\n  SQL=$sql\n";
-    }
-    return $sth;
-}
-
-#==================================================================
-# Subroutine:
-#   GetCenters - Get list of centers
-#
-# Arguments:
-#   none
-#
-# Returns:
-#   Reference to hash of center ids  to center names
-#==================================================================
-sub GetCenters {
-#    my ($d) = @_;
-    my %center2name = ();
-
-    #   Get all the known centers in the database
-    my $sql = "SELECT centerid,centername FROM $opts{centers_table}";
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { warn "$me$mesuffix No centers found\n"; }
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        if ($opts{center} && $href->{centername} ne $opts{center}) { next; }
-        $center2name{$href->{centerid}} = $href->{centername};
-    }
-    if ($opts{center}) {            # Only do one center
-        if (! %center2name) { die "$me$mesuffix Center '$opts{center}' unknown\n"; }
-        print "$me$mesuffix - Running on center '$opts{center}' only\n";
-    }
-    return \%center2name;
-}
-
-#==================================================================
-# Subroutine:
-#   GetRuns - Get list of runs for a center
-#
-# Arguments:
-#   cid = center id
-#
-# Returns:
-#   Reference to hash of run ids  to run dirnames
-#==================================================================
-sub GetRuns {
-    my ($cid) = @_;
-    my %run2dir = ();
-
-    my $sql = "SELECT runid,dirname FROM $opts{runs_table} WHERE centerid=$cid";
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if ((! $rowsofdata) && $opts{verbose}) {
-        warn "$me$mesuffix Found no runs for center '$cid'\n";
-        return \%run2dir;
-    }
-    my %theseruns = ();
-    if ($opts{runs}) {              # We only want some runs
-        $opts{runs} =~ s/,/ /g;
-        foreach my $r (split(' ', $opts{runs})) {
-            $theseruns{$r} = 1;
-            if (! $opts{onlyrun}) { 
-                print "$me$mesuffix - Using only run '$r'\n";
-                $opts{onlyrun}++;
-            }
-        }
-    }
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        if ($opts{runs} && (! exists($theseruns{$href->{dirname}}))) { next; }
-        $run2dir{$href->{runid}} = $href->{dirname};
-    }
-    return \%run2dir;
-}
-
-#==================================================================
 #   Perldoc Documentation
 #==================================================================
 __END__
@@ -547,7 +414,7 @@ Generates this output.
 =item B<-realm NAME>
 
 Specifies the realm name to be used.
-This defaults to B<.db_connections/monitor> in the same directory as
+This defaults to B<$opts{realm}> in the same directory as
 where this program is to be found.
 
 =item B<-runs NAME[,NAME,...]>
