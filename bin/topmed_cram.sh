@@ -21,8 +21,7 @@ if [ "$1" = "-submit" ]; then
   sq=''
   center=`echo $2 | grep /topmed/broad/`
   if [ "$center" = "" ]; then
-    #slurmp=topmed2-incoming
-    #slurmqos=topmed-bai
+    slurmp=topmed2-incoming
     sq='-squeezed'
   fi
 
