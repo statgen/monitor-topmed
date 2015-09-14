@@ -27,7 +27,6 @@ use TopMed_Get;
 use Getopt::Long;
 
 use POSIX qw(strftime);
-use XML::Simple;
 use File::Basename;
 
 #--------------------------------------------------------------
@@ -103,12 +102,6 @@ foreach my $centerid (keys %{$centersref}) {
             warn "How can runid not be defined?  dir=$d\n";
             next;
         }
-
-        #   If XML exists and has not been found before, process it
-        #   For now, always try to add new bams
-        #   Someday this isn't supposed to be necessary because the XML
-        #   will assure us that we know immediately what BAMs are expected
-        if (! $knownruns{$d}{xmlfound}) { AddXML($runid, $d); }
         AddBams($runid, $d);
     }
 }
@@ -228,155 +221,6 @@ sub AddBams {
     return 1;
 }
 
-
-#==================================================================
-# Subroutine:
-#   AddXML - Update details on this run to the database from the XML
-#   It's not complete since no one provides an XML file yet
-#
-# Arguments:
-#   runid - run id
-#   d - directory (e.g. run name)
-#
-# Returns:
-#   boolean if the database was updated
-#==================================================================
-sub AddXML {
-    my ($runid, $d) = @_;
-    return 0;
-    
-#==================================================================
-#   This has not been implemented yet 
-#==================================================================
-my $cid = 0;
-    if (! opendir(DIR, $d)) {
-        warn "Unable to read directory '$d': $!";
-        return 0;
-    }
-    my @xmllist = grep { (/^\w.+\.xml/) } readdir(DIR);
-    closedir DIR;
-
-    #   There are two types of XML files, run.xml and experiment.xml
-    #   Do the experiment data first, then run data
-    #   Catch XML parse errors this first time through. We will
-    #   re-parse these files again later, but only need catch errors
-    #   the first time through.
-    my %expt = ();
-    my $emsg;
-    foreach my $f (@xmllist) {
-        $emsg = "XML parse error in '$d/$f': ";
-        my $xml = new XML::Simple();
-        my $myxml = eval { $xml->XMLin("$d/$f") };
-        if ($@) {
-            warn $emsg . "Parse XML file error:$@\n";
-            exit(3);
-        }
-
-        if ($myxml->{RUN}[0]) { next; }
-        if (! $myxml->{EXPERIMENT}[0]) {
-            warn $emsg . "Unexpected XML file format\n";
-            next;
-        }
-        if ($opts{verbose}) { warn "Parse experiment file '$d/$f'\n"; }
-        #   Collect all the EXPERIMENT data for each BAM
-        for (my $i=0; $i<=$#{$myxml->{EXPERIMENT}}; $i++) {
-            my $alias   = $myxml->{EXPERIMENT}[$i]->{alias} ||
-                warn $emsg . "alias not found\n";
-            my $xref   = ${$myxml->{EXPERIMENT}[$i]->{DESIGN}->{SAMPLE_DESCRIPTOR}}{refname} ||
-                warn $emsg . "refname not found\n";
-            my $sampleid = ${$myxml->{EXPERIMENT}[$i]->{STUDY_REF}}{accession} ||
-                warn $emsg . "accession not found\n";
-            $expt{$alias}{xref} = $xref;
-            $expt{$alias}{sampleid} = $sampleid;
-        }
-    }
-    #   Now process the run files
-    my %bams = ();
-    foreach my $f (@xmllist) {
-        my $xml = new XML::Simple();
-        my $myxml = $xml->XMLin("$d/$f");
-        if ($myxml->{EXPERIMENT}[0]) { next; }
-        if (! $myxml->{RUN}[0]) {
-            warn $emsg . "Unexpected XML file format\n";
-            next;
-        }
-        #   Collect all the RUN data for each BAM
-        $emsg = "XML parse error in '$d/$f': ";
-        if ($opts{verbose}) { warn "Parse run file '$d/$f'\n"; }
-        for (my $i=0; $i<=$#{$myxml->{RUN}}; $i++) {
-            my $fn   = ${$myxml->{RUN}[$i]->{DATA_BLOCK}->{FILES}->{FILE}}{filename} ||
-                warn $emsg . "filename not found\n";
-            my $meth = ${$myxml->{RUN}[$i]->{DATA_BLOCK}->{FILES}->{FILE}}{checksum_method} ||
-                warn $emsg . "checksum_method not found\n";
-            my $cs   = ${$myxml->{RUN}[$i]->{DATA_BLOCK}->{FILES}->{FILE}}{checksum} ||
-                warn $emsg . "checksum not found\n";
-            my $rref = ${$myxml->{RUN}[$i]->{EXPERIMENT_REF}}{refname} ||
-                warn $emsg . "refname not found\n";
-            if ($meth ne 'MD5') {
-                warn $emsg . "unsupport checksum method found '$meth' in '$d/$f'\n";
-                return 0;
-            }
-            if (exists($bams{$fn})) {
-                warn $emsg . "Duplicate BAM '$fn' defined in '$d/$f'\n";
-                return 0;
-            }
-            if (! exists($expt{$rref})) {
-                warn $emsg . "refname '$rref' not found in any EXPERIMENT FILE\n";
-                return 0;
-            }
-            $bams{$fn}{checksum} = $cs;
-            $bams{$fn}{refname} = $rref;
-            $bams{$fn}{expt_refname} = $expt{$rref}{xref};
-            $bams{$fn}{expt_sampleid} = $expt{$rref}{sampleid};
-            $bams{$fn}{dateinit} = $nowdate;
-        }
-    }
-
-    #   We now have all the information for the bams in this run
-    #   Generate the run database entry. This entry might already
-    #   exist, because we faked the entry with MD5 data.
-    my @bamlist = keys %bams;
-    if (! @bamlist) {
-        warn "No BAMs found in XML files in '$d'\n";
-        return;
-    }
-    my $sql = "SELECT runid FROM $opts{runs_table} WHERE centerid=$cid AND dirname='$d'";
-    my $sth = DoSQL($sql,0);
-    my $rowsofdata = $sth->rows();
-    if ($rowsofdata) {                  # Update an existing row
-        my $href = $sth->fetchrow_hashref;
-        my $runid = $href->{runid};
-        foreach my $bamfn (keys %bams) {
-            my @cols = keys %{$bams{$bamfn}};
-            $sql = "UPDATE $opts{runs_table} SET "; 
-            foreach my $col (@cols) {
-                $sql .= "$col='" . $bams{$bamfn}{$col} . "',";
-            }
-            $sql .= "dateinit='$nowdate' WHERE runid=$runid";
-        }
-    }
-    else {
-        #  Add a new row
-        $sql = "INSERT INTO $opts{runs_table} (centerid,dirname,bamcount,comments,dateinit) " .
-            "VALUES($cid,'$d'," . scalar(@bamlist) . ",'Created FROM XML data','$nowdate')";
-        $sth = DoSQL($sql);
-        my $runid = $sth->{mysql_insertid};
-        #   Generate the bam database entry for each bam
-        foreach my $bamfn (keys %bams) {
-            my @cols = keys %{$bams{$bamfn}};
-            my $sql = "INSERT INTO $opts{bamfiles_table} (runid,bamname," .
-                join(',',@cols) . ") VALUES($runid,'$bamfn',";
-            foreach my $col (@cols) {
-                $sql .= "'" . $bams{$bamfn}{$col} . "',";
-            }
-            chop($sql);                         # Remove trailing ,
-            $sql .= ')';
-        }
-    }
-    $sth = DoSQL($sql);
-    return;
-}
-
 #==================================================================
 #   Perldoc Documentation
 #==================================================================
@@ -384,7 +228,7 @@ __END__
 
 =head1 NAME
 
-topmed_init.pl - Monitor
+topmed_init.pl - check for files that are arriving and initialize the database
 
 =head1 SYNOPSIS
 
@@ -424,7 +268,7 @@ Provided for developers to see additional information.
 
 =over 4
 
-=item B<monitor>
+=item B<updatedb>
 
 This directs the program to monitor the B<-dir> directory for changes
 and update the database table specified by B<-realm>.
