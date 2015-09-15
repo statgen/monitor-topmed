@@ -17,11 +17,17 @@ squeezed=n
 
 if [ "$1" = "-submit" ]; then
   shift
-  #  Is this squeezed or not?
+  #  Is this squeezed or not?  For now this is only files from the Broad usually,
+  #  however, not quite always.  $qual is the number of distinct base call quality 
+  #  score values plus one if the bam is not squeezed.  (from Tom)
   sq=''
-  center=`echo $2 | grep /topmed/broad/`
-  if [ "$center" = "" ]; then
-    slurmp=topmed2-incoming
+  #center=`echo $2 | grep /topmed/broad/`           # Old hard coded approach
+  #if [ "$center" = "" ]; then
+  #  slurmp=topmed2-incoming
+  #  sq='-squeezed'
+  #fi
+  qual=`samtools view $2 | head -10000 | cut -f 11 | sed 's/./&\n/g' | sort | uniq -c | wc -l`
+  if [ $qual -le 11 ]; then
     sq='-squeezed'
   fi
 
