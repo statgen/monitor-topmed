@@ -60,10 +60,7 @@ if ($#ARGV < 0 || $opts{help}) {
 my $fcn = shift @ARGV;
 
 my $dbh = DBConnect($opts{realm});
-if ($opts{verbose}) { print "$Script realm=$opts{realm}\n"; }
-
 my $nowdate = time();
-
 if ($fcn ne 'updatedb') { die "$Script  - Invalid function '$fcn'\n"; }
 chdir($opts{topdir}) ||
     die "$Script Unable to CD to '$opts{topdir}': $!\n";

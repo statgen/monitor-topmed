@@ -53,7 +53,7 @@ sub GetCenters {
 #   cid = center id
 #
 # Returns:
-#   Reference to hash of run ids  to run dirnames
+#   Reference to hash of run ids to run dirnames
 #==================================================================
 sub GetRuns {
     my ($cid) = @_;
