@@ -28,6 +28,7 @@ if [ "$1" = "-submit" ]; then
   #fi
   qual=`samtools view $2 | head -10000 | cut -f 11 | sed 's/./&\n/g' | sort | uniq -c | wc -l`
   if [ $qual -le 11 ]; then
+    slurmp=topmed2-incoming
     sq='-squeezed'
   fi
 
