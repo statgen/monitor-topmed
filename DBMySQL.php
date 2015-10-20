@@ -15,7 +15,11 @@
 #   $dbh - resource set for connection
 #   $SQL_ERROR - set here with error message from MySQL
 #
-# Copyright (C) 2010,2014 Terry Gliedt
+# NOTE: Do not load this with include_once else it is not loaded
+#   No, I have no idea why. Apparently there is some file of the
+#   same name somewhere that is not documented.
+#
+# Copyright (C) 2010-2015 Terry Gliedt
 # This is free software; you can redistribute it and/or modify it under the
 # terms of the GNU General Public License as published by the Free Software
 # Foundation; See http://www.gnu.org/copyleft/gpl.html
@@ -33,11 +37,11 @@
 ---------------------------------------------------------------*/
 function DB_Connect($realm) {
     global $dbh;
-
     $lines = file($realm);
     foreach ($lines as &$l) {
         if (preg_match('/DBD=(\S+)/', $l, $m)) { $type = $m[1]; continue; }
         if (preg_match('/SERVER=host=(\S+)/', $l, $m)) { $host = $m[1]; continue; }
+        if (preg_match('/SERVER=(\S+)/', $l, $m)) { $host = $m[1]; continue; }
         if (preg_match('/USER=(\S+)/', $l, $m)) { $user = $m[1]; continue; }
         if (preg_match('/PASS=(\S+)/', $l, $m)) { $pass = $m[1]; continue; }
         if (preg_match('/DATABASE=(\S+)/', $l, $m)) { $db = $m[1]; continue; }
@@ -47,10 +51,7 @@ function DB_Connect($realm) {
 
     $dbh = mysqli_connect($host, $user, $pass, $db);
     if ($dbh && (! mysqli_connect_errno())) { return $dbh; }
-    $msg = "Unable to connect to database<BR/>\n" .
-        mysqli_connect_errno() . '" ' . mysqli_connect_errno() . "<br/>\n";
-    //$msg .= mysqli_info(). "<br/>\n";   // Do not show password usually
-    Nice_Exit($msg);
+    DB_Gen_Error("Unable to connect to database - h=$host, u=$user, d=$db<br>");
 }
 
 /*---------------------------------------------------------------
@@ -66,15 +67,9 @@ function DB_Connect($realm) {
 function SQL_Query($sql, $dieonerror=1) {
     global $dbh, $SQL_ERROR;
     $SQL_ERROR = '';
-
     $result = mysqli_query($dbh, $sql);
     if ($result) { return $result; }
-
-    $SQL_ERROR = "SQL prepare/stmt failed. SQL=$sql<br/>\n" .
-        'Error=' . mysqli_connect_errno() . '" ' . mysqli_connect_errno() . "<br/>\n";
-    //$msg .= mysqli_info(). "<br/>\n";   // Do not show password usually
-    if ($dieonerror) { Nice_Exit($SQL_ERROR); }
-    return 0;
+    DB_Gen_Error("SQL prepare/stmt failed. SQL=$sql");
 }
 
 /*---------------------------------------------------------------
@@ -88,30 +83,24 @@ function SQL_Query($sql, $dieonerror=1) {
 ---------------------------------------------------------------*/
 function DB_CheckError($dbo) {
    global $dbh;
-    if (mysqli_error($dbh)) {
-        if ($dbo) { return $dbo->getMessage(); }
-        return 'Previous SQL command found no results';
-    }
-    return '';
+    if (! mysqli_errno($dbh)) { return ''; }
+    return DB_Gen_Error("SQL error detected", 0);
 }
 
 /*---------------------------------------------------------------
 # DB_IsError - If an error was detected, generate msg and exit
 #
 # Parameters:
-#   dbo - object for DB action
 #   table - name of table
 #
 # Returns:
 #   nothing or does not return
 ---------------------------------------------------------------*/
-function DB_IsError($dbo, $table='unknown') {
-   global $dbh;
-    if (! mysqli_error($dbh)) { return; }
-    $m = "DB failure for <b>'$table'</b> " . $dbo->getMessage() . "<br/>";
-    $m .= $dbo->getDebugInfo();     // Not for production mode
-    Emsg($m);
-    Nice_Exit("<br/><br/>Unable to update database");
+function DB_IsError($table='unknown') {
+    global $dbh;
+    if (! mysqli_errno($dbh)) { return ''; }
+    DB_Gen_Error("DB failure for <b>'$table'</b><br/>Unable to update database");
+
 }
 
 /*---------------------------------------------------------------
@@ -140,9 +129,7 @@ function SQL_Query_ID($dieonerror=1) {
     global $dbh, $SQL_ERROR;
     $i = mysqli_insert_id($dbh);
     if ($i) { return $i; }
-    $SQL_ERROR = "SQL_Query_ID did not return a value. No AUTO_INCREMENT found<br/>\n";
-    if ($dieonerror) { Nice_Exit($SQL_ERROR); exit; }
-	return $i;
+    return DB_Gen_Error("SQL_Query_ID did not return a value. No AUTO_INCREMENT found", $dieonerror);
 }
 
 /*---------------------------------------------------------------
@@ -170,7 +157,8 @@ function SQL_NumRows($res) {
 function SQL_Escape($s) {
     global $dbh;
     $ss = mysqli_real_escape_string($dbh, $s);
-    if ($ss) { return "'" . $ss . "'"; }
+    if ($ss) { return $ss; }
+    //if ($ss) { return "'" . $ss . "'"; }  // How'd this ever work ??
     return "'$s'";                  // Helps when we have a syntax error
 }
 
@@ -213,6 +201,25 @@ function SQL_Desc($table) {
         if (preg_match('/auto_increment/', $row['Extra'])) { $DESC['_inc_'] = $c; }
 	}
     return $DESC;
+}
+
+/*---------------------------------------------------------------
+# DB_Gen_Error - Generate a DB error message, possibly exit
+#
+# Parameters:
+#   m - message
+#   dieonerror - flag if we should exit
+#
+# Returns:
+#   Returns error message or dies
+---------------------------------------------------------------*/
+function DB_Gen_Error($m, $dieonerror=1) {
+    global $dbh, $SQL_ERROR;
+    $SQL_ERROR = "$m<br/>\n" .
+        'Error=' . mysqli_connect_errno($dbh) . '" ' . mysqli_connect_error($dbh) . "<br/>\n" .
+        mysqli_info($dbh). "<br/>\n";
+    if ($dieonerror) { Nice_Exit($SQL_ERROR); }
+    return $SQL_ERROR;
 }
 
 ?>
