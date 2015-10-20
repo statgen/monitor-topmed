@@ -22,6 +22,7 @@ use lib "$FindBin::Bin/../lib/perl5";
 use My_DB;
 use Getopt::Long;
 use XML::Simple;
+
 use POSIX qw(strftime);
 
 #--------------------------------------------------------------
@@ -59,6 +60,8 @@ my $filelist_ref = \@filelist;
 
 my $dbh = DBConnect($opts{realm});
 if ($opts{verbose}) { print "$Script realm=$opts{realm}\n"; }
+
+my $nowdate = strftime('%Y/%m/%d %H:%M', localtime);
 
 #--------------------------------------------------------------
 #   Execute the subcommands requested
@@ -119,7 +122,7 @@ sub Fetch {
         push @filelist, $f . '.gz';
     }
     close(IN);
-    print "Fetched $n PHS files to '$opts{phsdir}'\n";
+    print "$nowdate Fetched $n PHS files to '$opts{phsdir}'\n";
     return \@filelist;
 } 
 
@@ -179,7 +182,7 @@ sub Update {
             $changes++;
         }
         if ($f ne $file) { unlink($f); }
-        print "Updated $changes entries from $file\n";  
+        print "$nowdate Updated $changes entries from $file\n";  
     }      
 } 
 
