@@ -8,16 +8,16 @@
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 console=/net/topmed/working/topmed-output
 mem=${TOPMED_MEM:-1G}
-slurmp=${TOPMED_PARTITION:-topmed-incoming}
-slurmqos=topmed-verify
 
 if [ "$1" = "-submit" ]; then
   shift
-  homehost=`echo $3 | cut -d / -f 3`    # Should be topmed/topmed2
-  if [ "$homehost" != "" ]; then
-    console=/net/$homehost/working/topmed-output
-    slurmp="$homehost-incoming"
-  fi
+
+  #   Figure where to submit this to run - should be local
+  l=(`$topmedcmd where $1`)             # Get bampath backuppath bamname realhost realhostindex
+  realhost="${l[3]}"
+  realhostindex="${l[4]}"
+  slurmp="$realhost-incoming"
+  slurmqos="$realhost-verify"
 
   l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos -J $1-verify --output=$console/$1-verify.out $0 $*`)
   if [ "$?" != "0" ]; then

@@ -22,6 +22,7 @@ use lib "$FindBin::Bin/../lib";
 use lib "$FindBin::Bin/../lib/perl5";
 use My_DB;
 use Getopt::Long;
+use Cwd qw(realpath);
 
 my %VALIDVERBS = (                  # Valid verbs to database colum
     arrived => 'datearrived',
@@ -246,7 +247,7 @@ sub Export {
 # Subroutine:
 #   Where($bamid)
 #
-#   Print path to bamid, path to the backup directory and the bamname
+#   Print path to bamid, path to the backup directory, bamname, real host of bamname, numeric part of realhost
 #==================================================================
 sub Where {
     my ($bamid) = @_;
@@ -272,23 +273,33 @@ sub Where {
 
     #   The BAM is in one of those $opts{netdir} trees where center is not a symlink
     my $bamfdir = '';
-    foreach ('', '2', '3') {
+    foreach ('', '2', '3', '4') {
         $bamfdir = "$opts{netdir}$_/$opts{incomingdir}/$centername";
         if (! -l $bamfdir) { last; }        # Found non-symlink to center directory
     }
     if (! $bamfdir) { die "BAMID=$bamid Unable to find real directory for '$centername'\n"; }
     $bamfdir .= '/' . $rundir;
 
+    #   Because we can't really plan very well, some files in a directory might actually
+    #   live on some other host. All center directories and files should 'look' the
+    #   same on all hosts, but some directories can have files scattered all over the place.
+    my $realbamname = realpath("$bamfdir/$bamname");    # e.g. /net/topmed2/incoming/topmed/broad/2015jun22/xxxx
+    my $realhost = 'unknown';
+    if ($realbamname =~ /^($opts{netdir}\d*)\//)  { $realhost = substr($1,5); } # e.g. topmedN
+    my $realhostindex = '';
+    if ($realhost =~ /(\d)/)  { $realhostindex = $1; }     # e.g. 2
+
     #   The backup for the BAM is in another tree, also not a symlink
-    my $bakbamfdir = '';
-    if ($bamfdir =~ /$opts{netdir}\//)  { $bakbamfdir = $opts{netdir} . '2'; }
-    if ($bamfdir =~ /$opts{netdir}2\//) { $bakbamfdir = $opts{netdir} . '';  }
-    if (! $bakbamfdir) { die "BAMID=$bamid Unable to figure out backup for '$bamfdir'\n"; }
+    my $bakbamfdir = $opts{netdir};
+    if ($realhostindex eq '') { $bakbamfdir = $opts{netdir} . '2'; }
+    if ($realhostindex eq '2') { $bakbamfdir = $opts{netdir} . ''; }
+    if ($realhostindex eq '3') { $bakbamfdir = $opts{netdir} . 'x3'; }  # No idea what to do here
+    if ($realhostindex eq '4') { $bakbamfdir = $opts{netdir} . 'x4'; }  # No idea what to do here
     $bakbamfdir = "$bakbamfdir/$opts{backupsdir}/$centername";
     if (-l $bakbamfdir) { die "BAMID=$bamid bamdir=$bamfdir Backup directory may not be a symlink for '$bakbamfdir'\n"; }
     $bakbamfdir .= '/' . $rundir;
 
-    print "$bamfdir $bakbamfdir $bamname\n";
+    print "$bamfdir $bakbamfdir $bamname $realhost $realhostindex\n";
 }
 
 #==================================================================
