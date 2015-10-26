@@ -1,4 +1,4 @@
-#!/usr/bin/perl -I/usr/cluster/lib/perl5/site_perl
+#!/usr/bin/perl -I/usr/cluster/lib/perl5/site_perl -I/usr/cluster/monitor/lib/perl5
 ###################################################################
 #
 # Name: topmedcmd.pl
@@ -41,6 +41,14 @@ my %VALIDSTATUS = (                 # Valid status for the verbs
     failed => 1,
     cancelled => 1,
 );
+my %VALIDOPS = (
+    all => 1,
+    verify => 1,
+    backup => 1,
+    bai => 1,
+    qplot => 1,
+    cram => 1,
+);
 
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
@@ -49,6 +57,7 @@ our %opts = (
     realm => '/usr/cluster/monitor/etc/.db_connections/topmed',
     bamfiles_table => 'bamfiles',
     centers_table => 'centers',
+    permissions_table => 'permissions',
     runs_table => 'runs',
     netdir => '/net/topmed',
     incomingdir => 'incoming/topmed',
@@ -76,7 +85,11 @@ if ($#ARGV < 0 || $opts{help}) {
         "$m export\n" .
         "  or\n" .
         "$m where bamid\n" .
-        "Update the topmed database\n" .
+        "  or\n" .
+        "$m permit add operation center run\n" .
+        "$m permit remove permitid\n" .
+        "$m permit test operation bamid/n" .
+        "\nUpdate the topmed database\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
     exit 1;
@@ -94,6 +107,7 @@ if ($fcn eq 'set')      { Set(@ARGV); exit; }
 if ($fcn eq 'show')     { Show(@ARGV); exit; }
 if ($fcn eq 'export')   { Export(@ARGV); exit; }
 if ($fcn eq 'where')    { Where(@ARGV); exit; }
+if ($fcn eq 'permit')   { Permit(@ARGV); exit; }
 
 die "$Script  - Invalid function '$fcn'\n";
 exit;
@@ -304,6 +318,123 @@ sub Where {
 
 #==================================================================
 # Subroutine:
+#   Permit ($fcn, $op, $center, $run)
+#
+#   Controls a database of enabled or disabled operations for a center/run
+#
+#   Permit ('test', $op, $bamid)
+#
+#   Returns a boolean if an operation for a center/run is allowed
+#==================================================================
+sub Permit {
+    my ($fcn) = @_;
+    my ($sql, $sth, $href, $rowsofdata);
+    shift(@_);
+
+    #   Test is some operation is allowed
+    #   topmedcmd.pl permit test bai 4955
+    if ($fcn eq 'test') {
+        my ($op, $bamid) = @_;
+
+        #   Get runid and centerid for this bam
+        my ($centerid, $runid) = GetBamidInfo($bamid);
+
+        #   This is a small table, read it all
+        $sth = DoSQL("SELECT runid,centerid,operation FROM $opts{permissions_table}", 0);
+        $rowsofdata = $sth->rows();
+        if (! $rowsofdata) { exit(1); }                 # Table empty, permitted
+        for (my $i=1; $i<=$rowsofdata; $i++) {
+            $href = $sth->fetchrow_hashref;
+            if ($centerid eq $href->{centerid} || $href->{centerid} eq '0') {
+                if ($runid eq $href->{runid} || $href->{runid} eq '0') {
+                    if ($op eq $href->{operation} || $href->{operation} eq 'all') {
+                        exit;                           # Operation not permitted
+                    }
+                }
+            }
+        }
+        exit(1);                                    # TRUE, permitted  
+    }
+
+    #   Enable a permission by deleting a database entry
+    #   e.g. topmedcmd.pl permit remove id
+    if ($fcn eq 'remove') {
+        my ($id) = @_;
+        $sql = "SELECT * FROM $opts{permissions_table} WHERE id=$id";
+        $sth = DoSQL($sql, 0);
+        $rowsofdata = $sth->rows();
+        if (! $rowsofdata) { die "Permission '$id' does not exist\n"; }
+        $href = $sth->fetchrow_hashref;
+        my $s = "$href->{centername} / $href->{dirname} / $href->{operation}";
+        $sql = "DELETE FROM $opts{permissions_table} WHERE id='$id'";
+        $sth = DoSQL($sql, 0);
+        if (! $sth) { die "Failed to remove permission '$fcn' for 'id=$id $s'\nSQL=$sql"; }
+        print "Deleted permission control for '$s'\n";
+        exit;
+    }
+
+    if ($fcn ne 'add') { die "Unknown function '$fcn'\n"; }
+
+    #   Disable a permission by adding to the database entry
+    #   e.g. # topmedcmd.pl permit add [bai [broad [2015sep18]]]
+    my ($op, $center, $run) = @_;
+    if (! $op)       { $op = 'all'; }           # Set defaults
+    if (! $center)   { $center = 'all'; }
+    if (! $run)      { $run = 'all'; }
+    my ($centerid, $runid) = (0, 0);
+
+    if (! exists($VALIDOPS{$op})) { die "Operation '$op' is not known\n"; }
+
+    #   Verify op and run and center setting runid and centerid
+    if ($center ne 'all') {
+        $sql = "SELECT centerid FROM $opts{centers_table} WHERE centername='$center'";
+        $sth = DoSQL($sql, 0);
+        $rowsofdata = $sth->rows();
+        if (! $rowsofdata) { die "Center '$center' is not known\n"; }
+        $href = $sth->fetchrow_hashref;
+        $centerid = $href->{centerid};
+    }
+
+    if ($run ne 'all') {
+        $sql = "SELECT runid FROM $opts{runs_table} WHERE dirname='$run'";
+        $sth = DoSQL($sql, 0);
+        $rowsofdata = $sth->rows();
+        if (! $rowsofdata) { die "Run '$run' is not known\n"; }
+        $href = $sth->fetchrow_hashref;
+        $runid = $href->{runid};
+    }
+
+    $sql = "INSERT INTO $opts{permissions_table} " .
+        "(centername,dirname,centerid,runid,operation) " .
+        "VALUES ('$center', '$run', $centerid, $runid, '$op')";
+    $sth = DoSQL($sql, 0);
+    if (! $sth) { die "Failed to add permission '$fcn' for '$op'\nSQL=$sql"; }
+    print "Added permission '$center / $runid / $op'\n";
+    exit;
+}
+
+#==================================================================
+# Subroutine:
+#   ($centerid, $runid) = GetBamidInfo($bamid)
+#
+#==================================================================
+sub GetBamidInfo {
+    my ($bamid) = @_;
+
+    my $sth = DoSQL("SELECT runid FROM $opts{bamfiles_table} WHERE bamid=$bamid", 0);
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
+    my $href = $sth->fetchrow_hashref;
+    my $runid = $href->{runid};
+    $sth = DoSQL("SELECT centerid FROM $opts{runs_table} WHERE runid=$runid", 0);
+    $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { die "$Script - BAM '$bamid' has no center?  How'd that happen?\n"; }
+    $href = $sth->fetchrow_hashref;
+    return ($href->{centerid}, $runid);
+}
+
+#==================================================================
+# Subroutine:
 #   Set($bamid, $col, $val)
 #
 #   Set a database column
@@ -398,9 +529,13 @@ topmedcmd.pl - Update the database for NHLBI TopMed
   topmedcmd.pl mark 33 arrived completed   # BAM has arrived
   topmedcmd.pl unmark 33 arrived           # Reset BAM has arrived
 
-  topmedcmd.pl set 33 jobidqplot 123445    # set jobidqplot in bamfiles
+  topmedcmd.pl set 33 jobidqplot 123445    # Set jobidqplot in bamfiles
  
-  topmedcmd.pl where 2199                  # returns path to bam, path to backup, bamname
+  topmedcmd.pl where 2199                  # Returns path to bam, path to backup, bamname
+
+  topmedcmd.pl permit add bai braod 2015oct18   # Stop bai job submissions for a run
+  topmedcmd.pl permit remove 12             # Remove a permit control
+  topmedcmd.pl permit test bai 4567         # Test if we should submit a bai job for one bam
 
 =head1 DESCRIPTION
 
@@ -476,8 +611,16 @@ Note that this database field can have some surprising values.
  If time is 1, the task was cancelled.
  If time is 2, the task was submitted to the batch system.
  If time is positive, the task was completed.
- q
  If time is negative, the task was started.
+
+=item B<permit enable/disable operation center run>
+Use this to control the database which allows one enable or disable topmed operations
+(e.g. backup, verify etc) for a center or run.
+Use B<all> for all centers or all runs or all operations.
+
+=item B<permit test operation bamid>
+Use this to test if an operation (e.g. backup, verify etc) may be submitted 
+for a particular bam.
 
 =item B<set bamid columnname value>
 Use this to set the value for a column for a particular BAM file.
@@ -492,7 +635,9 @@ database value.
 =item B<where bamid>
 Use this to display the directory of the bam file, 
 the path to the backup direcotry,
-and the name of the bam without any path.
+the name of the bam without any path,
+the real host where the file leaves (e.g. B<topmed3>),
+and the index of the hostname (e.g. B<2> for topmed2).
 
 =back
 
