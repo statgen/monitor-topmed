@@ -17,6 +17,8 @@ include_once '../header.php';
 include_once '../DBMySQL.php';
 include_once "../edit.php";
 
+//print "<!-- _POST=\n"; print_r($_POST); print " -->\n";
+
 $qurl =  $_SERVER['SCRIPT_NAME'] . "?fcn=queue'";
 $STATUSLETTERS =  "<i>A=File Arrived, 5=MD5 Verified, B=BAM backed up, C=BAM=>CRAM, I=BAI created, Q=qplot run, M=Remapped BAM, N=File sent to NCBI";
 
@@ -82,6 +84,7 @@ $quickletter = array(                   // Map of status column to letter we see
     'datemapping'  => 'M',
     'datecp2ncbi'  => 'N',
 );
+$validfunctions = array('all', 'verify', 'backup', 'bai', 'qplot', 'cram');
 
 //  These columns are time() values to be converted to people readable dates
 //  See DateState() for possible values
@@ -115,7 +118,12 @@ if (! isset($_SERVER['REMOTE_USER'])) { $_SERVER['REMOTE_USER'] = 'none'; }
 $iammgr = 0;
 if (in_array($_SERVER['REMOTE_USER'], $MGRS)) { $iammgr = 1; }
 if (in_array($_SERVER['REMOTE_USER'], $REQMGRS)) { $iammgr = 1; }
-
+//  If a manager, allow them to control job submission
+if ($iammgr) {
+$SHOWQUEUES .= " &nbsp;&nbsp;&nbsp; <a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=control' " .
+    "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=control\",680,720); " .
+    "return false;'>Control Jobs</a>";
+}
 print doheader($HDR['title'], 1);
 if ($iammgr) {
     $s = "<b>See TOPMed monitor docs " .
@@ -131,7 +139,8 @@ print "<p class='intro'>The <a href='http://www.nhlbi.nih.gov/'>NHLBI</a> provid
 
 //  Real parameters for each form, default is ''
 $parmcols = array('fcn', 'maxdir', 'sortby', 'desc', 'center',
-    'runid', 'bamid', 'centerid', 'fetchpath', 'hostname', 'col');
+    'run', 'runid', 'bamid', 'centerid', 'fetchpath', 'hostname', 'col',
+    'op', 'id');
 extract (isolate_parms($parmcols));
 if (! $center) { $center = 'all'; }
 if (! $fcn)    { $fcn = 'runs'; }
@@ -175,6 +184,18 @@ if ($fcn == 'reqshow') {
     $a = 1;
     if ($iammgr) { $a = 0; }
     print ViewPullQueue($centerid, $a);
+    print dofooter($HDR['footer']);
+    exit;
+}
+if ($fcn == 'permit') {
+print "<!-- _POST=\n"; print_r($_POST); print " -->\n";
+    $h = HandlePermit($op, $center, $run, $id);
+    print ControlJobs($h);
+    print dofooter($HDR['footer']);
+    exit;
+}
+if ($fcn == 'control') {
+    print ControlJobs('');
     print dofooter($HDR['footer']);
     exit;
 }
@@ -287,29 +308,6 @@ if ($iammgr) {
 Emsg("Unknown directive '$fcn'.");
 Nice_Exit("How'd you do that?");
 exit;
-
-/*---------------------------------------------------------------
-#   html = GetCenters()
-#   Show summary of directories of runs
----------------------------------------------------------------*/
-function GetCenters() {
-    global $LDB, $CENTERID2NAME, $CENTERNAME2ID, $CENTERS;
-
-    $sql = 'SELECT * FROM ' . $LDB['centers'];
-    $result = SQL_Query($sql);
-    $numrows = SQL_NumRows($result);
-    $CENTERID2NAME = array();               // Hash of centerid to names
-    $CENTERID2NAME = array();               // Hash of names to centerid
-    $CENTERS = array();                     // Array of names
-    for ($j=0; $j<=$numrows; $j++) {
-        $row = SQL_Fetch($result);
-        $i = $row['centerid'];
-        $n = $row['centername'];
-        $CENTERID2NAME[$i] = $n;
-        $CENTERNAME2ID[$n] = $i;
-        array_push ($CENTERS,$n);
-    }
-}
 
 /*---------------------------------------------------------------
 #   html = PromptFetch($cid)
@@ -585,29 +583,6 @@ function ViewBams($runid, $maxdirs, $iammgr) {
     $result = SQL_Query($sql);
     $numrows = SQL_NumRows($result);
 
-    //  Make a hash of all files in the directory. No XML or dot files
-    //  The web server does not have access to the mounted files
-    //  so we cannot show 'extra' files
-    $filelisthash = array();
-    /*  Dead code since we cannot read files on topmed from statgen
-    $d = $FILES['topdir'] . "/$centername/$runname";
-    error_reporting(E_PARSE);
-    $filelist = scandir($d);
-    error_reporting(E_ALL);
-    if (empty($filelist)) {
-        $e = error_get_last();
-        $html .= Emsg("Error for '$d': " . $e['message'] ,1);
-    }
-    else {
-        foreach ($filelist as $f) { 
-            if (substr($f,0,1) == '.') { continue; }
-            if (preg_match('/\.xml$/', $f)) { continue; }
-            $filelisthash[$f] = 1;
-        }
-        unset($filelist);
-    }
-    */
-
     //  Show details for each bam
     $url = $HDR['home'] . "/index.php?center=$centername&amp;maxdir=50";
     $html .= "<h3 align='center'>BAM Files for '$runname' in center " .
@@ -631,7 +606,6 @@ function ViewBams($runid, $maxdirs, $iammgr) {
             if ($c == 'bamname') {
                 $u = $_SERVER['SCRIPT_NAME'] . "?fcn=bamdetail&amp;bamid=" . $row['bamid'];
                 $d = "<a href='$u' onclick='javascript:popup2(\"$u\",680,720); return false;'>$d</a>";
-                unset($filelisthash[$row[$c]]);
             }
             if ($c == 'bamsize') { $d = ShortForm($d); }
             $html .= "<td align='center'>$d</td>\n";
@@ -645,21 +619,6 @@ function ViewBams($runid, $maxdirs, $iammgr) {
     }
     $html .= "</table>\n" .
         "<div class='indent'>\n$BAMNOTE</div>\n";
-
-    /*  If there are extra files, show them
-    if (count($filelisthash) <= 0) {
-        $html .= "<br/><p>Security considerations mean additional files cannot be shown for '$runname'</p>\n";
-        return $html;
-    }
-    $html .= "<br/><h4>List of extra files in '$runname'</h4>\n<pre>\n";
-    $here = getcwd();
-    chdir($FILES['topdir'] . "/$centername/$runname");
-    $c = "/bin/ls -X -n -g -1 -L -l " . implode(' ', array_keys($filelisthash)) . ' 2>&1';
-    $f = `$c`;
-    //$html .= $c . "\n";;
-    $html .= $f . "</pre>\n";
-    chdir($here);
-    */
     return $html;
 }
 
@@ -729,6 +688,138 @@ function ViewBamDetail($bamid) {
         "<p align='right'><font size='-1'><a href='javascript:window.close()'>Close</a>&nbsp;&nbsp;&nbsp;</p>\n" .
         "</div>\n";
     return $html;
+}
+
+/*---------------------------------------------------------------
+#   html = ControlJobs($h)
+#   Show details for a particular run
+---------------------------------------------------------------*/
+function ControlJobs($h) {
+    global $LDB, $SHOWQUEUES, $CENTERS, $CENTERNAME2ID, $validfunctions;
+    $url = $_SERVER['PHP_SELF'] . "?fcn=permit";    
+    $html = '';
+
+    //  Dump table for each permission for now
+    $html .= "<h3 align='center'>Control Job Submission</h3>\n";
+    $html .= "<center>These controls do not affect jobs already submitted<br>" .
+        "$SHOWQUEUES</center><br/>\n";
+    if ($h) { $html .= "<div class='indent'><span class='surprise'>$h</span></div>\n"; }
+
+    //  Prompt for fields which can control permissions
+    $html .= "<h4>Use this to stop future job submissions</h4>\n" .
+        "<form action='$url' method='post'>\n" .
+        "<input type='hidden' name='fcn' value='permit'>\n" .
+        "<table align='left' width='80%' border='0'>\n" .
+        "<tr>" .
+        "<td align='right'><b>Center</b></td>" .
+        "<td>&nbsp;</td>" .
+        "<td><input type='text' name='center' length='8' value='all'></td>" .
+        "<td>&nbsp;</td>" .
+        "<td><font color='green'> broad, nygc, uw etc.  </font></td>" .
+        "</tr>\n" .
+        "<tr>" .
+        "<td align='right'><b>Name of Run</b></td>" .
+        "<td>&nbsp;</td>" .
+        "<td><input type='text' name='run' length='16' value='all'></td>" .
+        "<td>&nbsp;</td>" .
+        "<td><font color='green'> 2015aug22.weiss.06, 2015oct14 etc. </font></td>" .
+        "</tr>\n" .
+        "<tr>" .
+        "<td align='right'><b>Operation</b></td>" .
+        "<td>&nbsp;</td>";
+    $html .= "<td><select name='op'>";
+    foreach ($validfunctions as $fcn) { $html .= "<option value='$fcn'>$fcn</option>"; }
+    $html .= "</select></td>" .
+        "<td><font color='green'>&nbsp; </font></td>" .
+        "<td>&nbsp;</td>" .
+        "</tr>\n" .
+        "<tr>" .
+        "<td><input type='submit' value=' Stop Submissions '></td>" .
+        "<td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>" .
+        "</tr>\n" .
+        "</table>\n</form>\n";
+    
+    //  This shows what is in effect and allows on to delete an entry
+    $hdrcols  = array('operation', 'centername', 'dirname', 'centerid', 'runid');
+    $sql = 'SELECT * FROM ' . $LDB['permissions'];
+    $result = SQL_Query($sql);
+    $numrows = SQL_NumRows($result);
+
+    $html .= "<br><br><br><br><br><br><br><br>\n" .
+        "<h4>These job submission controls are in effect</h4>\n" .
+        "<p>Use '<b>Remove</b>' to remove a control and allow job submissions to resume.</p>\n" .
+        "<table align='center' width='90%' border='1'>\n" .
+        "<tr>\n";
+    foreach ($hdrcols as $c) {
+        $html .= "<th class='heading'>" . ucfirst($c) . "</th>\n";
+    }
+    $html .= "<th class='heading'>&nbsp;</th></tr>\n" .
+        "<tr>";
+
+    for ($i=0; $i<$numrows; $i++) {
+        $row = SQL_Fetch($result);
+        reset($hdrcols);
+        foreach ($hdrcols as $c) {
+            $d = $row[$c];
+            if ((! isset($d)) || ($d == '')) { $d = 'all'; }
+            $html .= "<td align='center'>$d</td>\n";
+        }
+        $html .= "<td align='center'><a href='$url&amp;op=del&amp;id=$row[id]'>" .
+            "<font color='green'>Remove</font></a></td>" .
+            "</tr>\n";
+    }
+    $html .= "</table>\n";
+    return $html;
+}
+
+/*---------------------------------------------------------------
+#   html = HandlePermit($op, $center, $run, $id)
+#   Update permissions table, return HTML about results
+---------------------------------------------------------------*/
+function HandlePermit($op, $center, $run, $id) {
+    global $validfunctions, $LDB;
+    $html = "Nothing honey";
+    if ($op == '') { return ''; }       // Avoid misleading err msgs
+
+    //  Delete a permission
+    if ($op == 'del') {
+        $cmd = escapeshellcmd($LDB['bindir'] . "/topmedcmd.pl permit remove $id");
+        $s = `$cmd 2>&1`;
+        return "<pre>$s</pre>\n";
+        //return "<pre>cmd=$cmd\n$s</pre>\n";
+    }
+    
+    //  Set a permission
+    if (! in_array($op, $validfunctions)) {
+        return Emsg("Invalid operation '$op' - How'd you do that?", 0);
+    }
+    $cmd = escapeshellcmd($LDB['bindir'] . "/topmedcmd.pl permit add $op $center $run");
+    $s = `$cmd 2>&1`;
+    return "<pre>$s</pre>\n";
+    //return "<pre>cmd=$cmd\n$s</pre>\n";
+}
+
+/*---------------------------------------------------------------
+#   GetCenters()
+#   Set globals with details about all centers
+---------------------------------------------------------------*/
+function GetCenters() {
+    global $LDB, $CENTERID2NAME, $CENTERNAME2ID, $CENTERS;
+
+    $sql = 'SELECT * FROM ' . $LDB['centers'];
+    $result = SQL_Query($sql);
+    $numrows = SQL_NumRows($result);
+    $CENTERID2NAME = array();               // Hash of centerid to names
+    $CENTERID2NAME = array();               // Hash of names to centerid
+    $CENTERS = array();                     // Array of names
+    for ($j=0; $j<=$numrows; $j++) {
+        $row = SQL_Fetch($result);
+        $i = $row['centerid'];
+        $n = $row['centername'];
+        $CENTERID2NAME[$i] = $n;
+        $CENTERNAME2ID[$n] = $i;
+        array_push ($CENTERS,$n);
+    }
 }
 
 /*---------------------------------------------------------------
