@@ -89,6 +89,20 @@ CREATE INDEX index_refname ON bamfiles(refname);
 
 # ALTER TABLE bamfiles ADD COLUMN datebai VARCHAR(12) AFTER datebackup;
 
+#   This table is used to control when/if an operation is permitted
+#   If an entry is in this table, it means it is disabled
+DROP TABLE IF EXISTS permissions;
+CREATE TABLE permissions (
+  id           INT         NOT NULL AUTO_INCREMENT,
+  centerid     INT         NOT NULL,            # 0 = all
+  centername   VARCHAR(16) NOT NULL,
+  runid        INT         NOT NULL,            # 0 = all
+  dirname      VARCHAR(64) NOT NULL,
+  operation    CHAR(12),
+  PRIMARY KEY  (id)
+);
+
+#   This table has never been used yet
 DROP TABLE IF EXISTS requestfiles;
 CREATE TABLE requestfiles (
   reqid        INT         NOT NULL AUTO_INCREMENT,
