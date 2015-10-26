@@ -35,12 +35,15 @@ sub GetCenters {
     if (! $rowsofdata) { warn "$main::Script No centers in '$main::opts{topdir}'\n"; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
+        if (defined($main::opts{center}) &&
+            $main::opts{center} eq $href->{centername}) {
+            my %c = ($href->{centerid} => $href->{centername});
+            print "$main::Script - Running on center '$main::opts{center}' only\n";
+            return \%c;
+        }
         $centers{$href->{centerid}} = $href->{centername};
     }
-    if ($main::opts{center}) {            # Only do one center
-        if (! %centers) { die "$main::Script '$main::opts{center}' unknown\n"; }
-        print "$main::Script - Running on center '$main::opts{center}' only\n";
-    }
+    if ($main::opts{center}) { die "$main::Script '$main::opts{center}' unknown\n"; }
     return \%centers;
 }
 
@@ -67,7 +70,7 @@ sub GetRuns {
         return \%run2dir;
     }
     my %theseruns = ();
-    if ($main::opts{runs}) {              # We only want some runs
+    if ($main::opts{runs}) {              # We onlyq want some runs
         $main::opts{runs} =~ s/,/ /g;
         foreach my $r (split(' ', $main::opts{runs})) {
             $theseruns{$r} = 1;
