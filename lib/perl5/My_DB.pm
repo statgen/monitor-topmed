@@ -61,12 +61,30 @@ sub DoSQL {
     if (! defined($die)) { $die = 1; }
     if ($main::opts{verbose} > 1) { warn "DEBUG: SQL=$sql\n"; }
     my $sth = $DBH->prepare($sql);
-    $sth->execute();
+    {
+        if (! $die) { $DBH->{RaiseError} = 0; $DBH->{PrintError} = 0; }
+        $sth->execute();
+    }
     if ($DBI::err) {
         if (! $die) { return 0; }
         die "SQL failure: $DBI::errstr\n  SQL=$sql\n";
     }
     return $sth;
+}
+
+#==================================================================
+# Subroutine:
+#   SQL_Last_Insert - returns the autoincrement of the last INSERT
+#
+# Arguments:
+#   sth - STH handle returned by DoSQL
+#
+# Returns:
+#   autoincrement id
+#==================================================================
+sub SQL_Last_Insert {
+    my ($sth) = @_;
+    return $sth->{mysql_insertid};
 }
 
 1;
