@@ -53,10 +53,12 @@ if ($MON == 'topmed') {
     $HDR['local'] = "    <link href='/monitor/css/TOPMEDstyle.css' rel='stylesheet'>\n" .
         "    <script src='/monitor/js/TOPMEDjs.js'></script>\n";
 
-    $LDB['realm'] = '/usr/cluster/monitor/etc/.db_connections/topmed';
+    $LDB['bindir'] = '/usr/cluster/monitor/bin';
+    $LDB['realm'] = $LDB['bindir'] . '/../etc/.db_connections/topmed';
     $LDB['centers'] = 'centers';            // SQL table names
     $LDB['runs'] = 'runs';
     $LDB['bamfiles'] = 'bamfiles';
+    $LDB['permissions'] = 'permissions';
     $LDB['pulls'] = 'requestfiles';
 
     $FILES['topdir'] = '/net/topmed/incoming/topmed';
