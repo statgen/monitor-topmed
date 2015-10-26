@@ -10,11 +10,22 @@ gcbin=/net/mario/gotcloud/bin
 gcref=/net/mario/nodeDataMaster/local/ref/gotcloud.ref
 topoutdir=/net/topmed/incoming/qc.results
 mem=${TOPMED_MEM:-8G}
-slurmp=${TOPMED_PARTITION:-topmed}
-slurmqos=${TOPMED_QOS:-topmed-qplot}
 
 if [ "$1" = "-submit" ]; then
   shift
+  #   May I submit this job?
+  $topmedcmd permit test qplot $1
+  if [ "$?" = "0" ]; then
+    exit 4
+  fi 
+
+  #   Figure where to submit this to run - should be local
+  l=(`$topmedcmd where $1`)     # Get bampath backuppath bamname realhost realhostindex
+  realhost="${l[3]}"
+  realhostindex="${l[4]}"
+  slurmp="$realhost-incoming"   # Sometimes we think this should be nomosix
+  slurmqos="$realhost-qplot"
+
   l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-qplot --output=$console/$1-qplot.out $0 $*`)
   if [ "$?" != "0" ]; then
     echo "Failed to submit command to SLURM"

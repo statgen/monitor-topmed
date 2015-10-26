@@ -11,9 +11,14 @@ mem=${TOPMED_MEM:-1G}
 
 if [ "$1" = "-submit" ]; then
   shift
+  #   May I submit this job?
+  $topmedcmd permit test verify $1
+  if [ "$?" = "0" ]; then
+    exit 4
+  fi 
 
   #   Figure where to submit this to run - should be local
-  l=(`$topmedcmd where $1`)             # Get bampath backuppath bamname realhost realhostindex
+  l=(`$topmedcmd where $1`)     # Get bampath backuppath bamname realhost realhostindex
   realhost="${l[3]}"
   realhostindex="${l[4]}"
   slurmp="$realhost-incoming"

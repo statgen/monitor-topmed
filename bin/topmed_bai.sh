@@ -8,16 +8,21 @@ topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 gcbin=/net/mario/gotcloud/bin
 mem=${TOPMED_MEM:-1G}
 console=/net/topmed/working/topmed-output
-slurmp=${TOPMED_PARTITION:-topmed-incoming}
-slurmqos=${TOPMED_QOS:-topmed-bai}
 
 if [ "$1" = "-submit" ]; then
   shift
-  homehost=`echo $2 | cut -d / -f 3`    # Should be topmed/topmed2
-  if [ "$homehost" != "" ]; then
-    console=/net/$homehost/working/topmed-output
-    slurmp="$homehost-incoming"
-  fi
+  #   May I submit this job?
+  $topmedcmd permit test bai $1
+  if [ "$?" = "0" ]; then
+    exit 4
+  fi 
+
+  #   Figure where to submit this to run - should be local
+  l=(`$topmedcmd where $1`)     # Get bampath backuppath bamname realhost realhostindex
+  realhost="${l[3]}"
+  realhostindex="${l[4]}"
+  slurmp="$realhost-incoming"
+  slurmqos="$realhost-bai"
 
   l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-bai --output=$console/$1-bai.out $0 $*`)
   if [ "$?" != "0" ]; then

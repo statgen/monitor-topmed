@@ -52,6 +52,9 @@ our %opts = (
     dryrun => 0,
     verbose => 0,
     maxjobs => 100,
+    jobcount => 0,              # Not actually an option, but stats
+    jobsnotpermitted => 0,
+    jobsfailedsubmission => 0,
 );
 Getopt::Long::GetOptions( \%opts,qw(
     help realm=s verbose topdir=s center=s runs=s maxjobs=i
@@ -125,7 +128,7 @@ if ($fcn eq 'arrive') {
             }
         }
     }
-    if ($opts{jobcount}) { print "$nowdate  $opts{jobcount} BAMs arrived\n"; }
+    ShowSummary('BAMs arrived');
     exit;
 }
 
@@ -135,7 +138,6 @@ if ($fcn eq 'arrive') {
 if ($fcn eq 'verify') {
     #   Get all the known centers in the database
     my $centersref = GetCenters();
-    $opts{jobcount} = 0;
     foreach my $cid (keys %{$centersref}) {
         my $centername = $centersref->{$cid};
         my $runsref = GetRuns($cid) || next;
@@ -177,7 +179,7 @@ if ($fcn eq 'verify') {
             }
         }
     }
-    if ($opts{jobcount}) { print "$nowdate  Submitted $opts{jobcount} jobs\n"; }
+    ShowSummary('verify');
     exit;
 }
 
@@ -187,7 +189,6 @@ if ($fcn eq 'verify') {
 if ($fcn eq 'bai') {
     #   Get all the known centers in the database
     my $centersref = GetCenters();
-    $opts{jobcount} = 0;
     foreach my $cid (keys %{$centersref}) {
         my $centername = $centersref->{$cid};
         my $runsref = GetRuns($cid) || next;
@@ -220,7 +221,7 @@ if ($fcn eq 'bai') {
             }
         }
     }
-    if ($opts{jobcount}) { print "$nowdate  Submitted $opts{jobcount} jobs\n"; }
+    ShowSummary('bai');
     exit;
 }
 
@@ -230,7 +231,6 @@ if ($fcn eq 'bai') {
 if ($fcn eq 'backup') {
     #   Get all the known centers in the database
     my $centersref = GetCenters();
-    $opts{jobcount} = 0;
     foreach my $cid (keys %{$centersref}) {
         my $centername = $centersref->{$cid};
         my $runsref = GetRuns($cid) || next;
@@ -263,7 +263,7 @@ if ($fcn eq 'backup') {
             }
         }
     }
-    if ($opts{jobcount}) { print "$nowdate  Submitted $opts{jobcount} jobs\n"; }
+    ShowSummary('backup');
     exit;
 }
 
@@ -273,7 +273,6 @@ if ($fcn eq 'backup') {
 if ($fcn eq 'cram') {
     #   Get all the known centers in the database
     my $centersref = GetCenters();
-    $opts{jobcount} = 0;
     foreach my $cid (keys %{$centersref}) {
         my $centername = $centersref->{$cid};
         my $runsref = GetRuns($cid) || next;
@@ -310,7 +309,7 @@ if ($fcn eq 'cram') {
             }
         }
     }
-    if ($opts{jobcount}) { print "$nowdate  Submitted $opts{jobcount} jobs\n"; }
+    ShowSummary('cram');
     exit;
 }
 
@@ -320,7 +319,6 @@ if ($fcn eq 'cram') {
 if ($fcn eq 'qplot') {
     #   Get all the known centers in the database
     my $centersref = GetCenters();
-    $opts{jobcount} = 0;
     foreach my $cid (keys %{$centersref}) {
         my $centername = $centersref->{$cid};
         my $runsref = GetRuns($cid) || next;
@@ -353,7 +351,7 @@ if ($fcn eq 'qplot') {
             }
         }
     }
-    if ($opts{jobcount}) { print "$nowdate  Submitted $opts{jobcount} jobs\n"; }
+    ShowSummary('qplot');
     exit;
 }
 
@@ -366,7 +364,6 @@ if ($fcn eq 'check') {
          "#    BEWARE OF FALSE ERRORS  when jobs are being processed\n$_\n";
     #   Get all the known centers in the database
     my $centersref = GetCenters();
-    $opts{jobcount} = 0;
     foreach my $cid (keys %{$centersref}) {
         my $centername = $centersref->{$cid};
         print "Checking center=$centername\n";
@@ -529,8 +526,32 @@ sub BatchSubmit {
     if ($opts{maxjobs} < 0) { return; }
     if ($opts{maxjobs} == 0) { print "Maximum limit of jobs that can be submitted has been reached\n"; }
     if ($opts{dryrun}) { print "dryrun => $cmd\n"; return; }
-    system("$cmd 2>&1") || $opts{jobcount}++;
-} 
+    my $rc = system("$cmd 2>&1");
+    $rc = $rc >> 8;
+    if ($rc == 0) { $opts{jobcount}++; return; }
+    $opts{maxjobs}++;                   # Submit failed, keep trying
+    if ($rc == 4) { $opts{jobsnotpermitted}++; }
+    else { $opts{jobsfailedsubmission}++; }
+    return;
+}
+
+#==================================================================
+# Subroutine:
+#   ShowSummary - Print summary of jobs activity
+#
+# Arguments:
+#   type - type of job, verify, backup etc
+#==================================================================
+sub ShowSummary {
+    my ($type) = @_;
+
+    my $s = '';
+    if ($opts{jobcount})            { $s .= "$opts{jobcount} jobs submitted\n"; }
+    if ($opts{jobsnotpermitted})    { $s .=  "  $opts{jobsnotpermitted} job submissions not permitted\n"; }
+    if ($opts{jobsfailedsubmission}) { $s .=  "  $opts{jobsfailedsubmission} job submissions failed\n"; }
+    if (! $s) { return; }
+    print "$nowdate $type: $s\n";
+}
 
 #==================================================================
 # Subroutine:

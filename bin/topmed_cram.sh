@@ -11,24 +11,29 @@ topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 backupdir=/net/topmed/working/backups
 mem=${TOPMED_MEM:-8G}
 console=/net/topmed/working/topmed-output
-slurmp=${TOPMED_PARTITION:-nomosix}
-slurmqos=topmed-cram
 squeezed=n
 
 if [ "$1" = "-submit" ]; then
   shift
+  #   May I submit this job?
+  $topmedcmd permit test cram $1
+  if [ "$?" = "0" ]; then
+    exit 4
+  fi 
+
+  #   Figure where to submit this to run - should be local
+  l=(`$topmedcmd where $1`)     # Get bampath backuppath bamname realhost realhostindex
+  realhost="${l[3]}"
+  realhostindex="${l[4]}"
+  slurmp="$realhost-incoming"
+  slurmqos="$realhost-cram"
+
   #  Is this squeezed or not?  For now this is only files from the Broad usually,
   #  however, not quite always.  $qual is the number of distinct base call quality 
   #  score values plus one if the bam is not squeezed.  (from Tom)
   sq=''
-  #center=`echo $2 | grep /topmed/broad/`           # Old hard coded approach
-  #if [ "$center" = "" ]; then
-  #  slurmp=topmed2-incoming
-  #  sq='-squeezed'
-  #fi
   qual=`$samtools view $2 | head -10000 | cut -f 11 | sed 's/./&\n/g' | sort | uniq -c | wc -l`
   if [ $qual -le 11 ]; then
-    slurmp=topmed2-incoming
     sq='-squeezed'
   fi
 
