@@ -199,6 +199,7 @@ sub ProcessGet {
                 topmed_monitor_bai.log
                 topmed_monitor_qplot.log
                 topmed_monitor_cram.log
+                topmed_monitor_ncbi.log
                 topmed_monitor_phs.log
                 )) {
                 
@@ -247,35 +248,27 @@ __END__
 
 =head1 NAME
 
-topmed_daemon.pl - Find runs that need some action
-
-THIS IS DONE
+topmed_daemon.pl - Issue commands to the topmed server
 
 =head1 SYNOPSIS
 
-  topmed_monitor.pl verify
+  topmed_daemon.pl
 
 =head1 DESCRIPTION
 
 
-#   Use this program to issue a SLURM squeue command and return
-#   the results. This program is expected to run as a daemon 
-#   usually with xinetd or inetd
-#
-#   This is necessary because our webservers are created with
-#   a different distribution than the rest of our machines.
-#   This means that the slurm binaries (like squeue) cannot
-#   be run on the web server.
+Use this program to issue a SLURM squeue command and return
+the results. This program is expected to run as a daemon 
+usually with xinetd or inetd
 
+This is necessary because our webservers are created with
+a different distribution than the rest of our machines.
+This means that the slurm binaries (like squeue) cannot
+be run on the web server.
 
-Use program as a crontab job to find runs that have not had certain
-steps completed. When one is found a request is queued to
-complete the step.
-
-This process will be most successful if this program is run
-after one might expect the previous step has completed.
-For instance for verifying a run, run this in the early morning when you
-might expect all the data has arrived.
+When we have all of our infrastructure machines on the same OS level,
+then this should be removed from the topmed PHP code and done
+more rationally. Until then, this is an embarrassing hack, but useful.
 
 =head1 OPTIONS
 

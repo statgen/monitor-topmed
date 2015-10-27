@@ -100,41 +100,27 @@ if [ "$1" = "-squeue" ]; then
   fi
   echo "<p>Partition <b>$2</b> has $n jobs queued"
   if [ "$2" = "nomosix" ]; then
-    s=`grep qpl $tmpfile|wc -l`
-    r=`grep align-topmed $tmpfile|grep ' R '|wc -l`
-    echo "<br/>align jobs: $s   ($r running)"
-    s=`grep cram $tmpfile|wc -l`
-    r=`grep cram $tmpfile|grep ' R '|wc -l`
-    echo "<br/>cram jobs: $s   ($r running)"
-    s=`grep backup $tmpfile|wc -l`
-    r=`grep backup $tmpfile|grep ' R '|wc -l`
-    echo "<br/>backup jobs: $s   ($r running)"
-  fi
-  if [ "$2" = "topmed" ]; then
-    s=`grep bac $tmpfile|wc -l`
-    r=`grep bac $tmpfile|grep ' R '|wc -l`
-    echo "<br/>backup jobs: $s   ($r running)"
-    s=`grep qpl $tmpfile|wc -l`
-    r=`grep qpl $tmpfile|grep ' R '|wc -l`
-    echo "<br/>qplot jobs: $s   ($r running)"
+    grep topmed $tmpfile > $tmpfile.tmp         # Only look at topmed jobs
+    mv $tmpfile.tmp $tmpfile
+    for t in ver bac bai qpl cra ncb; do
+      s=`grep $t $tmpfile|wc -l`
+      r=`grep $t $tmpfile|grep ' R '|wc -l`
+      if [ "$s" != "0" ]; then
+        echo "<br/>$t jobs: $s   ($r running)"
+      fi
+    done
   fi
   if [ "$2" = "topmed-incoming" -o "$2" = "topmed2-incoming" ]; then
-    s=`grep ver $tmpfile|wc -l`
-    r=`grep ver $tmpfile|grep ' R '|wc -l`
-    echo "<br/>verify jobs: $s   ($r running)"
-    s=`grep bac $tmpfile|wc -l`
-    r=`grep bac $tmpfile|grep ' R '|wc -l`
-    echo "<br/>backup jobs: $s   ($r running)"
-    s=`grep bai $tmpfile|wc -l`
-    r=`grep bai $tmpfile|grep ' R '|wc -l`
-    echo "<br/>bai jobs: $s   ($r running)"
-    s=`grep cram $tmpfile|wc -l`
-    r=`grep cram $tmpfile|grep ' R '|wc -l`
-    echo "<br/>cram jobs: $s   ($r running)"
+    for t in ver bac bai qpl cra ncb; do
+      s=`grep $t $tmpfile|wc -l`
+      r=`grep $t $tmpfile|grep ' R '|wc -l`
+      if [ "$s" != "0" ]; then
+        echo "<br/>$t jobs: $s   ($r running)"
+      fi
+    done
   fi
   echo "<br/>Last $lastn queued jobs are:</p><pre>"
-  grep backup $tmpfile | tail -$lastn
-  grep cram $tmpfile | tail -$lastn
+  grep backup $tmpfile | tail -$lastn $tmpfile
   echo "</pre>"
   rm -f $tmpfile
   exit

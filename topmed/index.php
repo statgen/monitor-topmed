@@ -47,6 +47,7 @@ $BAMNOTE = "<p><b>Note:</b><br>" .
     "<i>Colors:</i> " .
     "<span class='cancelled'> cancelled </span>&nbsp;" .
     "<span class='completed'> completed </span>&nbsp;" .
+    "<span class='delivered'> delivered </span>&nbsp;" .
     "<span class='failed'> failed </span>&nbsp;" .
     "<span class='requested'> requested </span>&nbsp;" .
     "<span class='started'> started </span>&nbsp;" . 
@@ -72,7 +73,7 @@ $quickcols = array(                     // Map of status column to verb
     'dateqplot'    => 'qplot',
     'datecram'     => 'cramed',
     'datemapping'  => 'mapping',
-    'datecp2ncbi'  => '2ncbi',
+    'datecp2ncbi'  => 'ncbi',
 );
 $quickletter = array(                   // Map of status column to letter we see
     'datearrived'  => 'A',
@@ -209,7 +210,6 @@ if ($fcn == 'showqlocal') {
 
 if ($fcn == 'showqrmt') {
     print "<center>$SHOWQUEUES &nbsp;&nbsp;&nbsp;</center>\n";
-    print ShowSLURM('topmed');
     print ShowSLURM('nomosix');
     exit;
 }
@@ -852,19 +852,21 @@ function QuickStatus($r) {
 #   $t = -1    Task failed
 #   $t = 0     Task requested
 #   $t = 1     Task cancelled
-#   $t = 2     Task submitted to queuing system
+#   $t = 2     Task submitted
+#   $t = 3     Data delivered, waiting for confirmation
 #   returns array (date-string, state)
 ---------------------------------------------------------------*/
 function DateState($t) {
     $state = 'notset';
     $str = '';
     if (isset($t) && $t != '') {
-        if ($t > 1)   { $state = 'completed'; $str = date('Y/m/d H:i', $t); }
+        if ($t > 10)  { $state = 'completed'; $str = date('Y/m/d H:i', $t); }
         if ($t < -1)  { $state = 'started'; $str = date('Y/m/d H:i', -$t); }
         if ($t == 0)  { $state = 'requested'; }
         if ($t == -1) { $state = 'failed'; }
         if ($t == 1)  { $state = 'cancelled'; }
         if ($t == 2)  { $state = 'submitted'; }
+        if ($t == 3)  { $state = 'delivered'; }
     }
     return array($str, $state);
 }

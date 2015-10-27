@@ -39,6 +39,7 @@ our %opts = (
     topmedcram   => "$topmedbin/topmed_cram.sh",
     topmedbai    => "$topmedbin/topmed_bai.sh",
     topmedqplot  => "$topmedbin/topmed_qplot.sh",
+    topmedncbi   => "$topmedbin/topmed_ncbi.sh",
     realm => '/usr/cluster/monitor/etc/.db_connections/topmed',
     centers_table => 'centers',
     runs_table => 'runs',
@@ -63,7 +64,7 @@ Getopt::Long::GetOptions( \%opts,qw(
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$Script [options] arrive|verify|backup|bai|qplot|cram|cp2ncbi\n" .
+    warn "$Script [options] arrive|verify|backup|bai|qplot|cram|ncbi\n" .
         "Find runs which need some action and queue a request to do it.\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
@@ -170,7 +171,6 @@ if ($fcn eq 'verify') {
                 if (defined($href->{datemd5ver}) && ($href->{datemd5ver} ne '')) {
                     if ($opts{suberr} && $href->{datemd5ver} == -1) { $href->{datemd5ver} = 0; }
                     if ($href->{datemd5ver} =~ /\D/) { next; }  # Not numeric
-                    if ($href->{datemd5ver} < 0) { next; }  # Already started
                     if ($href->{datemd5ver} == 2) { next; } # Already queued to be run
                     if ($href->{datemd5ver} > 10) { next; } # Already done
                 }
@@ -212,7 +212,6 @@ if ($fcn eq 'bai') {
                 if (defined($href->{datebai}) && ($href->{datebai} ne '')) {
                     if ($opts{suberr} && $href->{datebai} == -1) { $href->{datebai} = 0; }
                     if ($href->{datebai} =~ /\D/) { next; }  # Not numeric
-                    if ($href->{datebai} < 0) { next; }  # Already started
                     if ($href->{datebai} == 2) { next; } # Already queued to be run
                     if ($href->{datebai} > 10) { next; } # Already done
                 }
@@ -254,7 +253,6 @@ if ($fcn eq 'backup') {
                 if (defined($href->{datebackup}) && ($href->{datebackup} ne '')) {
                     if ($opts{suberr} && $href->{datebackup} == -1) { $href->{datebackup} = 0; }
                     if ($href->{datebackup} =~ /\D/) { next; }  # Not numeric
-                    if ($href->{datebackup} < 0) { next; }  # Already started
                     if ($href->{datebackup} == 2) { next; } # Already queued to be run
                     if ($href->{datebackup} > 10) { next; } # Already done
                 }
@@ -300,7 +298,6 @@ if ($fcn eq 'cram') {
                 if (defined($href->{datecram}) && ($href->{datecram} ne '')) {
                     if ($opts{suberr} && $href->{datecram} == -1) { $href->{datecram} = 0; }
                     if ($href->{datecram} =~ /\D/) { next; }  # Not numeric
-                    if ($href->{datecram} < 0) { next; }  # Already started
                     if ($href->{datecram} == 2) { next; } # Already queued to be run
                     if ($href->{datecram} > 10) { next; } # Already done
                 }
@@ -310,6 +307,48 @@ if ($fcn eq 'cram') {
         }
     }
     ShowSummary('cram');
+    exit;
+}
+
+#--------------------------------------------------------------
+#   Get a list of BAMs to be sent to NCBI
+#--------------------------------------------------------------
+if ($fcn eq 'ncbi') {
+    #   Get all the known centers in the database
+    my $centersref = GetCenters();
+    foreach my $cid (keys %{$centersref}) {
+        my $centername = $centersref->{$cid};
+        my $runsref = GetRuns($cid) || next;
+        #   For each run, see if there are bamfiles to be delivered to NCBI
+        foreach my $runid (keys %{$runsref}) {
+            my $dirname = $runsref->{$runid};
+            #   Get list of all bams that have not been sent
+            my $sql = "SELECT bamid,bamname,datecram,datecp2ncbi FROM " .
+                $opts{bamfiles_table} . " WHERE runid='$runid'";
+            my $sth = DoSQL($sql);
+            my $rowsofdata = $sth->rows();
+            if (! $rowsofdata) { next; }
+            for (my $i=1; $i<=$rowsofdata; $i++) {
+                my $href = $sth->fetchrow_hashref;
+                my $f = $opts{topdir} . "/$centername/$dirname/" . $href->{bamname};
+                #   Only do if cram has been created
+                if (! defined($href->{datecram})) { next; }
+                if ($href->{datecram} eq '') { next; }
+                if ($href->{datecram} =~ /\D/) { next; }  # Not numeric
+                if ($href->{datecram} < 10) { next; }     # No cram, avoid sending
+                if (defined($href->{datecp2ncbi}) && ($href->{datecp2ncbi} ne '')) {
+                    if ($opts{suberr} && $href->{datecp2ncbi} == -1) { $href->{datecp2ncbi} = 0; }
+                    if ($href->{datecp2ncbi} =~ /\D/) { next; }  # Not numeric
+                    if ($href->{datecp2ncbi} == 2) { next; } # Already queued to be run
+                    if ($href->{datecp2ncbi} == 3) { next; } # Already delivered data
+                    if ($href->{datecp2ncbi} > 10) { next; } # Already done
+                }
+                #   Run the command
+                BatchSubmit("$opts{topmedncbi} -submit $href->{bamid} $f");
+            }
+        }
+    }
+    ShowSummary('ncbi');
     exit;
 }
 
@@ -546,9 +585,9 @@ sub ShowSummary {
     my ($type) = @_;
 
     my $s = '';
-    if ($opts{jobcount})            { $s .= "$opts{jobcount} jobs submitted\n"; }
-    if ($opts{jobsnotpermitted})    { $s .=  "  $opts{jobsnotpermitted} job submissions not permitted\n"; }
-    if ($opts{jobsfailedsubmission}) { $s .=  "  $opts{jobsfailedsubmission} job submissions failed\n"; }
+    if ($opts{jobcount})            { $s .= "$opts{jobcount} jobs submitted"; }
+    if ($opts{jobsnotpermitted})    { $s .=  "  $opts{jobsnotpermitted} job submissions not permitted"; }
+    if ($opts{jobsfailedsubmission}) { $s .=  "  $opts{jobsfailedsubmission} job submissions failed"; }
     if (! $s) { return; }
     print "$nowdate $type: $s\n";
 }
@@ -660,7 +699,7 @@ Provided for developers to see additional information.
 
 =over 4
 
-=item B<arrive | verify | backup | bai | qplot | cram | cp2ncbi>
+=item B<arrive | verify | backup | bai | qplot | cram | ncbi>
 
 Directs this program to look for runs that have not been through the process name
 you provided and to queue a request they be verified.

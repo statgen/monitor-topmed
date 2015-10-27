@@ -79,6 +79,7 @@ CREATE TABLE bamfiles (
   jobidqplot   VARCHAR(12),
   jobidmapping VARCHAR(12),
   jobidcp2ncbi VARCHAR(12),
+  bam_delivered VARCHAR(12),
   bamsize      VARCHAR(16) DEFAULT 0,
 
   dateinit     VARCHAR(12),

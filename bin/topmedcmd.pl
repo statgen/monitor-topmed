@@ -31,23 +31,26 @@ my %VALIDVERBS = (                  # Valid verbs to database colum
     qploted => 'dateqplot',
     backedup => 'datebackup',
     cramed => 'datecram',
-    cp2ncbi => 'datecp2ncbi',
+    cped2ncbi => 'datecp2ncbi',
+    delivered => 'bam_delivered',
 );
 my %VALIDSTATUS = (                 # Valid status for the verbs
     requested => 1,
     completed => 1,
+    delivered => 1,
     started => 1,
     submitted => 1,
     failed => 1,
     cancelled => 1,
 );
-my %VALIDOPS = (
+my %VALIDOPS = (                    # Used for permit
     all => 1,
     verify => 1,
     backup => 1,
     bai => 1,
     qplot => 1,
     cram => 1,
+    ncbi => 1,
 );
 
 #--------------------------------------------------------------
@@ -72,7 +75,7 @@ Getopt::Long::GetOptions( \%opts,qw(
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
     my $m = "$Script [options]";
-    warn "$m mark bamid arrived|md5verified|baid|qploted|backedup|cramed|cp2ncbi requested|submitted|completed|started|failed|cancelled\n" .
+    warn "$m mark bamid arrived|md5verified|baid|qploted|backedup|cramed|cp2ncbi requested|submitted|completed|started|failed|cancelled|delivered\n" .
         "  or\n" .
         "$m unmark bamid [same list as mark]\n" .
         "  or\n" .
@@ -136,6 +139,7 @@ sub Mark {
     #   $t = 0     Task requested
     #   $t = 1     Task cancelled
     #   $t = 2     Task submitted
+    #   $t = 3     Data delivered, waiting for confirmation
     my $col = $VALIDVERBS{$op};
     my $val;
     my $done = 0;
@@ -146,6 +150,11 @@ sub Mark {
     if ($state eq 'completed') {
         $val = time();
         DoSQL("UPDATE $opts{bamfiles_table} SET $col='$val' WHERE bamid=$bamid");
+        $done++;
+    }
+    if ($state eq 'delivered') {
+        $val = time();
+        DoSQL("UPDATE $opts{bamfiles_table} SET $col='3' WHERE bamid=$bamid");
         $done++;
     }
     if ($state eq 'started') {
