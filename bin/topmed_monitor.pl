@@ -323,7 +323,7 @@ if ($fcn eq 'ncbi') {
         foreach my $runid (keys %{$runsref}) {
             my $dirname = $runsref->{$runid};
             #   Get list of all bams that have not been sent
-            my $sql = "SELECT bamid,bamname,datecram,datecp2ncbi FROM " .
+            my $sql = "SELECT bamid,bamname,datecram,datecp2ncbi,expt_sampleid FROM " .
                 $opts{bamfiles_table} . " WHERE runid='$runid'";
             my $sth = DoSQL($sql);
             my $rowsofdata = $sth->rows();
@@ -331,6 +331,9 @@ if ($fcn eq 'ncbi') {
             for (my $i=1; $i<=$rowsofdata; $i++) {
                 my $href = $sth->fetchrow_hashref;
                 my $f = $opts{topdir} . "/$centername/$dirname/" . $href->{bamname};
+                #   NWD must be known
+                if (! defined($href->{expt_sampleid})) { next; }
+                if ($href->{expt_sampleid} !~ /NWD/ '') { next; }
                 #   Only do if cram has been created
                 if (! defined($href->{datecram})) { next; }
                 if ($href->{datecram} eq '') { next; }
