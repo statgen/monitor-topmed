@@ -7,8 +7,6 @@
 #   Use this program to check for files that are arriving
 #   and initialize the NHLBI TOPMED database
 #
-#   Requires XML::Simple    (apt-get install libxml-simple-perl)
-#
 # ChangeLog:
 #   $Log: nhlbi_init.pl,v $
 #
@@ -253,7 +251,7 @@ Generates this output.
 =item B<-realm NAME>
 
 Specifies the realm name to be used.
-This defaults to B<webcd>.
+This defaults to B<topmed>.
 
 =item B<-verbose N>
 
