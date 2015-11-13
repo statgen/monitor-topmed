@@ -20,7 +20,7 @@ include_once "../edit.php";
 //print "<!-- _POST=\n"; print_r($_POST); print " -->\n";
 
 $qurl =  $_SERVER['SCRIPT_NAME'] . "?fcn=queue'";
-$STATUSLETTERS =  "<i>A=File Arrived, 5=MD5 Verified, B=BAM backed up, C=BAM=>CRAM, I=BAI created, Q=qplot run, M=Remapped BAM, N=File sent to NCBI";
+$STATUSLETTERS =  "<i>A=File Arrived, 5=MD5 Verified, B=BAM backed up, C=BAM=>CRAM, I=BAI created, Q=qplot run, 7=Remapped BAM Build=37, N=File sent to NCBI";
 
 $SHOWQUEUES = "STATUS: &nbsp;&nbsp;&nbsp;" .
     "<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=showqlocal' " .
@@ -82,7 +82,7 @@ $quickletter = array(                   // Map of status column to letter we see
     'datebai'      => 'I',
     'dateqplot'    => 'Q',
     'datecram'     => 'C',
-    'datemapping'  => 'M',
+    'datemapping'  => '7',
     'datecp2ncbi'  => 'N',
 );
 $validfunctions = array('all', 'verify', 'backup', 'bai', 'qplot', 'cram');
@@ -145,7 +145,7 @@ $parmcols = array('fcn', 'maxdir', 'sortby', 'desc', 'center',
 extract (isolate_parms($parmcols));
 if (! $center) { $center = 'all'; }
 if (! $fcn)    { $fcn = 'runs'; }
-if (! $maxdir) { $maxdir = '50'; }
+if (! $maxdir) { $maxdir = '150'; }
 
 DB_Connect($LDB['realm']);
 GetCenters();                   // Get maps to identify centers
@@ -496,6 +496,7 @@ function ViewRuns($center, $maxdirs, $sortby, $desc, $iammgr) {
                 if ($c == 'status') { $d = CalcRunStatus($d); }
                 //if ($c == 'dateinit' && (! preg_match('/\D/', $d))) { $d = date('Y/m/d H:i', $d); }
                 if ($c == 'dateinit') { $d = date('Y/m/d H:i', $d); }
+                if ($c == 'datecomplete' && $d != '&nbsp;') { $d = date('Y/m/d H:i', $d); }
                 $html .= "<td align='center'>$d</td>\n";
             }
             
@@ -563,7 +564,7 @@ function ViewRunDetail($runid) {
 ---------------------------------------------------------------*/
 function ViewBams($runid, $maxdirs, $iammgr) {
     global $LDB, $HDR, $CENTERS, $CENTERID2NAME, $CENTERNAME2ID, $FILES, $BAMNOTE, $SHOWQUEUES;
-    $hdrcols  = array('bamname', 'QUIKSTAT', 'bamsize', 'expt_refname');
+    $hdrcols  = array('bamname', 'QUIKSTAT', 'bamsize', 'piname');
     $html = '';
     $maxdirs = 0;                   // For now, show all BAMs
 
@@ -658,6 +659,7 @@ function ViewBamDetail($bamid) {
         if ($c == 'bamid') { $bamid = $row[$c]; continue; }
         $d = $row[$c];
         if ($c == 'dateinit') { $d = date('Y/m/d H:i', $d); }
+        if ($c == 'datecomplete' && $d != '&nbsp;') { $d = date('Y/m/d H:i', $d); }
         if (in_array($c, $conv2dat)) {  // Special date needs formatting
             $vals = DateState($d);
             if ($vals[1] != 'notset' && $c != 'dateinit') {
