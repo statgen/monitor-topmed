@@ -7,12 +7,14 @@ DROP TABLE IF EXISTS centers;
 CREATE TABLE centers (
   centerid     INT         NOT NULL AUTO_INCREMENT,
   centername   VARCHAR(16) NOT NULL,
+  centerdesc   VARCHAR(96) NOT NULL,
+  designdesc   TEXT NOT NULL,
   PRIMARY KEY  (centerid)
 );
-INSERT INTO centers (centername) VALUES('broad');
-INSERT INTO centers (centername) VALUES('illumina');
-INSERT INTO centers (centername) VALUES('nygc');
-INSERT INTO centers (centername) VALUES('uw');
+INSERT INTO centers (centername,centerdesc,designdesc) VALUES('broad', 'Broad Institute','Illumina sequencing of Homo sapiens via random selection');
+INSERT INTO centers (centername,centerdesc,designdesc) VALUES('illumina', 'Illumina Fast Track Services','PCR-Free Paired-end libraries are manually generated from 500ng-1ug of gDNA using the Illumina TruSeq DNA Sample Preparation Kit (Catalog #: FC-121-2001), based on the protocol in the TruSeq DNA PCR-Free Sample Preparation Guide.  Pre-fragmentation gDNA cleanup is performed using paramagnetic sample purification beads (Agencourt (TM) AMPure (TM) XP reagents, Beckman Coulter).  Samples are fragmented and libraries are size selected following fragmentation and end-repair using paramagnetic sample purification beads, targeting short inserts.  Final libraries are quality controlled for size using a gel electrophoretic separation system and are quantified.');
+INSERT INTO centers (centername,centerdesc,designdesc) VALUES('nygc', 'New York Genome Center','Whole genome sequencing using Illumina TruSeq PCR-free DNA library preparation with 500ng input DNA, sequenced to >30x mean coverage with 2x150bp reads on HiSeq X.');
+INSERT INTO centers (centername,centerdesc,designdesc) VALUES('uw', 'University of Washington Genome Sciences','equivalent to Illumina TruSeq PCR-free DNA sample prep');
 
 #   The first of these,  EXPERIMENT -> alias,  identifies which record was pointed to by
 #   RUN -> EXPERIMENT_REF -> refname. Then  EXPERIMENT -> SAMPLE_DESCRIPTOR -> refname
@@ -27,7 +29,7 @@ CREATE TABLE runs (
   dirname      VARCHAR(64) NOT NULL,
   status       VARCHAR(256),
   bamcount     INT,
-  xmlfound     INT DEFAULT 0,
+  xmlfound     INT DEFAULT 0,          /* Remove this */
 
   dateinit     VARCHAR(12),
   datecomplete VARCHAR(12),
@@ -51,8 +53,15 @@ DROP TABLE IF EXISTS bamfiles;
 CREATE TABLE bamfiles (
   bamid        INT         NOT NULL AUTO_INCREMENT,
   runid        INT         NOT NULL,
-  studyid      INT         NOT NULL,
+  studyid      INT         NOT NULL,          /* Remove this */
+  bamname_orig VARCHAR(96) NOT NULL,
   bamname      VARCHAR(96) NOT NULL,
+  bamsize      VARCHAR(16) DEFAULT 0,
+  nominal_length  INT DEFAULT 0,
+  nominal_sdev INT DEFAULT 0,
+  base_coord   INT DEFAULT 0,
+  library_name VARCHAR(96),
+  cramname     VARCHAR(96) NOT NULL,
   studyname    VARCHAR(96) NOT NULL,
   piname       VARCHAR(96),
   phs          VARCHAR(12),
@@ -69,7 +78,6 @@ CREATE TABLE bamfiles (
   datecram     VARCHAR(12),
   datebai      VARCHAR(12),
   dateqplot    VARCHAR(12),
-  datemapping  VARCHAR(12),
   datecp2ncbi  VARCHAR(12),
   jobidarrived VARCHAR(12),
   jobidmd5ver  VARCHAR(12),
@@ -77,10 +85,14 @@ CREATE TABLE bamfiles (
   jobidcram    VARCHAR(12),
   jobidbai     VARCHAR(12),
   jobidqplot   VARCHAR(12),
-  jobidmapping VARCHAR(12),
   jobidcp2ncbi VARCHAR(12),
   bam_delivered VARCHAR(12),
-  bamsize      VARCHAR(16) DEFAULT 0,
+#   Added for remapping with build37
+  datemapping  VARCHAR(12),
+  jobidmapping VARCHAR(12),
+#   Added for remapping with build38
+#  datemapping8 VARCHAR(12),
+#  jobidmapping8 VARCHAR(12),
 
   dateinit     VARCHAR(12),
   PRIMARY KEY  (bamid)
@@ -89,6 +101,7 @@ CREATE INDEX index_runid   ON bamfiles(runid);
 CREATE INDEX index_refname ON bamfiles(refname);
 
 # ALTER TABLE bamfiles ADD COLUMN datebai VARCHAR(12) AFTER datebackup;
+
 
 #   This table is used to control when/if an operation is permitted
 #   If an entry is in this table, it means it is disabled
