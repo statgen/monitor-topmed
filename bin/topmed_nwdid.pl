@@ -4,7 +4,8 @@
 # Name: topmed_nwdid.pl
 #
 # Description:
-#   Use this program to create the NWD id file
+#   Use this program to extract some data from the BAM header
+#   and save it in the database. It always tries to create the NWD id file
 #
 # ChangeLog:
 #   $Log: topmed_nwdid.pl,v $
@@ -31,6 +32,7 @@ our %opts = (
     topdir => '/net/topmed/incoming/topmed',
     qcresults => '/net/topmed/incoming/qc.results',
     topmedcmd => '/usr/cluster/monitor/bin/topmedcmd.pl',
+    nominal_awk => $Bin . '/topmed_get_nominal.awk',
     verbose => 0,
 );
 
@@ -73,7 +75,46 @@ foreach (split("\n", $res)) {
     $smvalue = $s;
     $smcount++;
 }
-if (! $smvalue) { die "BAM '$bamfile' had no SM: fields\n"; }
+if (! $smvalue) { die "BAM '$bamfile' had no SM: field (e.g. no NWDID)\n"; }
+
+#--------------------------------------------------------------
+#   The field library_name (e.g. LB:Pond-400614) comes from
+#   the header too.
+#--------------------------------------------------------------
+$cmd = $opts{samtools} . ' view -H ' . $bamfile . ' | grep -e \'^@RG\' | head -1 | tr "\t" "\n" | grep LB: | sed -e s/LB://';
+my $library_name = `$cmd`;
+chomp($library_name);
+if (! $library_name) {
+    #   Of course not all centers put this in the same place,
+    #   so we have a special hack for illumina :-(
+    $cmd = $opts{samtools} . ' view -H ' . $bamfile . ' | grep -e \'^@RG\' | head -1 | tr "\t" "\n" | grep DS: | sed -e s/DS://';
+    $library_name = `$cmd`;
+    chomp($library_name);
+}
+if (! $library_name) { die "BAM '$bamfile' had no LB: or DS: field for library_name\n"; }
+
+#--------------------------------------------------------------
+#   Get the nominal mean and std.dev of mapped insert size from the header.
+#   This returns something like:
+#       351.82 83.45 400.00 K 1 203752 151.00 2 201823 151.00 ...
+#   where column one is nominal_length, then nominal_sdev
+#   After the K are triplets of N and two numbers
+#   We want the triplet where the N is 1 and from that triplet 
+#   we want the last field (e.g. 151.00)
+#--------------------------------------------------------------
+$cmd = $opts{samtools} . ' view ' . $bamfile . " 2>/dev/null | awk -f $opts{nominal_awk}";
+$res = `$cmd`;
+if ($res !~ /^\s*(\S+)\s+(\S+)\s+\S+\s+K\s+(.+)/) { die "BAM '$bamfile' nominal mean and std.dev missing\n  CMD=$cmd/n"; }
+my $nominal_length = int((($1*10) + 5)/10);
+my $nominal_sdev = int((($2*5) + 2.5)/5);
+my $base_coord = '';
+my @triplets = split(' ', $3);
+for (my $i=0; $i<=$#triplets; $i=$i+3) {
+    if ($triplets[$i] ne '1') { next; }
+    $base_coord = int($triplets[$i+2]) + 1;
+    last;
+}
+if (! $base_coord) { die "BAM '$bamfile' base_coord missing\n  CMD=$cmd/n"; }
 
 #--------------------------------------------------------------
 #   In the lookup.table.tab file, get the fields "PI_NAME" and
@@ -105,12 +146,22 @@ if (! $pi_name) { die "Unable to find pi_name for '$smvalue' in '$opts{lookuptab
 #   Update database with this info if bamid provided
 #--------------------------------------------------------------
 if ($opts{bamid}) {
+    $cmd = "$opts{topmedcmd} set $opts{bamid} library_name $library_name";
+    system($cmd);
+    $cmd = "$opts{topmedcmd} set $opts{bamid} nominal_length $nominal_length";
+    system($cmd);
+    $cmd = "$opts{topmedcmd} set $opts{bamid} nominal_sdev $nominal_sdev";
+    system($cmd);
+    $cmd = "$opts{topmedcmd} set $opts{bamid} base_coord $base_coord";
+    system($cmd);
     $cmd = "$opts{topmedcmd} set $opts{bamid} piname $pi_name";
     system($cmd);
     $cmd = "$opts{topmedcmd} set $opts{bamid} studyname $study";
     system($cmd);
     $cmd = "$opts{topmedcmd} set $opts{bamid} expt_sampleid $smvalue";
-    system($cmd);               # Update NWDID
+    system($cmd);               # Update NWDID, weird database name
+    $cmd = "$opts{topmedcmd} set $opts{bamid} cramname $smvalue.src.cram";
+    system($cmd);
 }
 
 #--------------------------------------------------------------
@@ -138,8 +189,6 @@ if (! $opts{nonwdid}) {
 
 exit;
 
-
-
 #==================================================================
 #   Perldoc Documentation
 #==================================================================
@@ -147,7 +196,7 @@ __END__
 
 =head1 NAME
 
-topmed_nwdid.pl - Create the NWD id file
+topmed_nwdid.pl - Create the NWD id file and up probably update database
 
 =head1 SYNOPSIS
 
@@ -159,6 +208,17 @@ topmed_nwdid.pl - Create the NWD id file
 This program creates the NWD id file.
 The one-line file will be found in 
 /incoming/qc.results/CENTER/RUN/BAMFILE_BASENAME.nwdid
+
+If B-bamid> is provided, these fields from the BAM header
+are saved in the database:
+  library_name
+  nominal_length
+  nominal_sdev
+  base_coord
+  piname
+  studyname
+  expt_sampleid    (i.e. NWDID)
+  cramname
 
 =head1 OPTIONS
 

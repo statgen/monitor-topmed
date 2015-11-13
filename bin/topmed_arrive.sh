@@ -35,6 +35,8 @@ fi
 
 #   Mark this as started
 $topmedcmd mark $bamid arrived started || exit $?
+
+#   Set NWDID and other database fields
 $topmednwd -bamid $bamid $bamfile
 rc=$?
 if [ "$rc" = "0" ]; then
