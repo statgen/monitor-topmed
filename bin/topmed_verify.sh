@@ -6,6 +6,7 @@
 #   Do not specify a QOS for verify so it runs before QPLOT
 #
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
+topmedrename=/usr/cluster/monitor/bin/topmedrename.pl
 console=/net/topmed/working/topmed-output
 mem=${TOPMED_MEM:-1G}
 
@@ -65,10 +66,17 @@ echo "Command completed in $etime seconds"
 rm -f $tmpfile
 if [ "$rc" != "0" ]; then
   $topmedcmd mark $bamid md5verified failed
-  exit 0
+  exit 1
 fi
 $topmedcmd mark $bamid md5verified completed
 #   Set bamsize again to be sure
 sz=`ls -l $bamfile | awk '{print $5}'`
 $topmedcmd set $bamid bamsize $sz
-exit $rc
+
+#   Rename the BAM file and change the MD5 entry
+$topmedrename $bamid $checksum $bamfile
+if [ "$?" != "0" ]; then
+  $topmedcmd mark $bamid md5verified failed
+  exit 1
+fi
+exit
