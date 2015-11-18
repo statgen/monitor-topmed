@@ -183,17 +183,20 @@ rm -f ${chkname}.init.stat  ${chkname}.cram.stat ${chkname}.bam ${chkname}.bam.m
 
 echo "Calculating new MD5"
 now=`date +%s`
-md5sum $newname
-rc=$?
-if [ "$rc" != "0" ]; then
+#   Calculate the MD5 for the cram
+md5=`md5sum $newname | awk '{print $1}'`
+if [ "$md5" = "" ]; then
   echo "Command failed: md5sum $newname"
   $topmedcmd mark $bamid cramed failed
   exit 3
 fi
+$topmedcmd set $bamid cramchecksum $md5
 s=`date +%s`; s=`expr $s - $now`; echo "md5 calculated in $s seconds"
 
 etime=`date +%s`
 etime=`expr $etime - $stime`
+
+#   Be sure that NWDID is set in database
 here=`pwd`
 echo "BAM to CRAM backup completed in $etime seconds, created $here/$newname"
 $topmedcmd set $bamid expt_sampleid $nwdid
