@@ -24,19 +24,28 @@ use lib "$FindBin::Bin/../lib/perl5";
 use My_DB;
 use Getopt::Long;
 
-use IO::File;
-use XML::Writer;
 use File::Basename;
 
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
+my $xmlns_url = "xmlns:xsi = \"http://www.w3.org/2001/XMLSchema-instance\"\n" .
+        "  xsi:noNamespaceSchemaLocation = \"http://www.ncbi.nlm.nih.gov/viewvc/v1/" .
+            "trunk/sra/doc/SRA_1-5/SRA";
+my $incomingdir = '/net/topmed/incoming';
+my $topmed = '/net/topmed';
+my $topmed2 = '/net/topmed2';
 our %opts = (
     realm => '/usr/cluster/monitor/etc/.db_connections/topmed',
     centers_table => 'centers',
     runs_table => 'runs',
     bamfiles_table => 'bamfiles',
-    topdir => '/net/topmed/incoming/topmed',
+    topdir      => "$topmed/incoming/topmed",
+    topdir2     => "$topmed2/incoming/topmed",
+    backupdir   => "$topmed/working/backups/incoming/topmed",
+    backupdir2  => "$topmed2/working/backups/incoming/topmed",
+    resultsdir  => "$topmed/working/schelcj/results",
+    resultsdir2 => "$topmed2/working/schelcj/results",
     broker_name => "UM-SPH",
     lab_name => "Abecasis",
     master => 'Tom Blackwell',
@@ -47,10 +56,16 @@ our %opts = (
     build => 37,
     run_processing => 'run_processing.txt',
     verbose => 0,
+    xmlns_run => "$xmlns_url.run.xsd?view=co\">\n",
+    xmlns_experiment => "$xmlns_url.experiment.xsd?view=co\">\n",
+    xmlns_submission => "$xmlns_url.submission.xsd?view=co\">\n",
+    processingsectiondir => "$topmed/incoming/study.reference/send2ncbi",
+    experiment_title => "30x whole genome DNA sequence for NHLBI TOPMed sample",
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
     help nolint realm=s verbose=i build=i inst_model=s design_description=s run_processing=s
+    bamlist=s xmlprefix=s sendlist=s 
     )) || die "$Script Failed to parse options\n";
 
 #   Simple help if requested
@@ -83,155 +98,227 @@ if (! chdir($d)) {
 }
 
 #--------------------------------------------------------------
-#   Figure out names of XML files to be created
-#   If they already exist, make another since data CAN be
-#   submitted to NCBI more than once for the same run
+#   Prepare input to create XML
 #--------------------------------------------------------------
+#   Figure out names of XML files to be created
+#   If they already exist, they will be overwritten
+if (! $opts{xmlprefix}) { $opts{xmlprefix} = "nhlbi.$center.$run"; }
 my %files = (
-    submit => "nhlbi.$center.$run.submit",
-    expt =>   "nhlbi.$center.$run.expt",
-    run =>    "nhlbi.$center.$run.run"
+    submit => $opts{xmlprefix} . '.submit.xml',
+    expt =>   $opts{xmlprefix} . '.expt.xml',
+    run =>    $opts{xmlprefix} . '.run.xml'
 );
-foreach my $f (keys %files) {
-    if (! -f $files{$f}) { next; }              # File does not exist, use this
-    foreach my $i (1 .. 10) {                   # Else try another name
-        if (! -f "$files{$f}$i") { $files{$f} = "$files{$f}$i"; last; } 
-    }
-    if (-f $files{$f}) { die "$Script Unable to figure out XML name for '$files{$f}'\n"; }
-}
-foreach my $f (keys %files) { $files{$f} = $files{$f} . '.xml'; }   # Full name of files
-
 $opts{exptalias} = "$center.$run.$now";         # This ties expt with submit XML
 
+#   Get list of all BAMIDs
+my @bamids = ();
+if ($opts{bamlist}) {
+    open(IN,$opts{bamlist}) ||
+        die "$Script Unable to open list of BAM files '$opts{bamlist}': $!\n";
+    @bamids = <IN>;
+    close(IN);
+}
+else {                          # List not provided, get all bams for this center/RUN
+    my $sql = "SELECT * FROM $opts{runs_table} WHERE dirname='$run'";
+    my $sth = DoSQL($sql);
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { die "$Script Unknown run '$run'\n"; }
+    my $href = $sth->fetchrow_hashref;
+    my $runid = $href->{runid};                 # Uniq id for this run
+    $sql = "SELECT * FROM $opts{bamfiles_table} WHERE runid=$runid";
+    $sth = DoSQL($sql);
+    $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { die "$Script Run '$run' [$runid] has no BAM files\n"; }
+    for (my $i=1; $i<=$rowsofdata; $i++) {
+        $href = $sth->fetchrow_hashref;
+        push @bamids,$href->{bamid};
+    }
+    print "Using all BAMs for $center/$run. This is almost certainly not what you want\n";
+    print "Do you really want to continue? (Y/N): ";
+    $_ = <STDIN>;
+    if (! /^y/i) { die "Nothing done\n"; }
+}
+if (! @bamids) { die "$Script No BAMIDs were provided\n"; }
+print "Creating XML for a total of " . scalar(@bamids) . " BAMS in $center/$run\n";
+
 #--------------------------------------------------------------
-#   Create XML files or die   $center and $run are referenced globally
+#   Create XML files or die
 #--------------------------------------------------------------
-CreateSubmit($files{submit});
+#   Initialize the file of files to send
+if ($opts{sendlist}) {
+    open(APP, '>' . $opts{sendlist}) ||
+        die "$Script Unable to create to file '$opts{sendlist}': $!\n";
+    print APP "# XML This is a list of files to be sent to NCBI\n";
+    close(APP);
+}
+
+CreateSubmit($files{submit}, $files{run}, $files{expt});
 RunLINT($files{submit});
 
-#   Create XML of the experiment. Get array of runids to send
-my $runidref = CreateExpt($files{expt});
+#   Create experiment XML from the list of bamids
+CreateExpt($files{expt}, \@bamids);
 RunLINT($files{expt});
 
 #   Create XML of BAM details
-CreateRun($files{run}, $runidref, $opts{run_processing});
+#   Append fully qualified path of files to send in $opts{sendlist} on one line
+CreateRun($files{run}, \@bamids, "$opts{processingsectiondir}/$center.run_processing.txt",
+    "$opts{processingsectiondir}/um$opts{build}.run_processing.txt", $opts{sendlist});
 RunLINT($files{run});
+
+#   Last thing to be sent are the XML files themselves
+if ($opts{sendlist}) {
+    open(APP, '>>' . $opts{sendlist}) ||
+        die "$Script Unable to append to file '$opts{sendlist}': $!\n";
+    print APP "XML $files{submit} $files{expt} $files{run}\n";
+    close(APP);
+    print "Created list of files to send in '$opts{sendlist}'\n";
+}
 
 exit;
 
 #==================================================================
 # Subroutine:
-#   CreateRun($f, $runidsref, $processingfile)
+#   CreateRun($f, $bamidlistref, $centerprocessingfile, $remapprocessingfile, $path_files2send)
 #
 #   Create XML file of run information
+#   For each file in the set of bams, append the fully qualified path
+#   to the file to be sent (original cram + b37 cram) to the file $path_files2send
+
 #==================================================================
 sub CreateRun {
-    my ($f, $runidsref, $processingfile) = @_;
-    
+    my ($f, $bamidlistref, $centerprocessingfile, $buildprocessingfile, $path_files2send) = @_;
+
     #   Read in fixed XML data for all files in this run
-    open(IN, $processingfile) ||
-        die "$Script Unable to read 'run_processing' file '$processingfile': $!\n";
+    open(IN, $centerprocessingfile) ||
+        die "$Script Unable to read file '$centerprocessingfile': $!\n";
     my @l = <IN>;
     close(IN);
-    my $runlines = join('', @l);        # Insert this in every RUN block
+    my $centerrunlines = join('', @l);  # Insert this in every RUN block
+
+    #   Read in fixed XML data for all remapped files in this run
+    open(IN, $buildprocessingfile) ||
+        die "$Script Unable to read file '$buildprocessingfile': $!\n";
+    @l = <IN>;
+    close(IN);
+    my $buildrunlines = join('', @l);   # Insert this in every remapped RUN block
 
     #   Create the run XML file
     open(OUT, '>' . $f) ||
         die "$Script Unable to create file '$f': $!\n";
 
     print OUT "<?xml\n  version = \"1.0\"\n  encoding = \"UTF-8\"?>\n";
-    print OUT "<RUN_SET\n" .
-        "  xmlns:xsi = \"http://www.w3.org/2001/XMLSchema-instance\"\n" .
-        "  xsi:noNamespaceSchemaLocation = \"http://www.ncbi.nlm.nih.gov/viewvc/v1/" .
-            "trunk/sra/doc/SRA_1-5/SRA.run.xsd?view=co\">\n";
+    print OUT "<RUN_SET\n" . $opts{xmlns_run};
 
-    #   Now walk through all bams for this run
+    #   For all bams in our list, create a RUN section
     my $count = 0;
-    foreach my $runid (@{$runidsref}) {
-        my $sql = "SELECT * FROM $opts{bamfiles_table} WHERE runid=$runid";
+    my $xml = '';
+    my $files2send = '';
+    foreach my $bamid (@{$bamidlistref}) {
+        my $sql = "SELECT * FROM $opts{bamfiles_table} WHERE bamid=$bamid";
         my $sth = DoSQL($sql);
         my $rowsofdata = $sth->rows();
-        if (! $rowsofdata) { die "$Script Run '$run' [$runid] has no BAM files\n"; }
         $href = $sth->fetchrow_hashref;
-        $count++;
-        print OUT "<RUN\n" .
-            "  alias = \"$href->{checksum}\"\n" .
-            "  center_name = \"$centerdesc\"\n" .
-            "  broker_name = \"$opts{broker_name}\"\n" .
-            "  run_center = \"$centerdesc\">\n" .
-            "<TITLE>Secondary mapping for Build $opts{build}</TITLE>\n" .
-            $runlines .
-            "<DATA_BLOCK>\n" .
-            "  <FILES>\n" .
-            "    <FILE\n" .
-            "      filename = \"$href->{bamname}\"\n" .
-            "      filetype = \"bam\"\n" .
-            "      checksum_method = \"MD5\"\n" .
-            "      checksum = \"$href->{checksum}\">\n" .
-            "    </FILE>\n" .
-            "  </FILES>\n" .
-            "</DATA_BLOCK>\n" .
-            "</RUN>\n";
+        my $s = '';
+        #   If the original BAM (cram) has not been sent, include that
+        if ($href->{cramorigsent} ne 'Y') {
+            $count++;
+            $xml .= "<RUN\n" .
+                "  alias = \"$href->{cramchecksum}\"\n" .
+                "  center_name = \"$centerdesc\"\n" .
+                "  broker_name = \"$opts{broker_name}\"\n" .
+                "  run_center = \"$centerdesc\">\n" .
+                "<TITLE>Secondary mapping Build $opts{build} for $href->{expt_sampleid}</TITLE>\n" .
+                $centerrunlines .
+                "<DATA_BLOCK>\n" .
+                "  <FILES>\n" .
+                "    <FILE\n" .
+                "      filename = \"$href->{cramname}\"\n" .
+                "      filetype = \"cram\"\n" .
+                "      checksum_method = \"MD5\"\n" .
+                "      checksum = \"$href->{cramchecksum}\">\n" .
+                "      <READ_LABEL>forward</READ_LABEL>\n" .
+                "      <READ_LABEL>reverse</READ_LABEL>\n" .
+                "      <READ_LABEL>unmapped</READ_LABEL>\n" .
+                "    </FILE>\n" .
+                "  </FILES>\n" .
+                "</DATA_BLOCK>\n" .
+                "</RUN>\n";
+            #   Path of file to send
+            $s .= "$opts{backupdir}/$center/$run/$href->{cramname}";
+        }
+        if ($href->{cramb37sent} ne 'Y') {
+            $count++;
+            $xml .= "<RUN\n" .
+                "  alias = \"$href->{cramb37checksum}\"\n" .
+                "  center_name = \"$centerdesc\"\n" .
+                "  broker_name = \"$opts{broker_name}\"\n" .
+                "  run_center = \"$centerdesc\">\n" .
+                "<TITLE>Primary mapping Build $opts{build} for $href->{expt_sampleid}</TITLE>\n" .
+                $buildrunlines .
+                "<DATA_BLOCK>\n" .
+                "  <FILES>\n" .
+                "    <FILE\n" .
+                "      filename = \"$href->{expt_sampleid}.recal.cram\"\n" .
+                "      filetype = \"cram\"\n" .
+                "      checksum_method = \"MD5\"\n" .
+                "      checksum = \"$href->{cramb37checksum}\">\n" .
+                "      <READ_LABEL>forward</READ_LABEL>\n" .
+                "      <READ_LABEL>reverse</READ_LABEL>\n" .
+                "      <READ_LABEL>unmapped</READ_LABEL>\n" .
+                "    </FILE>\n" .
+                "  </FILES>\n" .
+                "</DATA_BLOCK>\n" .
+                "</RUN>\n";
+            #   Path of file to send
+            $s .= " $opts{resultsdir}/$center/$href->{piname}/" .
+                "$href->{expt_sampleid}/bams/$href->{expt_sampleid}.recal.cram";
+        }
+        if ($s) { $files2send .= $href->{bamid} . " $s\n"; }
     }
-    print OUT "</RUN_SET>\n";
+    print OUT $xml . "</RUN_SET>\n";
     close(OUT);
-    if (! $count) {
-        unlink($f);
-        die "$Script No eligible BAMs were found for '$center' '$run'. File '$f' not created.\n";
+    print "  Created '$f' for $count BAMs\n";
+
+    #   Append files to be sent to $path_files2send
+    if ($files2send) {
+        open(APP, '>>' . $path_files2send) ||
+            die "$Script Unable to append to file '$path_files2send': $!\n";
+        print APP $files2send;
+        close(APP);
     }
-    print "Created '$f' for $count BAMs\n";
 }
 
 #==================================================================
 # Subroutine:
-#   $aref = CreateExpt($f)
+#   $aref = CreateExpt($f, $bamidlistref)
 #
 #   Create XML file of experiment information
-#
-#   Returns:  Reference to array of runids to be sent
 #==================================================================
 sub CreateExpt {
-    my ($f) = @_;
+    my ($f, $bamidlistref, $path_files2send) = @_;
 
     #   Create the experiment XML file
     open(OUT, '>' . $f) ||
         die "Script Unable to create file '$f': $!\n";
 
     print OUT "<?xml\n  version = \"1.0\"\n  encoding = \"UTF-8\"?>\n";
-    print OUT "<EXPERIMENT_SET\n" .
-        "  xmlns:xsi = \"http://www.w3.org/2001/XMLSchema-instance\"\n" .
-        "  xsi:noNamespaceSchemaLocation = \"http://www.ncbi.nlm.nih.gov/viewvc/v1/" .
-            "trunk/sra/doc/SRA_1-5/SRA.experiment.xsd?view=co\">\n";
-
-    my $sql = "SELECT * FROM $opts{runs_table} WHERE dirname='$run'";
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "$Script Unknown center '$center'\n"; }
-    my $href = $sth->fetchrow_hashref;
-    my $runid = $href->{runid};                 # Uniq id for this run
-
-    #   Now walk through all bams for this run and make an EXPERIMENT section
-    $sql = "SELECT * FROM $opts{bamfiles_table} WHERE runid=$runid";
-    $sth = DoSQL($sql);
-    $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "$Script Run '$run' [$runid] has no BAM files\n"; }
-    my @runids = ();                    # Keep track of all runs we found
-    for (my $i=1; $i<=$rowsofdata; $i++) {
+    print OUT "<EXPERIMENT_SET\n" . $opts{xmlns_experiment};
+            
+    #   Make an EXPERIMENT section for each BAMID
+    my $count = 0;
+    foreach my $bamid (@{$bamidlistref}) {
+        my $sql = "SELECT * FROM $opts{bamfiles_table} WHERE bamid=$bamid";
+        my $sth = DoSQL($sql);
         $href = $sth->fetchrow_hashref;
         my $x = Experiment($href);
-        if (! $x) { next; }             # Nope, did not like this BAM
+        if (! $x) { die "$Script Failed to create experiment for $href->{bamname} [$href->{bamid}]\n"; }
         print OUT $x;
-        push @runids, $href->{runid};   # Save for later
+        $count++;
     }
 
     print OUT "</EXPERIMENT_SET>\n";
     close(OUT);
-    if (! @runids) {
-        unlink($f);
-        die "$Script No eligible BAMs were found for '$center' '$run'. File '$f' not created.\n";
-    }
-    print "Created '$f' for " . (scalar(@runids)+1) . " BAMs\n";
-    return \@runids;                    # Return list of BAMs
+    print "  Created '$f' for $count BAMs\n";
 }
 
 #==================================================================
@@ -245,15 +332,8 @@ sub CreateExpt {
 sub Experiment {
     my ($href) = @_;
 
-    #   Check if this BAM can be sent
-    foreach my $col (qw(checksum phs nominal_length nominal_sdev base_coord library_name expt_sampleid)) {
-        if (exists($href->{$col}) && $href->{$col}) { next; }
-        print "  Skipping BAM '$href->{bamname}' which has no value for '$col'\n";
-        return '';
-    }
-
     if (exists($href->{bam_delivered}) && $href->{bam_delivered} && ($href->{bam_delivered} > 10)) {
-        print "  Skipping '$href->{bamname}' which has already been sent\n";
+        print "  '$href->{bamname}' has already been sent\n";
         return '';
     }
 
@@ -262,7 +342,7 @@ sub Experiment {
         "  alias = \"$href->{checksum}\"\n" .
         "  center_name = \"$centerdesc\"\n" .
         "  broker_name = \"$opts{broker_name}\">\n" .
-        "<TITLE>30x whole genome DNA sequence for NHLBI TOPMed sample</TITLE>\n" .
+        "<TITLE>$opts{experiment_title}</TITLE>\n" .
         "<STUDY_REF\n" .
         "  accession = \"$href->{phs}\"/>\n" .
         "<DESIGN>\n" .
@@ -314,22 +394,19 @@ sub Experiment {
 
 #==================================================================
 # Subroutine:
-#   CreateSubmit($f)
+#   CreateSubmit($f, $runf, $exptf)
 #
 #   Create XML file of submission information
 #==================================================================
 sub CreateSubmit {
-    my ($f) = @_;
+    my ($f, $runf, $exptf) = @_;
 
     #   Create the submit XML file
     open(OUT, '>' . $f) ||
         die "$Script Unable to create file '$f': $!\n";
 
     print OUT "<?xml\n  version = \"1.0\"\n  encoding = \"UTF-8\"?>\n";
-    print OUT "<SUBMISSION\n" .
-        "  xmlns:xsi = \"http://www.w3.org/2001/XMLSchema-instance\"\n" .
-        "  xsi:noNamespaceSchemaLocation = \"http://www.ncbi.nlm.nih.gov/viewvc/v1/" .
-            "trunk/sra/doc/SRA_1-5/SRA.submission.xsd?view=co\"\n" .
+    print OUT "<SUBMISSION\n" . $opts{xmlns_submission} .
         "  alias = \"$opts{exptalias}\"\n" .
         "  center_name = \"$centerdesc\"\n" .
         "  broker_name = \"$opts{broker_name}\"\n" .
@@ -347,18 +424,18 @@ sub CreateSubmit {
  
     print OUT "<ACTIONS>\n  <ACTION>\n" .
         "    <ADD\n" .
-        "      source = \"$files{expt}\"\n" .
+        "      source = \"$exptf\"\n" .
         "      schema = \"experiment\"/>\n" .
         "  </ACTION>\n  <ACTION>\n" .
         "  <ADD\n" .
-        "      source = \"$files{run}\"\n" .
+        "      source = \"$runf\"\n" .
         "      schema = \"run\"/>\n" .
         "  </ACTION>\n";
     print OUT "  <ACTION>\n    <PROTECT/>\n  </ACTION>\n</ACTIONS>\n";
 
     print OUT "</SUBMISSION>\n";
     close(OUT);
-    print "Created '$f'\n";
+    print "  Created '$f'\n";
 }
 
 #==================================================================
