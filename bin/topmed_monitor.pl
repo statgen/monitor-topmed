@@ -25,7 +25,7 @@ use My_DB;
 use TopMed_Get;
 use Getopt::Long;
 
-use POSIX qw(strftime);
+use POSIX qw(strftime tmpnam);
 
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
@@ -40,6 +40,7 @@ our %opts = (
     topmedbai    => "$topmedbin/topmed_bai.sh",
     topmedqplot  => "$topmedbin/topmed_qplot.sh",
     topmedncbi   => "$topmedbin/topmed_ncbi.sh",
+    topmedxml    => "$topmedbin/topmed_xml.pl",
     realm => '/usr/cluster/monitor/etc/.db_connections/topmed',
     centers_table => 'centers',
     runs_table => 'runs',
@@ -56,9 +57,10 @@ our %opts = (
     jobcount => 0,              # Not actually an option, but stats
     jobsnotpermitted => 0,
     jobsfailedsubmission => 0,
+    batchsize => 120,           # Send up to this many BAMs to NCBi at a time
 );
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose topdir=s center=s runs=s maxjobs=i
+    help realm=s verbose topdir=s center=s runs=s maxjobs=i batchsize=i
     memory=s partition=s qos=s dryrun suberr
     )) || die "Failed to parse options\n";
 
@@ -322,23 +324,50 @@ if ($fcn eq 'ncbi') {
         #   For each run, see if there are bamfiles to be delivered to NCBI
         foreach my $runid (keys %{$runsref}) {
             my $dirname = $runsref->{$runid};
-            #   Get list of all bams that have not been sent
-            my $sql = "SELECT bamid,bamname,datecram,datecp2ncbi,expt_sampleid FROM " .
-                $opts{bamfiles_table} . " WHERE runid='$runid'";
+            #   Get list of all bams known at NCBI and that have not been sent
+            my $sql = "SELECT * FROM $opts{bamfiles_table} " .
+                "WHERE runid='$runid' AND nwdid_known='Y'";
             my $sth = DoSQL($sql);
             my $rowsofdata = $sth->rows();
             if (! $rowsofdata) { next; }
+            my %pistudy2bamlist = ();
             for (my $i=1; $i<=$rowsofdata; $i++) {
                 my $href = $sth->fetchrow_hashref;
                 my $f = $opts{topdir} . "/$centername/$dirname/" . $href->{bamname};
-                #   NWD must be known
-                if (! defined($href->{expt_sampleid})) { next; }
-                if ($href->{expt_sampleid} !~ /NWD/ '') { next; }
-                #   Only do if cram has been created
+                
+                #   Check important fields for this BAM are possibly correct
+                my $skip = 0;
+                foreach my $col (qw(checksum phs nominal_length nominal_sdev base_coord library_name
+                    expt_sampleid cramchecksum cramb37checksum)) {
+                    if (exists($href->{$col}) && $href->{$col}) { next; }
+                    if ($opts{verbose}) { print "  BAM '$href->{bamname}' [$href->{bamid}] has no value for '$col'\n"; }
+                    $skip++;
+                }
+                #   Do better checking than just is the field non-blank
+                if ($href->{expt_sampleid} !~ /^NWD/) {
+                    die "$Script How can BAMID=$href->{bamid} have an invalid NWDID '$href->{expt_sampleid}'?\n";
+                }
+                if ($href->{piname} !~ /^\S+/) {
+                    die "$Script How can BAMID=$href->{bamid} have an invalid PINAME '$href->{piname}'?\n";
+                }
+                if ($href->{studyname} !~ /^\S+/) {
+                    die "$Script How can BAMID=$href->{bamid} have an invalid STUDYNAME '$href->{studyname}'?\n";
+                }
+                if ($skip) {
+                    print "  BAM '$href->{bamname}' [$href->{bamid}] is ignored because of incomplete data\n";
+                    next;
+                }
+
+                #   Only do if cram has been created and remapping done
                 if (! defined($href->{datecram})) { next; }
                 if ($href->{datecram} eq '') { next; }
                 if ($href->{datecram} =~ /\D/) { next; }  # Not numeric
-                if ($href->{datecram} < 10) { next; }     # No cram, avoid sending
+                if ($href->{datecram} < 10) { next; }     # No cram yet, avoid sending
+                if (! defined($href->{datemapping})) { next; }
+                if ($href->{datemapping} eq '') { next; }
+                if ($href->{datemapping} =~ /\D/) { next; }  # Not numeric
+                if ($href->{datemapping} < 10) { next; }     # No remapping yet, avoid sending
+                #   And only if we are not already sending
                 if (defined($href->{datecp2ncbi}) && ($href->{datecp2ncbi} ne '')) {
                     if ($opts{suberr} && $href->{datecp2ncbi} == -1) { $href->{datecp2ncbi} = 0; }
                     if ($href->{datecp2ncbi} =~ /\D/) { next; }  # Not numeric
@@ -346,12 +375,23 @@ if ($fcn eq 'ncbi') {
                     if ($href->{datecp2ncbi} == 3) { next; } # Already delivered data
                     if ($href->{datecp2ncbi} > 10) { next; } # Already done
                 }
-                #   Run the command
-                BatchSubmit("$opts{topmedncbi} -submit $href->{bamid} $f");
+                #   This bamid can be sent. Collect a list of all of these
+                #   As a favor to NCBI we group the files to send by PI and study name
+                my $k = $href->{piname} . '-' . $href->{studyname};
+                push @{$pistudy2bamlist{$k}},$href->{bamid};   # Array of bams by pi-studyname
+            }
+            #   We now have all the bamids to queue as an array in %pistudy2bamlist
+            #   These have been grouped into sets by PI and study
+            foreach my $k (sort keys %pistudy2bamlist) {
+                $opts{jobcount} = 0;
+                $opts{jobsnotpermitted} = 0;
+                $opts{jobsfailedsubmission} = 0;
+                SubmitBAM2NCBI($pistudy2bamlist{$k}, $centername, $dirname, $opts{batchsize});
+                ShowSummary("ncbi $k");
+if (%pistudy2bamlist) { exit; }     # Only let one of these run for now
             }
         }
     }
-    ShowSummary('ncbi');
     exit;
 }
 
@@ -554,6 +594,54 @@ if ($fcn eq 'check') {
 
 die "Invalid request '$fcn'. Try '$Script --help'\n";
 
+#==================================================================
+# Subroutine:
+#   SubmitBAM2NCBI - Submit a list of BAMs in collections
+#
+# Arguments:
+#   aref - reference to array of bamids
+#   center - name of center
+#   run - dirname of run
+#   max - send bams in sets this size
+#==================================================================
+sub SubmitBAM2NCBI {
+    my ($aref, $center, $run, $max) = @_;
+
+    my ($tmpfile) = tmpnam();
+    my ($tmpfile2) = tmpnam();
+    while (@{$aref}) {
+        #   Get a set of BAMIDs to send
+        my $last = $max;
+        if ($last > scalar(@{$aref})) { $last = scalar(@{$aref}); }
+        my @bamids = splice(@{$aref}, 0, $last);    # Peel off N bamids
+        if (! @bamids) { die "$Script SubmitBAMList - how can list of BAMIDs be empty?\n"; }
+        open(OUT, '>' . $tmpfile) ||
+            die "$Script Unable to create file '$tmpfile': $!\n";
+        print OUT join("\n", @bamids) . "\n";
+        close(OUT);
+    
+        #   Create the XML files
+        sleep(1);                   # Insures unique file for xmlprefix
+        my $pfx = time();
+$pfx = 'test';
+        my $cmd = "$opts{topmedxml} -bamlist $tmpfile -xmlprefix $pfx -sendlist $tmpfile2 $center $run";
+print "$cmd\n"; exit;
+        system($cmd) &&
+            die "$Script Failed to create XML files. CMD=$cmd\n";
+        #   Get parameters for shell script:  bamid file1 file2 ...
+        #   or for the XML file it is:        xml   xmlfile1 xmlfile2 xmlfile3
+        open(IN, $tmpfile2) ||
+            die "$Script Unable to get list of XML files from '$tmpfile': $!\n";
+        $_ = <IN>;                              # Check that first line looks as expected
+        if (! /^#.+ XML/) { die "$Script '$tmpfile2' did not have names of XML files\n"; }
+        while (<IN>) {
+            chomp();
+            BatchSubmit("echo $opts{topmedncbi} -submit $_");
+        }
+        close(IN);
+    }
+    unlink($tmpfile, $tmpfile2);
+}
 
 #==================================================================
 # Subroutine:
@@ -640,6 +728,12 @@ might expect all the data has arrived.
 =head1 OPTIONS
 
 =over 4
+
+=item B<-batchsize N>
+
+When sending sets of files to NCBI, batch them into sets of this size.
+This might possibly make it easier to keep track of what has been sent.
+The default for B<-batchsize> is B<120>.
 
 =item B<-center NAME>
 
