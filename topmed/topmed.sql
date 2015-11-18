@@ -62,6 +62,7 @@ CREATE TABLE bamfiles (
   base_coord   INT DEFAULT 0,
   library_name VARCHAR(96),
   cramname     VARCHAR(96) NOT NULL,
+  cramchecksum VARCHAR(96) NOT NULL,
   studyname    VARCHAR(96) NOT NULL,
   piname       VARCHAR(96),
   phs          VARCHAR(12),
@@ -72,6 +73,7 @@ CREATE TABLE bamfiles (
   refname      VARCHAR(96) NOT NULL,
   expt_refname VARCHAR(96) NOT NULL,
   expt_sampleid VARCHAR(24) NOT NULL,
+  nwdid_known  CHAR(1) DEFAULT 'N',
   datearrived  VARCHAR(12),
   datemd5ver   VARCHAR(12),
   datebackup   VARCHAR(12),
@@ -87,17 +89,23 @@ CREATE TABLE bamfiles (
   jobidqplot   VARCHAR(12),
   jobidcp2ncbi VARCHAR(12),
   bam_delivered VARCHAR(12),
+  cramorigsent CHAR(1) DEFAULT 'N',
 #   Added for remapping with build37
   datemapping  VARCHAR(12),
   jobidmapping VARCHAR(12),
+  cramb37sent CHAR(1) DEFAULT 'N',
+  cramb37checksum VARCHAR(96) NOT NULL,
 #   Added for remapping with build38
 #  datemapping8 VARCHAR(12),
 #  jobidmapping8 VARCHAR(12),
+#  cramb39sent CHAR(1) DEFAULT 'N',
+#  cramb39checksum VARCHAR(96) NOT NULL,
 
   dateinit     VARCHAR(12),
   PRIMARY KEY  (bamid)
 );
 CREATE INDEX index_runid   ON bamfiles(runid);
+CREATE INDEX index_nwdid   ON bamfiles(expt_sampleid);
 CREATE INDEX index_refname ON bamfiles(refname);
 
 # ALTER TABLE bamfiles ADD COLUMN datebai VARCHAR(12) AFTER datebackup;
