@@ -36,8 +36,11 @@ our %opts = (
     studies_table => 'studies',
     bamfiles_table => 'bamfiles',
     topdir  => '/net/topmed/incoming/topmed',
-    backupdir => '/working/backups/incoming/topmed',
+    backupdir => '/net/topmed/working/backups/incoming/topmed',
+    backupdir2 => '/net/topmed2/working/backups/incoming/topmed',
     resultsdir => '/incoming/qc.results',
+    remappeddir => '/net/topmed/working/schelcj/results',
+    remappeddir2 => '/net/topmed2/working/schelcj/results',
     count => 1000,
     verbose => 0,
 );
@@ -47,7 +50,7 @@ Getopt::Long::GetOptions( \%opts,qw(
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$Script [options] nwd|rename\n" .
+    warn "$Script [options] nwd|rename|crammd5\n" .
         "Fix problems with various hacks.\n";
     exit 1;
 }
@@ -93,6 +96,103 @@ if ($fcn eq 'nwd') {
     }
     exit;
 }
+#--------------------------------------------------------------
+#   Calculate MD5 for all our CRAMs
+#--------------------------------------------------------------
+if ($fcn eq 'crammd5') {
+    my $cons = '/net/topmed/working/topmed-output';
+    my $submitcmd = "/usr/cluster/bin/sbatch --mem=2G -Q --workdir=$cons";
+                    
+    #   Get all the known centers in the database
+    my $centersref = GetCenters();
+    foreach my $cid (keys %{$centersref}) {
+        my $centername = $centersref->{$cid};
+        my $runsref = GetRuns($cid) || next;
+        #   For each run, see if there are bamfiles that arrived
+        foreach my $runid (keys %{$runsref}) {
+            my $dirname = $runsref->{$runid};
+            print "Doing $dirname\n";
+            #   Get list of all bams
+            my $sql = "SELECT * FROM $opts{bamfiles_table} WHERE runid='$runid'";
+            my $sth = DoSQL($sql);
+            my $rowsofdata = $sth->rows();
+            if (! $rowsofdata) { next; }
+            my $b37fmissing = 0;
+            my $bfmissing = 0;
+            my $alreadydone = 0;
+            my $submitted = 0;
+            for (my $i=1; $i<=$rowsofdata; $i++) {
+                my $href = $sth->fetchrow_hashref;
+                my $bamid = $href->{bamid};
+
+                #   Maybe this was already done?
+                if ($href->{cramchecksum} && $href->{cramb37checksum}) { $alreadydone++; next; }
+
+                #   Deal with b37 CRAM
+                if (! $href->{cramb37checksum}) {
+                    my $topmedhost = '';             # This is where the job should be run
+                    #   Figure out where b37 cram lives
+                    my $recalfile = $href->{expt_sampleid} . '.recal.cram';
+                    my $part = "/$centername/" . $href->{piname} . '/' .
+                        $href->{expt_sampleid} . '/bams/' . $recalfile;
+                    my $f = $opts{remappeddir} . $part;
+                    if (-f $f) { $topmedhost = 'topmed'; }
+                    if (! $topmedhost) {
+                        $f = $opts{remappeddir2} . $part;
+                        if (-f $f) { $topmedhost = 'topmed2'; }
+                        if (! $topmedhost) {
+                            if ($opts{verbose}) { print "Remapped CRAM '$recalfile' not found\n"; }
+                            $b37fmissing++;
+                            next;
+                        }
+                    }
+                    #   Submit jobs to calculate md5s
+                    my $cmd = "$submitcmd -p $topmedhost-incoming --qos=$topmedhost-fixit " .
+                        "-J $bamid-fixit --output=$cons/$bamid-fixit.$topmedhost.out " .
+                        "/home/topmed/makemd5.sh $bamid $f cramb37checksum";
+                    system($cmd) &&
+                        print "  Failed: CMD=$cmd\n";
+                    $submitted++;
+                    if ($opts{verbose}) { print "  $recalfile to be calculated\n"; }
+                }
+
+                #   Deal with backup CRAM
+                if (! $href->{cramchecksum}) {
+                    my $topmedhost = '';             # This is where the job should be run
+                    #   Figure out where backup cram lives
+                    my $backupfile = $href->{expt_sampleid} . '.src.cram';
+                    my $part = "/$centername/$dirname/$backupfile";
+                    my $f = $opts{backupdir} . $part;
+                    if (-f $f) { $topmedhost = 'topmed'; }
+                    if (! $topmedhost) {
+                        $f = $opts{backupdir2} . $part;
+                        if (-f $f) { $topmedhost = 'topmed2'; }
+                        if (! $topmedhost) {
+                            if ($opts{verbose}) { print "Backup CRAM '$backupfile' not found\n"; }
+                            $bfmissing++;
+                            next;
+                        }
+                    }
+                    #   Submit jobs to calculate md5s
+                    my $cmd = "$submitcmd -p $topmedhost-incoming --qos=$topmedhost-fixit " .
+                        "-J $bamid-fixit --output=$cons/$bamid-fixit.$topmedhost.out " .
+                        "/home/topmed/makemd5.sh $bamid $f cramchecksum";
+                    system($cmd) &&
+                        print "  Failed: CMD=$cmd\n";
+                    $submitted++;
+                    if ($opts{verbose}) { print "  $backupfile to be calculated\n"; }
+                }
+                $opts{count}--;
+                if ($opts{count} < 1) { last; }
+            }
+            print "  Submitted $submitted jobs for $centername/$dirname  " .
+                "$alreadydone MD5s already done, " .
+                "$b37fmissing B37 CRAMs missing, $bfmissing backup CRAMs missing\n";
+            if ($opts{count} < 1) { print "Count exhausted, stopping early\n"; exit; }
+        }
+    }
+    exit;
+}
 
 #--------------------------------------------------------------
 #   Rename the BAM file to use NWDID, not whatever the center wanted
@@ -128,6 +228,7 @@ if ($fcn eq 'rename') {
                 closedir DIR;
                 foreach my $f (@renamelist) {
                     rename($f, "$f.old") ||
+                        die "$Script Failed to rename $f $f.old\n";
                 }
             }
 
@@ -198,6 +299,9 @@ if ($fcn eq 'rename') {
                 }
 
                 #   Rename MD5 files so they do not get reprocessed
+my $qcdir = 'this got broken somehow';
+my $partname = 'this got broken somehow';
+
                 if (! opendir(DIR, $qcdir)) {
                     print "  Unable to read directory '$qcdir'. Continuing\n";
                     next;
@@ -217,27 +321,15 @@ if ($fcn eq 'rename') {
                     RunCMD("mv $qcdir/$f $qcdir/$nwdid.$2");
                 }
 
-
-
-
-                
-                $opts{topdir} . "/$centername/$dirname/" . $newbamname;
-                
-    if (! open(IN, "cat $d/*.md5 $d/*.MD5 *$d/Manifest.txt 2>/dev/null |")) {
-         warn "No MD5 files found in directory '$d'. Maybe later, eh?\n";
-         return 0;
-    }
-
-
                 #   Rename QPLOT output
-                my $qcdir = $opts{resultsdir} . "/$centername/$dirname";
-                my $partname = $oldbamname;
+                $qcdir = $opts{resultsdir} . "/$centername/$dirname";
+                $partname = $oldbamname;
                 $partname =~ s/.bam//;
                 if (! opendir(DIR, $qcdir)) {
                     print "  Unable to read directory '$qcdir'. Continuing\n";
                     next;
                 }
-                my @filelist = grep { /^$partname/ } readdir(DIR);
+        @filelist = grep { /^$partname/ } readdir(DIR);
                 closedir DIR;
                 if (! @filelist) {
                     print "  SURPRISE: Found no files in '$qcdir' to rename! Continuing\n";
