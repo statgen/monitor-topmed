@@ -155,6 +155,7 @@ sub Update {
         my $k = $#{$myxml->{Study}->{SampleList}->{Sample}};
         if ($opts{verbose}) { print "  Processing $k NWDID entries\n"; }
         my $changes = 0;
+        my $unknowns = 0;
         for (my $i=0; $i<=$k; $i++) {
             my $phs = $myxml->{Study}->{accession};
             if ($phs =~ /^(phs\d+)/) { $phs = $1; }
@@ -167,7 +168,11 @@ sub Update {
             #   Update this NWDID in database, else ignore 
             my $sth = DoSQL("SELECT bamid from $opts{bamfiles_table} WHERE expt_sampleid='$nwdid'", 0);
             my $rowsofdata = $sth->rows();
-            if (! $rowsofdata) { next; }
+            if (! $rowsofdata) { 
+                if ($opts{verbose}) { print "  No BAMID found for NWDID='$nwdid'\n"; }
+                $unknowns++;
+                next;
+            }
             if ($rowsofdata > 1) { die "Yikes! NWDID '$nwdid' not unique in $opts{bamfiles_table}\n"; }
             my $href = $sth->fetchrow_hashref;
 
@@ -175,14 +180,15 @@ sub Update {
             my $updsql = "UPDATE $opts{bamfiles_table} SET phs='$phs'," .
                 "phs_consent_short_name='$consent'," .
                 "phs_sra_sample_id='$sra_sample'," .
-                "phs_sra_data_details='$sra_details' " .
+                "phs_sra_data_details='$sra_details'," .
+                "nwdid_known='Y' " .
                 "WHERE bamid=$href->{bamid}";
             if ($opts{dryrun}) { print "Did not update with: $updsql\n"; }
             else { DoSQL($updsql); }
             $changes++;
         }
         if ($f ne $file) { unlink($f); }
-        print "$nowdate Updated $changes entries from $file\n";  
+        print "$nowdate Updated $changes entries from $file, $unknowns unknown bamids\n";  
     }      
 } 
 
