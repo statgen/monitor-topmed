@@ -28,7 +28,7 @@ use File::Basename;
 #--------------------------------------------------------------
 our %opts = (
     samtools => '/net/mario/gotcloud/bin/samtools',
-    lookuptable => '/net/topmed/incoming/study.reference/study.reference/nhlbi.463.initial.lookup.table.tab',
+    lookuptable => '/net/topmed/incoming/study.reference/study.reference/lookup.table.tab',
     topdir => '/net/topmed/incoming/topmed',
     qcresults => '/net/topmed/incoming/qc.results',
     topmedcmd => '/usr/cluster/monitor/bin/topmedcmd.pl',
