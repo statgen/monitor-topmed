@@ -64,7 +64,7 @@ our %opts = (
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help nolint realm=s verbose=i build=i inst_model=s design_description=s run_processing=s
+    help nolint realm=s verbose build=i inst_model=s design_description=s run_processing=s
     bamlist=s xmlprefix=s sendlist=s 
     )) || die "$Script Failed to parse options\n";
 
@@ -158,6 +158,8 @@ RunLINT($files{submit});
 #   Create experiment XML from the list of bamids
 CreateExpt($files{expt}, \@bamids);
 RunLINT($files{expt});
+my $firstbamid = $bamids[0];            # Use this as alias for failure if XML files
+chomp($firstbamid);
 
 #   Create XML of BAM details
 #   Append fully qualified path of files to send in $opts{sendlist} on one line
@@ -169,7 +171,7 @@ RunLINT($files{run});
 if ($opts{sendlist}) {
     open(APP, '>>' . $opts{sendlist}) ||
         die "$Script Unable to append to file '$opts{sendlist}': $!\n";
-    print APP "XML $files{submit} $files{expt} $files{run}\n";
+    print APP "$firstbamid XML $files{submit} $files{expt} $files{run}\n";
     close(APP);
     print "Created list of files to send in '$opts{sendlist}'\n";
 }
@@ -181,9 +183,9 @@ exit;
 #   CreateRun($f, $bamidlistref, $centerprocessingfile, $remapprocessingfile, $path_files2send)
 #
 #   Create XML file of run information
-#   For each file in the set of bams, append the fully qualified path
-#   to the file to be sent (original cram + b37 cram) to the file $path_files2send
-
+#   For each file in the set of bams, append this information to $path_files2send
+#     fully qualified path to file  + database column to be set
+#   The contents of these lines become part of the command line to topmed_ncbi.sh
 #==================================================================
 sub CreateRun {
     my ($f, $bamidlistref, $centerprocessingfile, $buildprocessingfile, $path_files2send) = @_;
@@ -222,56 +224,26 @@ sub CreateRun {
         #   If the original BAM (cram) has not been sent, include that
         if ($href->{cramorigsent} ne 'Y') {
             $count++;
-            $xml .= "<RUN\n" .
-                "  alias = \"$href->{cramchecksum}\"\n" .
-                "  center_name = \"$centerdesc\"\n" .
-                "  broker_name = \"$opts{broker_name}\"\n" .
-                "  run_center = \"$centerdesc\">\n" .
-                "<TITLE>Secondary mapping Build $opts{build} for $href->{expt_sampleid}</TITLE>\n" .
-                $centerrunlines .
-                "<DATA_BLOCK>\n" .
-                "  <FILES>\n" .
-                "    <FILE\n" .
-                "      filename = \"$href->{cramname}\"\n" .
-                "      filetype = \"cram\"\n" .
-                "      checksum_method = \"MD5\"\n" .
-                "      checksum = \"$href->{cramchecksum}\">\n" .
-                "      <READ_LABEL>forward</READ_LABEL>\n" .
-                "      <READ_LABEL>reverse</READ_LABEL>\n" .
-                "      <READ_LABEL>unmapped</READ_LABEL>\n" .
-                "    </FILE>\n" .
-                "  </FILES>\n" .
-                "</DATA_BLOCK>\n" .
-                "</RUN>\n";
+            $xml .= GenRUNXML($href->{cramchecksum},
+                "Secondary mapping Build $opts{build} for $href->{expt_sampleid} [$href->{bamid}]",
+                $href->{checksum},
+                $centerrunlines,
+                $href->{cramname},
+                $href->{cramchecksum});
             #   Path of file to send
-            $s .= "$opts{backupdir}/$center/$run/$href->{cramname}";
+            $s .= "$opts{backupdir}/$center/$run/$href->{cramname} cramorigsent";
         }
         if ($href->{cramb37sent} ne 'Y') {
             $count++;
-            $xml .= "<RUN\n" .
-                "  alias = \"$href->{cramb37checksum}\"\n" .
-                "  center_name = \"$centerdesc\"\n" .
-                "  broker_name = \"$opts{broker_name}\"\n" .
-                "  run_center = \"$centerdesc\">\n" .
-                "<TITLE>Primary mapping Build $opts{build} for $href->{expt_sampleid}</TITLE>\n" .
-                $buildrunlines .
-                "<DATA_BLOCK>\n" .
-                "  <FILES>\n" .
-                "    <FILE\n" .
-                "      filename = \"$href->{expt_sampleid}.recal.cram\"\n" .
-                "      filetype = \"cram\"\n" .
-                "      checksum_method = \"MD5\"\n" .
-                "      checksum = \"$href->{cramb37checksum}\">\n" .
-                "      <READ_LABEL>forward</READ_LABEL>\n" .
-                "      <READ_LABEL>reverse</READ_LABEL>\n" .
-                "      <READ_LABEL>unmapped</READ_LABEL>\n" .
-                "    </FILE>\n" .
-                "  </FILES>\n" .
-                "</DATA_BLOCK>\n" .
-                "</RUN>\n";
+            $xml .= GenRUNXML($href->{cramb37checksum},
+                "Primary mapping Build $opts{build} for $href->{expt_sampleid} [$href->{bamid}]",
+                $href->{checksum},
+                $buildrunlines,
+                $href->{expt_sampleid} . ".recal.cram",
+                $href->{cramb37checksum});
             #   Path of file to send
             $s .= " $opts{resultsdir}/$center/$href->{piname}/" .
-                "$href->{expt_sampleid}/bams/$href->{expt_sampleid}.recal.cram";
+                "$href->{expt_sampleid}/bams/$href->{expt_sampleid}.recal.cram cramb37sent";
         }
         if ($s) { $files2send .= $href->{bamid} . " $s\n"; }
     }
@@ -286,6 +258,48 @@ sub CreateRun {
         print APP $files2send;
         close(APP);
     }
+}
+
+#==================================================================
+# Subroutine:
+#   $xml = GenRUNXML($alias, $title, $refname, $runlines, $filename, $checksum)
+#
+#   Create XML fragment for <RUN> clause
+#==================================================================
+sub GenRUNXML {
+    my ($alias, $title, $refname, $runlines, $filename, $checksum) = @_;
+
+    my $xml .= "<RUN\n" .
+        "  alias = \"$alias\"\n" .
+        "  center_name = \"$centerdesc\"\n" .
+        "  broker_name = \"$opts{broker_name}\"\n" .
+        "  run_center = \"$centerdesc\">\n" .
+        "<TITLE>$title</TITLE>\n" .
+        "<EXPERIMENT_REF\n" .
+        "  refname = \"$refname\"\n" .
+        "  refcenter = \"$centerdesc\"/>\n" .
+        $runlines .
+        "<DATA_BLOCK>\n" .
+        "  <FILES>\n" .
+        "    <FILE\n" .
+        "      filename = \"$filename\"\n" .
+        "      filetype = \"cram\"\n" .
+        "      checksum_method = \"MD5\"\n" .
+        "      checksum = \"$checksum\">\n" .
+        "      <READ_LABEL>forward</READ_LABEL>\n" .
+        "      <READ_LABEL>reverse</READ_LABEL>\n" .
+        "      <READ_LABEL>unmapped</READ_LABEL>\n" .
+        "    </FILE>\n" .
+        "  </FILES>\n" .
+        "</DATA_BLOCK>\n" .
+        "<RUN_ATTRIBUTES>\n" .
+        "  <RUN_ATTRIBUTE>\n" .
+        "    <TAG>assembly</TAG>\n" .
+        "    <VALUE>GRCh37</VALUE>\n" .
+        "  </RUN_ATTRIBUTE>\n" .
+        "</RUN_ATTRIBUTES>\n" .
+        "</RUN>\n";
+    return $xml;
 }
 
 #==================================================================
@@ -342,7 +356,7 @@ sub Experiment {
         "  alias = \"$href->{checksum}\"\n" .
         "  center_name = \"$centerdesc\"\n" .
         "  broker_name = \"$opts{broker_name}\">\n" .
-        "<TITLE>$opts{experiment_title}</TITLE>\n" .
+        "<TITLE>$opts{experiment_title} for $href->{expt_sampleid}</TITLE>\n" .
         "<STUDY_REF\n" .
         "  accession = \"$href->{phs}\"/>\n" .
         "<DESIGN>\n" .
@@ -453,8 +467,10 @@ sub RunLINT {
     my $rc = system($cmd);
     if (! $rc) { print "OK\n"; return; }
     print "ERROR\n";
-    unlink($f);
-    die "$Script XML file '$f' was mal-formated and has been removed\n";
+    my $emsg = "$Script XML file '$f' was mal-formated\n";
+    if (! $opts{verbose}) { unlink($f); }
+    else { $emsg .= " and has been removed.  Specify -v to keep the file around."; }
+    die $emsg . "\n";
 }
 
 #==================================================================
@@ -481,6 +497,13 @@ process of preparing the files to be sent and then copy them there.
 
 =over 4
 
+=item B<-bamlist path>
+
+Specifies the path to a file which contains a list of all the BAMIDs to be
+sent to NCBI.  Each line must contain a BAMID beginning in column one.
+If none is provided, the list of bams is taken from the database
+directly. This is almost never the option you want.
+
 =item B<-build nn>
 
 Specifies the build number for the BAMs to be sent
@@ -495,14 +518,14 @@ This defaults to B<Equivalent to Illumina TruSeq PCR-free DNA sample prep>.
 
 Generates this output.
 
-=item B<-nolint>
-
-Specifies that xmllint should not be run on the XML files.
-
 =item B<-inst_model>
 
 Specifies the INSTRUMENT_MODEL value in the experiment file.
 This defaults to B<HiSeq X Ten>.
+
+=item B<-nolint>
+
+Specifies that xmllint should not be run on the XML files.
 
 =item B<-realm NAME>
 
@@ -517,9 +540,26 @@ the names of the programs and their versions.
 This differs for each run and will over time change.
 This file must exist in the run directory and defaults to B<run_processing.txt>.
 
+=item B<-sendlist path>
+
+Specifies the path of a file of data to be sent to NCBI.
+Each line of the file contains the parameters passed to the shell script B<topmed_ncbi.sh>.
+Two formats for lines in this file are:
+
+bamid + multiple pairs of filetosend databasecolumn 
+  or
+bamid XML filetosend1 filetosend2 ...
+
 =item B<-verbose N>
 
 Provided for developers to see additional information.
+
+=item B<-xmlprefix string>
+
+Specifies a prefix for the three XML files to be created.
+This allows the caller to make these unique.
+This defaults to B<nhlbi.$center.$run>.
+
 
 =back
 
