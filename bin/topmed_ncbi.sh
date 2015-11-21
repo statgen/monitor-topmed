@@ -1,15 +1,16 @@
 #!/bin/bash
 #
-#   topmed_ncbi.sh -submit bamid bamfile
+#   topmed_ncbi.sh -submit bamid + paris of cramfile colname
+#   topmed_ncbi.sh -submit bamid XML  xml1  xml2 xml3
 #
 #	Send the proper set of files to NCBI
 #
 bindir=/usr/cluster/bin
-samtools=/net/mario/gotcloud/bin/samtools
-ref=/net/mario/gotcloud/gotcloud.ref/hs37d5.fa
+ascpcmd="$bindir/ascp -i /net/topmed/incoming/study.reference/send2ncbi/topmed-2-ncbi.pri -l 800M -k 1"
+#ascpcmd="$bindir/ascp -i /net/topmed/incoming/study.reference/send2ncbi/topmed-2-ncbi.ppk -Q -l 800M -k 1"
+ascpdest='asp-um-sph@gap-upload.ncbi.nlm.nih.gov:protected'
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
-ncbidir=/net/topmed/working/cp2ncbi
-mem=${TOPMED_MEM:-8G}
+mem=2G
 console=/net/topmed/working/topmed-output
 
 if [ "$1" = "-submit" ]; then
@@ -20,7 +21,7 @@ if [ "$1" = "-submit" ]; then
     exit 4
   fi 
 
-  #   Figure where to submit this to run - should be local
+  #   This will usually have files on both topmeds, so it does not matter where it runs
   l=(`$topmedcmd where $1`)     # Get bampath backuppath bamname realhost realhostindex
   realhost="${l[3]}"
   realhostindex="${l[4]}"
@@ -41,145 +42,86 @@ if [ "$1" = "-submit" ]; then
   exit
 fi
 
-if [ "$2" = "" ]; then
+if [ "$3" = "" ]; then
   me=`basename $0`
-  echo "Usage: $me [-submit] bamid bamfile"
+  echo "Usage: $me [-submit] bamid cramfile colname [cramfile colname]"
+  echo "Usage: $me [-submit] bamid XML xml1 xml2 xml3"
   echo ""
-  echo "Copy the BAM and CRAM files to NCBI"
+  echo "Copy CRAM files to NCBI"
   exit 1
 fi
 bamid=$1
-bamfile=$2
-
-#   This is not implemented for the moment
-$topmedcmd mark $bamid cped2ncbi completed
-$topmedcmd mark $bamid cped2ncbi delivered
-#$topmedcmd mark $bamid cped2ncbi failed
-exit 2
-
-#========================== dead code ==========================
-#   Now calc destination directory
-l=(`$topmedcmd where $bamid`)           # Get bampath backuppath bamname
-bampath="${l[0]}"
-backupdir="${l[1]}"
-bamname="${l[2]}"
-
-if [ "$bampath/$bamname" != "$bamfile" ]; then
-  echo ""
-  echo ""
-  echo "This sure looks wrong - the input is not where I think it should be. Continuing anyway"
-  echo "  input    bamfile=$bamfile"
-  echo "  expected bamfile=$bampath/$bamname"
-  echo ""
-  echo ""
-fi
+shift
 
 d=`date +%Y/%m/%d`
-mkdir -p $backupdir
-cd $backupdir
-if [ "$?" != "0" ]; then
-  echo "Unable to CD $backupdir"
-  $topmedcmd mark $bamid cped2ncbi failed
-  exit 2
-fi
-s=`hostname`
-echo "#========= '$d' host=$s $SLURM_JOB_ID squeezed=$squeezed $0 bamid=$bamid bamfile=$bamfile backupdir=$backupdir ========="
+echo "#========= $d $SLURM_JOB_ID $0 bamid=$bamid files=$* ========="
 
-#   Mark this as started
-$topmedcmd mark $bamid cped2ncbi started
-stime=`date +%s`
-#   Try to force everything as readonly
-chmod 555 $bamfile 2> /dev/null
+#   Well hidden documentation for Aspera command line syntax comes from:
+#       http://download.asperasoft.com/download/docs/ascp/3.5.2/html/
+#       http://download.asperasoft.com/download/docs/ascp/2.7/html/
+#       http://download.asperasoft.com/download/docs/ascp/2.7/html/fasp/ascp-usage.html.
 
-#   Run 'bam squeeze' on .bam file with result written as .cram
-#   Checking with 'samtools flagstat' is quick, zero means success.
-#   Running 'samtools index' on a .cram file does NOT require 
-#   an explicit genome reference sequence, but 'samtools view' 
-#   does.  (And, 'samtools flagstat' does accept .sam input.)
-#
-#   All this code used to be just a simple
-#       cp -p $bamfile $backupdir
-#
-chkname=`basename $bamfile .bam`
-nwdid=`$samtools view -H $bamfile | grep '^@RG' | grep -o 'SM:\S*' | sort -u | cut -d \: -f 2`
-if [ "$nwdid" = "" ]; then
-  echo "Unable to extract NWDID from header of '$bamfile'"
-  $topmedcmd mark $bamid cped2ncbi failed
-  exit 2
-fi
-newname="$nwdid.src.cram"
-
-now=`date +%s`
-$samtools flagstat  $bamfile  >  ${chkname}.init.stat
-if [ "$?" != "0" ]; then
-  echo "Command failed: $samtools flagstat  $bamfile"
-  $topmedcmd mark $bamid cped2ncbi failed
-  exit 3
-fi
-s=`date +%s`; s=`expr $s - $now`; echo "samtools flagstat completed in $s seconds"
-
-now=`date +%s`
-if [ "$squeezed" = "n" ]; then
-  $bindir/bam squeeze  --in $bamfile  --out - --rmTags "BI:Z;BD:Z;PG:Z"  --keepDups --binMid  --binQualS  2,3,10,20,25,30,35,40,50 | $samtools view  -C -T  $ref  -  >  $newname
-else 
-  $samtools view  -C -T $ref  $bamfile  >  $newname
-fi
-if [ "$?" != "0" ]; then
-  echo "Command failed: $bindir/bam squeeze  --in $bamfile ..."
-  $topmedcmd mark $bamid cped2ncbi failed
+#   Special case - if bamid = XML, then send all XML files at once
+if [ "$1" = "XML" ]; then
+  shift
+  echo "Sending XML files to NCBI - $*"
+  $ascpcmd $* $ascpdest                 # We count on this working, no retries
+  if [ "$?" = "0" ]; then
+    echo "XML files sent to NCBI"       # Nothing to mark in the database as success
+    exit
+  fi
+  echo "FAILED sending XML files to NCBI"       # We have no real bamid for the XML files
+  $topmedcmd mark $bamid cped2ncbi failed       # Mark first bamid we sent as failed
   exit 1
 fi
-s=`date +%s`; s=`expr $s - $now`; echo "squeeze completed in $s seconds"
 
-now=`date +%s`
-$samtools index $newname
-if [ "$?" != "0" ]; then
-  echo "Command failed: $samtools index $newname"
-  $topmedcmd mark $bamid cped2ncbi failed
-  exit 3
-fi
-s=`date +%s`; s=`expr $s - $now`; echo "samtools index completed in $s seconds"
+#   Here we send one file at a time (usually just two files)
+#   Columns must come in pairs - path to file and database column to set to Y
+while [ "$1" != "" ]; do
+  f=$1
+  dbcol=$2
+  shift
+  shift
+  if [ "$dbcol" = "" ]; then
+    echo "Not enough parameters: $0 $bamid $*"
+    exit 2
+  fi
 
-now=`date +%s`
-$samtools view  -u -T  $ref $newname | $samtools flagstat  - >  ${chkname}.cram.stat
-if [ "$?" != "0" ]; then
-  echo "Command failed: $samtools view  -h -T  $ref $newname ..."
-  $topmedcmd mark $bamid cped2ncbi failed
-  exit 3
-fi
-s=`date +%s`; s=`expr $s - $now`; echo "samtools view completed in $s seconds"
+  echo "Sending '$f' to NCBI  bamid=$bamid"
+  stime=`date +%s`
 
-diff=`diff  ${chkname}.init.stat  ${chkname}.cram.stat | wc -l`
-if [ "$diff" != "0" ]; then
-  echo "Stat for backup CRAM file differs from that for original BAM"
-  diff  ${chkname}.init.stat  ${chkname}.cram.stat
-  $topmedcmd mark $bamid cped2ncbi failed
-  exit 2
-fi
-echo "Stat for CRAM file matches that of original"
-rm -f ${chkname}.init.stat  ${chkname}.cram.stat ${chkname}.bam ${chkname}.bam.md5  ${chkname}.bai ${chkname}.bai.md5
+  # We really really want this to complete, cause recovery is a giant pain
+  retries=10
+  waitsec=60
+  until [ "$retries" = "0" ]; do
+    $ascpcmd $f $ascpdest
+    rc=$?
+    if [ "$rc" = "0" ]; then
+      $topmedcmd set $bamid $dbcol Y        # Mark this CRAM as delivered
+      retries=0
+    else 
+      echo "FAILED sending '$f' to NCBI, retrying in $waitsecs seconds"
+      retries=`expr $retries - 1`
+      sleep $waitsec
+      waitsec=`expr $waitsec + 60`
+    fi
+  done
+  if [ "$rc" != "0" ]; then
+    echo "I've tried about all I can try"
+    $topmedcmd mark $bamid cped2ncbi failed
+    exit $rc
+  fi
+ 
+  etime=`date +%s`
+  etime=`expr $etime - $stime`
+  echo "Sent '$f' in $etime seconds for bamid=$bamid"
+done
 
-echo "Calculating new MD5"
-now=`date +%s`
-md5sum $newname
-rc=$?
-if [ "$rc" != "0" ]; then
-  echo "Command failed: md5sum $newname"
-  $topmedcmd mark $bamid cramed failed
-  exit 3
-fi
-s=`date +%s`; s=`expr $s - $now`; echo "md5 calculated in $s seconds"
-
-etime=`date +%s`
-etime=`expr $etime - $stime`
-here=`pwd`
-echo "BAM to CRAM backup completed in $etime seconds, created $here/$newname"
-$topmedcmd set $bamid expt_sampleid $nwdid
-if [ "$?" != "0" ]; then
-  echo "Command failed: $topmedcmd set $bamid expt_sampleid $nwdid"
-  $topmedcmd mark $bamid cramed failed
-  exit 3
-fi
-
-#   All was good
+#   All files for this bamid have been delivered
 $topmedcmd mark $bamid cped2ncbi delivered
+exit
+
+#   Somehow someday this we also need to do
+$topmedcmd mark $bamid cped2ncbi completed
+exit 2
+
