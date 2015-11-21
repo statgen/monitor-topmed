@@ -57,10 +57,11 @@ our %opts = (
     jobcount => 0,              # Not actually an option, but stats
     jobsnotpermitted => 0,
     jobsfailedsubmission => 0,
-    batchsize => 120,           # Send up to this many BAMs to NCBi at a time
+    batchsize => 10,            # Send up to this many BAMs to NCBi at a time
+    maxsubmits => 1,            # Send no more than this many runs to NCBI
 );
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose topdir=s center=s runs=s maxjobs=i batchsize=i
+    help realm=s verbose topdir=s center=s runs=s maxjobs=i maxsubmits=i batchsize=i
     memory=s partition=s qos=s dryrun suberr
     )) || die "Failed to parse options\n";
 
@@ -386,9 +387,9 @@ if ($fcn eq 'ncbi') {
                 $opts{jobcount} = 0;
                 $opts{jobsnotpermitted} = 0;
                 $opts{jobsfailedsubmission} = 0;
-                SubmitBAM2NCBI($pistudy2bamlist{$k}, $centername, $dirname, $opts{batchsize});
+                SubmitBAM2NCBI($pistudy2bamlist{$k},
+                    $centername, $dirname, $opts{batchsize});
                 ShowSummary("ncbi $k");
-if (%pistudy2bamlist) { exit; }     # Only let one of these run for now
             }
         }
     }
@@ -607,6 +608,8 @@ die "Invalid request '$fcn'. Try '$Script --help'\n";
 sub SubmitBAM2NCBI {
     my ($aref, $center, $run, $max) = @_;
 
+    if ($opts{maxsubmits} <= 0) { return; }         # Already did my fair share
+
     my ($tmpfile) = tmpnam();
     my ($tmpfile2) = tmpnam();
     while (@{$aref}) {
@@ -624,8 +627,10 @@ sub SubmitBAM2NCBI {
         sleep(1);                   # Insures unique file for xmlprefix
         my $pfx = time();
 $pfx = 'test';
-        my $cmd = "$opts{topmedxml} -bamlist $tmpfile -xmlprefix $pfx -sendlist $tmpfile2 $center $run";
-print "$cmd\n"; exit;
+        my $cmd = $opts{topmedxml};
+        if ($opts{verbose}) { $cmd .= ' -v'; }
+        $cmd .= " -bamlist $tmpfile -xmlprefix $pfx -sendlist $tmpfile2 $center $run";
+        # print "$cmd\n";
         system($cmd) &&
             die "$Script Failed to create XML files. CMD=$cmd\n";
         #   Get parameters for shell script:  bamid file1 file2 ...
@@ -633,12 +638,17 @@ print "$cmd\n"; exit;
         open(IN, $tmpfile2) ||
             die "$Script Unable to get list of XML files from '$tmpfile': $!\n";
         $_ = <IN>;                              # Check that first line looks as expected
-        if (! /^#.+ XML/) { die "$Script '$tmpfile2' did not have names of XML files\n"; }
+        if (! /^# XML/) { die "$Script '$tmpfile2' did not have names of XML files\n"; }
         while (<IN>) {
             chomp();
             BatchSubmit("echo $opts{topmedncbi} -submit $_");
         }
         close(IN);
+        $opts{maxsubmits}--;
+        if ($opts{maxsubmits} <= 0) {
+            print "Limit of XML sets to send to NCBI has been reached\n";
+            last;
+        }
     }
     unlink($tmpfile, $tmpfile2);
 }
@@ -654,7 +664,7 @@ sub BatchSubmit {
     my ($cmd) = @_;
     $opts{maxjobs}--;
     if ($opts{maxjobs} < 0) { return; }
-    if ($opts{maxjobs} == 0) { print "Maximum limit of jobs that can be submitted has been reached\n"; }
+    if ($opts{maxjobs} == 0) { print "Limit of jobs to be submitted has been reached\n"; }
     if ($opts{dryrun}) { print "dryrun => $cmd\n"; return; }
     my $rc = system("$cmd 2>&1");
     $rc = $rc >> 8;
@@ -754,17 +764,25 @@ Generates this output.
 Do not submit more than N jobs for this invocation.
 The default for B<-maxjobs> is B<100>.
 
+=item B<-maxsubmits N>
+
+Do not send more than N XML submits to NCBI.
+The default for B<-maxjobs> is B<10>.
+
 =item B<-memory nG>
 
 Force the sbatch --mem setting when submitting a job.
+This requires the SHELL scripts to handle the environment variable.
 
 =item B<-partition name>
 
 Force the sbatch --partition setting when submitting a job.
+This requires the SHELL scripts to handle the environment variable.
 
 =item B<-qos name>
 
 Force the sbatch --qos setting when submitting a job.
+This requires the SHELL scripts to handle the environment variable.
 
 =item B<-realm NAME>
 
