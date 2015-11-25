@@ -30,6 +30,15 @@ use POSIX qw(strftime tmpnam);
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
+my $NOTSET    = 0;            # Not set
+my $REQUESTED = 1;            # Task requested
+my $SUBMITTED = 2;            # Task submitted to be run
+my $STARTED   = 3;            # Task started
+my $DELIVERED = 19;           # Data delivered, but not confirmed
+my $COMPLETED = 20;           # Task completed successfully
+my $CANCELLED = 89;           # Task cancelled
+my $FAILED    = 99;           # Task failed
+
 my $topmedbin = '/usr/cluster/monitor/bin';
 our %opts = (
     topmedcmd => "$topmedbin/topmedcmd.pl",
@@ -39,7 +48,10 @@ our %opts = (
     topmedcram   => "$topmedbin/topmed_cram.sh",
     topmedbai    => "$topmedbin/topmed_bai.sh",
     topmedqplot  => "$topmedbin/topmed_qplot.sh",
-    topmedncbi   => "$topmedbin/topmed_ncbi.sh",
+    topmednwdid  => "$topmedbin/topmed_nwdid.sh",
+    topmedncbiorig => "$topmedbin/topmed_ncbiorig.sh",
+    topmedncbib37 => "$topmedbin/topmed_ncbib37.sh",
+    topmedncbib38 => "$topmedbin/topmed_ncbib38.sh",
     topmedxml    => "$topmedbin/topmed_xml.pl",
     realm => '/usr/cluster/monitor/etc/.db_connections/topmed',
     centers_table => 'centers',
@@ -109,7 +121,7 @@ if ($fcn eq 'arrive') {
         foreach my $runid (keys %{$runsref}) {
             my $dirname = $runsref->{$runid};
             #   Get list of all bams that have not yet arrived properly
-            my $sql = "SELECT bamid,bamname,datearrived FROM $opts{bamfiles_table} " .
+            my $sql = "SELECT bamid,bamname,state_arrive FROM $opts{bamfiles_table} " .
                 "WHERE runid='$runid'";
             my $sth = DoSQL($sql);
             my $rowsofdata = $sth->rows();
@@ -121,9 +133,7 @@ if ($fcn eq 'arrive') {
                 my @stats = stat($f);
                 if (! @stats) { next; }
                 #   See if we should mark this as arrived. Few states possible
-                if (defined($href->{datearrived}) && ($href->{datearrived} ne '')) {
-                    if ($href->{datearrived} > 10) { next; }     # Already arrived
-                }
+                if ($href->{state_arrive} == $COMPLETED) { next; }  # Already arrived
                 #   If the mtime on the file is very recent, it might still be coming
                 my $nowtime = time();
                 if ((time() - $stats[9]) < 3600) { next; }
@@ -149,7 +159,7 @@ if ($fcn eq 'verify') {
         foreach my $runid (keys %{$runsref}) {
             my $dirname = $runsref->{$runid};
             #   Get list of all bams that have not yet arrived properly
-            my $sql = "SELECT bamid,bamname,datearrived,datemd5ver,checksum,bamsize FROM " .
+            my $sql = "SELECT bamid,bamname,state_arrive,state_md5ver,checksum,bamsize FROM " .
                 $opts{bamfiles_table} . " WHERE runid='$runid'";
             my $sth = DoSQL($sql);
             my $rowsofdata = $sth->rows();
@@ -167,16 +177,10 @@ if ($fcn eq 'verify') {
                     }
                 }
                 #   Only do verify if file has arrived and ready to be run
-                if (! defined($href->{datearrived})) { next; }
-                if ($href->{datearrived} eq '') { next; }    # Not here
-                if ($href->{datearrived} =~ /\D/) { next; }  # Not numeric
-                if ($href->{datearrived} < 10) { next; }     # Not arrived, avoid verify
-                if (defined($href->{datemd5ver}) && ($href->{datemd5ver} ne '')) {
-                    if ($opts{suberr} && $href->{datemd5ver} == -1) { $href->{datemd5ver} = 0; }
-                    if ($href->{datemd5ver} =~ /\D/) { next; }  # Not numeric
-                    if ($href->{datemd5ver} == 2) { next; } # Already queued to be run
-                    if ($href->{datemd5ver} > 10) { next; } # Already done
-                }
+                if ($href->{state_arrive} != $COMPLETED) { next; }
+                if ($opts{suberr} && $href->{state_md5ver} == $FAILED) { $href->{state_md5ver} = $REQUESTED; }
+                if ($href->{state_md5ver} != $NOTSET && $href->{state_md5ver} != $REQUESTED) { next; }
+
                 #   Run the command
                 BatchSubmit("$opts{topmedverify} -submit $href->{bamid} $href->{checksum} $f");
             }
@@ -199,7 +203,7 @@ if ($fcn eq 'bai') {
         foreach my $runid (keys %{$runsref}) {
             my $dirname = $runsref->{$runid};
             #   Get list of all bams that have not yet arrived properly
-            my $sql = "SELECT bamid,bamname,datemd5ver,datebai FROM " .
+            my $sql = "SELECT bamid,bamname,state_md5ver,state_bai FROM " .
                 $opts{bamfiles_table} . " WHERE runid='$runid'";
             my $sth = DoSQL($sql);
             my $rowsofdata = $sth->rows();
@@ -207,17 +211,10 @@ if ($fcn eq 'bai') {
             for (my $i=1; $i<=$rowsofdata; $i++) {
                 my $href = $sth->fetchrow_hashref;
                 my $f = $opts{topdir} . "/$centername/$dirname/" . $href->{bamname};
-                #   Only do bai if file has arrived
-                if (! defined($href->{datemd5ver})) { next; }
-                if ($href->{datemd5ver} eq '') { next; }    # Not here
-                if ($href->{datemd5ver} =~ /\D/) { next; }  # Not numeric
-                if ($href->{datemd5ver} < 10) { next; }     # Not arrived, avoid bai
-                if (defined($href->{datebai}) && ($href->{datebai} ne '')) {
-                    if ($opts{suberr} && $href->{datebai} == -1) { $href->{datebai} = 0; }
-                    if ($href->{datebai} =~ /\D/) { next; }  # Not numeric
-                    if ($href->{datebai} == 2) { next; } # Already queued to be run
-                    if ($href->{datebai} > 10) { next; } # Already done
-                }
+                #   Only do bai if file has been verified
+                if ($href->{state_md5ver} != $COMPLETED) { next; }
+                if ($opts{suberr} && $href->{state_bai} == $FAILED) { $href->{state_bai} = $REQUESTED; }
+                if ($href->{state_bai} != $NOTSET && $href->{state_bai} != $REQUESTED) { next; }
                 #   Run the command
                 BatchSubmit("$opts{topmedbai} -submit $href->{bamid} $f");
             }
@@ -240,7 +237,7 @@ if ($fcn eq 'backup') {
         foreach my $runid (keys %{$runsref}) {
             my $dirname = $runsref->{$runid};
             #   Get list of all bams that have not yet arrived properly
-            my $sql = "SELECT bamid,bamname,datearrived,datebackup FROM " .
+            my $sql = "SELECT bamid,bamname,state_md5ver,state_backup FROM " .
                 $opts{bamfiles_table} . " WHERE runid='$runid'";
             my $sth = DoSQL($sql);
             my $rowsofdata = $sth->rows();
@@ -248,17 +245,10 @@ if ($fcn eq 'backup') {
             for (my $i=1; $i<=$rowsofdata; $i++) {
                 my $href = $sth->fetchrow_hashref;
                 my $f = $opts{topdir} . "/$centername/$dirname/" . $href->{bamname};
-                #   Only do backup if file has arrived and ready to be run
-                if (! defined($href->{datearrived})) { next; }
-                if ($href->{datearrived} eq '') { next; }    # Not here
-                if ($href->{datearrived} =~ /\D/) { next; }  # Not numeric
-                if ($href->{datearrived} < 10) { next; }     # Not arrived, avoid backup
-                if (defined($href->{datebackup}) && ($href->{datebackup} ne '')) {
-                    if ($opts{suberr} && $href->{datebackup} == -1) { $href->{datebackup} = 0; }
-                    if ($href->{datebackup} =~ /\D/) { next; }  # Not numeric
-                    if ($href->{datebackup} == 2) { next; } # Already queued to be run
-                    if ($href->{datebackup} > 10) { next; } # Already done
-                }
+                #   Only do bai if file has been verified
+                if ($href->{state_md5ver} != $COMPLETED) { next; }
+                if ($opts{suberr} && $href->{state_backup} == $FAILED) { $href->{state_backup} = $REQUESTED; }
+                if ($href->{state_backup} != $NOTSET && $href->{state_backup} != $REQUESTED) { next; }
                 #   Run the command
                 BatchSubmit("$opts{topmedbackup} -submit $href->{bamid} $f");
             }
@@ -281,7 +271,7 @@ if ($fcn eq 'cram') {
         foreach my $runid (keys %{$runsref}) {
             my $dirname = $runsref->{$runid};
             #   Get list of all bams that have not yet arrived properly
-            my $sql = "SELECT bamid,bamname,datearrived,datebackup,datecram FROM " .
+            my $sql = "SELECT bamid,bamname,state_md5ver,state_cram FROM " .
                 $opts{bamfiles_table} . " WHERE runid='$runid'";
             my $sth = DoSQL($sql);
             my $rowsofdata = $sth->rows();
@@ -289,21 +279,10 @@ if ($fcn eq 'cram') {
             for (my $i=1; $i<=$rowsofdata; $i++) {
                 my $href = $sth->fetchrow_hashref;
                 my $f = $opts{topdir} . "/$centername/$dirname/" . $href->{bamname};
-                #   Only do cram if file has arrived and been backed up
-                if (! defined($href->{datearrived})) { next; }
-                if ($href->{datearrived} eq '') { next; }    # Not here
-                if ($href->{datearrived} =~ /\D/) { next; }  # Not numeric
-                if ($href->{datearrived} < 10) { next; }     # Not arrived, avoid backup
-                if (defined($href->{datebackup}) && ($href->{datebackup} ne '')) {
-                    if ($href->{datebackup} =~ /\D/) { next; }  # Not numeric
-                    if ($href->{datebackup} <= 10) { next; } # Not done
-                }
-                if (defined($href->{datecram}) && ($href->{datecram} ne '')) {
-                    if ($opts{suberr} && $href->{datecram} == -1) { $href->{datecram} = 0; }
-                    if ($href->{datecram} =~ /\D/) { next; }  # Not numeric
-                    if ($href->{datecram} == 2) { next; } # Already queued to be run
-                    if ($href->{datecram} > 10) { next; } # Already done
-                }
+                #   Only create cram if file has been verified
+                if ($href->{state_md5ver} != $COMPLETED) { next; }
+                if ($opts{suberr} && $href->{state_cram} == $FAILED) { $href->{state_cram} = $REQUESTED; }
+                if ($href->{state_cram} != $NOTSET && $href->{state_cram} != $REQUESTED) { next; }
                 #   Run the command
                 BatchSubmit("$opts{topmedcram} -submit $href->{bamid} $f");
             }
@@ -314,9 +293,95 @@ if ($fcn eq 'cram') {
 }
 
 #--------------------------------------------------------------
+#   Run QPLOT on BAMs
+#--------------------------------------------------------------
+if ($fcn eq 'qplot') {
+    #   Get all the known centers in the database
+    my $centersref = GetCenters();
+    foreach my $cid (keys %{$centersref}) {
+        my $centername = $centersref->{$cid};
+        my $runsref = GetRuns($cid) || next;
+        #   For each run, see if there are bamfiles to run qplot on
+        foreach my $runid (keys %{$runsref}) {
+            my $dirname = $runsref->{$runid};
+            #   Get list of all bams that have not yet arrived properly
+            my $sql = "SELECT bamid,bamname,state_bai,state_qplot FROM " .
+                $opts{bamfiles_table} . " WHERE runid='$runid'";
+            my $sth = DoSQL($sql);
+            my $rowsofdata = $sth->rows();
+            if (! $rowsofdata) { next; }
+            for (my $i=1; $i<=$rowsofdata; $i++) {
+                my $href = $sth->fetchrow_hashref;
+                my $f = $opts{topdir} . "/$centername/$dirname/" . $href->{bamname};
+                if (! -f $f) { next; }      # If BAM not there, do not submit
+                #   Only do qplot if BAI finished
+                if ($href->{state_bai} != $COMPLETED) { next; }
+                if ($opts{suberr} && $href->{state_qplot} == $FAILED) { $href->{state_qplot} = $REQUESTED; }
+                if ($href->{state_qplot} != $NOTSET && $href->{state_qplot} != $REQUESTED) { next; }
+                #   Run the command
+                BatchSubmit("$opts{topmedqplot} -submit $href->{bamid} $f");
+            }
+        }
+    }
+    ShowSummary('qplot');
+    exit;
+}
+#--------------------------------------------------------------
+#   Create experiment XML and sent it to NCBI for this NWDID
+#--------------------------------------------------------------
+if ($fcn eq 'nwdid') {
+    #   Get all the known centers in the database
+    my $centersref = GetCenters();
+    foreach my $cid (keys %{$centersref}) {
+        my $centername = $centersref->{$cid};
+        my $runsref = GetRuns($cid) || next;
+        #   For each run, see if there are bamfiles to be delivered to NCBI
+        foreach my $runid (keys %{$runsref}) {
+            my $dirname = $runsref->{$runid};
+            #   Get list of all bams known at NCBI and that have not been sent
+            my $sql = "SELECT * FROM $opts{bamfiles_table} " .
+                "WHERE runid='$runid' AND nwdid_known='Y'";
+            my $sth = DoSQL($sql);
+            my $rowsofdata = $sth->rows();
+            if (! $rowsofdata) { next; }
+            my %pistudy2bamlist = ();
+            for (my $i=1; $i<=$rowsofdata; $i++) {
+                my $href = $sth->fetchrow_hashref;
+                my $f = $opts{topdir} . "/$centername/$dirname/" . $href->{bamname};
+                
+                #   Check important fields for this BAM are possibly correct
+                my $skip = 0;
+                foreach my $col (qw(expt_sampleid phs library_name nominal_length nominal_sdev base_coord)) {
+                    if (exists($href->{$col}) && $href->{$col}) { next; }
+                    if ($opts{verbose}) { print "  BAM '$href->{bamname}' [$href->{bamid}] has no value for '$col'\n"; }
+                    $skip++;
+                }
+                #   Do better checking than just is the field non-blank
+                if ($href->{expt_sampleid} !~ /^NWD/) {
+                    die "$Script How can BAMID=$href->{bamid} have an invalid NWDID '$href->{expt_sampleid}'?\n";
+                }
+                if ($skip) {
+                    print "  BAM '$href->{bamname}' [$href->{bamid}] is ignored because of incomplete data\n";
+                    next;
+                }
+
+                #   Only do if the bam has been verified and we did something with it
+                if ($href->{state_qplot} != $COMPLETED) { next; }
+                if ($opts{suberr} && $href->{state_nwdid} == $FAILED) { $href->{state_nwdid} = $REQUESTED; }
+                if ($href->{state_nwdid} != $NOTSET && $href->{state_nwdid} != $REQUESTED) { next; }
+                #   Tell NCBI about this NWDID experiment
+                BatchSubmit("echo $opts{topmednwdid} -submit $href->{bamid}");
+            }
+        }
+        ShowSummary("nwdid");
+    }
+    exit;
+}
+
+#--------------------------------------------------------------
 #   Get a list of BAMs to be sent to NCBI
 #--------------------------------------------------------------
-if ($fcn eq 'ncbi') {
+if ($fcn eq 'ncbiorig') {
     #   Get all the known centers in the database
     my $centersref = GetCenters();
     foreach my $cid (keys %{$centersref}) {
@@ -397,51 +462,9 @@ if ($fcn eq 'ncbi') {
 }
 
 #--------------------------------------------------------------
-#   Run QPLOT on BAMs
-#--------------------------------------------------------------
-if ($fcn eq 'qplot') {
-    #   Get all the known centers in the database
-    my $centersref = GetCenters();
-    foreach my $cid (keys %{$centersref}) {
-        my $centername = $centersref->{$cid};
-        my $runsref = GetRuns($cid) || next;
-        #   For each run, see if there are bamfiles to run qplot on
-        foreach my $runid (keys %{$runsref}) {
-            my $dirname = $runsref->{$runid};
-            #   Get list of all bams that have not yet arrived properly
-            my $sql = "SELECT bamid,bamname,datebai,dateqplot FROM " .
-                $opts{bamfiles_table} . " WHERE runid='$runid'";
-            my $sth = DoSQL($sql);
-            my $rowsofdata = $sth->rows();
-            if (! $rowsofdata) { next; }
-            for (my $i=1; $i<=$rowsofdata; $i++) {
-                my $href = $sth->fetchrow_hashref;
-                my $f = $opts{topdir} . "/$centername/$dirname/" . $href->{bamname};
-                if (! -f $f) { next; }      # If BAM not there, do not submit
-                #   Only do qplot if BAI finished
-                if (! defined($href->{datebai})) { next; }
-                if ($href->{datebai} eq '') { next; }
-                if ($href->{datebai} < 10) { next; }
-                if (defined($href->{dateqplot}) && ($href->{dateqplot} ne '')) {
-                    if ($opts{suberr} && $href->{dateqplot} == -1) { $href->{dateqplot} = 0; }
-                    if ($href->{dateqplot} =~ /\D/) { next; }  # Not numeric
-                    if ($href->{dateqplot} < 0) { next; }  # Already started
-                    if ($href->{dateqplot} == 2) { next; } # Already queued to be run
-                    if ($href->{dateqplot} > 10) { next; } # Already done
-                }
-                #   Run the command
-                BatchSubmit("$opts{topmedqplot} -submit $href->{bamid} $f");
-            }
-        }
-    }
-    ShowSummary('qplot');
-    exit;
-}
-
-#--------------------------------------------------------------
 #   Check all the BAMs and see if the files match what the DB says
 #--------------------------------------------------------------
-if ($fcn eq 'check') {
+if ($fcn eq 'redo-check') {
     $_ = "#" . '-' x 70;
     print "$_\n#    Found these inconsistencies between the database and file system\n" .
          "#    BEWARE OF FALSE ERRORS  when jobs are being processed\n$_\n";
