@@ -27,15 +27,27 @@ use Getopt::Long;
 
 #   These represent states the run can be in. column name to letter
 my %attributes2letter = (
-    datearrived => 'A',
-    datebai => 'I',
-    datemd5ver => '5',
-    datemapping => '7',
-    dateqplot => 'Q',
-    datebackup => 'B',
-    datecram => 'C',
-    datecp2ncbi => 'N',
+    'state_arrive'   => 'A',
+    'state_md5ver'   => '5',
+    'state_backup'   => 'B',
+    'state_bai'      => 'I',
+    'state_qplot'    => 'Q',
+    'state_cram'     => 'C',
+    'state_nwdid'    => 'X',
+    'state_b37'      => '7',
+    'state_b38'      => '8',
+    'state_ncbiorig' => 'O',
+    'state_ncbib37'  => 'R',
+    'state_ncbib38'  => 'S',
 );
+my $NOTSET    = 0;            # Not set
+my $REQUESTED = 1;            # Task requested
+my $SUBMITTED = 2;            # Task submitted to be run
+my $STARTED   = 3;            # Task started
+my $DELIVERED = 19;           # Data delivered, but not confirmed
+my $COMPLETED = 20;           # Task completed successfully
+my $CANCELLED = 89;           # Task cancelled
+my $FAILED    = 99;           # Task failed
 
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
@@ -102,20 +114,20 @@ if ($fcn eq 'runstatus') {
                 #   Get counts of states we are interested for each attribute
                 foreach my $a (@attributes) {
                     if (! defined($href->{$a})) { next; }
-                    if ($href->{$a} eq '') { next; }
-                    if ($href->{$a} == 1)  { next; }    # cancelled
+                    if ($href->{$a} == $NOTSET) { next; }
+                    if ($href->{$a} == $CANCELLED)  { next; }    # cancelled
                     #   These go into done, processing or neither states
-                    if ($href->{$a} > 10)  { $counts{$a}{done}++;   next; } # yea!
-                    if ($href->{$a} == -1) { $counts{$a}{failed}++; next; } # boo!
+                    if ($href->{$a} ==  $COMPLETED)  { $counts{$a}{done}++;   next; } # yea!
+                    if ($href->{$a} == $FAILED) { $counts{$a}{failed}++; next; } # boo!
                     $counts{$a}{processing}++;
                 }
             }
+
             #   Figure out the status for this run
             #   Status consists of a letter and a summary value
             #   The letter represents the step (e.g. A for arrived)
             #   the summary value is one of done processing or unknown
             my $s = '';
-            my $n;
             foreach my $a (@attributes) {
                 if (! exists($counts{$a}{failed}))     { $counts{$a}{failed} = 0; }
                 if (! exists($counts{$a}{done}))       { $counts{$a}{done} = 0; }
