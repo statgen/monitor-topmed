@@ -20,7 +20,7 @@ include_once "../edit.php";
 //print "<!-- _POST=\n"; print_r($_POST); print " -->\n";
 
 $qurl =  $_SERVER['SCRIPT_NAME'] . "?fcn=queue'";
-$STATUSLETTERS =  "<i>A=File Arrived, 5=MD5 Verified, B=BAM backed up, C=BAM=>CRAM, I=BAI created, Q=qplot run, 7=Remapped BAM Build=37, N=File sent to NCBI";
+$STATUSLETTERS =  "<i>A=File Arrived, 5=MD5 Verified, B=BAM backed up, C=BAM=>CRAM, I=BAI created, Q=qplot run, 7=Remapped Build=37, 9=Remapped Build=39, X=EXPT=>NCBI, O=Orig=>NCBI, R=B37=>NCBI, S=b38=>NCBI";
 
 $SHOWQUEUES = "STATUS: &nbsp;&nbsp;&nbsp;" .
     "<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=showqlocal' " .
@@ -65,41 +65,58 @@ $RUNNOTE = "<p><b>Note:</b><br>" .
     "<i>Steps:</i> $STATUSLETTERS<br>" .
     "</p>\n";
 
-$quickcols = array(                     // Map of status column to verb
-    'datearrived'  => 'arrived',
-    'datemd5ver'   => 'md5ver',
-    'datebackup'   => 'backedup',
-    'datebai'      => 'bai',
-    'dateqplot'    => 'qplot',
-    'datecram'     => 'cramed',
-    'datemapping'  => 'mapping',
-    'datecp2ncbi'  => 'ncbi',
+$quickcols = array(                     // Map of status column to topmedcmd verb
+    'state_arrive'   => 'arrived',
+    'state_md5ver'   => 'md5ver',
+    'state_backup'   => 'backedup',
+    'state_bai'      => 'bai',
+    'state_qplot'    => 'qplot',
+    'state_cram'     => 'cramed',
+    'state_nwdid'    => 'sendnwdid',
+    'state_b37'      => 'mapping37',
+    'state_b38'      => 'mapping38',
+    'state_ncbiorig' => 'sendorig',
+    'state_ncbib37'  => 'sendb37',
+    'state_ncbib38'  => 'sendb38'
 );
 $quickletter = array(                   // Map of status column to letter we see
-    'datearrived'  => 'A',
-    'datemd5ver'   => '5',
-    'datebackup'   => 'B',
-    'datebai'      => 'I',
-    'dateqplot'    => 'Q',
-    'datecram'     => 'C',
-    'datemapping'  => '7',
-    'datecp2ncbi'  => 'N',
+    'state_arrive'   => 'A',
+    'state_md5ver'   => '5',
+    'state_backup'   => 'B',
+    'state_bai'      => 'I',
+    'state_qplot'    => 'Q',
+    'state_cram'     => 'C',
+    'state_nwdid'    => 'X',
+    'state_b37'      => '7',
+    'state_b38'      => '8',
+    'state_ncbiorig' => 'O',
+    'state_ncbib37'  => 'R',
+    'state_ncbib38'  => 'S'
 );
-$validfunctions = array('all', 'verify', 'backup', 'bai', 'qplot', 'cram');
+$validfunctions = array('all', 'verify', 'backup', 'bai', 'qplot', 'cram', 'nwdid', 'sb37', 'sb38');
+$NOTSET = 0;                // Not set
+$REQUESTED = 1;             // Task requested
+$SUBMITTED = 2;             // Task submitted to be run
+$STARTED   = 3;             // Task started
+$DELIVERED = 19;            // Data delivered, but not confirmed
+$COMPLETED = 20;            // Task completed successfully
+$CANCELLED = 89;            // Task cancelled
+$FAILED    = 99;            // Task failed
+$state2str = array(         // Values here are class for SPAN tag
+    $NOTSET => 'notset',
+    $REQUESTED => 'requested',
+    $SUBMITTED => 'submitted',
+    $STARTED => 'started',
+    $DELIVERED => 'delivered',
+    $COMPLETED => 'completed',
+    $CANCELLED => 'cancelled',
+    $FAILED => 'failed'
+);
 
-//  These columns are time() values to be converted to people readable dates
+
+//  These columns are state values to be converted to people readable strings
 //  See DateState() for possible values
-$conv2dat = array (
-    'datefetch',
-    'datearrived',
-    'datemd5ver',
-    'datebackup',
-    'datebai',
-    'dateqplot',
-    'datecram',
-    'datemapping',
-    'datecp2ncbi',
-);
+$conv2dat = array_keys($quickcols);
 
 //  Handy javascript fragments
 $JS['VSPACER'] = "<br/><br/><br/><br/>";
@@ -239,7 +256,7 @@ print "$cmd\n";
 //  Certain users can do more
 if ($iammgr) {
     if ($fcn == 'setcancel') {
-        $sql = 'UPDATE ' . $LDB['bamfiles'] . " SET $col=1 WHERE bamid=$bamid";
+        $sql = 'UPDATE ' . $LDB['bamfiles'] . " SET $col=$CANCELLED WHERE bamid=$bamid";
         $result = SQL_Query($sql);
         Msg("Cancelled '$col' for BAM '$bamid'  SQL=$sql");
         print $JS['CLOSE'];
@@ -247,7 +264,7 @@ if ($iammgr) {
         exit;
     }
     if ($fcn == 'setrequest') {
-        $sql = 'UPDATE ' . $LDB['bamfiles'] . " SET $col=0 WHERE bamid=$bamid";
+        $sql = 'UPDATE ' . $LDB['bamfiles'] . " SET $col=$REQUESTED WHERE bamid=$bamid";
         $result = SQL_Query($sql);
         Msg("Requested '$col' for BAM '$bamid'");
         print $JS['CLOSE'];
@@ -660,10 +677,10 @@ function ViewBamDetail($bamid) {
         $d = $row[$c];
         if ($c == 'dateinit') { $d = date('Y/m/d H:i', $d); }
         if ($c == 'datecomplete' && $d != '&nbsp;') { $d = date('Y/m/d H:i', $d); }
-        if (in_array($c, $conv2dat)) {  // Special date needs formatting
-            $vals = DateState($d);
-            if ($vals[1] != 'notset' && $c != 'dateinit') {
-                $d = $vals[0] . $JS['SPACER'] . "<span class='note'>($vals[1])</span>";
+        if (in_array($c, $conv2dat)) {  // Special field needs formatting
+            $val = DateState($d);
+            if ($val != 'notset') {
+                $d = "<span class='$val'>$val</span>";
 
                 $url = $_SERVER['PHP_SELF'] . "?bamid=$bamid&amp;col=$c&amp;fcn=setrequest";
                 $d .= $JS['SPACER'] . 
@@ -823,7 +840,36 @@ function GetCenters() {
         array_push ($CENTERS,$n);
     }
 }
-
+/* $quickcols = array(                     // Map of status column to topmedcmd verb
+    'state_arrive'   => 'arrived',
+    'state_md5ver'   => 'md5ver',
+    'state_backup'   => 'backedup',
+    'state_bai'      => 'bai',
+    'state_qplot'    => 'qplot',
+    'state_cram'     => 'cramed',
+    'state_nwdid'    => 'sendnwdid',
+    'state_b37'      => 'mapping37',
+    'state_b38'      => 'mapping38',
+    'state_ncbiorig' => 'sendorig',
+    'state_ncbib37'  => 'sendb37',
+    'state_ncbib38'  => 'sendb38',
+);
+$quickletter = array(                   // Map of status column to letter we see
+    'state_arrive'   => 'A',
+    'state_md5ver'   => '5',
+    'state_backup'   => 'B',
+    'state_bai'      => 'I',
+    'state_qplot'    => 'Q',
+    'state_cram'     => 'C',
+    'state_nwdid'    => 'X',
+    'state_b37'      => '7',
+    'state_b38'      => '8',
+    'state_ncbiorig' => 'O',
+    'state_ncbib37'  => 'R',
+    'state_ncbib38'  => 'S',
+);
+$state2str
+*/
 /*---------------------------------------------------------------
 # href = QuickStatus($r)
 #   $r = row of data for this BAM, contains dates for tasks
@@ -837,40 +883,23 @@ function QuickStatus($r) {
     $span='notset';
     $cols = array_keys($quickcols);
     foreach ($cols as $c) {
-        $vals = array('','notset');
-        if (isset($r[$c]) && $r[$c] != '') {    // Something happened
-            $vals = DateState($r[$c]);
-        }
-        $h .= "<span class='$vals[1]'>&nbsp;" . $quickletter[$c] . "&nbsp;</span>";
+        $val = DateState($r[$c]);
+        $h .= "<span class='$val'>&nbsp;" . $quickletter[$c] . "&nbsp;</span>";
     }
     return $h;
 }
 
 /*---------------------------------------------------------------
 # href = DateState($t)
-#   Return state for a particular time. The convention is
-#   $t > 10    Task completed
-#   $t < 0     Task started
-#   $t = -1    Task failed
-#   $t = 0     Task requested
-#   $t = 1     Task cancelled
-#   $t = 2     Task submitted
-#   $t = 3     Data delivered, waiting for confirmation
-#   returns array (date-string, state)
+#   Return state for a particular time. See values at top of this pgm
+#   returns array (state)
 ---------------------------------------------------------------*/
 function DateState($t) {
+    global $state2str;
     $state = 'notset';
-    $str = '';
-    if (isset($t) && $t != '') {
-        if ($t > 10)  { $state = 'completed'; $str = date('Y/m/d H:i', $t); }
-        if ($t < -1)  { $state = 'started'; $str = date('Y/m/d H:i', -$t); }
-        if ($t == 0)  { $state = 'requested'; }
-        if ($t == -1) { $state = 'failed'; }
-        if ($t == 1)  { $state = 'cancelled'; }
-        if ($t == 2)  { $state = 'submitted'; }
-        if ($t == 3)  { $state = 'delivered'; }
-    }
-    return array($str, $state);
+    if (in_array($t, $state2str)) { $state = $state2str[$t]; }
+    $state = $state2str[$t];
+    return $state;
 }
 
 /*---------------------------------------------------------------
