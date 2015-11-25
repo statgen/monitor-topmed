@@ -1,8 +1,22 @@
-#---------------------------------------------------------------
+/* --------------------------------------------------------------
 #       NHLBI TopMed tracking entries
 #
 #   Do not delete columns without telling Chris so he can fix mapping
-#---------------------------------------------------------------
+#--------------------------------------------------------------- */
+/* This table is used to control when/if an operation is permitted
+   If an entry is in this table, it means it is disabled */
+DROP TABLE IF EXISTS permissions;
+CREATE TABLE permissions (
+  id           INT         NOT NULL AUTO_INCREMENT,
+  centerid     INT         NOT NULL,            # 0 = all
+  centername   VARCHAR(16) NOT NULL,
+  runid        INT         NOT NULL,            # 0 = all
+  dirname      VARCHAR(64) NOT NULL,
+  operation    CHAR(12),
+  PRIMARY KEY  (id)
+);
+
+/* Lists all the centers we get BAMs from */
 DROP TABLE IF EXISTS centers;
 CREATE TABLE centers (
   centerid     INT         NOT NULL AUTO_INCREMENT,
@@ -16,12 +30,7 @@ INSERT INTO centers (centername,centerdesc,designdesc) VALUES('illumina', 'Illum
 INSERT INTO centers (centername,centerdesc,designdesc) VALUES('nygc', 'New York Genome Center','Whole genome sequencing using Illumina TruSeq PCR-free DNA library preparation with 500ng input DNA, sequenced to >30x mean coverage with 2x150bp reads on HiSeq X.');
 INSERT INTO centers (centername,centerdesc,designdesc) VALUES('uw', 'University of Washington Genome Sciences','equivalent to Illumina TruSeq PCR-free DNA sample prep');
 
-#   The first of these,  EXPERIMENT -> alias,  identifies which record was pointed to by
-#   RUN -> EXPERIMENT_REF -> refname. Then  EXPERIMENT -> SAMPLE_DESCRIPTOR -> refname
-#   gives the individual identifier that we will search for in an external lookup table
-#   to find out whether the associated .bam file should be transmitted immediately
-#   to NCBI, or backed up for later transfer, or neither (if it already exists
-#   in Amazon S3 or equivalent).
+/* Lists all runs (directories of data). Must be tied to a center */
 DROP TABLE IF EXISTS runs;
 CREATE TABLE runs (
   runid        INT         NOT NULL AUTO_INCREMENT,
@@ -40,20 +49,12 @@ CREATE TABLE runs (
 CREATE INDEX index_centerid_dirname ON runs(centerid,dirname);
 CREATE INDEX index_dirname ON runs(dirname);
 
-DROP TABLE IF EXISTS studies;
-CREATE TABLE studies (
-  studyid      INT         NOT NULL AUTO_INCREMENT,
-  studyname    VARCHAR(64) NOT NULL,
-  PRIMARY KEY  (studyid)
-);
-CREATE INDEX index_studyid_studyname ON studies(studyid,studyname);
-CREATE INDEX index_studyname ON studies(studyname);
-
+/* Lists all BAMs we know about (e.g. NWDID)  Must be tied to a run */
 DROP TABLE IF EXISTS bamfiles;
 CREATE TABLE bamfiles (
+  dateinit     VARCHAR(12),
   bamid        INT         NOT NULL AUTO_INCREMENT,
   runid        INT         NOT NULL,
-  studyid      INT         NOT NULL,          /* Remove this */
   bamname_orig VARCHAR(96) NOT NULL,
   bamname      VARCHAR(96) NOT NULL,
   bamsize      VARCHAR(16) DEFAULT 0,
@@ -72,8 +73,43 @@ CREATE TABLE bamfiles (
   checksum     VARCHAR(96) NOT NULL,
   refname      VARCHAR(96) NOT NULL,
   expt_refname VARCHAR(96) NOT NULL,
-  expt_sampleid VARCHAR(24) NOT NULL,
+  expt_sampleid VARCHAR(24) NOT NULL,   /* NWDID */
   nwdid_known  CHAR(1) DEFAULT 'N',
+
+/* Fields to track state for each step */
+/* See values at top of topmed_monitor.pl for possible states */
+  state_arrive   INT DEFAULT 0,
+  state_md5ver   INT DEFAULT 0,
+  state_backup   INT DEFAULT 0,
+  state_cram     INT DEFAULT 0,
+  state_bai      INT DEFAULT 0,
+  state_qplot    INT DEFAULT 0,
+  state_b37      INT DEFAULT 0,
+  state_b38      INT DEFAULT 0,
+  state_nwdid    INT DEFAULT 0,
+  state_ncbiorig INT DEFAULT 0,
+  state_ncbib37  INT DEFAULT 0,
+  state_ncbib38  INT DEFAULT 0,
+
+  jobidarrived VARCHAR(12),
+  jobidmd5ver  VARCHAR(12),
+  jobidbackup  VARCHAR(12),
+  jobidcram    VARCHAR(12),
+  jobidbai     VARCHAR(12),
+  jobidqplot   VARCHAR(12),
+  jobidb37     VARCHAR(12),
+  jobidb38     VARCHAR(12),
+  jobidnwdid   VARCHAR(12),
+  jobidncbiorig VARCHAR(12),
+  jobidncbib37  VARCHAR(12),
+  jobidncbib38  VARCHAR(12),
+
+  PRIMARY KEY  (bamid)
+
+
+/* ####################################################
+   Remove these some day 
+   #################################################### */
   datearrived  VARCHAR(12),
   datemd5ver   VARCHAR(12),
   datebackup   VARCHAR(12),
@@ -81,28 +117,16 @@ CREATE TABLE bamfiles (
   datebai      VARCHAR(12),
   dateqplot    VARCHAR(12),
   datecp2ncbi  VARCHAR(12),
-  jobidarrived VARCHAR(12),
-  jobidmd5ver  VARCHAR(12),
-  jobidbackup  VARCHAR(12),
-  jobidcram    VARCHAR(12),
-  jobidbai     VARCHAR(12),
-  jobidqplot   VARCHAR(12),
-  jobidcp2ncbi VARCHAR(12),
-  bam_delivered VARCHAR(12),
+  datemapping  VARCHAR(12),
+  studyid      INT         NOT NULL,          /* Remove this someday */
   cramorigsent CHAR(1) DEFAULT 'N',
 #   Added for remapping with build37
-  datemapping  VARCHAR(12),
-  jobidmapping VARCHAR(12),
   cramb37sent CHAR(1) DEFAULT 'N',
   cramb37checksum VARCHAR(96) NOT NULL,
-#   Added for remapping with build38
-#  datemapping8 VARCHAR(12),
-#  jobidmapping8 VARCHAR(12),
-#  cramb39sent CHAR(1) DEFAULT 'N',
-#  cramb39checksum VARCHAR(96) NOT NULL,
+  bam_delivered VARCHAR(12),
+  jobidcp2ncbi VARCHAR(12),
+  jobidmapping VARCHAR(12),
 
-  dateinit     VARCHAR(12),
-  PRIMARY KEY  (bamid)
 );
 CREATE INDEX index_runid   ON bamfiles(runid);
 CREATE INDEX index_nwdid   ON bamfiles(expt_sampleid);
@@ -111,20 +135,18 @@ CREATE INDEX index_refname ON bamfiles(refname);
 # ALTER TABLE bamfiles ADD COLUMN datebai VARCHAR(12) AFTER datebackup;
 
 
-#   This table is used to control when/if an operation is permitted
-#   If an entry is in this table, it means it is disabled
-DROP TABLE IF EXISTS permissions;
-CREATE TABLE permissions (
-  id           INT         NOT NULL AUTO_INCREMENT,
-  centerid     INT         NOT NULL,            # 0 = all
-  centername   VARCHAR(16) NOT NULL,
-  runid        INT         NOT NULL,            # 0 = all
-  dirname      VARCHAR(64) NOT NULL,
-  operation    CHAR(12),
-  PRIMARY KEY  (id)
+/* ####################################################
+   Remove these some day 
+   #################################################### */
+DROP TABLE IF EXISTS studies;
+CREATE TABLE studies (
+  studyid      INT         NOT NULL AUTO_INCREMENT,
+  studyname    VARCHAR(64) NOT NULL,
+  PRIMARY KEY  (studyid)
 );
+CREATE INDEX index_studyid_studyname ON studies(studyid,studyname);
+CREATE INDEX index_studyname ON studies(studyname);
 
-#   This table has never been used yet
 DROP TABLE IF EXISTS requestfiles;
 CREATE TABLE requestfiles (
   reqid        INT         NOT NULL AUTO_INCREMENT,
