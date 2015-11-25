@@ -26,6 +26,15 @@ use Getopt::Long;
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
+my $NOTSET    = 0;            # Not set
+my $REQUESTED = 1;            # Task requested
+my $SUBMITTED = 2;            # Task submitted to be run
+my $STARTED   = 3;            # Task started
+my $DELIVERED = 19;           # Data delivered, but not confirmed
+my $COMPLETED = 20;           # Task completed successfully
+my $CANCELLED = 89;           # Task cancelled
+my $FAILED    = 99;           # Task failed
+
 my $topmedbin = '/usr/cluster/monitor/bin';
 our %opts = (
     topmedcmd => "$topmedbin/topmedcmd.pl",
@@ -50,7 +59,7 @@ Getopt::Long::GetOptions( \%opts,qw(
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$Script [options] nwd|rename|crammd5\n" .
+    warn "$Script [options] nwd|rename|crammd5|fixmapping\n" .
         "Fix problems with various hacks.\n";
     exit 1;
 }
@@ -113,7 +122,7 @@ if ($fcn eq 'crammd5') {
             my $dirname = $runsref->{$runid};
             print "Doing $dirname\n";
             #   Get list of all bams
-            my $sql = "SELECT * FROM $opts{bamfiles_table} WHERE runid='$runid'";
+            my $sql = "SELECT * FROM $opts{bamfiles_table} WHERE runid='$runid' AND piname!=NULL";
             my $sth = DoSQL($sql);
             my $rowsofdata = $sth->rows();
             if (! $rowsofdata) { next; }
@@ -351,6 +360,62 @@ my $partname = 'this got broken somehow';
     exit;
 }
 
+#--------------------------------------------------------------
+#   Update state_b37 from datamapping until Chris' remapping finally completes
+#   Remove comments to correct all those date* fields
+#--------------------------------------------------------------
+if ($fcn eq 'fixmapping') {
+    my %old2new = (
+#        datearrived => 'state_arrive',
+#        datemd5ver => 'state_md5ver',
+#        datebackup => 'state_backup',
+#        datecram => 'state_cram',
+#        datebai => 'state_bai',
+#        dateqplot => 'state_qplot',
+        datemapping => 'state_b37',
+    );
+
+    #   Get all the known centers in the database
+    my $centersref = GetCenters();
+    foreach my $cid (keys %{$centersref}) {
+        my $centername = $centersref->{$cid};
+        my $runsref = GetRuns($cid) || next;
+        #   For each run, see if there are bamfiles that arrived
+        foreach my $runid (keys %{$runsref}) {
+            my $dirname = $runsref->{$runid};
+            print "Doing $dirname\n";
+            #   Get list of all bams
+            my $sql = "SELECT * FROM $opts{bamfiles_table} WHERE runid='$runid'";
+            my $sth = DoSQL($sql);
+            my $rowsofdata = $sth->rows();
+            if (! $rowsofdata) { next; }
+            for (my $i=1; $i<=$rowsofdata; $i++) {
+                my $href = $sth->fetchrow_hashref;
+                my $bamid = $href->{bamid};
+                #   Create UPDATE statements for each field to be changed
+                my $sets = '';
+                foreach my $oldcol (keys %old2new) {
+                    my $newcol = $old2new{$oldcol};
+                    if (defined($href->{$oldcol}) && $href->{$oldcol} ne ' ') {
+                        if ($href->{$oldcol} < 0)   { $sets .= "$newcol=$STARTED,";   next; }
+                        if ($href->{$oldcol} == -1) { $sets .= "$newcol=$FAILED,";    next; }
+                        if ($href->{$oldcol} == 0)  { $sets .= "$newcol=$REQUESTED,"; next; }
+                        if ($href->{$oldcol} == 2)  { $sets .= "$newcol=$SUBMITTED,"; next; }
+                        if ($href->{$oldcol} == 3)  { $sets .= "$newcol=$DELIVERED,"; next; }
+                        if ($href->{$oldcol} == 1)  { $sets .= "$newcol=$CANCELLED,"; next; }
+                        if ($href->{$oldcol} > 10)  { $sets .= "$newcol=$COMPLETED,"; next; }
+                        print "Didn't know what to do with $oldcol='$href->{$oldcol}'\n";
+                    }
+                }
+                if (! $sets) { print "Nothing to do for BAMID=$href->{bamid}\n"; next; }
+                chop($sets);
+                $sql = "UPDATE $opts{bamfiles_table} SET $sets WHERE bamid=$href->{bamid}";
+                my $sth2 = DoSQL($sql);
+            }
+        }
+    }
+    exit;
+}
 
 die "Invalid request '$fcn'. Try '$Script --help'\n";
 
