@@ -1,4 +1,4 @@
-#!/usr/bin/perl -I/usr/cluster/lib/perl5/site_perl -I/usr/cluster/monitor/lib/perl5
+#!/usr/bin/perl -I/usr/cluster/lib/perl5/site_perl -I/usr/cluster/monitor/lib/perl5 -I /usr/cluster/monitor/bin
 ###################################################################
 #
 # Name: topmedcmd.pl
@@ -20,28 +20,43 @@ use FindBin qw($Bin $Script);
 use lib "$FindBin::Bin";
 use lib "$FindBin::Bin/../lib";
 use lib "$FindBin::Bin/../lib/perl5";
+use TopMed_Get;
 use My_DB;
 use Getopt::Long;
 use Cwd qw(realpath);
 
+my $NOTSET = 0;                     # Not set
+my $REQUESTED = 1;                  # Task requested
+my $SUBMITTED = 2;                  # Task submitted to be run
+my $STARTED   = 3;                  # Task started
+my $DELIVERED = 19;                 # Data delivered, but not confirmed
+my $COMPLETED = 20;                 # Task completed successfully
+my $CANCELLED = 89;                 # Task cancelled
+my $FAILED    = 99;                 # Task failed
+
 my %VALIDVERBS = (                  # Valid verbs to database colum
-    arrived => 'datearrived',
-    md5verified => 'datemd5ver',
-    baid    => 'datebai',
-    qploted => 'dateqplot',
-    backedup => 'datebackup',
-    cramed => 'datecram',
-    cped2ncbi => 'datecp2ncbi',
-    delivered => 'bam_delivered',
+    arrived     => 'state_arrive',
+    md5verified => 'state_md5ver',
+    backedup    => 'state_backup',  
+    baid        => 'state_bai',  
+    qploted     => 'state_qplot',
+    cramed      => 'state_cram',   
+    sentnwdid   => 'state_nwdid',
+    mapped37    => 'state_b37',   
+    mapped38    => 'state_b38',     
+    sentorig    => 'state_ncbiorig',
+    sentb37     => 'state_ncbib37',
+    sentb38     => 'state_ncbib38', 
 );
 my %VALIDSTATUS = (                 # Valid status for the verbs
-    requested => 1,
-    completed => 1,
-    delivered => 1,
-    started => 1,
-    submitted => 1,
-    failed => 1,
-    cancelled => 1,
+   notset    => $NOTSET,
+   requested => $REQUESTED,
+   submitted => $SUBMITTED,
+   started   => $STARTED,
+   delivered => $DELIVERED,
+   completed => $COMPLETED,
+   cancelled => $CANCELLED,
+   failed    =>  $FAILED, 
 );
 my %VALIDOPS = (                    # Used for permit
     all => 1,
@@ -50,7 +65,9 @@ my %VALIDOPS = (                    # Used for permit
     bai => 1,
     qplot => 1,
     cram => 1,
-    ncbi => 1,
+    nwdid => 1,
+    sb37 => 1,
+    sb38 => 1,
 );
 
 #--------------------------------------------------------------
@@ -75,7 +92,9 @@ Getopt::Long::GetOptions( \%opts,qw(
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
     my $m = "$Script [options]";
-    warn "$m mark bamid arrived|md5verified|baid|qploted|backedup|cramed|cp2ncbi requested|submitted|completed|started|failed|cancelled|delivered\n" .
+    my $verbs = join(',', sort keys %VALIDVERBS);
+    my $requests = join(',', sort values %VALIDSTATUS);
+    warn "$m mark bamid $verbs $requests\n" .
         "  or\n" .
         "$m unmark bamid [same list as mark]\n" .
         "  or\n" .
@@ -119,7 +138,7 @@ exit;
 # Subroutine:
 #   Mark($bamid, $op, $state)
 #
-#   Set dates in the status database
+#   Set states in the bamfiles database
 #==================================================================
 sub Mark {
     my ($bamid, $op, $state) = @_;
@@ -132,46 +151,39 @@ sub Mark {
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
 
-    #   Set time for the verb based on this algorithm
-    #   $t > 0     Task completed
-    #   $t < 0     Task started
-    #   $t = -1    Task failed
-    #   $t = 0     Task requested
-    #   $t = 1     Task cancelled
-    #   $t = 2     Task submitted
-    #   $t = 3     Data delivered, waiting for confirmation
+    #   Set state for the verb
     my $col = $VALIDVERBS{$op};
-    my $val;
     my $done = 0;
     if ($state eq 'requested') {
-        DoSQL("UPDATE $opts{bamfiles_table} SET $col='0' WHERE bamid=$bamid");
+        DoSQL("UPDATE $opts{bamfiles_table} SET $col=$REQUESTED WHERE bamid=$bamid");
         $done++;
     }
     if ($state eq 'completed') {
-        $val = time();
-        DoSQL("UPDATE $opts{bamfiles_table} SET $col='$val' WHERE bamid=$bamid");
+        DoSQL("UPDATE $opts{bamfiles_table} SET $col=$COMPLETED WHERE bamid=$bamid");
         $done++;
     }
     if ($state eq 'delivered') {
-        $val = time();
-        DoSQL("UPDATE $opts{bamfiles_table} SET $col='3' WHERE bamid=$bamid");
+        DoSQL("UPDATE $opts{bamfiles_table} SET $col=$DELIVERED WHERE bamid=$bamid");
         $done++;
     }
     if ($state eq 'started') {
-        $val = -time();
-        DoSQL("UPDATE $opts{bamfiles_table} SET $col='$val' WHERE bamid=$bamid");
+        DoSQL("UPDATE $opts{bamfiles_table} SET $col=$STARTED WHERE bamid=$bamid");
         $done++;
     }
     if ($state eq 'failed') {
-        DoSQL("UPDATE $opts{bamfiles_table} SET $col='-1' WHERE bamid=$bamid");
+        DoSQL("UPDATE $opts{bamfiles_table} SET $col=$FAILED WHERE bamid=$bamid");
         $done++;
     }
     if ($state eq 'cancelled') {
-        DoSQL("UPDATE $opts{bamfiles_table} SET $col='1' WHERE bamid=$bamid");
+        DoSQL("UPDATE $opts{bamfiles_table} SET $col=$CANCELLED WHERE bamid=$bamid");
         $done++;
     }
     if ($state eq 'submitted') {
-        DoSQL("UPDATE $opts{bamfiles_table} SET $col='2' WHERE bamid=$bamid");
+        DoSQL("UPDATE $opts{bamfiles_table} SET $col=$SUBMITTED WHERE bamid=$bamid");
+        $done++;
+    }
+    if ($state eq 'notset') {
+        DoSQL("UPDATE $opts{bamfiles_table} SET $col=$NOTSET WHERE bamid=$bamid");
         $done++;
     }
     if ($done) {
@@ -184,7 +196,7 @@ sub Mark {
 # Subroutine:
 #   UnMark($dirname, $op)
 #
-#   Reset dates in the statusdatabase
+#   Reset state in the bamfiles database
 #==================================================================
 sub UnMark {
     my ($bamid, $op) = @_;
@@ -198,7 +210,7 @@ sub UnMark {
     if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
 
     my $col = $VALIDVERBS{$op};
-    DoSQL("UPDATE $opts{bamfiles_table} SET $col=NULL WHERE bamid=$bamid");
+    DoSQL("UPDATE $opts{bamfiles_table} SET $col=$NOTSET WHERE bamid=$bamid");
     if ($opts{verbose}) { print "$Script  'unmark $bamid $op'  successful\n"; }
 }
 
@@ -207,16 +219,16 @@ sub UnMark {
 #   Export()
 #
 #   Generate a CSV file of possibly interesting data to STDOUT
+#   This is incomplete and will need more attention
 #==================================================================
 sub Export {
     #my ($center, $run) = @_;
 
     #   Generate header for CSV file
-    my @cols = qw(bamid bamname studyname piname bamsize datemapping);
-    my $s = 'CENTER,DIRNAME,FULLPATH';
+    my @cols = qw(bamname studyname piname expt_sampleid);
+    my $s = 'CENTER,DIRNAME,';
     foreach (@cols) { $s .= uc($_) . ','; }
-    chop($s);
-    print $s . "\n";
+    print $s . "FULLPATH\n";
     
     #   Get all the known centers in the database
     my $centersref = GetCenters();
@@ -236,29 +248,17 @@ sub Export {
                 my $href = $sth->fetchrow_hashref;
                 my $f = "$opts{netdir}/$opts{incomingdir}/$centername/$dirname/" .
                     $href->{bamname};
-                #   See if this has arrived. Few states possible
-                if (defined($href->{datearrived}) && ($href->{datearrived} ne '')) {
-                    if ($href->{datearrived} =~ /\D/) { next; }  # Not numeric
-                    if ($href->{datearrived} < 10) { next; }     # Already arrived
-                }
-                #   Convert mapping state into a string
-                my $state = '';
-                if (defined($href->{datemapping}) && $href->{datemapping} ne '') {
-                    if ($href->{datemapping} eq '0')  { $state = 'requested'; }
-                    if ($href->{datemapping} eq '1')  { $state = 'cancelled'; }
-                    if ($href->{datemapping} eq '2')  { $state = 'submitted'; }
-                    if ($href->{datemapping} < 0)     { $state = 'started'; }
-                    if ($href->{datemapping} eq '-1') { $state = 'failed'; }
-                    if ($href->{datemapping} > 10)    { $state = 'completed'; }
-                }
-                $href->{datemapping} = $state;               
-
+                #   See if this has arrived
+                if ($href->{state_arrive} != $COMPLETED) { next; }
+                #   Convert mapping state into a string   Not used
+                #my $state = $VALIDSTATUS{$href->{state_arrive}};
                 #   Show data for this BAM
-                $s = "$centername,$dirname,$f,";
+                $s = "$centername,$dirname,";
                 foreach (@cols) {
                     if (! defined($href->{$_})) { $s .= ','; }
                     else { $s .= $href->{$_} . ','; }
                  }
+                $s .= $f . ' ';
                 chop($s);
                 print $s . "\n";
             }
@@ -503,7 +503,7 @@ sub ShowArrived {
         foreach my $runid (keys %{$runsref}) {
             my $dirname = $runsref->{$runid};
             #   Get list of all bams that have not yet arrived properly
-            my $sql = "SELECT bamid,bamname,datearrived FROM " .
+            my $sql = "SELECT bamid,bamname,state_arrived FROM " .
                 $opts{bamfiles_table} . " WHERE runid='$runid'";
             my $sth = DoSQL($sql);
             my $rowsofdata = $sth->rows();
@@ -513,10 +513,7 @@ sub ShowArrived {
                 my $f = $opts{topdir} . "/$centername/$dirname/" .
                     $href->{bamname};
                 #   See if this has arrived. Few states possible
-                if (defined($href->{datearrived}) && ($href->{datearrived} ne '')) {
-                    if ($href->{datearrived} =~ /\D/) { next; }  # Not numeric
-                    if ($href->{datearrived} < 10) { next; }     # Not arrived
-                }
+                if ($href->{datearrived} != $COMPLETED) { next; }
                 #   Run the command
                 print "$href->{bamid} $centername $dirname $f\n";
             }
@@ -596,31 +593,7 @@ to deal with specific sets of information in the monitor databases.
 Use this to set the state for a particular BAM file.
 Mark will set a date for the process (e.g. arrived sets datearrived)
 and unmark will set that entry to NULL.
-
-Here is the list of supported verbs:
- arrived
- md5verified
- backedup
- cramed
- baid
- qploted
- cp2ncbi
-
-Here is the list of supported states:
- requested
- submitted
- completed
- started
- failed
- cancelled
-
-Note that this database field can have some surprising values. 
- If time is -1, the task failed.
- If time is zero, the task has been requested.
- If time is 1, the task was cancelled.
- If time is 2, the task was submitted to the batch system.
- If time is positive, the task was completed.
- If time is negative, the task was started.
+The list of verbs and states can be seen by B<perldoc topmedcmd.pl>.
 
 =item B<permit enable/disable operation center run>
 Use this to control the database which allows one enable or disable topmed operations
