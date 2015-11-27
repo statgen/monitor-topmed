@@ -118,7 +118,21 @@ if ($#ARGV < 0 || $opts{help}) {
 }
 my $fcn = shift @ARGV;
 
-my $dbh = DBConnect($opts{realm});
+#   Our network can get flakey and the DBConnect can fail
+#   Catch when this happens and wait a bit and try again
+my $dbh;
+my $sleeptime = 10;
+for (1 .. 10) {
+    eval { $dbh = DBConnect($opts{realm}); };
+    if ($@) {                           # Failed, wait a bit and try again
+        print "Datbase connection failed, wait and retry\n";
+        sleep($sleeptime);
+        $sleeptime += 10;
+    }
+    else { last; }
+}
+if ($@) { die $@ . "\n"; }
+#my $dbh = DBConnect($opts{realm});
 
 #--------------------------------------------------------------
 #   Execute the command provided
