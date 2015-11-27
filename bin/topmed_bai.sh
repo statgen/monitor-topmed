@@ -32,7 +32,7 @@ if [ "$1" = "-submit" ]; then
   fi
   $topmedcmd mark $1 baid submitted
   if [ "${l[0]}" = "Submitted" ]; then      # Job was submitted, save jobid
-    $topmedcmd set $1 jobidbai ${l[3]}
+    echo `date` bai ${l[3]} >> $console/$1.jobids
   fi
   exit
 fi

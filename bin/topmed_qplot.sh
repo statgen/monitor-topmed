@@ -34,7 +34,7 @@ if [ "$1" = "-submit" ]; then
   fi
   $topmedcmd mark $1 qploted submitted
   if [ "${l[0]}" = "Submitted" ]; then      # Job was submitted, save jobid
-    $topmedcmd set $1 jobidqplot ${l[3]}
+    echo `date` qplot ${l[3]} >> $console/$1.jobids
   fi
   exit
 fi

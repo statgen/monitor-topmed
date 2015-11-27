@@ -33,7 +33,7 @@ if [ "$1" = "-submit" ]; then
   fi
   $topmedcmd mark $1 md5verified submitted
   if [ "${l[0]}" = "Submitted" ]; then      # Job was submitted, save jobid
-    $topmedcmd set $1 jobidmd5ver ${l[3]}
+    echo `date` verify ${l[3]} >> $console/$1.jobids
   fi
   exit
 fi

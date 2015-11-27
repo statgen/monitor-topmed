@@ -33,7 +33,7 @@ if [ "$1" = "-submit" ]; then
   fi
   $topmedcmd mark $1 backedup submitted
   if [ "${l[0]}" = "Submitted" ]; then      # Job was submitted, save jobid
-    $topmedcmd set $1 jobidbackup ${l[3]}
+    echo `date` backup ${l[3]} >> $console/$1.jobids
   fi
   exit
 fi
