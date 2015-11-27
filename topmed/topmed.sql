@@ -91,19 +91,6 @@ CREATE TABLE bamfiles (
   state_ncbib37  INT DEFAULT 0,
   state_ncbib38  INT DEFAULT 0,
 
-  jobidarrived VARCHAR(12),
-  jobidmd5ver  VARCHAR(12),
-  jobidbackup  VARCHAR(12),
-  jobidcram    VARCHAR(12),
-  jobidbai     VARCHAR(12),
-  jobidqplot   VARCHAR(12),
-  jobidb37     VARCHAR(12),
-  jobidb38     VARCHAR(12),
-  jobidnwdid   VARCHAR(12),
-  jobidncbiorig VARCHAR(12),
-  jobidncbib37  VARCHAR(12),
-  jobidncbib38  VARCHAR(12),
-
   PRIMARY KEY  (bamid)
 
 
@@ -118,6 +105,18 @@ CREATE TABLE bamfiles (
   dateqplot    VARCHAR(12),
   datecp2ncbi  VARCHAR(12),
   datemapping  VARCHAR(12),
+  jobidarrived VARCHAR(12),
+  jobidmd5ver  VARCHAR(12),
+  jobidbackup  VARCHAR(12),
+  jobidcram    VARCHAR(12),
+  jobidbai     VARCHAR(12),
+  jobidqplot   VARCHAR(12),
+  jobidnwdid   VARCHAR(12),
+  jobidncbiorig VARCHAR(12),
+  jobidncbib37  VARCHAR(12),
+  jobidncbib38  VARCHAR(12),
+  jobidb37     VARCHAR(12),
+  jobidb38     VARCHAR(12),
   studyid      INT         NOT NULL,          /* Remove this someday */
   cramorigsent CHAR(1) DEFAULT 'N',
 #   Added for remapping with build37
