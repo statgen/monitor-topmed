@@ -44,7 +44,7 @@ our %opts = (
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose=i center=s
+    help realm=s verbose center=s
     )) || die "Failed to parse options\n";
 
 #   Simple help if requested
@@ -176,6 +176,7 @@ sub AddBams {
     }
     my ($fn, $checksum, $f3);
     while (<IN>) {                  # Sometimes it's file checksum, sometimes not
+        if (/^#/) { next; }
         ($checksum, $fn, $f3) = split(' ',$_);
         if (! $fn) { warn "Surprising md5 syntax line: $_"; next; }
         if ($f3) { ($fn, $checksum) = ($checksum, $f3); }
@@ -253,7 +254,7 @@ Generates this output.
 Specifies the realm name to be used.
 This defaults to B<topmed>.
 
-=item B<-verbose N>
+=item B<-verbose>
 
 Provided for developers to see additional information.
 
