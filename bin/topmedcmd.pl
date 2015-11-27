@@ -102,7 +102,7 @@ if ($#ARGV < 0 || $opts{help}) {
         "  or\n" .
         "$m show arrived\n" .
         "  or\n" .
-        "$m show bamid colname\n" .
+        "$m show bamid colname|run|center\n" .
         "  or\n" .
         "$m export\n" .
         "  or\n" .
@@ -479,7 +479,7 @@ sub Set {
 
 #==================================================================
 # Subroutine:
-#   Show($fcn|$bamid, $col)
+#   Show($fcn, $bamid, $col)
 #
 #   Generate list of information from the database
 #   or show the value for a column
@@ -492,11 +492,41 @@ sub Show {
         die "$Script Invalid 'show' syntax. Try '$Script -help'\n";
     }
 
-    #   Make sure this is a bam we know
-    my $sth = DoSQL("SELECT bamid,$col from $opts{bamfiles_table} WHERE bamid=$bamid", 0);
+    my $sth = DoSQL("SELECT bamid,runid from $opts{bamfiles_table} WHERE bamid=$bamid", 0);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "$Script - BAM '$bamid' or column '$col' is unknown\n"; }
+    if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
     my $href = $sth->fetchrow_hashref;
+
+    #   Get run if asked for it
+    if ($col eq 'run') {
+        $sth = DoSQL("SELECT centerid,dirname from $opts{runs_table} WHERE runid=$href->{runid}", 0);
+        $rowsofdata = $sth->rows();
+        if (! $rowsofdata) { die "$Script - RUNID '$href->runid' is unknown\n"; }
+        $href = $sth->fetchrow_hashref;
+        print $href->{dirname} . "\n";
+        return;
+    }
+
+    #   Get center if asked for it
+    if ($col eq 'center') {
+        $sth = DoSQL("SELECT centerid from $opts{runs_table} WHERE runid=$href->{runid}", 0);
+        $rowsofdata = $sth->rows();
+        if (! $rowsofdata) { die "$Script - RUNID '$href->runid' is unknown\n"; }
+        $href = $sth->fetchrow_hashref;
+
+        $sth = DoSQL("SELECT centername from $opts{centers_table} WHERE centerid=$href->{centerid}", 0);
+        $rowsofdata = $sth->rows();
+        if (! $rowsofdata) { die "$Script - CENTERID '$href->centerid' is unknown\n"; }
+        $href = $sth->fetchrow_hashref;
+        print $href->{centername} . "\n";
+        return;
+    }
+
+    #   Get value of column we asked for
+    $sth = DoSQL("SELECT $col from $opts{bamfiles_table} WHERE bamid=$bamid", 0);
+    $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { die "$Script - BAM '$bamid' or column '$col' is unknown\n"; }
+    $href = $sth->fetchrow_hashref;
     print $href->{$col} . "\n";
 }
 
