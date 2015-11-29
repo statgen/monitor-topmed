@@ -71,9 +71,9 @@ CREATE TABLE bamfiles (
   phs_sra_sample_id VARCHAR(24),
   phs_sra_data_details VARCHAR(255),
   checksum     VARCHAR(96) NOT NULL,
-  refname      VARCHAR(96) NOT NULL,
-  expt_refname VARCHAR(96) NOT NULL,
-  expt_sampleid VARCHAR(24) NOT NULL,   /* NWDID */
+  refname      VARCHAR(96) DEFAULT 'UNKNOWN',
+  expt_refname VARCHAR(96) DEFAULT 'UNKNOWN',
+  expt_sampleid VARCHAR(24) DEFAULT 'UNKNOWN',  /* NWDID */
   nwdid_known  CHAR(1) DEFAULT 'N',
 
 /* Fields to track state for each step */
