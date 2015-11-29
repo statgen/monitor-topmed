@@ -20,7 +20,7 @@ include_once "../edit.php";
 //print "<!-- _POST=\n"; print_r($_POST); print " -->\n";
 
 $qurl =  $_SERVER['SCRIPT_NAME'] . "?fcn=queue'";
-$STATUSLETTERS =  "<i>A=File Arrived, 5=MD5 Verified, B=BAM backed up, C=BAM=>CRAM, I=BAI created, Q=qplot run, 7=Remapped Build=37, 9=Remapped Build=39, X=EXPT=>NCBI, O=Orig=>NCBI, R=B37=>NCBI, S=b38=>NCBI";
+$STATUSLETTERS =  "<i>A=File Arrived, 5=MD5 Verified, B=BAM backed up, C=BAM=>CRAM, I=BAI created, Q=qplot run, 7=Remapped Build=37, 9=Remapped Build=39, X=EXPT=>NCBI, S=Orig=>NCBI, P=B37=>NCBI, T=b38=>NCBI";
 
 $SHOWQUEUES = "STATUS: &nbsp;&nbsp;&nbsp;" .
     "<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=showqlocal' " .
@@ -89,11 +89,11 @@ $quickletter = array(                   // Map of status column to letter we see
     'state_nwdid'    => 'X',
     'state_b37'      => '7',
     'state_b38'      => '8',
-    'state_ncbiorig' => 'O',
-    'state_ncbib37'  => 'R',
-    'state_ncbib38'  => 'S'
+    'state_ncbiorig' => 'S',
+    'state_ncbib37'  => 'P',
+    'state_ncbib38'  => 'T'
 );
-$validfunctions = array('all', 'verify', 'backup', 'bai', 'qplot', 'cram', 'nwdid', 'sb37', 'sb38');
+$validfunctions = array('all', 'verify', 'backup', 'bai', 'qplot', 'cram', 'nwdid', 'sorig', 'sb37', 'sb38');
 $NOTSET = 0;                // Not set
 $REQUESTED = 1;             // Task requested
 $SUBMITTED = 2;             // Task submitted to be run
