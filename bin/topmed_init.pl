@@ -1,4 +1,4 @@
-#!/usr/bin/perl -I/usr/cluster/lib/perl5/site_perl
+#!/usr/bin/perl -I/usr/cluster/lib/perl5/site_perl -I/usr/cluster/monitor/lib/perl5 -I /usr/cluster/monitor/bin
 ###################################################################
 #
 # Name:	topmed_init.pl
@@ -94,7 +94,7 @@ foreach my $centerid (keys %{$centersref}) {
     foreach my $d (@{$dirsref}) {
         $runid = $knownruns{$d}{runid} || CreateRun($centerid, $d);
         if (! defined($runid)) {
-            warn "How can runid not be defined?  dir=$d\n";
+            warn "$Script How can runid not be defined?  dir=$d\n";
             next;
         }
         AddBams($runid, $d);
@@ -130,7 +130,7 @@ sub CreateRun {
     warn "Added run '$d'\n";
     $opts{runcount}++;
     #   Try to force permissions so things can work later. Can't trust the users
-    chmod(0775, $d) || print "Unable to force permissions for '$d'. Too bad for you.\n"; 
+    chmod(0775, $d) || print "$Script Unable to force permissions for '$d'. Too bad for you.\n"; 
     return $runid;
 }
 
@@ -149,7 +149,7 @@ sub AddBams {
     my ($runid, $d) = @_;
 
     if (! -d $d) {
-        warn "Unable to read directory '$d': $!";
+        warn "$Script Unable to read directory '$d': $!";
         return 0;
     }
     
@@ -164,55 +164,63 @@ sub AddBams {
         }
     }
 
-    #   Merge all the MD5 files together and get list of bams and checksums
-    #   There is noconsistency what people do here. Some files are bam checksum,
-    #   some are the other way around. Other files have three field and again
+    #   Check all the MD5 files
+    #   There is no consistency what people do here. Some files are bam checksum,
+    #   some are the other way around. Other files have three fields and again
     #   the order is anything you can imagine. Grrrr
-    my %bams = ();
-    my $bamcount = 0;
-    if (! open(IN, "cat $d/*.md5 $d/*.MD5 *$d/Manifest.txt 2>/dev/null |")) {
-         warn "No MD5 files found in directory '$d'. Maybe later, eh?\n";
-         return 0;
-    }
-    my ($fn, $checksum, $f3);
-    while (<IN>) {                  # Sometimes it's file checksum, sometimes not
-        if (/^#/) { next; }
-        ($checksum, $fn, $f3) = split(' ',$_);
-        if (! $fn) { warn "Surprising md5 syntax line: $_"; next; }
-        if ($f3) { ($fn, $checksum) = ($checksum, $f3); }
-        if ($fn !~ /bam$/) { ($checksum, $fn) = ($fn, $checksum); }
-        if ($fn =~ /\//) { $fn = basename($fn); }
-        if ($fn !~ /bam$/) {
-             if ($opts{verbose}) { warn "Ignoring md5 syntax line: $_"; }
-             next;
-        }
-        $bams{$fn} = $checksum;
-        $bamcount++;
-     }
-    close(IN);
-    if (! %bams) {
-        if ($opts{verbose}) { warn "No bams found in '$d'\n"; }
-        return 0;
-    }
-
-    #   Generate the bam database entry for each bam
     my $newbams = 0;
-    foreach my $f (keys %bams) {
-        if (exists($knownbams{$f})) { next; }   # Skip known bams
-        $sql = "INSERT INTO $opts{bamfiles_table} " .
-            "(runid,bamname,checksum,refname,expt_refname,expt_sampleid,dateinit) " .
-            "VALUES($runid,'$f','$bams{$f}','UNKNOWN','UNKNOWN', 'UNKNOWN', $nowdate)";
-        $sth = DoSQL($sql);
-        $newbams++;
+    my $bamcount = 0;
+    my ($fn, $checksum, $f3);
+    opendir(my $dh, $d) ||
+        die "$Script Unable to read directory '$d'\n";
+    while (my $f = readdir $dh) {
+        if ($f !~ /\.md5$/i && $f ne 'Manifest.txt') { next; }
+        $f = "$d/$f";                   # Path to md5 file
+        if (! open(IN, $f)) {
+            warn "$Script Unable to read MD5 file '$f': $!\n";
+            next;
+        }
+        while (<IN>) {                  # Sometimes it's file checksum, sometimes not
+            if (/^#/) { next; }
+            ($checksum, $fn, $f3) = split(' ',$_);
+            if (! $fn) { warn "$Script Surprising md5 syntax line: $_"; next; }
+            if ($f3) { ($fn, $checksum) = ($checksum, $f3); }
+            if ($fn !~ /bam$/) { ($checksum, $fn) = ($fn, $checksum); }
+            if ($fn =~ /\//) { $fn = basename($fn); }
+            if ($fn !~ /bam$/) {
+                 if ($opts{verbose}) { warn "$Script Ignoring md5 syntax line: $_"; }
+                 next;
+            }
+            $bamcount++;
+            if (exists($knownbams{$f})) { next; }   # Skip known bams
+            #   New BAM, create database record for it. We do not require it to exist yet
+            $sql = "INSERT INTO $opts{bamfiles_table} " .
+                "(runid,bamname,checksum,dateinit) " .
+                "VALUES($runid,'$fn','$checksum', $nowdate)";
+            #print "$d - $f - $sql\n";
+            $sth = DoSQL($sql);
+            $newbams++;
+        }
+        close(IN);
+        #   We now know about all BAMs in this MD5 file, rename it so we do not process it again
+        rename($f, "$f.old") ||
+            die "$Script Unable to rename $f to  '$f.old'\n";
+    }
+    closedir $dh;
+
+    
+    if (! $bamcount) {
+        if ($opts{verbose}) { warn "$Script No bams found in '$d'\n"; }
+        return 0;
     }
 
     #   If we added bams, change the bamcount
     if ($newbams) {
-        my $n = 
         $sql = "UPDATE $opts{runs_table}  SET bamcount=$bamcount WHERE runid=$runid";
         $sth = DoSQL($sql);
         $opts{bamcount} += $newbams;
         $opts{bamcountruns} .= $d . ' ';
+        if ($opts{verbose}) { warn "$Script $newbams new bams found in '$d'\n"; }
     }
     return 1;
 }
