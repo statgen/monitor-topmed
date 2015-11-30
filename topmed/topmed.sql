@@ -71,8 +71,6 @@ CREATE TABLE bamfiles (
   phs_sra_sample_id VARCHAR(24),
   phs_sra_data_details VARCHAR(255),
   checksum     VARCHAR(96) NOT NULL,
-  refname      VARCHAR(96) DEFAULT 'UNKNOWN',
-  expt_refname VARCHAR(96) DEFAULT 'UNKNOWN',
   expt_sampleid VARCHAR(24) DEFAULT 'UNKNOWN',  /* NWDID */
   nwdid_known  CHAR(1) DEFAULT 'N',
 
@@ -125,6 +123,9 @@ CREATE TABLE bamfiles (
   bam_delivered VARCHAR(12),
   jobidcp2ncbi VARCHAR(12),
   jobidmapping VARCHAR(12),
+
+  refname      VARCHAR(96) DEFAULT 'UNKNOWN',
+  expt_refname VARCHAR(96) DEFAULT 'UNKNOWN',
 
 );
 CREATE INDEX index_runid   ON bamfiles(runid);
