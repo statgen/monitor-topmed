@@ -442,7 +442,7 @@ function ViewRuns($center, $maxdirs, $sortby, $desc, $iammgr) {
         "<center>" .
         "<a href='" . $_SERVER['SCRIPT_NAME'] . "?maxdirs=25'>Show Last 25</a>" .
         "&nbsp;&nbsp;&nbsp; or &nbsp;&nbsp;&nbsp;" .
-        "<a href='" . $_SERVER['SCRIPT_NAME'] . "?maxdir=50'>Show Last 50</a>" .
+        "<a href='" . $_SERVER['SCRIPT_NAME'] . "?maxdir=75'>Show Last 75</a>" .
         "&nbsp;&nbsp;&nbsp; or &nbsp;&nbsp;&nbsp;" .
           "<a href='" . $_SERVER['SCRIPT_NAME'] . "?" . $_SERVER['QUERY_STRING'] .
         "'>Refresh</a><br>\n Or Choose a Center: " .
@@ -495,7 +495,7 @@ function ViewRuns($center, $maxdirs, $sortby, $desc, $iammgr) {
         if ($iammgr) { $html .= "<th>&nbsp;</th>"; }
         $html .= "</tr>\n";
 
-        //  Walk through memory database showing data for this center
+        //  Walk through database showing data for this center
         reset($rows);
         foreach ($rows as $id => $row) {
             if ($row['centerid'] != $cid) { continue; }
@@ -840,36 +840,7 @@ function GetCenters() {
         array_push ($CENTERS,$n);
     }
 }
-/* $quickcols = array(                     // Map of status column to topmedcmd verb
-    'state_arrive'   => 'arrived',
-    'state_md5ver'   => 'md5ver',
-    'state_backup'   => 'backedup',
-    'state_bai'      => 'bai',
-    'state_qplot'    => 'qplot',
-    'state_cram'     => 'cramed',
-    'state_nwdid'    => 'sendnwdid',
-    'state_b37'      => 'mapping37',
-    'state_b38'      => 'mapping38',
-    'state_ncbiorig' => 'sendorig',
-    'state_ncbib37'  => 'sendb37',
-    'state_ncbib38'  => 'sendb38',
-);
-$quickletter = array(                   // Map of status column to letter we see
-    'state_arrive'   => 'A',
-    'state_md5ver'   => '5',
-    'state_backup'   => 'B',
-    'state_bai'      => 'I',
-    'state_qplot'    => 'Q',
-    'state_cram'     => 'C',
-    'state_nwdid'    => 'X',
-    'state_b37'      => '7',
-    'state_b38'      => '8',
-    'state_ncbiorig' => 'O',
-    'state_ncbib37'  => 'R',
-    'state_ncbib38'  => 'S',
-);
-$state2str
-*/
+
 /*---------------------------------------------------------------
 # href = QuickStatus($r)
 #   $r = row of data for this BAM, contains dates for tasks
