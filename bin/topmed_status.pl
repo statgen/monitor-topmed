@@ -36,10 +36,11 @@ my %attributes2letter = (
     'state_nwdid'    => 'X',
     'state_b37'      => '7',
     'state_b38'      => '8',
-    'state_ncbiorig' => 'O',
-    'state_ncbib37'  => 'R',
-    'state_ncbib38'  => 'S',
+    'state_ncbiorig' => 'S',
+    'state_ncbib37'  => 'P',
+    'state_ncbib38'  => 'T',
 );
+
 my $NOTSET    = 0;            # Not set
 my $REQUESTED = 1;            # Task requested
 my $SUBMITTED = 2;            # Task submitted to be run
