@@ -174,6 +174,12 @@ sub Mark {
     }
     if ($state eq 'completed') {
         DoSQL("UPDATE $opts{bamfiles_table} SET $col=$COMPLETED WHERE bamid=$bamid");
+        if ($col eq 'state_arrive') {       # hack for Chris until new code in place
+            DoSQL("UPDATE $opts{bamfiles_table} SET datearrived='" . time() . "' WHERE bamid=$bamid");
+        }
+        if ($col eq 'state_b37') {          # hack for Chris until new code in place
+            DoSQL("UPDATE $opts{bamfiles_table} SET datemapping='" . time() . "' WHERE bamid=$bamid");
+        }
         $done++;
     }
     if ($state eq 'delivered') {
@@ -186,6 +192,12 @@ sub Mark {
     }
     if ($state eq 'failed') {
         DoSQL("UPDATE $opts{bamfiles_table} SET $col=$FAILED WHERE bamid=$bamid");
+        if ($col eq 'state_arrive') {       # hack for Chris until new code in place
+            DoSQL("UPDATE $opts{bamfiles_table} SET datearrived='-1' WHERE bamid=$bamid");
+        }
+        if ($col eq 'state_b37') {          # hack for Chris until new code in place
+            DoSQL("UPDATE $opts{bamfiles_table} SET datemapping='-1' WHERE bamid=$bamid");
+        }
         $done++;
     }
     if ($state eq 'cancelled') {

@@ -394,22 +394,31 @@ if ($fcn eq 'fixmapping') {
                 my $bamid = $href->{bamid};
                 #   Create UPDATE statements for each field to be changed
                 my $sets = '';
+                my $st = '';
                 foreach my $oldcol (keys %old2new) {
                     my $newcol = $old2new{$oldcol};
+                    if ($href->{$newcol} == $COMPLETED) { next; }
+                    if (! defined($href->{$oldcol})) { $href->{$oldcol} = ' '; }
+                    $st .= "newcol=$newcol [$href->{$newcol}] oldcol=$oldcol [$href->{$oldcol}]";
                     if (defined($href->{$oldcol}) && $href->{$oldcol} ne ' ') {
-                        if ($href->{$oldcol} < 0)   { $sets .= "$newcol=$STARTED,";   next; }
                         if ($href->{$oldcol} == -1) { $sets .= "$newcol=$FAILED,";    next; }
+                        if ($href->{$oldcol} < 0)   { $sets .= "$newcol=$STARTED,";   next; }
                         if ($href->{$oldcol} == 0)  { $sets .= "$newcol=$REQUESTED,"; next; }
                         if ($href->{$oldcol} == 2)  { $sets .= "$newcol=$SUBMITTED,"; next; }
-                        if ($href->{$oldcol} == 3)  { $sets .= "$newcol=$DELIVERED,"; next; }
+                        #if ($href->{$oldcol} == 3)  { $sets .= "$newcol=$DELIVERED,"; next; }
+                        if ($href->{$oldcol} == 3)  { $sets .= "$newcol=$COMPLETED,"; next; }
                         if ($href->{$oldcol} == 1)  { $sets .= "$newcol=$CANCELLED,"; next; }
                         if ($href->{$oldcol} > 10)  { $sets .= "$newcol=$COMPLETED,"; next; }
-                        print "Didn't know what to do with $oldcol='$href->{$oldcol}'\n";
+                        print "Unable to handle $oldcol='$href->{$oldcol}'  bamid=$href->{bamid}\n";
                     }
                 }
-                if (! $sets) { print "Nothing to do for BAMID=$href->{bamid}\n"; next; }
+                if (! $sets) {
+                    if ($opts{verbose}) { print "Nothing to do for BAMID=$href->{bamid}\n"; }
+                    next;
+                }
                 chop($sets);
                 $sql = "UPDATE $opts{bamfiles_table} SET $sets WHERE bamid=$href->{bamid}";
+                #print "$st\n  $sql\n";
                 my $sth2 = DoSQL($sql);
             }
         }
