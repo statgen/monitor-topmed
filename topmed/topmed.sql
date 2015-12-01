@@ -84,7 +84,7 @@ CREATE TABLE bamfiles (
   state_qplot    INT DEFAULT 0,
   state_b37      INT DEFAULT 0,
   state_b38      INT DEFAULT 0,
-  state_nwdid    INT DEFAULT 0,
+  state_ncbiexpt INT DEFAULT 0,
   state_ncbiorig INT DEFAULT 0,
   state_ncbib37  INT DEFAULT 0,
   state_ncbib38  INT DEFAULT 0,

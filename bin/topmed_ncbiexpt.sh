@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-#   topmed_nwdid.sh -submit bamid
+#   topmed_ncbiexpt.sh -submit bamid
 #
 #	Send experiment XML for a bamid to NCBI
 #
@@ -32,7 +32,7 @@ if [ "$1" = "-submit" ]; then
     echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-nwdid --output=$console/$1-nwdid.out $0 $*"
     exit 1
   fi
-  $topmedcmd mark $1 sentnwdid submitted
+  $topmedcmd mark $1 sentexpt submitted
   if [ "${l[0]}" = "Submitted" ]; then      # Job was submitted, save jobid
     echo `date` nwdid ${l[3]} >> $console/$1.jobids
   fi
@@ -51,7 +51,7 @@ shift
 nwdid=`$topmedcmd show $bamid expt_sampleid`
 if [ "$nwdid" = "" ]; then
   echo "Invalid bamid '$bamid'. NWDID not known"
-  $topmedcmd mark $bamid sentnwdid failed
+  $topmedcmd mark $bamid sentexpt failed
   exit 2
 fi
 
@@ -61,7 +61,7 @@ echo "#========= $d $SLURM_JOB_ID $0 bamid=$bamid files=$* ========="
 cd $console
 if [ "$?" != "0" ]; then
   echo "Unable to CD to '$console' to create XML file"
-  $topmedcmd mark $bamid sentnwdid failed
+  $topmedcmd mark $bamid sentexpt failed
   exit 2
 fi
 mkdir XMLfiles 2>/dev/null
@@ -72,7 +72,7 @@ here=`pwd`
 $topmedxml -xmlprefix $here/ -type expt $bamid
 if [ "$?" != "0" ]; then
   echo "Unable to create experiment XML files"
-  $topmedcmd mark $bamid sentnwdid failed
+  $topmedcmd mark $bamid sentexpt failed
   exit $rc
 fi
 
@@ -81,7 +81,7 @@ files=''
 for f in $nwdid-expt.submit.xml $nwdid.expt.xml; do
   if [ ! -f $f ]; then
     echo "Missing XML file '$f'"   
-    $topmedcmd mark $bamid sentnwdid failed
+    $topmedcmd mark $bamid sentexpt failed
     exit 2
   fi
   files="$files $f"
@@ -91,11 +91,11 @@ echo "Sending XML files to NCBI - $files"
 $ascpcmd $files $ascpdest
 if [ "$?" = "0" ]; then
   echo "XML files '$files' sent to NCBI"
-  $topmedcmd mark $bamid sentnwdid delivered
+  $topmedcmd mark $bamid sentexpt delivered
   exit
 fi
 
 echo "FAILED to send XML files to NCBI - $files"
-$topmedcmd mark $bamid sentnwdid failed 
+$topmedcmd mark $bamid sentexpt failed 
 exit 1
 

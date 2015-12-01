@@ -1,4 +1,4 @@
-#!/usr/bin/perl -I/usr/cluster/lib/perl5/site_perl
+#!/usr/bin/perl -I/usr/cluster/lib/perl5/site_perl -I/usr/cluster/monitor/lib/perl5 -I /usr/cluster/monitor/bin
 ###################################################################
 #
 # Name: topmed_monitor.pl
@@ -48,7 +48,7 @@ our %opts = (
     topmedcram   => "$topmedbin/topmed_cram.sh",
     topmedbai    => "$topmedbin/topmed_bai.sh",
     topmedqplot  => "$topmedbin/topmed_qplot.sh",
-    topmednwdid  => "$topmedbin/topmed_nwdid.sh",
+    topmednwdid  => "$topmedbin/topmed_ncbiexpt.sh",
     topmedncbiorig => "$topmedbin/topmed_ncbiorig.sh",
     topmedncbib37 => "$topmedbin/topmed_ncbib37.sh",
     topmedncbib38 => "$topmedbin/topmed_ncbib38.sh",
@@ -367,8 +367,8 @@ if ($fcn eq 'nwdid') {
 
                 #   Only do if the bam has been verified and we did something with it
                 if ($href->{state_qplot} != $COMPLETED) { next; }
-                if ($opts{suberr} && $href->{state_nwdid} == $FAILED) { $href->{state_nwdid} = $REQUESTED; }
-                if ($href->{state_nwdid} != $NOTSET && $href->{state_nwdid} != $REQUESTED) { next; }
+                if ($opts{suberr} && $href->{state_ncbiexpt} == $FAILED) { $href->{state_ncbiexpt} = $REQUESTED; }
+                if ($href->{state_ncbiexpt} != $NOTSET && $href->{state_ncbiexpt} != $REQUESTED) { next; }
                 #   Tell NCBI about this NWDID experiment
                 BatchSubmit("echo $opts{topmednwdid} -submit $href->{bamid}");
             }
