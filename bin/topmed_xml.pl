@@ -59,9 +59,10 @@ our %opts = (
     type => 'run',                  # Can be remap, secondary, or expt
     xmlns_run => "$xmlns_url.run.xsd?view=co\">\n",
     xmlns_experiment => "$xmlns_url.experiment.xsd?view=co\">\n",
-    xmlns_submission => "$xmlns_url.submission.xsd?view=co\">\n",
+    xmlns_submission => "$xmlns_url.submission.xsd?view=co\"\n",
     processingsectiondir => "$topmed/incoming/study.reference/send2ncbi",
     experiment_title => "30x whole genome DNA sequence for NHLBI TOPMed sample",
+    schema =>  'http://www.ncbi.nlm.nih.gov/viewvc/v1/trunk/sra/doc/SRA/SRA.%TYPE%.xsd?view=co',
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
@@ -131,9 +132,9 @@ if ($opts{type} eq 'expt') {
     my $submitfile = $opts{xmlprefix} . "$href->{expt_sampleid}-$opts{type}.submit.xml";
     my $exptfile   = $opts{xmlprefix} . "$href->{expt_sampleid}.expt.xml";
     CreateSubmit($submitfile, "$href->{expt_sampleid}.$now.submit", $opts{type}, $exptfile);
-    RunLINT($submitfile);
+    RunLINT($submitfile, 'submission');
     CreateExpt($exptfile, $href);
-    RunLINT($exptfile);
+    RunLINT($exptfile, 'experiment');
     exit;
 }
 
@@ -141,10 +142,10 @@ if ((! $bamfn) || (! $checksum)) { die "$Script BAM filename or CHECKSUM not pro
 
 my $submitfile = $opts{xmlprefix} . "$href->{expt_sampleid}-$opts{type}.$opts{build}.submit.xml";
 my $runfile = $opts{xmlprefix} . "$href->{expt_sampleid}-$opts{type}.$opts{build}.run.xml";
-CreateSubmit($submitfile, "$href->{expt_sampleid}.run.$now.submit", $opts{type}, $runfile);
-RunLINT($submitfile);
+CreateSubmit($submitfile, "$href->{expt_sampleid}.run.$now.submit", 'run', $runfile);
+RunLINT($submitfile, 'submission');
 CreateRun($runfile, $href, $bamfn, $checksum);
-RunLINT($runfile);
+RunLINT($runfile, 'run' );
 exit;
 
 #==================================================================
@@ -212,11 +213,7 @@ sub GenRUNXML {
         "      filename = \"$filename\"\n" .
         "      filetype = \"bam\"\n" .
         "      checksum_method = \"MD5\"\n" .
-        "      checksum = \"$checksum\">\n" .
-        "      <READ_LABEL>forward</READ_LABEL>\n" .
-        "      <READ_LABEL>reverse</READ_LABEL>\n" .
-        "      <READ_LABEL>unmapped</READ_LABEL>\n" .
-        "    </FILE>\n" .
+        "      checksum = \"$checksum\"></FILE>\n" .
         "  </FILES>\n" .
         "</DATA_BLOCK>\n" .
         "<RUN_ATTRIBUTES>\n" .
@@ -368,22 +365,23 @@ sub CreateSubmit {
 
 #==================================================================
 # Subroutine:
-#   RunLINT($f)
+#   RunLINT($f, $schema)
 #
 #   Run XMLLINT on an XML file. Dies on error
 #==================================================================
 sub RunLINT {
-    my ($f) = @_;
+    my ($f, $schema) = @_;
     if ($opts{nolint}) { return; }
 
     print "  Checking XML syntax for $f ... ";
-    my $cmd = "xmllint $f > /dev/null";     # Only show errors
+    my $s = $opts{schema};
+    $s =~ s/%TYPE%/$schema/;
+    my $cmd = "xmllint --schema $s $f > /dev/null";     # Only show errors
     my $rc = system($cmd);
     if (! $rc) { print "OK\n"; return; }
     print "ERROR\n";
-    my $emsg = "$Script XML file '$f' was mal-formed\n";
-    if (! $opts{verbose}) { unlink($f); }
-    else { $emsg .= " and has been removed.  Specify -v to keep the file around."; }
+    my $emsg = "$Script XML file '$f' was mal-formed and renamed to '$f.failed'\n";
+    rename($f,"$f.failed");
     die $emsg . "\n";
 }
 
