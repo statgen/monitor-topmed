@@ -145,6 +145,15 @@ for f in $nwdid-secondary.37.submit.xml $nwdid-secondary.37.run.xml; do
   files="$files $f"
 done
 
+#   Make a TAR of the XML files to send
+tar cf $nwdid-secondary.37.tar $files
+if [ "$?" != "0" ]; then
+  echo "Unable to create TAR of XML files"
+  $topmedcmd mark $bamid sentexpt failed
+  exit 2
+fi
+files=$nwdid-secondary.37.tar
+
 echo "Sending data file to NCBI - $sendbam"
 ls -l $sendbam
 stime=`date +%s`

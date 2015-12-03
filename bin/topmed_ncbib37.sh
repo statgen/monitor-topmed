@@ -118,6 +118,7 @@ if [ "$checksum" = "" ]; then
   $topmedcmd mark $bamid sentb37 failed
   exit 3
 fi
+$topmedcmd set $bamid b37bamchecksum $checksum
 etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "MD5 calculated from CRAM in $etime seconds"
@@ -140,6 +141,15 @@ for f in $nwdid-remap.37.submit.xml $nwdid-remap.37.run.xml; do
   fi
   files="$files $f"
 done
+
+#   Make a TAR of the XML files to send
+tar cf $nwdid-remap.37.tar $files
+if [ "$?" != "0" ]; then
+  echo "Unable to create TAR of XML files"
+  $topmedcmd mark $bamid sentexpt failed
+  exit 2
+fi
+files=$nwdid-remap.37.tar
 
 echo "Sending data file to NCBI - $sendbam"
 ls -l $sendbam

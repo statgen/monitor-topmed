@@ -87,6 +87,15 @@ for f in $nwdid-expt.submit.xml $nwdid.expt.xml; do
   files="$files $f"
 done
 
+#   Make a TAR of the XML files to send
+tar cf $nwdid-expt.tar $files
+if [ "$?" != "0" ]; then
+  echo "Unable to create TAR of XML files"
+  $topmedcmd mark $bamid sentexpt failed
+  exit 2
+fi
+files=$nwdid-expt.tar
+
 echo "Sending XML files to NCBI - $files"
 $ascpcmd $files $ascpdest
 if [ "$?" = "0" ]; then
