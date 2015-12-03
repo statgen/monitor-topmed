@@ -64,6 +64,7 @@ CREATE TABLE bamfiles (
   library_name VARCHAR(96),
   cramname     VARCHAR(96) NOT NULL,
   cramchecksum VARCHAR(96) NOT NULL,
+  b37bamchecksum VARCHAR(96) NOT NULL,
   studyname    VARCHAR(96) NOT NULL,
   piname       VARCHAR(96),
   phs          VARCHAR(12),
