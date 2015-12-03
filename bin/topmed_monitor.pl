@@ -48,7 +48,7 @@ our %opts = (
     topmedcram   => "$topmedbin/topmed_cram.sh",
     topmedbai    => "$topmedbin/topmed_bai.sh",
     topmedqplot  => "$topmedbin/topmed_qplot.sh",
-    topmednwdid  => "$topmedbin/topmed_ncbiexpt.sh",
+    topmedexpt  => "$topmedbin/topmed_ncbiexpt.sh",
     topmedncbiorig => "$topmedbin/topmed_ncbiorig.sh",
     topmedncbib37 => "$topmedbin/topmed_ncbib37.sh",
     topmedncbib38 => "$topmedbin/topmed_ncbib38.sh",
@@ -79,7 +79,7 @@ Getopt::Long::GetOptions( \%opts,qw(
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$Script [options] arrive|verify|backup|bai|qplot|cram|ncbi\n" .
+    warn "$Script [options] arrive|verify|backup|bai|qplot|cram|expt|ncbiorig\n" .
         "Find runs which need some action and queue a request to do it.\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
@@ -95,18 +95,6 @@ my $nowdate = strftime('%Y/%m/%d %H:%M', localtime);
 if ($opts{memory})    { $ENV{TOPMED_MEMORY} = $opts{memory}; }
 if ($opts{partition}) { $ENV{TOPMED_PARTITION} = $opts{partition}; }
 if ($opts{qos})       { $ENV{TOPMED_QOS} = $opts{qos}; }
-
-#--------------------------------------------------------------
-#   dateXXXX columns are either a time when something was done
-#   or a flag indicating varying states. For example with verify:
-#   datemd5ver not defined   - nothing every happened
-#   datemd5ver > 10    verify successfully
-#   datemd5ver < 0     started to verify
-#   datemd5ver = -1    verify failed
-#   datemd5ver = 0     verify requested
-#   datemd5ver = 2     verify submitted to be done (not done for arrived)
-#   datemd5ver = 1     verify cancelled
-#--------------------------------------------------------------
 
 #--------------------------------------------------------------
 #   Get a list of BAMs we have not noticed they arrived yet
@@ -186,7 +174,7 @@ if ($fcn eq 'verify') {
             }
         }
     }
-    ShowSummary('verify');
+    ShowSummary($fcn);
     exit;
 }
 
@@ -220,7 +208,7 @@ if ($fcn eq 'bai') {
             }
         }
     }
-    ShowSummary('bai');
+    ShowSummary($fcn);
     exit;
 }
 
@@ -254,7 +242,7 @@ if ($fcn eq 'backup') {
             }
         }
     }
-    ShowSummary('backup');
+    ShowSummary($fcn);
     exit;
 }
 
@@ -288,7 +276,7 @@ if ($fcn eq 'cram') {
             }
         }
     }
-    ShowSummary('cram');
+    ShowSummary($fcn);
     exit;
 }
 
@@ -323,13 +311,13 @@ if ($fcn eq 'qplot') {
             }
         }
     }
-    ShowSummary('qplot');
+    ShowSummary($fcn);
     exit;
 }
 #--------------------------------------------------------------
 #   Create experiment XML and sent it to NCBI for this NWDID
 #--------------------------------------------------------------
-if ($fcn eq 'nwdid') {
+if ($fcn eq 'expt') {
     #   Get all the known centers in the database
     my $centersref = GetCenters();
     foreach my $cid (keys %{$centersref}) {
@@ -347,39 +335,40 @@ if ($fcn eq 'nwdid') {
             my %pistudy2bamlist = ();
             for (my $i=1; $i<=$rowsofdata; $i++) {
                 my $href = $sth->fetchrow_hashref;
-                my $f = $opts{topdir} . "/$centername/$dirname/" . $href->{bamname};
                 
+                #   Only do if this NWDID if it has been verified and we did something with it
+                if ($href->{state_qplot} != $COMPLETED) { next; }
+
                 #   Check important fields for this BAM are possibly correct
                 my $skip = 0;
                 foreach my $col (qw(expt_sampleid phs library_name nominal_length nominal_sdev base_coord)) {
                     if (exists($href->{$col}) && $href->{$col}) { next; }
-                    if ($opts{verbose}) { print "  BAM '$href->{bamname}' [$href->{bamid}] has no value for '$col'\n"; }
+                    if ($opts{verbose}) { print "  No value for '$col'\n"; }
                     $skip++;
                 }
                 #   Do better checking than just is the field non-blank
                 if ($href->{expt_sampleid} !~ /^NWD/) {
-                    die "$Script How can BAMID=$href->{bamid} have an invalid NWDID '$href->{expt_sampleid}'?\n";
+                    print "  Invalid NWDID '$href->{expt_sampleid}'?\n";
+                    $skip++;
                 }
                 if ($skip) {
                     print "  BAM '$href->{bamname}' [$href->{bamid}] is ignored because of incomplete data\n";
                     next;
                 }
 
-                #   Only do if the bam has been verified and we did something with it
-                if ($href->{state_qplot} != $COMPLETED) { next; }
                 if ($opts{suberr} && $href->{state_ncbiexpt} == $FAILED) { $href->{state_ncbiexpt} = $REQUESTED; }
                 if ($href->{state_ncbiexpt} != $NOTSET && $href->{state_ncbiexpt} != $REQUESTED) { next; }
                 #   Tell NCBI about this NWDID experiment
-                BatchSubmit("echo $opts{topmednwdid} -submit $href->{bamid}");
+                BatchSubmit("echo $opts{topmedexpt} -submit $href->{bamid}");
             }
         }
-        ShowSummary("nwdid");
+        ShowSummary($fcn);
     }
     exit;
 }
 
 #--------------------------------------------------------------
-#   Get a list of BAMs to be sent to NCBI
+#   Get a list of secondary BAMs to be sent to NCBI
 #--------------------------------------------------------------
 if ($fcn eq 'ncbiorig') {
     #   Get all the known centers in the database
@@ -399,64 +388,75 @@ if ($fcn eq 'ncbiorig') {
             my %pistudy2bamlist = ();
             for (my $i=1; $i<=$rowsofdata; $i++) {
                 my $href = $sth->fetchrow_hashref;
-                my $f = $opts{topdir} . "/$centername/$dirname/" . $href->{bamname};
-                
+
+                #   Only send the original BAM if the experiment was accepted at NCBI
+                if ($href->{state_ncbiexpt} != $COMPLETED) { next; }
+
                 #   Check important fields for this BAM are possibly correct
                 my $skip = 0;
-                foreach my $col (qw(checksum phs nominal_length nominal_sdev base_coord library_name
-                    expt_sampleid cramchecksum cramb37checksum)) {
+                foreach my $col (qw(checksum expt_sampleid)) {
                     if (exists($href->{$col}) && $href->{$col}) { next; }
-                    if ($opts{verbose}) { print "  BAM '$href->{bamname}' [$href->{bamid}] has no value for '$col'\n"; }
+                    if ($opts{verbose}) { print "  No value for '$col'\n"; }
                     $skip++;
-                }
-                #   Do better checking than just is the field non-blank
-                if ($href->{expt_sampleid} !~ /^NWD/) {
-                    die "$Script How can BAMID=$href->{bamid} have an invalid NWDID '$href->{expt_sampleid}'?\n";
-                }
-                if ($href->{piname} !~ /^\S+/) {
-                    die "$Script How can BAMID=$href->{bamid} have an invalid PINAME '$href->{piname}'?\n";
-                }
-                if ($href->{studyname} !~ /^\S+/) {
-                    die "$Script How can BAMID=$href->{bamid} have an invalid STUDYNAME '$href->{studyname}'?\n";
                 }
                 if ($skip) {
                     print "  BAM '$href->{bamname}' [$href->{bamid}] is ignored because of incomplete data\n";
                     next;
                 }
-
-                #   Only do if cram has been created and remapping done
-                if (! defined($href->{datecram})) { next; }
-                if ($href->{datecram} eq '') { next; }
-                if ($href->{datecram} =~ /\D/) { next; }  # Not numeric
-                if ($href->{datecram} < 10) { next; }     # No cram yet, avoid sending
-                if (! defined($href->{datemapping})) { next; }
-                if ($href->{datemapping} eq '') { next; }
-                if ($href->{datemapping} =~ /\D/) { next; }  # Not numeric
-                if ($href->{datemapping} < 10) { next; }     # No remapping yet, avoid sending
-                #   And only if we are not already sending
-                if (defined($href->{datecp2ncbi}) && ($href->{datecp2ncbi} ne '')) {
-                    if ($opts{suberr} && $href->{datecp2ncbi} == -1) { $href->{datecp2ncbi} = 0; }
-                    if ($href->{datecp2ncbi} =~ /\D/) { next; }  # Not numeric
-                    if ($href->{datecp2ncbi} == 2) { next; } # Already queued to be run
-                    if ($href->{datecp2ncbi} == 3) { next; } # Already delivered data
-                    if ($href->{datecp2ncbi} > 10) { next; } # Already done
-                }
-                #   This bamid can be sent. Collect a list of all of these
-                #   As a favor to NCBI we group the files to send by PI and study name
-                my $k = $href->{piname} . '-' . $href->{studyname};
-                push @{$pistudy2bamlist{$k}},$href->{bamid};   # Array of bams by pi-studyname
-            }
-            #   We now have all the bamids to queue as an array in %pistudy2bamlist
-            #   These have been grouped into sets by PI and study
-            foreach my $k (sort keys %pistudy2bamlist) {
-                $opts{jobcount} = 0;
-                $opts{jobsnotpermitted} = 0;
-                $opts{jobsfailedsubmission} = 0;
-                SubmitBAM2NCBI($pistudy2bamlist{$k},
-                    $centername, $dirname, $opts{batchsize});
-                ShowSummary("ncbi $k");
+                if ($opts{suberr} && $href->{state_ncbiorig} == $FAILED) { $href->{state_ncbiorig} = $REQUESTED; }
+                if ($href->{state_ncbiorig} != $NOTSET && $href->{state_ncbiorig} != $REQUESTED) { next; }
+                #   Send the secondary BAM to NCBI
+                BatchSubmit("echo $opts{topmedncbiorig} -submit $href->{bamid}");
             }
         }
+        ShowSummary($fcn);
+    }
+    exit;
+}
+
+#--------------------------------------------------------------
+#   Get a list of remapped primary BAMs to be sent to NCBI
+#--------------------------------------------------------------
+if ($fcn eq 'ncbib37') {
+    #   Get all the known centers in the database
+    my $centersref = GetCenters();
+    foreach my $cid (keys %{$centersref}) {
+        my $centername = $centersref->{$cid};
+        my $runsref = GetRuns($cid) || next;
+        #   For each run, see if there are bamfiles to be delivered to NCBI
+        foreach my $runid (keys %{$runsref}) {
+            my $dirname = $runsref->{$runid};
+            #   Get list of all bams known at NCBI and that have not been sent
+            my $sql = "SELECT * FROM $opts{bamfiles_table} " .
+                "WHERE runid='$runid' AND nwdid_known='Y'";
+            my $sth = DoSQL($sql);
+            my $rowsofdata = $sth->rows();
+            if (! $rowsofdata) { next; }
+            my %pistudy2bamlist = ();
+            for (my $i=1; $i<=$rowsofdata; $i++) {
+                my $href = $sth->fetchrow_hashref;
+
+                #   Only send the primary BAM if the experiment was accepted at NCBI
+                if ($href->{state_ncbiexpt} != $COMPLETED) { next; }
+
+                #   Check important fields for this BAM are possibly correct
+                my $skip = 0;
+                foreach my $col (qw(cramname cramchecksum expt_sampleid)) {
+                    if (exists($href->{$col}) && $href->{$col}) { next; }
+                    if ($opts{verbose}) { print "  No value for '$col'\n"; }
+                    $skip++;
+                }
+                if ($skip) {
+                    print "  BAM '$href->{bamname}' [$href->{bamid}] is ignored because of incomplete data\n";
+                    next;
+                }
+                if ($opts{suberr} && $href->{state_ncbiorig} == $FAILED) { $href->{state_ncbiorig} = $REQUESTED; }
+                if ($href->{state_ncbiorig} != $NOTSET && $href->{state_ncbiorig} != $REQUESTED) { next; }
+                #   Send the primary CRAM (as BAM) to NCBI
+                BatchSubmit("echo $opts{topmedncbib37} -submit $href->{bamid}");
+            }
+        }
+        ShowSummary($fcn);
     }
     exit;
 }
@@ -837,7 +837,7 @@ Provided for developers to see additional information.
 
 =over 4
 
-=item B<arrive | verify | backup | bai | qplot | cram | ncbi>
+=item B<arrive | verify | backup | bai | qplot | cram | expt | ncbiorig>
 
 Directs this program to look for runs that have not been through the process name
 you provided and to queue a request they be verified.
