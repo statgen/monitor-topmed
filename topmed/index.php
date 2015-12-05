@@ -20,7 +20,7 @@ include_once "../edit.php";
 //print "<!-- _POST=\n"; print_r($_POST); print " -->\n";
 
 $qurl =  $_SERVER['SCRIPT_NAME'] . "?fcn=queue'";
-$STATUSLETTERS =  "<i><b>A</b>=File Arrived, <b>5</b>=MD5 Verified, <b>B</b>=BAM backed up, <b>C</b>=BAM=>CRAM, <b>I</b>=BAI created<br/>" .
+$STATUSLETTERS =  "<i><b>A</b>=File Arrived, <b>5</b>=MD5 Verified, <b>C</b>=BAM=>CRAM, <b>I</b>=BAI created<br/>" .
     "<b>Q</b>=qplot run, <b>7</b>=Remapped Build=37, <b>8</b>=Remapped Build=38, <b>X</b>=EXPT=>NCBI<br/>" .
     "<b>S</b>=Secondary BAM=>NCBI, <b>P=</b>B37=>Primary BAM=>NCBI, <b>T</b>=b38=>Tertiary BAM=>NCBI";
 
@@ -84,7 +84,6 @@ $quickcols = array(                     // Map of status column to topmedcmd ver
 $quickletter = array(                   // Map of status column to letter we see
     'state_arrive'   => 'A',
     'state_md5ver'   => '5',
-    'state_backup'   => 'B',
     'state_bai'      => 'I',
     'state_qplot'    => 'Q',
     'state_cram'     => 'C',
@@ -95,7 +94,7 @@ $quickletter = array(                   // Map of status column to letter we see
     'state_ncbib37'  => 'P',
     'state_ncbib38'  => 'T'
 );
-$validfunctions = array('all', 'verify', 'backup', 'bai', 'qplot', 'cram', 'sexpt', 'sorig', 'sb37', 'sb38');
+$validfunctions = array('all', 'verify', 'bai', 'qplot', 'cram', 'sexpt', 'sorig', 'sb37', 'sb38');
 $NOTSET = 0;                // Not set
 $REQUESTED = 1;             // Task requested
 $SUBMITTED = 2;             // Task submitted to be run
