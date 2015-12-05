@@ -200,6 +200,7 @@ sub AddBams {
             #print "$d - $f - $sql\n";
             $sth = DoSQL($sql);
             $newbams++;
+            $bamcount++;
         }
         close(IN);
         #   We now know about all BAMs in this MD5 file, rename it so we do not process it again
