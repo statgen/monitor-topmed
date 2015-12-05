@@ -49,7 +49,7 @@ our %opts = (
     broker_name => "UM-SPH",
     lab_name => "Abecasis",
     master => 'Tom Blackwell',
-    master_email => 'tblackw@umich.edu',
+    master_email => 'unattended@umich.edu',
     inst_model => 'HiSeq X Ten',
     design_description => 'Not set',
     build => 37,                    # 37, 38 etc
@@ -343,10 +343,12 @@ sub CreateSubmit {
 
     print OUT "<CONTACTS>\n" .
         "<CONTACT\n" .
-        "  name = \"$opts{master}\"\n" .
-        "  inform_on_status = \"$opts{master_email}\"\n" .
-        "  inform_on_error = \"$opts{master_email}\"/>\n" .
-        "</CONTACTS>\n";
+        "  name = \"$opts{master}\"\n";
+    if ($opts{master_email}) {
+        print "  inform_on_status = \"$opts{master_email}\"\n" .
+        "  inform_on_error = \"$opts{master_email}\"/>\n";
+    }
+    print "</CONTACTS>\n";
  
     print OUT "<ACTIONS>\n" .
         "  <ACTION>\n" .
