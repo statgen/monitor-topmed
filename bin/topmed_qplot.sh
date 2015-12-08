@@ -2,7 +2,7 @@
 #
 #   topmed_qplot.sh [-submit [-mem NG]] bamid bamfile
 #
-#	Verify the MD5 checksum for a BAM file
+#	Run QPLOT on a BAM file
 #
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 console=/net/topmed/working/topmed-output
