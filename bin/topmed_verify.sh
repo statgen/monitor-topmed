@@ -56,7 +56,7 @@ echo "$checksum  $bamfile" > $tmpfile
 $topmedcmd mark $bamid md5verified started
 d=`date +%Y/%m/%d`
 s=`hostname`
-echo "#========= '$d' host=$s $SLURM_JOB_ID $0 checksum=$checksum bamfile=$bamfile ========="
+echo "#========= '$d' host=$s $SLURM_JOB_ID $0 bamid=$bamid checksum=$checksum bamfile=$bamfile ========="
 stime=`date +%s`
 md5sum -c $tmpfile
 rc=$?
