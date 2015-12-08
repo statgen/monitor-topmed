@@ -59,6 +59,8 @@ if (! $rowsofdata) { die "Script BAM '$bamid' does not exist in database [$bamfi
 my $href = $sth->fetchrow_hashref;
 my $nwdid = $href->{expt_sampleid};
 if ($nwdid !~ /^NWD/) { die "Script BAM '$bamid' NWDID [$nwdid] was not set [$bamfilepath]\n"; }
+#   Checksum hack - allow this to be 'useoldvalue' and then use the checksum value from the db
+if ($checksum eq 'useoldvalue' && $href->{checksum}) { $checksum =$href->{checksum}; }
 
 #   CD to place where BAM exists
 my $dirname = dirname($bamfilepath);
