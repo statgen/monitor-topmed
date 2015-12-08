@@ -15,7 +15,7 @@ console=/net/topmed/working/topmed-output
 if [ "$1" = "-submit" ]; then
   shift
   #   May I submit this job?
-  $topmedcmd permit test nwdid $1
+  $topmedcmd permit test expt $1
   if [ "$?" = "0" ]; then
     exit 4
   fi 
@@ -26,15 +26,15 @@ if [ "$1" = "-submit" ]; then
   slurmqos="$realhost-ncbi"
 
   #  Submit this script to be run
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-nwdid --output=$console/$1-nwdid.out $0 $*`)
+  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-expt --output=$console/$1-expt.out $0 $*`)
   if [ "$?" != "0" ]; then
     echo "Failed to submit command to SLURM"
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-nwdid --output=$console/$1-nwdid.out $0 $*"
+    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-expt --output=$console/$1-expt.out $0 $*"
     exit 1
   fi
   $topmedcmd mark $1 sentexpt submitted
   if [ "${l[0]}" = "Submitted" ]; then      # Job was submitted, save jobid
-    echo `date` nwdid ${l[3]} >> $console/$1.jobids
+    echo `date` expt ${l[3]} >> $console/$1.jobids
   fi
   exit
 fi
