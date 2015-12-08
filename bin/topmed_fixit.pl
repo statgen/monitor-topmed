@@ -59,7 +59,7 @@ Getopt::Long::GetOptions( \%opts,qw(
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$Script [options] nwd|rename|crammd5|fixmapping\n" .
+    warn "$Script [options] nwd|rename|crammd5|fixdups|fixmapping|bamcount\n" .
         "Fix problems with various hacks.\n";
     exit 1;
 }
@@ -420,6 +420,37 @@ if ($fcn eq 'fixmapping') {
                 $sql = "UPDATE $opts{bamfiles_table} SET $sets WHERE bamid=$href->{bamid}";
                 #print "$st\n  $sql\n";
                 my $sth2 = DoSQL($sql);
+            }
+        }
+    }
+    exit;
+}
+
+#--------------------------------------------------------------
+#   Check for mismatch in bamfiles records and number of bams found
+#   This doesn't work very well, since Tom has deleted massive
+#   numbers of BAM files. Try counting the number of CRAMs instead.
+#--------------------------------------------------------------
+if ($fcn eq 'bamcount') {
+    my $centersref = GetCenters();
+    foreach my $cid (keys %{$centersref}) {
+        my $centername = $centersref->{$cid};
+        my $d = $opts{topdir} . '/' . $centername;
+        if (! chdir($d)) {
+            warn "$Script - Unable to CD to '$d': $!\n";
+            next;
+        }        
+        my $runsref = GetRuns($cid) || next;
+        #   For each run, get bam count from database and from directory
+        foreach my $runid (keys %{$runsref}) {
+            $d = $runsref->{$runid};
+            my $sql = "SELECT bamid FROM $opts{bamfiles_table} WHERE runid=$runid";
+            my $sth = DoSQL($sql);
+            my $numbamrecords = $sth->rows();
+            my $n = `ls $opts{backupdir}/$centername/$d/*.cram 2>/dev/null | wc -l`;
+            chomp($n);
+            if ($n ne $numbamrecords) {
+                print "$Script - For $centername / $d, # crams [$n] != # database records [$numbamrecords]\n";
             }
         }
     }
