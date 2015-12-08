@@ -31,24 +31,24 @@ if [ "$1" = "-submit" ]; then
   slurmqos="$realhost-ncbi"
 
   #  Submit this script to be run
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-ncbiorig --output=$console/$1-ncbiorig.out $0 $*`)
+  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-ncbib37 --output=$console/$1-ncbib37.out $0 $*`)
   if [ "$?" != "0" ]; then
     echo "Failed to submit command to SLURM"
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-ncbiorig --output=$console/$1-ncbiorig.out $0 $*"
+    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-ncbib37 --output=$console/$1-ncbib37.out $0 $*"
     exit 1
   fi
-  $topmedcmd mark $1 sentorig submitted
+  $topmedcmd mark $1 sentb37 submitted
   if [ "${l[0]}" = "Submitted" ]; then      # Job was submitted, save jobid
-    echo `date` ncbiorig ${l[3]} >> $console/$1.jobids
+    echo `date` ncbib37 ${l[3]} >> $console/$1.jobids
   fi
   exit
 fi
 
 if [ "$1" = "" ]; then
   me=`basename $0`
-  echo "Usage: $me [-submit] bamid nwdid center path2originalbamfile"
+  echo "Usage: $me [-submit] bamid
   echo ""
-  echo "Send original BAM files to NCBI"
+  echo "Send Remapped Build 37 BAM file to NCBI"
   exit 1
 fi
 bamid=$1
