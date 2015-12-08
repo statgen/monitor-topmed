@@ -426,6 +426,50 @@ if ($fcn eq 'fixmapping') {
     exit;
 }
 
+#--------------------------------------------------------------
+#   Find duplicate records in the database
+#--------------------------------------------------------------
+if ($fcn eq 'findups') {
+    my %bamnames = ();
+    my %bamname_origs = ();
+    #   Get all bamnames and original bamnames for all centers
+    my $centersref = GetCenters();
+    foreach my $cid (keys %{$centersref}) {
+        my $centername = $centersref->{$cid};
+        my $runsref = GetRuns($cid) || next;
+        #   For each run, see if there are bamfiles that arrived
+        foreach my $runid (keys %{$runsref}) {
+            my $dirname = $runsref->{$runid};
+            print "Doing $dirname\n";
+            #   Get list of all bams
+            my $sql = "SELECT * FROM $opts{bamfiles_table} WHERE runid='$runid'";
+            my $sth = DoSQL($sql);
+            my $rowsofdata = $sth->rows();
+            if (! $rowsofdata) { next; }
+            for (my $i=1; $i<=$rowsofdata; $i++) {
+                my $href = $sth->fetchrow_hashref;
+                my $val = "$centername / $dirname / $href->{bamname} => $href->{bamid}";
+                if (exists($bamnames{$href->{bamname}})) {
+                    print "$val is dup of $bamnames{$href->{bamname}}\n";
+                    next;
+                }
+                if ($href->{bamname_orig} && exists($bamname_origs{$href->{bamname_orig}})) {
+                    $val = "$centername / $dirname / $href->{bamname_orig} => $href->{bamid}";
+                    print "$val is dup of $bamname_origs{$href->{bamname_orig}}\n";
+                    next;
+                }
+                $bamnames{$href->{bamname}} = $val;
+                
+                if ($href->{bamname_orig}) {
+                    $val = "$centername / $dirname / $href->{bamname_orig} => $href->{bamid}";
+                    $bamname_origs{$href->{bamname_orig}} = $val;
+                }
+            }
+        }
+    }
+    exit;
+}
+
 die "Invalid request '$fcn'. Try '$Script --help'\n";
 
 #==================================================================
