@@ -65,6 +65,7 @@ CREATE TABLE bamfiles (
   cramname     VARCHAR(96) NOT NULL,
   cramchecksum VARCHAR(96) NOT NULL,
   b37bamchecksum VARCHAR(96) NOT NULL,
+  b38bamchecksum VARCHAR(96) NOT NULL,
   studyname    VARCHAR(96) NOT NULL,
   piname       VARCHAR(96),
   phs          VARCHAR(12),
@@ -116,7 +117,7 @@ CREATE TABLE bamfiles (
   jobidncbib38  VARCHAR(12),
   jobidb37     VARCHAR(12),
   jobidb38     VARCHAR(12),
-  studyid      INT         NOT NULL,          /* Remove this someday */
+  studyid      INT         NOT NULL,
   cramorigsent CHAR(1) DEFAULT 'N',
 #   Added for remapping with build37
   cramb37sent CHAR(1) DEFAULT 'N',
