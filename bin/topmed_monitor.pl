@@ -70,16 +70,15 @@ our %opts = (
     jobsnotpermitted => 0,
     jobsfailedsubmission => 0,
     batchsize => 10,            # Send up to this many BAMs to NCBi at a time
-    maxsubmits => 1,            # Send no more than this many runs to NCBI
 );
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose topdir=s center=s runs=s maxjobs=i maxsubmits=i batchsize=i
+    help realm=s verbose topdir=s center=s runs=s maxjobs=i batchsize=i
     memory=s partition=s qos=s dryrun suberr
     )) || die "Failed to parse options\n";
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$Script [options] arrive|verify|backup|bai|qplot|cram|expt|ncbiorig\n" .
+    warn "$Script [options] arrive|verify|backup|bai|qplot|cram|sexpt|sorig|sb37|sb38\n" .
         "Find runs which need some action and queue a request to do it.\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
@@ -317,7 +316,7 @@ if ($fcn eq 'qplot') {
 #--------------------------------------------------------------
 #   Create experiment XML and sent it to NCBI for this NWDID
 #--------------------------------------------------------------
-if ($fcn eq 'expt') {
+if ($fcn eq 'sexpt') {
     #   Get all the known centers in the database
     my $centersref = GetCenters();
     foreach my $cid (keys %{$centersref}) {
@@ -359,7 +358,7 @@ if ($fcn eq 'expt') {
                 if ($opts{suberr} && $href->{state_ncbiexpt} == $FAILED) { $href->{state_ncbiexpt} = $REQUESTED; }
                 if ($href->{state_ncbiexpt} != $NOTSET && $href->{state_ncbiexpt} != $REQUESTED) { next; }
                 #   Tell NCBI about this NWDID experiment
-                BatchSubmit("echo $opts{topmedexpt} -submit $href->{bamid}");
+                BatchSubmit("$opts{topmedexpt} -submit $href->{bamid}");
             }
         }
         ShowSummary($fcn);
@@ -370,7 +369,7 @@ if ($fcn eq 'expt') {
 #--------------------------------------------------------------
 #   Get a list of secondary BAMs to be sent to NCBI
 #--------------------------------------------------------------
-if ($fcn eq 'ncbiorig') {
+if ($fcn eq 'sorig') {
     #   Get all the known centers in the database
     my $centersref = GetCenters();
     foreach my $cid (keys %{$centersref}) {
@@ -417,7 +416,7 @@ if ($fcn eq 'ncbiorig') {
 #--------------------------------------------------------------
 #   Get a list of remapped primary BAMs to be sent to NCBI
 #--------------------------------------------------------------
-if ($fcn eq 'ncbib37') {
+if ($fcn eq 'sb37') {
     #   Get all the known centers in the database
     my $centersref = GetCenters();
     foreach my $cid (keys %{$centersref}) {
@@ -450,10 +449,10 @@ if ($fcn eq 'ncbib37') {
                     print "  BAM '$href->{bamname}' [$href->{bamid}] is ignored because of incomplete data\n";
                     next;
                 }
-                if ($opts{suberr} && $href->{state_ncbiorig} == $FAILED) { $href->{state_ncbiorig} = $REQUESTED; }
-                if ($href->{state_ncbiorig} != $NOTSET && $href->{state_ncbiorig} != $REQUESTED) { next; }
+                if ($opts{suberr} && $href->{state_ncbib37} == $FAILED) { $href->{state_ncbib37} = $REQUESTED; }
+                if ($href->{state_ncbib37} != $NOTSET && $href->{state_ncbib37} != $REQUESTED) { next; }
                 #   Send the primary CRAM (as BAM) to NCBI
-                BatchSubmit("echo $opts{topmedncbib37} -submit $href->{bamid}");
+                BatchSubmit("$opts{topmedncbib37} -submit $href->{bamid}");
             }
         }
         ShowSummary($fcn);
@@ -620,64 +619,6 @@ die "Invalid request '$fcn'. Try '$Script --help'\n";
 
 #==================================================================
 # Subroutine:
-#   SubmitBAM2NCBI - Submit a list of BAMs in collections
-#
-# Arguments:
-#   aref - reference to array of bamids
-#   center - name of center
-#   run - dirname of run
-#   max - send bams in sets this size
-#==================================================================
-sub SubmitBAM2NCBI {
-    my ($aref, $center, $run, $max) = @_;
-
-    if ($opts{maxsubmits} <= 0) { return; }         # Already did my fair share
-
-    my ($tmpfile) = tmpnam();
-    my ($tmpfile2) = tmpnam();
-    while (@{$aref}) {
-        #   Get a set of BAMIDs to send
-        my $last = $max;
-        if ($last > scalar(@{$aref})) { $last = scalar(@{$aref}); }
-        my @bamids = splice(@{$aref}, 0, $last);    # Peel off N bamids
-        if (! @bamids) { die "$Script SubmitBAMList - how can list of BAMIDs be empty?\n"; }
-        open(OUT, '>' . $tmpfile) ||
-            die "$Script Unable to create file '$tmpfile': $!\n";
-        print OUT join("\n", @bamids) . "\n";
-        close(OUT);
-    
-        #   Create the XML files
-        sleep(1);                   # Insures unique file for xmlprefix
-        my $pfx = time();
-$pfx = 'test';
-        my $cmd = $opts{topmedxml};
-        if ($opts{verbose}) { $cmd .= ' -v'; }
-        $cmd .= " -bamlist $tmpfile -xmlprefix $pfx -sendlist $tmpfile2 $center $run";
-        # print "$cmd\n";
-        system($cmd) &&
-            die "$Script Failed to create XML files. CMD=$cmd\n";
-        #   Get parameters for shell script:  bamid file1 file2 ...
-        #   or for the XML file it is:        xml   xmlfile1 xmlfile2 xmlfile3
-        open(IN, $tmpfile2) ||
-            die "$Script Unable to get list of XML files from '$tmpfile': $!\n";
-        $_ = <IN>;                              # Check that first line looks as expected
-        if (! /^# XML/) { die "$Script '$tmpfile2' did not have names of XML files\n"; }
-        while (<IN>) {
-            chomp();
-            BatchSubmit("echo $opts{topmedncbi} -submit $_");
-        }
-        close(IN);
-        $opts{maxsubmits}--;
-        if ($opts{maxsubmits} <= 0) {
-            print "Limit of XML sets to send to NCBI has been reached\n";
-            last;
-        }
-    }
-    unlink($tmpfile, $tmpfile2);
-}
-
-#==================================================================
-# Subroutine:
 #   BatchSubmit - Run a command which submits the command to batch
 #
 # Arguments:
@@ -787,11 +728,6 @@ Generates this output.
 Do not submit more than N jobs for this invocation.
 The default for B<-maxjobs> is B<100>.
 
-=item B<-maxsubmits N>
-
-Do not send more than N XML submits to NCBI.
-The default for B<-maxjobs> is B<10>.
-
 =item B<-memory nG>
 
 Force the sbatch --mem setting when submitting a job.
@@ -837,7 +773,7 @@ Provided for developers to see additional information.
 
 =over 4
 
-=item B<arrive | verify | backup | bai | qplot | cram | expt | ncbiorig>
+=item B<arrive | verify | backup | bai | qplot | cram | sexpt | sorig | sb37 | sb38>
 
 Directs this program to look for runs that have not been through the process name
 you provided and to queue a request they be verified.
