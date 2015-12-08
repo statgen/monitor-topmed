@@ -102,7 +102,7 @@ if [ "$1" = "-squeue" ]; then
   if [ "$2" = "nomosix" ]; then
     grep topmed $tmpfile > $tmpfile.tmp         # Only look at topmed jobs
     mv $tmpfile.tmp $tmpfile
-    for t in ver bac bai qpl cra ncb; do
+    for t in ver bac bai qpl cra exp orig b37 b38; do
       s=`grep $t $tmpfile|wc -l`
       r=`grep $t $tmpfile|grep ' R '|wc -l`
       if [ "$s" != "0" ]; then
