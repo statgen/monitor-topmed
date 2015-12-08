@@ -248,15 +248,9 @@ sub AddBams {
     $opts{bamcountruns} .= $d . ' ';
 
     #   Get number of database records
-    $sql = "SELECT count(*) FROM $opts{bamfiles_table} WHERE runid=$runid";
+    $sql = "SELECT bamid FROM $opts{bamfiles_table} WHERE runid=$runid";
     $sth = DoSQL($sql);
-    $rowsofdata = $sth->rows();
-    if (! $rowsofdata) {
-        print "$Script - Can the number of BAM database records be zero?\n";
-        return 0;
-    }
-    my $href = $sth->fetchrow_hashref;
-    my $numbamrecords = $href->{'count(*)'};
+    my $numbamrecords = $sth->rows();
     $sql = "UPDATE $opts{runs_table}  SET bamcount=$numbamrecords WHERE runid=$runid";
     $sth = DoSQL($sql);
 
