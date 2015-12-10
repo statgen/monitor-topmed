@@ -12,6 +12,7 @@ topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 topmedxml=/usr/cluster/monitor/bin/topmed_xml.pl
 mem=8G
 console=/net/topmed/working/topmed-output
+tmpconsole=/working/topmed-output
 topmeddir=/net/topmed/incoming/topmed
 remapdir=/net/topmed/working/schelcj/results
 
@@ -47,7 +48,7 @@ fi
 
 if [ "$1" = "" ]; then
   me=`basename $0`
-  echo "Usage: $me [-submit] bamid
+  echo "Usage: $me [-submit] bamid"
   echo ""
   echo "Send Remapped Build 37 BAM file to NCBI"
   exit 1
@@ -82,9 +83,9 @@ fi
 d=`date +%Y/%m/%d`
 echo "#========= $d $SLURM_JOB_ID $0 bamid=$bamid file=$fqremappedcram ========="
 #   Go to our working directory
-cd $console
+cd $tmpconsole
 if [ "$?" != "0" ]; then
-  echo "Unable to CD to '$console' to create XML file"
+  echo "Unable to CD to '$tmpconsole' to create XML file"
   $topmedcmd mark $bamid sentb37 failed
   exit 2
 fi
