@@ -51,7 +51,7 @@ my $bamfilepath = shift(@ARGV);
 my $dbh = DBConnect($opts{realm});
 
 #--------------------------------------------------------------
-#   Rename the BAM file, change the MD5 file
+#   Rename the BAM file and change bamname in database
 #--------------------------------------------------------------
 my $sth = DoSQL("SELECT * FROM $opts{bamfiles_table} WHERE bamid='$bamid'");
 my $rowsofdata = $sth->rows();
@@ -59,72 +59,31 @@ if (! $rowsofdata) { die "Script BAM '$bamid' does not exist in database [$bamfi
 my $href = $sth->fetchrow_hashref;
 my $nwdid = $href->{expt_sampleid};
 if ($nwdid !~ /^NWD/) { die "Script BAM '$bamid' NWDID [$nwdid] was not set [$bamfilepath]\n"; }
-#   Checksum hack - allow this to be 'useoldvalue' and then use the checksum value from the db
-if ($checksum eq 'useoldvalue' && $href->{checksum}) { $checksum =$href->{checksum}; }
+
 
 #   CD to place where BAM exists
 my $dirname = dirname($bamfilepath);
 chdir($dirname) ||
     die "$Script Unable to CD to '$dirname': $!\n";
 my $bamfile = basename($bamfilepath);
-if ($bamfile =~ /^NWD/) {
-    if ($opts{verbose}) { print "$Script Bamid=$bamid already uses NWD format\n"; }
-    exit;
-}
 
-#   Rename the BAM file
-my $newbamfile = $bamfile;
-if ($newbamfile !~ /^[^.]+\.(.+)/) { die "$Script Unable to parse '$newbamfile'\n"; }
-$newbamfile = $nwdid . '.' . $1;
-rename($bamfile, $newbamfile) ||
-    die "$Script Unable to rename $bamfile $newbamfile (bamid=$bamid)\n";
-if ($opts{verbose}) { print "$Script Renamed $bamfile to $newbamfile\n"; }
-
-#   Save original bamname once in database, change name in database
-if ((! defined($href->{bamname_orig})) || $href->{bamname_orig} eq '') {
-    DoSQL("UPDATE $opts{bamfiles_table} SET bamname_orig='$bamfile' WHERE bamid=$bamid");
-}
-DoSQL("UPDATE $opts{bamfiles_table} SET bamname='$newbamfile' WHERE bamid=$bamid");
-
-#   Figure out the MD5 file used and then comment out the proper line
-#   Every center has it's own convention, cause that's what standards are for
-#   Find all MD5 files and search them, too many ways to fail otherwise
-if (opendir(DIR, '.')) {
-    my @md5list = ();
-    while (readdir(DIR)) {
-        if (/\.md5$/) { push @md5list,$_; next; }
-        if (/\.MD5$/) { push @md5list,$_; next; }
-        if ($_ eq 'Manifest.txt') { push @md5list,$_; next; }
-    }
-    closedir DIR;
-    my $changed = 0;
-    my $active = 0;
-    foreach my $f (@md5list) {
-        # Read this MD5 file and look for checksum line
-        open(IN, $f) ||
-            die "$Script Unable to open file '$f'\n";
-        my $lines = '';
-        while(<IN>) {
-            if (/$checksum/) { $_ = '# ' . $_; $changed++; }
-            if (! /^#/) { $active++; }  # Still have MD5s to do
-            $lines .= $_;
+#   Rename the BAM file unless they already use NWDID
+if ($bamfile !~ /^NWD/) {
+    my $newbamfile = $bamfile;
+    if ($newbamfile !~ /^[^.]+\.(.+)/) { die "$Script Unable to parse '$newbamfile'\n"; }
+    $newbamfile = $nwdid . '.' . $1;
+    #   Aspera screws us up by re-transmitting the file if we rename it
+    #   so we create a symlink to the original
+    if (! -f $newbamfile) {         # Only do this once
+        system("ln -s $bamfile, $newbamfile") &&
+            die "$Script Unable to create symlink to $bamfile for $newbamfile (bamid=$bamid)\n";
+        if ($opts{verbose}) { print "$Script Symlink created to $bamfile for $newbamfile\n"; }
+        #   Save original bamname once in database, change name in database
+        if ((! defined($href->{bamname_orig})) || $href->{bamname_orig} eq '') {
+            DoSQL("UPDATE $opts{bamfiles_table} SET bamname_orig='$bamfile' WHERE bamid=$bamid");
         }
-        close(IN);
-        if ($changed) {
-            if ($opts{verbose}) { print "Removing checksum line for $bamfile from '$f'\n"; }
-            open(OUT, '>', $f) ||
-                die "$Script Unable to overwrite '$f' [$bamid]\n";
-            print OUT $lines;
-            close(OUT);
-            #   If there are no more MD5 sums in this file, rename it
-            if (! $active) {
-                rename($f, "$f.old") ||
-                    print "$Script Unable to rename $f $f.old (bamid=$bamid)\n";
-            }
-            last;
-        }
+        DoSQL("UPDATE $opts{bamfiles_table} SET bamname='$newbamfile' WHERE bamid=$bamid");
     }
-    if (! $changed) { print "$Script MD5 file not found for $bamfilepath [$bamid] checksum=$checksum\n"; }
 }
 
 exit;
@@ -152,6 +111,11 @@ and comment out that line.
 If the resulting MD5 file contains no more MD% checksums, then
 that file is also renamed.
 
+It turns out Aspera can re-transmit the file if we actually rename it,
+causing chaos all around as data re-appears after being processed.
+So rather than actually renaming files, we create a symlink, making
+two versions of the file, under different names.
+
 =head1 OPTIONS
 
 =over 4
@@ -159,6 +123,10 @@ that file is also renamed.
 =item B<-help>
 
 Generates this output.
+
+=item B<-realm NAME>
+
+Specifies the database realm to read data from. This defaults to B<topmed>;
 
 =item B<-verbose>
 

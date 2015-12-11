@@ -127,10 +127,11 @@ sub CreateRun {
         "VALUES($cid,'$d','',0,'$nowdate')";
     my $sth = DoSQL($sql);
     my $runid = $sth->{mysql_insertid};
-    warn "Added run '$d'\n";
+    print "$Script - Added run '$d'\n";
     $opts{runcount}++;
     #   Try to force permissions so things can work later. Can't trust the users
-    chmod(0775, $d) || print "$Script Unable to force permissions for '$d'. Too bad for you.\n"; 
+    chmod(0775, $d) ||
+        print "$Script Unable to force permissions for '$d'. Too bad for you.\n"; 
     return $runid;
 }
 
@@ -148,7 +149,12 @@ sub CreateRun {
 sub AddBams {
     my ($runid, $d) = @_;
     if (! -d $d) {
-        print "$Script - Unable to read directory '$d': $!";
+        print "$Script - Unable to read directory '$d': $!\n";
+        return 0;
+    }
+    #   If we're using one MD5 file and the .old version exists, we have nothing to add
+    if (-f "$d/Manifest.txt.old") {
+        if ($opts{verbose}) { print "$Script - $d/Manifest.txt.old found, no more BAMs to add\n"; }
         return 0;
     }
 
@@ -169,23 +175,25 @@ sub AddBams {
     }
 
     #   Get list of all new MD5 files
-    #   There is no consistency what people do here.
     my @md5files = ();
-    if ( -r "$d/Manifest.txt") {
-        push @md5files,'Manifest.txt';
-    }
+    if ( -r "$d/Manifest.txt") { push @md5files,'Manifest.txt'; }
     else {
         opendir(my $dh, $d) ||
             die "$Script - Unable to read directory '$d'\n";
         while (readdir $dh) {
             if (! /\.md5$/) { next; }
-            if ($_ eq $opts{topmedmd5file}) { next; }
+            #   If a .old version of this file exists, we've done it before
+            if (-f "$d/$_.old") { next; }
             push @md5files,$_;
         }
         closedir $dh;
     }
-    if (! @md5files) { return 0; }          # No new md5 files found
+    if (! @md5files) {
+        if ($opts{verbose}) { print "$Script - No new MD5 files found in $d\n"; }
+        return 0;
+    }
 
+    #   There is no consistency what people do here.
     #   Foreach md5 file, get the new of the BAM and create the bamfiles record
     #   Append the md5 record to $opts{topmedmd5file} and rename the md5 file
     #   so we do not process it again
@@ -199,51 +207,42 @@ sub AddBams {
             next;
         }
         my $badmd5 = 0;
-        while (my $l = <IN>) {                      # Sometimes it's file checksum, sometimes not
-            if ($l =~ /^#/) { next; }
-            ($checksum, $fn) = split(' ',$l);
-            #   Do sanity check trying to guess the format of their md5 file
-            if ($checksum =~ /\./) { ($fn, $checksum) = ($checksum, $fn); }
-            if (length($checksum) < 30) {
-                print "$Script - Invalid checksum '$checksum' in '$f'. Line: $l";
-                $badmd5++;
-                next;
-            }
-            if ($fn =~ /\//) { $fn = basename($fn); }   # Path should not be qualified, but ...
-            if ($fn !~ /bam$/) {                    # File better be a bam
-                print "$Script - Invalid BAM name '$fn' in '$f'. Line: $l";
-                $badmd5++;
-                next;
-            }
-            $md5lines .= $l;                        # Line OK. Save for our own file
-
-            #   Ideally we only create NEW records, but sometimes we might
-            #   reprocess an MD5. If so, don't make duplicate records
+        while (my $l = <IN>) {          # Read md5 checksum file
+            ($checksum, $fn) = NormalizeMD5Line($l, $f);
+            if (! $checksum) { $badmd5++; next; }
+            #   Ideally we only read MD5 files for NEW records, but sometimes we might
+            #   reprocess an MD5 intentionally (?) or but accident/bug.
+            #   In any case don't make duplicate records
             if (exists($knownbams{$fn})) { next; }       # Skip known bams
             if (exists($knownorigbam{$fn})) { next; }    # Skip known original bams
 
-            #   New BAM, create database record for it. May not exist yet
+            #   New BAM, create database record for it. Actual BAM may not exist yet
             $sql = "INSERT INTO $opts{bamfiles_table} " .
                 "(runid,bamname,checksum,dateinit) " .
                 "VALUES($runid,'$fn','$checksum', $nowdate)";
-            $sth = DoSQL($sql);
+            if ($opts{verbose}) { print "SQL=$sql\n"; }
+            else { $sth = DoSQL($sql); }
             $newbams++;
         }
         close(IN);
         if ($badmd5) { next; }              # This MD5 was in error
 
         #   Have added new bam. Rename MD5 file and append $md5lines to our own MD5 file
-        open(OUT, '>>' . "$d/$opts{topmedmd5file}") ||
-            die "$Script - Unable to append MD5 data to '$d/$opts{topmedmd5file}': $!\n";
-        print OUT $md5lines;
-        close(OUT);
-        rename($f, "$f.old") ||
-            die "$Script - Unable to rename '$f' to '$f.old': $!\n";
+        #   Aspera can really screw us up by re-transmitting a renamed file.
+        #   To avoid this we create a symlink to the MD5 file
+        my $oldchecksum = "$f.old";
+        if (! -f $oldchecksum) {            # Only do this once
+            if ($opts{verbose}) { print "SYMLINK:   ln -s $f $oldchecksum\n"; }
+            else {
+                system("ln -s $f $oldchecksum") &&
+                    die "$Script - Unable to create symlink to $f for $oldchecksum ($d)\n";
+            }
+        }
     }
 
     #   If we added bams, change the bamcount
     if (! $newbams) { return 0; }
-    print "$Script $newbams new bams found in '$d'\n";
+    print "$Script - $newbams new bams found in '$d'\n";
     $opts{bamcount} += $newbams;            # Stats for ending msg
     $opts{bamcountruns} .= $d . ' ';
 
@@ -259,8 +258,43 @@ sub AddBams {
     my $n = `ls $d/*.bam | wc -l`;
     chomp($n);
     if ($n eq $numbamrecords) { print "$Script - Congratulations, # bams = # database records\n"; }
-    else { print "$Script - Warning, # bams [$n] != # database records [$numbamrecords].  If data is incoming, this might be OK\n"; }
+    else {
+        print "$Script - Warning, # bams [$n] != # database records [$numbamrecords].  " .
+            "If data is incoming, this might be OK\n";
+    }
     return 1;
+}
+
+#==================================================================
+# Subroutine:
+#   NormalizeMD5Line - Return filename and checksum
+#
+# Arguments:
+#   l - line from an md5 file (well, what they pretend is an md5 file)
+#   f - name of file (for error msgs only)
+#
+# Returns:
+#   array of filename and checksum or NULL
+#==================================================================
+sub NormalizeMD5Line {
+    my ($l, $f) = @_;
+    my @retvals = ();
+    if ($l =~ /^#/) { return @retvals; }
+
+    my ($checksum, $fn) = split(' ',$l);
+    #   Do sanity check trying to guess the format of their md5 file
+    if ($checksum =~ /\./) { ($fn, $checksum) = ($checksum, $fn); }
+    if (length($checksum) < 30) {
+        print "$Script - Invalid checksum '$checksum' in '$f'. Line: $l";
+        return @retvals;
+    }
+    if ($fn =~ /\//) { $fn = basename($fn); }   # Path should not be qualified, but ...
+    if ($fn !~ /bam$/) {                    # File better be a bam
+        print "$Script - Invalid BAM name '$fn' in '$f'. Line: $l";
+        return @retvals;
+    }
+    @retvals = ($fn, $checksum);
+    return @retvals;
 }
 
 #==================================================================
@@ -279,7 +313,8 @@ topmed_init.pl - check for files that are arriving and initialize the database
 =head1 DESCRIPTION
 
 This program monitors directories for incoming data and then
-updates a database with various status values.
+creates records for new run directories and/or new BAMs
+(based on new MD5 files being discovered).
 
 =head1 OPTIONS
 
