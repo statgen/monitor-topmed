@@ -66,7 +66,8 @@ our %opts = (
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help nolint realm=s verbose build=s inst_model=s design_description=s run_processing=s xmlprefix=s type=s bamfn=s bamchecksum=s
+    help nolint realm=s verbose build=s inst_model=s design_description=s
+    run_processing=s xmlprefix=s type=s bamfn=s bamchecksum=s
     )) || die "$Script Failed to parse options\n";
 
 #   Simple help if requested
@@ -158,10 +159,14 @@ exit;
 sub CreateRun {
     my ($f, $href, $bamfn, $checksum) = @_;
     my ($processingfile, $title);
+    $bamfn = basename($bamfn);                  # No fully qualified path
 
     if ($opts{type} eq 'secondary') {           # Original bam
         $processingfile = "$opts{processingsectiondir}/$center.run_processing.txt";
         $title = "Secondary mapping Build $opts{build} for $href->{expt_sampleid} [$href->{bamid}]";
+        if ($bamfn =~ /(^NWD\d+)/) {            # BAM we send should be called NWDxxxxx.src.bam
+            $bamfn = $1 . '.src.bam';
+        }
     }
     else {
         if (! defined($bamfn)) { die "$Script BAM file not provided for RUN XML\n"; }
