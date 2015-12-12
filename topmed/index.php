@@ -223,6 +223,8 @@ if ($fcn == 'showqlocal') {
     print "<center>$SHOWQUEUES &nbsp;&nbsp;&nbsp;</center>\n";
     print ShowSLURM('topmed-incoming');
     print ShowSLURM('topmed2-incoming');
+    print ShowSLURM('topmed3-incoming');
+    //print ShowSLURM('topmed4-incoming');
     exit;
 }
 
