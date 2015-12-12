@@ -110,7 +110,7 @@ if [ "$1" = "-squeue" ]; then
       fi
     done
   fi
-  if [ "$2" = "topmed-incoming" -o "$2" = "topmed2-incoming" ]; then
+  if [ "$2" = "topmed-incoming" -o "$2" = "topmed2-incoming" -o "$2" = "topmed3-incoming" -o "$2" = "topmed4-incoming" ]; then
     for t in ver bac bai qpl cra ncb; do
       s=`grep $t $tmpfile|wc -l`
       r=`grep $t $tmpfile|grep ' R '|wc -l`
