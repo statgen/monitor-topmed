@@ -198,8 +198,8 @@ sub AddBams {
     my $newbams = 0;
     my ($fn, $checksum);
     my $md5lines = '';
-    foreach (@md5files) {
-        my $f = "$d/$_";
+    foreach my $origf (@md5files) {
+        my $f = "$d/$origf";
         if (! open(IN, $f)) {
             warn "$Script - Unable to read MD5 file '$f': $!\n";
             next;
@@ -232,7 +232,7 @@ sub AddBams {
         if (! -f $oldchecksum) {            # Only do this once
             if ($opts{verbose}) { print "SYMLINK:   ln -s $f $oldchecksum\n"; }
             else {
-                system("ln -s $f $oldchecksum") &&
+                system("ln -s $origf $oldchecksum") &&
                     die "$Script - Unable to create symlink to $f for $oldchecksum ($d)\n";
             }
         }

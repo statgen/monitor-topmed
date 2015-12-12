@@ -75,7 +75,7 @@ if ($bamfile !~ /^NWD/) {
     #   Aspera screws us up by re-transmitting the file if we rename it
     #   so we create a symlink to the original
     if (! -f $newbamfile) {         # Only do this once
-        system("ln -s $bamfile, $newbamfile") &&
+        system("ln -s $bamfile $newbamfile") &&
             die "$Script Unable to create symlink to $bamfile for $newbamfile (bamid=$bamid)\n";
         if ($opts{verbose}) { print "$Script Symlink created to $bamfile for $newbamfile\n"; }
         #   Save original bamname once in database, change name in database
