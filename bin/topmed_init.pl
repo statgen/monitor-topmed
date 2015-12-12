@@ -36,7 +36,6 @@ our %opts = (
     runs_table => 'runs',
     bamfiles_table => 'bamfiles',
     topdir => '/net/topmed/incoming/topmed',
-    topmedmd5file => 'topmed_md5.txt',          # Consolidate all MD5s in this
     runcount => 0,
     bamcount => 0,
     bamcountruns => '',
@@ -195,8 +194,7 @@ sub AddBams {
 
     #   There is no consistency what people do here.
     #   Foreach md5 file, get the new of the BAM and create the bamfiles record
-    #   Append the md5 record to $opts{topmedmd5file} and rename the md5 file
-    #   so we do not process it again
+    #   and rename the md5 file so we do not process it again
     my $newbams = 0;
     my ($fn, $checksum);
     my $md5lines = '';
@@ -208,7 +206,7 @@ sub AddBams {
         }
         my $badmd5 = 0;
         while (my $l = <IN>) {          # Read md5 checksum file
-            ($checksum, $fn) = NormalizeMD5Line($l, $f);
+            ($fn, $checksum) = NormalizeMD5Line($l, $f);
             if (! $checksum) { $badmd5++; next; }
             #   Ideally we only read MD5 files for NEW records, but sometimes we might
             #   reprocess an MD5 intentionally (?) or but accident/bug.
@@ -284,7 +282,7 @@ sub NormalizeMD5Line {
     my ($checksum, $fn) = split(' ',$l);
     #   Do sanity check trying to guess the format of their md5 file
     if ($checksum =~ /\./) { ($fn, $checksum) = ($checksum, $fn); }
-    if (length($checksum) < 30) {
+    if (length($checksum) != 32) {
         print "$Script - Invalid checksum '$checksum' in '$f'. Line: $l";
         return @retvals;
     }
