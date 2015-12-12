@@ -98,7 +98,7 @@ here=`pwd`
 #   suppress this and specify the output file name in the options to samtools.
 #   Option "-@" tells how many extra threads to use for compression when writing
 #   a .bam file.  I'm just guessing 3 -- meaning 4 threads total, including the main one.
-sendbam="$nwdid.recal.bam"
+sendbam="$nwdid.recal.37.bam"
 echo "Creating BAM $sendbam from CRAM $fqremappedcram"
 stime=`date +%s`
 $samtools view -b -@3 -o $sendbam $fqremappedcram 
