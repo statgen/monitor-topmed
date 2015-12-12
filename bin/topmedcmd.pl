@@ -177,6 +177,9 @@ sub Mark {
         if ($col eq 'state_arrive') {       # hack for Chris until new code in place
             DoSQL("UPDATE $opts{bamfiles_table} SET datearrived='" . time() . "' WHERE bamid=$bamid");
         }
+        if ($col eq 'state_md5ver') {       # hack for Chris until new code in place
+            DoSQL("UPDATE $opts{bamfiles_table} SET datemd5ver='" . time() . "' WHERE bamid=$bamid");
+        }
         if ($col eq 'state_b37') {          # hack for Chris until new code in place
             DoSQL("UPDATE $opts{bamfiles_table} SET datemapping='" . time() . "' WHERE bamid=$bamid");
         }
@@ -194,6 +197,9 @@ sub Mark {
         DoSQL("UPDATE $opts{bamfiles_table} SET $col=$FAILED WHERE bamid=$bamid");
         if ($col eq 'state_arrive') {       # hack for Chris until new code in place
             DoSQL("UPDATE $opts{bamfiles_table} SET datearrived='-1' WHERE bamid=$bamid");
+        }
+        if ($col eq 'state_md5ver') {       # hack for Chris until new code in place
+            DoSQL("UPDATE $opts{bamfiles_table} SET datemd5ver='-1' WHERE bamid=$bamid");
         }
         if ($col eq 'state_b37') {          # hack for Chris until new code in place
             DoSQL("UPDATE $opts{bamfiles_table} SET datemapping='-1' WHERE bamid=$bamid");
@@ -245,7 +251,7 @@ sub UnMark {
 #   Export()
 #
 #   Generate a CSV file of possibly interesting data to STDOUT
-#   This is incomplete and will need more attention
+#   This is incomplete and will need more attention, but works for Chris now
 #==================================================================
 sub Export {
     #my ($center, $run) = @_;
@@ -274,10 +280,8 @@ sub Export {
                 my $href = $sth->fetchrow_hashref;
                 my $f = "$opts{netdir}/$opts{incomingdir}/$centername/$dirname/" .
                     $href->{bamname};
-                #   See if this has arrived
-                if ($href->{state_arrive} != $COMPLETED) { next; }
-                #   Convert mapping state into a string   Not used
-                #my $state = $VALIDSTATUS{$href->{state_arrive}};
+                #   See if this has been verified
+                if ($href->{state_md5ver} != $COMPLETED) { next; }
                 #   Show data for this BAM
                 $s = "$centername,$dirname,";
                 foreach (@cols) {
@@ -569,7 +573,7 @@ sub ShowArrived {
                 my $f = $opts{topdir} . "/$centername/$dirname/" .
                     $href->{bamname};
                 #   See if this has arrived. Few states possible
-                if ($href->{datearrived} != $COMPLETED) { next; }
+                if ($href->{state_arrive} != $COMPLETED) { next; }
                 #   Run the command
                 print "$href->{bamid} $centername $dirname $f\n";
             }
@@ -647,7 +651,7 @@ to deal with specific sets of information in the monitor databases.
 
 =item B<mark bamid dirname  [verb] [state]>
 Use this to set the state for a particular BAM file.
-Mark will set a date for the process (e.g. arrived sets datearrived)
+Mark will set a date for the process (e.g. arrived sets state_arrive)
 and unmark will set that entry to NULL.
 The list of verbs and states can be seen by B<perldoc topmedcmd.pl>.
 
