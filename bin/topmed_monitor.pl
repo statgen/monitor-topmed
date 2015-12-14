@@ -405,7 +405,7 @@ if ($fcn eq 'sorig') {
                 if ($opts{suberr} && $href->{state_ncbiorig} == $FAILED) { $href->{state_ncbiorig} = $REQUESTED; }
                 if ($href->{state_ncbiorig} != $NOTSET && $href->{state_ncbiorig} != $REQUESTED) { next; }
                 #   Send the secondary BAM to NCBI
-                BatchSubmit("echo $opts{topmedncbiorig} -submit $href->{bamid}");
+                BatchSubmit("$opts{topmedncbiorig} -submit $href->{bamid}");
             }
         }
         ShowSummary($fcn);
