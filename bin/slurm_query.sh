@@ -8,7 +8,7 @@
 #
 url=http://topmed:48109
 tmpfile=/tmp/showslurm.out
-lastn=25
+lastn=15
 
 if [ "$2" = "" ]; then
   echo "Usage: $0 -squeue partition"
