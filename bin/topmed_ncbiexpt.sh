@@ -26,10 +26,10 @@ if [ "$1" = "-submit" ]; then
   slurmqos="$realhost-ncbi"
 
   #  Submit this script to be run
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-expt --output=$console/$1-expt.out $0 $*`)
+  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-expt --output=$console/$1-sexpt.out $0 $*`)
   if [ "$?" != "0" ]; then
     echo "Failed to submit command to SLURM"
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-expt --output=$console/$1-expt.out $0 $*"
+    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-expt --output=$console/$1-sexpt.out $0 $*"
     exit 1
   fi
   $topmedcmd mark $1 sentexpt submitted
@@ -73,7 +73,7 @@ $topmedxml -xmlprefix $here/ -type expt $bamid
 if [ "$?" != "0" ]; then
   echo "Unable to create experiment XML files"
   $topmedcmd mark $bamid sentexpt failed
-  exit $rc
+  exit 2
 fi
 
 #   Check files we created
