@@ -351,7 +351,7 @@ sub CreateSubmit {
         "  name = \"$opts{master}\"\n";
     if ($opts{master_email}) {
         print OUT "  inform_on_status = \"$opts{master_email}\"\n" .
-        "  inform_on_error = \"$opts{master_email}\"\n";
+        "  inform_on_error = \"$opts{master_email}\"";
     }
     print OUT "/>\n" .
         "</CONTACTS>\n";
