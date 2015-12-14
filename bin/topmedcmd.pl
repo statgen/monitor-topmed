@@ -346,7 +346,7 @@ sub Where {
     my $bakbamfdir = $opts{netdir};
     if ($realhostindex eq '') { $bakbamfdir = $opts{netdir} . '2'; }
     if ($realhostindex eq '2') { $bakbamfdir = $opts{netdir} . ''; }
-    if ($realhostindex eq '3') { $bakbamfdir = $opts{netdir} . 'x3'; }  # No idea what to do here
+    if ($realhostindex eq '3') { $bakbamfdir = $opts{netdir} . '3'; }   # No idea what to do here
     if ($realhostindex eq '4') { $bakbamfdir = $opts{netdir} . 'x4'; }  # No idea what to do here
     $bakbamfdir = "$bakbamfdir/$opts{backupsdir}/$centername";
     if (-l $bakbamfdir) { die "BAMID=$bamid bamdir=$bamfdir Backup directory may not be a symlink for '$bakbamfdir'\n"; }
