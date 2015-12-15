@@ -6,7 +6,7 @@
 #
 bindir=/usr/cluster/bin
 ascpcmd="$bindir/ascp -i /net/topmed/incoming/study.reference/send2ncbi/topmed-2-ncbi.pri -l 800M -k 1"
-ascpdest='asp-um-sph@gap-upload.ncbi.nlm.nih.gov:protected'
+ascpdest='asp-um-sph@gap-submit.ncbi.nlm.nih.gov:protected'
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 topmedxml=/usr/cluster/monitor/bin/topmed_xml.pl
 mem=2G
