@@ -127,12 +127,11 @@ print "Creating XML for BAMID '$bamid' from $center/$run\n";
 #   Create XML files
 #--------------------------------------------------------------
 if ($opts{xmlprefix} && $opts{xmlprefix} !~ /[\/\/]$/) { $opts{xmlprefix} .= '.'; }
-my $now = time();
 
 if ($opts{type} eq 'expt') {
     my $submitfile = $opts{xmlprefix} . "$href->{expt_sampleid}-$opts{type}.submit.xml";
     my $exptfile   = $opts{xmlprefix} . "$href->{expt_sampleid}.expt.xml";
-    CreateSubmit($submitfile, "$href->{expt_sampleid}.$now.submit", $opts{type}, $exptfile);
+    CreateSubmit($submitfile, "$href->{expt_sampleid}.expt.submit", 'expt', $exptfile);
     RunLINT($submitfile, 'submission');
     CreateExpt($exptfile, $href);
     RunLINT($exptfile, 'experiment');
@@ -143,7 +142,7 @@ if ((! $bamfn) || (! $checksum)) { die "$Script BAM filename or CHECKSUM not pro
 
 my $submitfile = $opts{xmlprefix} . "$href->{expt_sampleid}-$opts{type}.$opts{build}.submit.xml";
 my $runfile = $opts{xmlprefix} . "$href->{expt_sampleid}-$opts{type}.$opts{build}.run.xml";
-CreateSubmit($submitfile, "$href->{expt_sampleid}.run.$now.submit", 'run', $runfile);
+CreateSubmit($submitfile, "$href->{expt_sampleid}.run.$opts{type}.submit", 'run', $runfile);
 RunLINT($submitfile, 'submission');
 CreateRun($runfile, $href, $bamfn, $checksum);
 RunLINT($runfile, 'run' );
@@ -329,7 +328,8 @@ sub Experiment {
 #==================================================================
 sub CreateSubmit {
     my ($f, $alias, $t, $f2) = @_;
-    if ($t eq 'expt') { $t = 'experiment'; }
+    my $action = 'MODIFY';
+    if ($t eq 'expt') { $action = 'ADD'; $t = 'experiment'; }
     $f2 = basename($f2);
 
     #   Create the submit XML file
@@ -344,7 +344,7 @@ sub CreateSubmit {
         "  lab_name = \"$opts{lab_name}\"\n" .
         "  submission_comment = \"\">\n";
 
-    print OUT "<TITLE>$center $run " . time() . "</TITLE>\n";
+    print OUT "<TITLE>$center $run $t</TITLE>\n";
 
     print OUT "<CONTACTS>\n" .
         "<CONTACT\n" .
@@ -358,7 +358,7 @@ sub CreateSubmit {
  
     print OUT "<ACTIONS>\n" .
         "  <ACTION>\n" .
-        "    <ADD\n" .
+        "    <$action\n" .
         "      source = \"$f2\"\n" .
         "      schema = \"$t\"/>\n" .
         "  </ACTION>\n" .
