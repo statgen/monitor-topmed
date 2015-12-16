@@ -37,8 +37,8 @@ $SHOWQUEUES = "STATUS: &nbsp;&nbsp;&nbsp;" .
     "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=df\",680,720); " .
     "return false;'>Disk Usage</a> &nbsp;&nbsp;&nbsp;" .
 
-    "<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=errorcheck' " .
-    "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=errorcheck\",680,720); " .
+    //"<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=errorcheck' " .
+    //"onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=errorcheck\",680,720); " .
     //"return false;'>Error Check</a> &nbsp;&nbsp;&nbsp;" .
 
     "<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=logs' " .
