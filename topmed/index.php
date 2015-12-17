@@ -589,12 +589,13 @@ function ViewBams($runid, $maxdirs, $iammgr) {
     $maxdirs = 0;                   // For now, show all BAMs
 
     //  Figure out RUN for this BAM
-    $sql = 'SELECT dirname,centerid FROM ' . $LDB['runs'] . " WHERE runid=$runid";
+    $sql = 'SELECT dirname,centerid,bamcount FROM ' . $LDB['runs'] . " WHERE runid=$runid";
     $result = SQL_Query($sql, 0);
     $e = DB_CheckError($result);
     if ($e) { return EMsg("Surprise: Unable to find RUN id=$runid: $e", 1); }
     $row = SQL_Fetch($result);
     $runname = $row['dirname'];
+    $bamcount = $row['bamcount'];
     $centername = $CENTERID2NAME[$row['centerid']];
     $center = strtoupper($centername);
 
@@ -606,7 +607,7 @@ function ViewBams($runid, $maxdirs, $iammgr) {
 
     //  Show details for each bam
     $url = $HDR['home'] . "/index.php?center=$centername&amp;maxdir=50";
-    $html .= "<h3 align='center'>BAM Files for '$runname' in center " .
+    $html .= "<h3 align='center'>$bamcount BAM Files for '$runname' [$runid] in center " .
         "<a href='$url'>$center</a></h3>\n";
     $html .= "<p align='center'/>$SHOWQUEUES</p>\n";
 
