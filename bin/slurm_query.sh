@@ -8,7 +8,7 @@
 #
 url=http://topmed:48109
 tmpfile=/tmp/showslurm.out
-lastn=15
+lastn=10
 
 if [ "$2" = "" ]; then
   echo "Usage: $0 -squeue partition"
@@ -111,6 +111,12 @@ if [ "$1" = "-squeue" ]; then
     done
   fi
   if [ "$2" = "topmed-incoming" -o "$2" = "topmed2-incoming" -o "$2" = "topmed3-incoming" -o "$2" = "topmed4-incoming" ]; then
+    show=`/usr/cluster/bin/sinfo -p $2 show node | grep -v PART`
+    x=`echo $show | grep drain`
+    if [ "$x" != "" ]; then
+      echo "<br/><font color=red>$show</font>"
+    fi
+    echo "<br/><font color=blue>$show</font>"
     for t in ver bac bai qpl cra exp ori b37 b38; do
       s=`grep $t $tmpfile|wc -l`
       r=`grep $t $tmpfile|grep ' R '|wc -l`
