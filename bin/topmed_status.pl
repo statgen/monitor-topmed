@@ -77,18 +77,6 @@ my $fcn = shift(@ARGV);
 my $dbh = DBConnect($opts{realm});
 
 #--------------------------------------------------------------
-#   dateXXXX columns are either a time when something was done
-#   or a flag indicating varying states. For example with verify:
-#   datemd5ver not defined   - nothing every happened
-#   datemd5ver > 10    verify successfully
-#   datemd5ver < 0     started to verify
-#   datemd5ver = -1    verify failed
-#   datemd5ver = 0     verify requested
-#   datemd5ver = 2     verify submitted to be done (not done for arrived)
-#   datemd5ver = 1     verify cancelled
-#--------------------------------------------------------------
-
-#--------------------------------------------------------------
 #   Calculate overall status for each run 
 #--------------------------------------------------------------
 if ($fcn eq 'runstatus') {
