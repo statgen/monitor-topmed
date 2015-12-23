@@ -41,6 +41,9 @@ $SHOWQUEUES = "STATUS: &nbsp;&nbsp;&nbsp;" .
     //"onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=errorcheck\",680,720); " .
     //"return false;'>Error Check</a> &nbsp;&nbsp;&nbsp;" .
 
+    "<a href='https://statgen.sph.umich.edu/monitor/topmed/loadedfiles.txt' target='blank'> " .
+    " NCBI Log</a> &nbsp;&nbsp;&nbsp;" .
+
     "<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=logs' " .
     "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=logs\",680,720); " .
     "return false;'>Tail Logs</a>";
