@@ -60,7 +60,7 @@ our %opts = (
     verbose => 0,
 );
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose center=s runs=s fetchfiles
+    help realm=s verbose center=s runs=s fetchfiles xmlfilesdir=s
     )) || die "Failed to parse options\n";
 
 #   Simple help if requested
@@ -128,6 +128,8 @@ if ($opts{fetchfiles}) {
 #--------------------------------------------------------------
 #   Update state_expt fields in database when NCBI is happy with what we sent
 #--------------------------------------------------------------
+if ($fcn eq 'ignore') { exit; }     # Convenient way to just load files
+
 if ($fcn eq 'updatedb') {
     my $centersref = GetCenters();
     CheckEXPT($centersref, "$opts{xmlfilesdir}/$opts{studystatus}");
@@ -196,28 +198,51 @@ sub CheckORIG {
 
     #   Find all NWDIDnnnnn.src.bam in
     #   protected 3563129 2014-09-06T09:24:12 NWDnnnnn.src.bam 10844214270 93ed94e9918b868d0ecd7009c3e427e8 = = = loaded BAM etc
-    my %ncbinwdids = ();
+    #     or
+    #   protected NWD792235-remap.37.run.xml ... error RUN_XML - some_error_message
+    my %loadednwdids = ();
+    my %nwdid2errormsg = ();
     my $completed = 0;
-    open(IN, $file) ||
-        die "$Script - Unable to read file '$file': $!\n";
+    my $errors = 0;
+    my $rc;
+    if ($file =~ /\.gz$/) { $rc = open(IN, "gunzip -c $file |"); }
+    else { $rc = open(IN, $file); }
+    if (! $rc) { die "$Script - Unable to read file '$file': $!\n"; }
     while (<IN>) {
+        if (/protected\s+.+\s+(NWD\S+.run.xml)\s+.+\s+error\s+RUN_XML\s+-\s+(\S+)/) {
+            my ($x, $msg) = ($1, $2);
+            $msg =~ s/_/ /g;
+            if ($x =~ /(NWD\d+)/) { $x = $1; }      # Isolate NWDID
+            $nwdid2errormsg{$x} .= $msg . "\n";
+            next;
+        }
         if (! /proected\s+.+\s+(NWD\S+).src.bam\s+.+=\s+=\s+=\s+loaded\sBAM/) { next; }
-        $ncbinwdids{$1} = 1;
+        $loadednwdids{$1} = 1;
     }
     close(IN);
-    if (! %ncbinwdids) { print "  No completed original BAMs were found at NCBI\n"; return; }
 
-    #   Found complete list of loaded NWDIDs
-    foreach my $nwdid (keys %{$nwd2bamid}) {
-        if (! exists($ncbinwdids{$nwdid})) { next; }
-        #   This NWDID is now known
+    #   Found list of NWDIDs in error
+    foreach my $nwdid (keys %nwdid2errormsg) {
+        #   This NWDID was in eror
+        if ($opts{verbose}) { print "  FAILED: $nwdid - $nwdid2errormsg{$nwdid}"; }
+        #else {
+            print "SQL=UPDATE $opts{bamfiles_table} SET state_ncbiorig=$FAILED WHERE expt_sampleid='$nwdid'\n";
+        #}
+        $errors++;
+    }
+    if ($errors) { print "$nowdate  $errors original BAMs marked as FAILED\n"; }
+
+    #   Found list of loaded NWDIDs
+    foreach my $nwdid (keys %loadednwdids) {
+        if (! exists($nwd2bamid->{$nwdid})) { next; }
+        #   This NWDID is known
         if ($opts{verbose}) { print "  Completed original BAM for $nwdid (bamid=$nwd2bamid->{$nwdid})\n"; }
-        else {
-            DoSQL("UPDATE $opts{bamfiles_table} SET state_ncbiorig=$COMPLETED WHERE bamid=$ncbinwdids{$nwdid}");
-        }
+        #else {
+            print "SQL=UPDATE $opts{bamfiles_table} SET state_ncbiorig=$COMPLETED WHERE bamid=$nwd2bamid->{$nwdid}\n";
+        #}
         $completed++;
     }
-    print "$nowdate  Marked $completed original BAMs as completed\n";
+    if ($completed) { print "$nowdate  $completed original BAMs marked as COMPLETED\n"; }
     return;
 }
 
