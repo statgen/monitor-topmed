@@ -43,7 +43,7 @@ our %opts = (
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose center=s
+    help realm=s verbose center=s run=s
     )) || die "Failed to parse options\n";
 
 #   Simple help if requested
@@ -96,6 +96,7 @@ foreach my $centerid (keys %{$centersref}) {
             warn "$Script How can runid not be defined?  dir=$d\n";
             next;
         }
+        if ($opts{run} && $opts{run} ne $d) { next; }
         AddBams($runid, $d);
     }
 }
@@ -253,7 +254,7 @@ sub AddBams {
 
     #   Last sanity check, see if number of BAM files matches records
     #   This might not always be accurate, but ...
-    my $n = `ls $d/*.bam | wc -l`;
+    my $n = `ls $d/N*.bam | wc -l`;
     chomp($n);
     if ($n eq $numbamrecords) { print "$Script - Congratulations, # bams = # database records\n"; }
     else {
@@ -332,6 +333,12 @@ Generates this output.
 
 Specifies the realm name to be used.
 This defaults to B<topmed>.
+
+=item B<-runs NAME>
+
+Specifies a specific run on which to run the action.
+This is useful for testing.
+The default is to run against all runs for the center.
 
 =item B<-verbose>
 
