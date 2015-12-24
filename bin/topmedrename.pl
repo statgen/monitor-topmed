@@ -1,11 +1,10 @@
 #!/usr/bin/perl -I/usr/cluster/lib/perl5/site_perl -I/usr/cluster/monitor/lib/perl5 -I /usr/cluster/monitor/bin
 ###################################################################
 #
-# Name: topmedrename.pl bamid checksum bamfilepath
+# Name: topmedrename.pl bamid bamfilepath
 #
 # Description:
 #   Use this program to rename a BAM to it's nwdid name
-#   and to correct the MD5 file entry for the BAM
 #
 # ChangeLog:
 #   $Log: topmedrename.pl,v $
@@ -21,7 +20,6 @@ use lib "$FindBin::Bin";
 use lib "$FindBin::Bin/../lib";
 use lib "$FindBin::Bin/../lib/perl5";
 use My_DB;
-use TopMed_Get;
 use Getopt::Long;
 use File::Basename;
 
@@ -40,13 +38,12 @@ Getopt::Long::GetOptions( \%opts,qw(
     )) || die "Failed to parse options\n";
 
 #   Simple help if requested
-if ($#ARGV < 2 || $opts{help}) {
-    warn "$Script [options] bamid checksum bamfilepath\n" .
+if ($#ARGV < 1 || $opts{help}) {
+    warn "$Script [options] bamid bamfilepath\n" .
         "Rename the BAM file to its NWDID name, correct the MD5 file entry.\n";
     exit 1;
 }
 my $bamid = shift(@ARGV);
-my $checksum = shift(@ARGV);
 my $bamfilepath = shift(@ARGV);
 my $dbh = DBConnect($opts{realm});
 
@@ -106,10 +103,6 @@ topmedrename.pl - Rename a BAM to its nwdid name and update the MD5 file
 =head1 DESCRIPTION
 
 This program renames the original BAM file to it's NWD name.
-It will also figure out the MD5 file that contained the checksum
-and comment out that line.
-If the resulting MD5 file contains no more MD% checksums, then
-that file is also renamed.
 
 It turns out Aspera can re-transmit the file if we actually rename it,
 causing chaos all around as data re-appears after being processed.
@@ -140,11 +133,6 @@ Provided for developers to see additional information.
 
 =item B<bamid>
 This is bamid in the database for this BAM.
-
-=item B<checksum>
-This is the full checksum value.
-This provides us a means to determine where the checksum cam from
-and to comment out that line of the file.
 
 =item B<bamfilepath>
 This is the fully qualified path to a bamfile.
