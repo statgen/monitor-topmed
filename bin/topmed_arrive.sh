@@ -8,6 +8,7 @@
 #
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 topmednwd=/usr/cluster/monitor/bin/topmed_nwdid.pl
+topmedrename=/usr/cluster/monitor/bin/topmedrename.pl
 console=/net/topmed/working/topmed-output
 slurmp=${TOPMED_PARTITION:-topmed}
 slurmqos=topmed-unused
@@ -39,10 +40,17 @@ $topmedcmd mark $bamid arrived started || exit $?
 #   Set NWDID and other database fields
 $topmednwd -bamid $bamid $bamfile
 rc=$?
-if [ "$rc" = "0" ]; then
-  $topmedcmd mark $bamid arrived completed
-  exit 0
+if [ "$rc" != "0" ]; then
+  $topmedcmd mark $bamid arrived failed
+  exit $rc
 fi
-$topmedcmd mark $bamid arrived failed
-exit $rc
 
+#   Rename the bamfile to NWD and fix the database
+$topmedrename $bamid $bamfile
+rc=$?
+if [ "$rc" != "0" ]; then
+  $topmedcmd mark $bamid arrived failed
+  exit $rc
+fi
+$topmedcmd mark $bamid arrived completed
+exit 0
