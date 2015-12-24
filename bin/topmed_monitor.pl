@@ -119,8 +119,10 @@ if ($fcn eq 'arrive') {
                     $href->{bamname};
                 my @stats = stat($f);
                 if (! @stats) { next; }
-                #   See if we should mark this as arrived. Few states possible
-                if ($href->{state_arrive} == $COMPLETED) { next; }  # Already arrived
+                #   See if we should mark this as arrived
+                #   All BAMs must start with NWD. Only skip this if the BAM name
+                #   is NWD and it is marked as completed
+                if ($href->{bamname} =~ /^NWD/ && $href->{state_arrive} == $COMPLETED) { next; }
                 #   If the mtime on the file is very recent, it might still be coming
                 my $nowtime = time();
                 if ((time() - $stats[9]) < 3600) { next; }
