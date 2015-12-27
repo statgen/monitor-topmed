@@ -70,11 +70,11 @@ if [ "$rc" != "0" ]; then
 fi
 $topmedcmd mark $bamid md5verified completed
 #   Set bamsize again to be sure
-sz=`ls -l $bamfile | awk '{print $5}'`
+sz=`ls -L -l $bamfile | awk '{print $5}'`
 $topmedcmd set $bamid bamsize $sz
 
 #   Rename the BAM file and change the MD5 entry
-$topmedrename $bamid $checksum $bamfile
+$topmedrename $bamid $bamfile
 if [ "$?" != "0" ]; then
   $topmedcmd mark $bamid md5verified failed
   exit 1
