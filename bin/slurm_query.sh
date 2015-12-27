@@ -88,7 +88,7 @@ fi
 if [ "$1" = "-squeue" ]; then
   /usr/bin/wget -o /dev/null -O $tmpfile $url/squeue/$2
   if [ "$?" != "0" ]; then
-    echo "<b>Query for partition '$2' failed. Perhaps daemon at '$url' is not running</b>"
+    echo "<b>Query for partition '$2' failed. Perhaps daemon at '$url' is not running</b><br>"
     exit 2
   fi
   n=`cat $tmpfile | wc -l`
@@ -98,36 +98,49 @@ if [ "$1" = "-squeue" ]; then
     echo "<b>Unable to get details for partition '$2'</b>"
     exit
   fi
-  echo "<p>Partition <b>$2</b> has $n jobs queued"
-  if [ "$2" = "nomosix" ]; then
-    grep topmed $tmpfile > $tmpfile.tmp         # Only look at topmed jobs
-    mv $tmpfile.tmp $tmpfile
-    for t in ver bac bai qpl cra exp ori b37 b38; do
-      s=`grep $t $tmpfile|wc -l`
-      r=`grep $t $tmpfile|grep ' R '|wc -l`
-      if [ "$s" != "0" ]; then
-        echo "<br/>$t jobs: $s   ($r running)"
+  h=`echo $2|sed -e s/-incoming//`
+  state=''
+  if [ "$2" != "nomosix" -a "$h" != "" ]; then
+    #  Get state of this node
+    /usr/bin/wget -o /dev/null -O $tmpfile.0 $url/shownode/$h
+    if [ "$?" = "0" ]; then
+      show=`cat $tmpfile.0`
+      rm -f $tmpfile.0
+      s=blue
+      x=`echo $show | grep DRAIN`
+      if [ "$x" != "" ]; then
+        state="<font color=red>Node $show</font>"
+      else
+        state="Node $show"
       fi
-    done
-  fi
-  if [ "$2" = "topmed-incoming" -o "$2" = "topmed2-incoming" -o "$2" = "topmed3-incoming" -o "$2" = "topmed4-incoming" ]; then
-    show=`/usr/cluster/bin/sinfo -p $2 show node | grep -v PART`
-    x=`echo $show | grep drain`
-    if [ "$x" != "" ]; then
-      echo "<br/><font color=red>$show</font>"
     fi
-    echo "<br/><font color=blue>$show</font>"
-    for t in ver bac bai qpl cra exp ori b37 b38; do
-      s=`grep $t $tmpfile|wc -l`
-      r=`grep $t $tmpfile|grep ' R '|wc -l`
-      if [ "$s" != "0" ]; then
-        echo "<br/>$t jobs: $s   ($r running)"
-      fi
-    done
   fi
-  echo "<br/>Last $lastn queued jobs are:</p><pre>"
-  grep backup $tmpfile | tail -$lastn $tmpfile
-  echo "</pre>"
+  echo "<p>Partition <b>$2</b> has $n jobs queued &nbsp;&nbsp;&nbsp;&nbsp;  $state"
+  if [  "$n" != "0" ]; then
+    if [ "$2" = "nomosix" ]; then
+      grep topmed $tmpfile > $tmpfile.tmp         # Only look at topmed jobs
+      mv $tmpfile.tmp $tmpfile
+      for t in ver bac bai qpl cra exp ori b37 b38; do
+        s=`grep $t $tmpfile|wc -l`
+        r=`grep $t $tmpfile|grep ' R '|wc -l`
+        if [ "$s" != "0" ]; then
+          echo "<br/>$t jobs: $s   ($r running)"
+        fi
+      done
+    fi
+    if [ "$2" = "topmed-incoming" -o "$2" = "topmed2-incoming" -o "$2" = "topmed3-incoming" -o "$2" = "topmed4-incoming" ]; then
+      for t in ver bac bai qpl cra exp ori b37 b38; do
+        s=`grep $t $tmpfile|wc -l`
+        r=`grep $t $tmpfile|grep ' R '|wc -l`
+        if [ "$s" != "0" ]; then
+          echo "<br/>$t jobs: $s   ($r running)"
+        fi
+      done
+    fi
+    echo "<br/>Last $lastn queued jobs are:</p><pre>"
+    grep backup $tmpfile | tail -$lastn $tmpfile
+    echo "</pre>"
+  fi
   rm -f $tmpfile
   exit
 fi
