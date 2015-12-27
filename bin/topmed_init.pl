@@ -254,7 +254,7 @@ sub AddBams {
 
     #   Last sanity check, see if number of BAM files matches records
     #   This might not always be accurate, but ...
-    my $n = `ls $d/N*.bam | wc -l`;
+    my $n = `ls $d/N*.bam 2>/dev/null | wc -l`;
     chomp($n);
     if ($n eq $numbamrecords) { print "$Script - Congratulations, # bams = # database records\n"; }
     else {
