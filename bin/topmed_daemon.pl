@@ -42,6 +42,7 @@ my %opts = (
     squeue => '/usr/cluster/bin/squeue --format "%.9i %.10P %.12j %.8u %.2t %.10M %R"',
     df => '/bin/df -h /net/topmed/incoming /net/topmed/working /net/topmed2/incoming /net/topmed2/working',
     errorcheck => '/usr/cluster/monitor/bin/topmed_monitor.pl check',
+    shownode => '/usr/cluster/bin/scontrol show node',
 );
 $opts{mycommand} = "$0 "  . join(' ', @ARGV);    # To support restart
 
@@ -125,20 +126,25 @@ sub ProcessGet {
     if (! defined($query)) { $query = ''; }
     $query = uri_unescape($query);
 
-    #   Handle squeue?squeueopts
-    if ($path =~ '/squeue/(\S+)') {
-        my $part = $1;
-        $part =~ s/\n/NL/g;          # Clean out nasty chars
-        $part =~ s/\t/ /g;
-        $part =~ s/\r/CR/g;
-        $part =~ s/;/SEMI/g;
-        $part =~ s/\|/BAR/g;
-        $part =~ s/\&/AMP/g;
+    #   Handle squeue/queue
+    if ($path =~ /squeue.(\S+)/) {
+        my $part = Clean($1);
         my $cmd = "$opts{squeue} -p $part";
         if ($opts{verbose}) { print "  CMD=$cmd\n"; }
         my $s = `$cmd  2>&1`;
         SendText($conn, $s);
-        #SendText($conn, "You asked\n  for\n    '$path' '$query'\n");
+        return;
+    }
+
+    #   Handle shownode/node
+    if ($path =~ /shownode.(\S+)/) {
+        my $node = Clean($1);
+        my $cmd = "$opts{shownode} $node";
+        if ($opts{verbose}) { print "  CMD=$cmd\n"; }
+        my $s = `$cmd | grep State=`;
+        my @c = split(' ',$s);
+        if ($opts{verbose}) { print "  RESULTS=$c[0]\n"; }
+        SendText($conn, "$node $c[0]");
         return;
     }
 
@@ -214,6 +220,28 @@ sub ProcessGet {
     #   Nothing we knew about
     $conn->send_error(RC_NOT_ACCEPTABLE, "Invalid URI path '$path'");
     return;
+}
+
+#==================================================================
+# Subroutine:
+#   Clean($str)
+#   Remove nasty chars from a string
+#
+# Arguments:
+#   str - string
+#
+# Returns:
+#   str
+#==================================================================
+sub Clean {
+    my ($str) = @_;
+    $str =~ s/\n/NL/g;
+    $str =~ s/\t/ /g;
+    $str =~ s/\r/CR/g;
+    $str =~ s/;/SEMI/g;
+    $str =~ s/\|/BAR/g;
+    $str =~ s/\&/AMP/g;
+    return $str;
 }
 
 #==================================================================
