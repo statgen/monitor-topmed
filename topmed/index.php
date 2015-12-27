@@ -29,9 +29,9 @@ $SHOWQUEUES = "STATUS: &nbsp;&nbsp;&nbsp;" .
     "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=showqlocal\",680,720); " .
     "return false;'>Local Queue</a> &nbsp;&nbsp;&nbsp;" .
 
-    "<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=showqrmt' " .
-    "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=showqrmt\",680,720); " .
-    "return false;'>Remote Queue</a> &nbsp;&nbsp;&nbsp;" .
+    //"<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=showqrmt' " .
+    //"onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=showqrmt\",680,720); " .
+    //"return false;'>Remote Queue</a> &nbsp;&nbsp;&nbsp;" .
 
     "<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=df' " .
     "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=df\",680,720); " .
