@@ -363,8 +363,8 @@ if ($fcn eq 'sexpt') {
                 BatchSubmit("$opts{topmedexpt} -submit $href->{bamid}");
             }
         }
-        ShowSummary($fcn);
     }
+    ShowSummary($fcn);
     exit;
 }
 
@@ -410,8 +410,8 @@ if ($fcn eq 'sorig') {
                 BatchSubmit("$opts{topmedncbiorig} -submit $href->{bamid}");
             }
         }
-        ShowSummary($fcn);
     }
+    ShowSummary($fcn);
     exit;
 }
 
@@ -457,8 +457,8 @@ if ($fcn eq 'sb37') {
                 BatchSubmit("$opts{topmedncbib37} -submit $href->{bamid}");
             }
         }
-        ShowSummary($fcn);
     }
+    ShowSummary($fcn);
     exit;
 }
 
