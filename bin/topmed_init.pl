@@ -184,6 +184,7 @@ sub AddBams {
             if (! /\.md5$/) { next; }
             #   If a .old version of this file exists, we've done it before
             if (-f "$d/$_.old") { next; }
+            if (-z "$d/$_") { next; }
             push @md5files,$_;
         }
         closedir $dh;
