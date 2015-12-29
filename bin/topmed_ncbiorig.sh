@@ -16,7 +16,7 @@ tmpconsole=/working/topmed-output
 topmeddir=/net/topmed/incoming/topmed
 build=37
 version=secondary
-markverb=sendorig
+markverb=sentorig
 jobname=orig
 
 if [ "$1" = "-submit" ]; then
