@@ -69,10 +69,9 @@ our %opts = (
     jobcount => 0,              # Not actually an option, but stats
     jobsnotpermitted => 0,
     jobsfailedsubmission => 0,
-    batchsize => 10,            # Send up to this many BAMs to NCBi at a time
 );
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose topdir=s center=s runs=s maxjobs=i batchsize=i
+    help realm=s verbose topdir=s center=s runs=s maxjobs=i
     memory=s partition=s qos=s dryrun suberr
     )) || die "Failed to parse options\n";
 
@@ -704,12 +703,6 @@ might expect all the data has arrived.
 =head1 OPTIONS
 
 =over 4
-
-=item B<-batchsize N>
-
-When sending sets of files to NCBI, batch them into sets of this size.
-This might possibly make it easier to keep track of what has been sent.
-The default for B<-batchsize> is B<120>.
 
 =item B<-center NAME>
 
