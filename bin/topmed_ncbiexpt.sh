@@ -21,7 +21,7 @@ if [ "$1" = "-submit" ]; then
   fi 
 
   #   This is short and sweet, can run anywhere
-  realhost=topmed
+  realhost=topmed2
   slurmp="$realhost-incoming"
   slurmqos="$realhost-ncbi"
 
