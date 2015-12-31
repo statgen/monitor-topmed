@@ -133,7 +133,6 @@ if ($fcn eq 'ignore') { exit; }     # Convenient way to just load files
 if ($fcn eq 'updatedb') {
     my $centersref = GetCenters();
     CheckEXPT($centersref, "$opts{xmlfilesdir}/$opts{studystatus}");
-$opts{verbose}++;           # Force no update of database
     CheckORIG($centersref, "$opts{xmlfilesdir}/$opts{bamsstatus}");
 
     exit;
@@ -172,9 +171,7 @@ sub CheckEXPT {
         if (! exists($ncbinwdids{$nwdid})) { next; }
         #   This NWDID is now known
         if ($opts{verbose}) { print "  Completed experiment for $nwdid (bamid=$nwd2bamid->{$nwdid})\n"; }
-        else {
-            DoSQL("UPDATE $opts{bamfiles_table} SET state_ncbiexpt=$COMPLETED WHERE bamid=$nwd2bamid->{$nwdid}");
-        }
+        DoSQL("UPDATE $opts{bamfiles_table} SET state_ncbiexpt=$COMPLETED WHERE bamid=$nwd2bamid->{$nwdid}");
         $completed++;
     }
     print "$nowdate  Marked $completed experiments as completed\n";
@@ -216,7 +213,7 @@ sub CheckORIG {
             $nwdid2errormsg{$x} .= $msg . "\n";
             next;
         }
-        if (! /proected\s+.+\s+(NWD\S+).src.bam\s+.+=\s+=\s+=\s+loaded\sBAM/) { next; }
+        if (! /protected\s+.+\s+(NWD\S+).src.bam\s+.+=\s+=\s+=\s+loaded\sBAM/) { next; }
         $loadednwdids{$1} = 1;
     }
     close(IN);
@@ -225,9 +222,7 @@ sub CheckORIG {
     foreach my $nwdid (keys %nwdid2errormsg) {
         #   This NWDID was in eror
         if ($opts{verbose}) { print "  FAILED: $nwdid - $nwdid2errormsg{$nwdid}"; }
-        #else {
-            print "SQL=UPDATE $opts{bamfiles_table} SET state_ncbiorig=$FAILED WHERE expt_sampleid='$nwdid'\n";
-        #}
+        DoSQL("UPDATE $opts{bamfiles_table} SET state_ncbiorig=$FAILED WHERE expt_sampleid='$nwdid'");
         $errors++;
     }
     if ($errors) { print "$nowdate  $errors original BAMs marked as FAILED\n"; }
@@ -237,9 +232,7 @@ sub CheckORIG {
         if (! exists($nwd2bamid->{$nwdid})) { next; }
         #   This NWDID is known
         if ($opts{verbose}) { print "  Completed original BAM for $nwdid (bamid=$nwd2bamid->{$nwdid})\n"; }
-        #else {
-            print "SQL=UPDATE $opts{bamfiles_table} SET state_ncbiorig=$COMPLETED WHERE bamid=$nwd2bamid->{$nwdid}\n";
-        #}
+        DoSQL("UPDATE $opts{bamfiles_table} SET state_ncbiorig=$COMPLETED WHERE bamid=$nwd2bamid->{$nwdid}");
         $completed++;
     }
     if ($completed) { print "$nowdate  $completed original BAMs marked as COMPLETED\n"; }
