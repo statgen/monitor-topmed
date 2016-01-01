@@ -32,7 +32,7 @@ if [ "$1" = "-submit" ]; then
   #  however, not quite always.  $qual is the number of distinct base call quality 
   #  score values plus one if the bam is not squeezed.  (from Tom)
   sq=''
-  qual=`$samtools view $2 | head -10000 | cut -f 11 | sed 's/./&\n/g' | sort | uniq -c | wc -l`
+  qual=`$samtools view $2 2>/dev/null | head -10000 | cut -f 11 | sed 's/./&\n/g' | sort | uniq -c | wc -l`
   if [ $qual -le 11 ]; then
     sq='-squeezed'
   fi
@@ -132,7 +132,7 @@ fi
 newname="$nwdid.src.cram"
 
 now=`date +%s`
-$samtools flagstat  $bamfile  >  ${chkname}.init.stat
+$samtools flagstat  $bamfile >  ${chkname}.init.stat
 if [ "$?" != "0" ]; then
   echo "Command failed: $samtools flagstat  $bamfile"
   $topmedcmd mark $bamid cramed failed
@@ -142,7 +142,7 @@ s=`date +%s`; s=`expr $s - $now`; echo "samtools flagstat completed in $s second
 
 now=`date +%s`
 if [ "$squeezed" = "n" ]; then
-  $bindir/bam squeeze  --in $bamfile  --out - --rmTags "BI:Z;BD:Z;PG:Z"  --keepDups --binMid  --binQualS  2,3,10,20,25,30,35,40,50 | $samtools view  -C -T  $ref  -  >  $newname
+  $bindir/bam squeeze  --in $bamfile  --out - --rmTags "BI:Z;BD:Z;PG:Z"  --keepDups --binMid  --binQualS  2,3,10,20,25,30,35,40,50 | $samtools view  -C -T  $ref  -  >  $newname 
 else 
   $samtools view  -C -T $ref  $bamfile  >  $newname
 fi
