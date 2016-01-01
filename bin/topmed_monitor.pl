@@ -331,7 +331,10 @@ if ($fcn eq 'sexpt') {
                 "WHERE runid='$runid' AND nwdid_known='Y'";
             my $sth = DoSQL($sql);
             my $rowsofdata = $sth->rows();
-            if (! $rowsofdata) { next; }
+            if (! $rowsofdata) {
+                if ($opts{runs}) { print "No BAMs from '$dirname' have nwdid_known='Y'\n"; }
+                next;
+            }
             my %pistudy2bamlist = ();
             for (my $i=1; $i<=$rowsofdata; $i++) {
                 my $href = $sth->fetchrow_hashref;
@@ -384,7 +387,10 @@ if ($fcn eq 'sorig') {
                 "WHERE runid='$runid' AND nwdid_known='Y'";
             my $sth = DoSQL($sql);
             my $rowsofdata = $sth->rows();
-            if (! $rowsofdata) { next; }
+            if (! $rowsofdata) {
+                if ($opts{runs}) { print "No BAMs from '$dirname' have nwdid_known='Y'\n"; }
+                next;
+            }
             my %pistudy2bamlist = ();
             for (my $i=1; $i<=$rowsofdata; $i++) {
                 my $href = $sth->fetchrow_hashref;
