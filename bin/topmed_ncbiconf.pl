@@ -89,19 +89,33 @@ if ($opts{fetchfiles}) {
     #   Get today's list of files sent to NCBI and their status
     #   Unfortunately, if there is no activity yesterday, there is none for today
     #   so we must do some guessing as to the last report generated
-    my $report = 'NCBI_SRA_Files_UM-SPH_';
     my $ym = strftime('%Y%m', localtime);
     my $today = strftime('%d', localtime);
+    my $d = sprintf('%02d', $today);
+    my $report = 'NCBI_SRA_Files_Full_UM-SPH_';
     my $rc = 1;
-    foreach (0 .. 4) {                  # Try to get one of the last few days
-        my $d = sprintf('%02d', $today - $_);
+    #   Just for consistency's sake, the first of the month is different
+    if ($d eq '01') {                       # The first of the month is different
         my $f = $report . $ym . $d . '.gz';
         $cmd = "$opts{ascpcmd} $ascphost:$opts{ascpinfiles}/$f .";
-        $rc = system($cmd);                 # Failure is OK, up to a point
+        $rc = system($cmd);
         if ($rc == 0) {                     # This day's file exists
             rename($f, $opts{bamsstatus});  # Save as lastest file
             print "Fetched file $f, saved as '$opts{xmlfilesdir}/$opts{bamsstatus}'\n";
-            last;
+        }
+    }
+    if ($rc) {                              # Not the first, search for the last file
+        $report = 'NCBI_SRA_Files_UM-SPH_';
+        foreach (0 .. 4) {                  # Try to get one of the last few days
+            my $d = sprintf('%02d', $today - $_);
+            my $f = $report . $ym . $d . '.gz';
+            $cmd = "$opts{ascpcmd} $ascphost:$opts{ascpinfiles}/$f .";
+            $rc = system($cmd);                 # Failure is OK, up to a point
+            if ($rc == 0) {                     # This day's file exists
+                rename($f, $opts{bamsstatus});  # Save as lastest file
+                print "Fetched file $f, saved as '$opts{xmlfilesdir}/$opts{bamsstatus}'\n";
+                last;
+            }
         }
     }
     if ($rc) {                              # Pretty lost, get all files and use last loaded file
@@ -133,6 +147,7 @@ if ($fcn eq 'ignore') { exit; }     # Convenient way to just load files
 if ($fcn eq 'updatedb') {
     my $centersref = GetCenters();
     CheckEXPT($centersref, "$opts{xmlfilesdir}/$opts{studystatus}");
+    CheckEXPT($centersref, "$opts{xmlfilesdir}/$opts{bamsstatus}");
     CheckORIG($centersref, "$opts{xmlfilesdir}/$opts{bamsstatus}");
 
     exit;
@@ -156,16 +171,27 @@ sub CheckEXPT {
     if (! %{$nwd2bamid}) { print "$Script - No experiments have been delivered\n"; return; }
 
     #   Find all submitted_sample_id="NWD560497"
+    #     or
+    #   protected 5265301 2015-12-31T12:59:26 NWD481739.expt.xml 1720 72b081e2eac659ff8e38b8aa54e360ca
+    #     NWD481739-expt.tar 10240 509ed745d862576639f459fe5f115f2d loaded EXPERIMENT_XML - - SRA324210 ...
     my %ncbinwdids = ();
     my $completed = 0;
-    open(IN, $file) ||
-        die "$Script - Unable to read file '$file': $!\n";
+    my $rc;
+    if ($file =~ /\.gz$/) { $rc = open(IN, "gunzip -c $file |"); }
+    else { $rc = open(IN, $file); }
+    if (! $rc) { die "$Script - Unable to read file '$file': $!\n"; }
     while (<IN>) {
-        if (! /submitted_sample_id=.(NWD\d+)/) { next; }
-        $ncbinwdids{$1} = 1;
+        if (/submitted_sample_id=.(NWD\d+)/) {
+            $ncbinwdids{$1} = 1;
+            next;
+        }
+        if (/protected.+\s+(NWD\d+).expt.xml.+loaded\s+EXPERIMENT_XML\s+-\s+-\s+SRA\d+/) {
+            $ncbinwdids{$1} = 1;
+            next;
+        }        
     }
     close(IN);
-    if (! %ncbinwdids) { print "  No completed original BAMs were found at NCBI\n"; return; }
+    if (! %ncbinwdids) { print "  No completed experiments found at NCBI\n"; return; }
 
     foreach my $nwdid (keys %{$nwd2bamid}) {
         if (! exists($ncbinwdids{$nwdid})) { next; }
@@ -199,7 +225,8 @@ sub CheckORIG {
     #   protected NWD792235-remap.37.run.xml ... error RUN_XML - some_error_message
     my %loadednwdids = ();
     my %nwdid2errormsg = ();
-    my $completed = 0;
+    my %completed = ();
+    $completed{orig} = $completed{b37} = $completed{b38} = 0;
     my $errors = 0;
     my $rc;
     if ($file =~ /\.gz$/) { $rc = open(IN, "gunzip -c $file |"); }
@@ -213,8 +240,18 @@ sub CheckORIG {
             $nwdid2errormsg{$x} .= $msg . "\n";
             next;
         }
-        if (! /protected\s+.+\s+(NWD\S+).src.bam\s+.+=\s+=\s+=\s+loaded\sBAM/) { next; }
-        $loadednwdids{$1} = 1;
+        if (/protected\s+.+\s+(NWD\S+).src.bam\s+.+=\s+=\s+=\s+loaded\sBAM/) {
+            $loadednwdids{$1} = 'orig';
+            next;
+        }
+        if (/protected\s+.+\s+(NWD\S+).recal.37.bam\s+.+=\s+=\s+=\s+loaded\sBAM/) { 
+            $loadednwdids{$1} = 'b37';
+            next;
+        }
+        if (/protected\s+.+\s+(NWD\S+).recal.38.bam\s+.+=\s+=\s+=\s+loaded\sBAM/) { 
+            $loadednwdids{$1} = 'b38';
+            next;
+        }
     }
     close(IN);
 
@@ -231,11 +268,17 @@ sub CheckORIG {
     foreach my $nwdid (keys %loadednwdids) {
         if (! exists($nwd2bamid->{$nwdid})) { next; }
         #   This NWDID is known
-        if ($opts{verbose}) { print "  Completed original BAM for $nwdid (bamid=$nwd2bamid->{$nwdid})\n"; }
-        DoSQL("UPDATE $opts{bamfiles_table} SET state_ncbiorig=$COMPLETED WHERE bamid=$nwd2bamid->{$nwdid}");
-        $completed++;
+        my $v = $loadednwdids{$nwdid};
+        if ($opts{verbose}) { print "  Completed $v BAM for $nwdid (bamid=$nwd2bamid->{$nwdid})\n"; }
+        #DoSQL("UPDATE $opts{bamfiles_table} SET state_ncbi$v=$COMPLETED WHERE bamid=$nwd2bamid->{$nwdid}");
+        print "UPDATE $opts{bamfiles_table} SET state_ncbi$v=$COMPLETED WHERE bamid=$nwd2bamid->{$nwdid}\n";
+        $completed{$v}++;
     }
-    if ($completed) { print "$nowdate  $completed original BAMs marked as COMPLETED\n"; }
+    foreach my $k (keys %completed) {
+        #if ($completed{$k}) {
+            print "$nowdate  $completed{$k} $k BAMs marked as COMPLETED\n";
+        #}
+    }
     return;
 }
 
