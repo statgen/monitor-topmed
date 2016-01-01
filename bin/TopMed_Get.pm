@@ -70,7 +70,7 @@ sub GetRuns {
         return \%run2dir;
     }
     my %theseruns = ();
-    if ($main::opts{runs}) {              # We onlyq want some runs
+    if ($main::opts{runs}) {              # We only want some runs
         $main::opts{runs} =~ s/,/ /g;
         foreach my $r (split(' ', $main::opts{runs})) {
             $theseruns{$r} = 1;
