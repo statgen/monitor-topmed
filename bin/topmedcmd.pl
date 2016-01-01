@@ -108,6 +108,8 @@ if ($#ARGV < 0 || $opts{help}) {
         "  or\n" .
         "$m where bamid\n" .
         "  or\n" .
+        "$m whatnwdid NWDnnnnn\n" .
+        "  or\n" .
         "$m permit add operation center run\n" .
         "$m permit remove permitid\n" .
         "$m permit test operation bamid/n" .
@@ -143,6 +145,7 @@ if ($fcn eq 'set')      { Set(@ARGV); exit; }
 if ($fcn eq 'show')     { Show(@ARGV); exit; }
 if ($fcn eq 'export')   { Export(@ARGV); exit; }
 if ($fcn eq 'where')    { Where(@ARGV); exit; }
+if ($fcn eq 'whatnwdid')  { WhatNWDID(@ARGV); exit; }
 if ($fcn eq 'permit')   { Permit(@ARGV); exit; }
 
 die "$Script  - Invalid function '$fcn'\n";
@@ -294,6 +297,25 @@ sub Export {
             }
         }
     }
+}
+
+#==================================================================
+# Subroutine:
+#   WhatNWDID($nwdid)
+#
+#   Print interesting details about an NWDID
+#==================================================================
+sub WhatNWDID {
+    my ($nwdid) = @_;
+
+    #   Reconstruct partial path to BAM
+    my $sth = DoSQL("SELECT runid from $opts{bamfiles_table} WHERE expt_sampleid='$nwdid'", 0);
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { die "$Script - NWDID '$nwdid' is unknown\n"; }
+    my $href = $sth->fetchrow_hashref;
+    $sth = DoSQL("SELECT dirname from $opts{runs_table} WHERE runid=$href->{runid}");
+    $href = $sth->fetchrow_hashref;
+    print "'$nwdid' can be found in run '$href->{dirname}'\n";
 }
 
 #==================================================================
