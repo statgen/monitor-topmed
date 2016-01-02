@@ -270,8 +270,7 @@ sub CheckORIG {
         #   This NWDID is known
         my $v = $loadednwdids{$nwdid};
         if ($opts{verbose}) { print "  Completed $v BAM for $nwdid (bamid=$nwd2bamid->{$nwdid})\n"; }
-        #DoSQL("UPDATE $opts{bamfiles_table} SET state_ncbi$v=$COMPLETED WHERE bamid=$nwd2bamid->{$nwdid}");
-        print "UPDATE $opts{bamfiles_table} SET state_ncbi$v=$COMPLETED WHERE bamid=$nwd2bamid->{$nwdid}\n";
+        DoSQL("UPDATE $opts{bamfiles_table} SET state_ncbi$v=$COMPLETED WHERE bamid=$nwd2bamid->{$nwdid}");
         $completed{$v}++;
     }
     foreach my $k (keys %completed) {
