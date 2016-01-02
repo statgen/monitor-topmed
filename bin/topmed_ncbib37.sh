@@ -33,6 +33,7 @@ if [ "$1" = "-submit" ]; then
   #   This will usually have files on both topmeds, so it does not matter where it runs
   l=(`$topmedcmd where $1`)     # Get bampath backuppath bamname realhost realhostindex
   realhost="${l[3]}"
+  realhost=topmed3
   realhostindex="${l[4]}"
   slurmp="$realhost-incoming"
   slurmqos="$realhost-ncbi"
