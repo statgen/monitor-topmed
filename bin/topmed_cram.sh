@@ -50,8 +50,9 @@ if [ "$1" = "-submit" ]; then
     exit 1
   fi
   $topmedcmd mark $1 $markverb submitted
-  if [ "${l[0]}" = "Submitted" ]; then      # Job was submitted, save jobid
-    $topmedcmd set $1 jobidcram ${l[3]}
+  if [ "${l[0]}" = "Submitted" ]; then      # Job was submitted, save job details
+    echo `date` cram ${l[3]} $slurmp $slurmqos $mem >> $console/$1.jobids
+  fi
   fi
   exit
 fi
