@@ -94,7 +94,7 @@ if ($#ARGV < 0 || $opts{help}) {
     my $m = "$Script [options]";
     my $verbs = join(',', sort keys %VALIDVERBS);
     my $requests = join(',', sort values %VALIDSTATUS);
-    warn "$m mark bamid $verbs $requests\n" .
+    warn "$m mark bamid|NWDnnnnn $verbs $requests\n" .
         "  or\n" .
         "$m unmark bamid [same list as mark]\n" .
         "  or\n" .
@@ -159,6 +159,13 @@ exit;
 #==================================================================
 sub Mark {
     my ($bamid, $op, $state) = @_;
+    if ($bamid =~ /NWD/) {              # Special Hack for Chris cause he does not same BAMID
+        my $sth = DoSQL("SELECT bamid from $opts{bamfiles_table} WHERE expt_sampleid='$bamid'", 0);
+        if ($sth) {
+            my $href = $sth->fetchrow_hashref;
+            $bamid = $href->{bamid};
+        }
+    }
     if (($bamid !~ /^\d+$/) || (! exists($VALIDVERBS{$op})) || (! exists($VALIDSTATUS{$state}))) {
         die "$Script Invalid 'mark' syntax. Try '$Script -help'\n";
     }
@@ -615,6 +622,7 @@ topmedcmd.pl - Update the database for NHLBI TopMed
 =head1 SYNOPSIS
 
   topmedcmd.pl mark 33 arrived completed   # BAM has arrived
+  topmedcmd.pl mark NWD00234  arrived completed   # Same BAM has arrived
   topmedcmd.pl unmark 33 arrived           # Reset BAM has arrived
 
   topmedcmd.pl set 33 jobidqplot 123445    # Set jobidqplot in bamfiles
@@ -669,41 +677,39 @@ Provided for developers to see additional information.
 Parameters to this program are grouped into several groups which are used
 to deal with specific sets of information in the monitor databases.
 
-=over 4
-
-=item B<mark bamid dirname  [verb] [state]>
+B<mark bamid dirname  [verb] [state]>
 Use this to set the state for a particular BAM file.
+You may specify the bamid or the NWDID.
 Mark will set a date for the process (e.g. arrived sets state_arrive)
 and unmark will set that entry to NULL.
 The list of verbs and states can be seen by B<perldoc topmedcmd.pl>.
 
-=item B<permit enable/disable operation center run>
+B<permit enable/disable operation center run>
 Use this to control the database which allows one enable or disable topmed operations
 (e.g. backup, verify etc) for a center or run.
 Use B<all> for all centers or all runs or all operations.
 
-=item B<permit test operation bamid>
+B<permit test operation bamid>
 Use this to test if an operation (e.g. backup, verify etc) may be submitted 
 for a particular bam.
 
-=item B<set bamid columnname value>
+B<set bamid columnname value>
 Use this to set the value for a column for a particular BAM file.
 
-=item B<show arrived>
+B<show arrived>
 Use this to show the bamids for all BAMs that are marked arrived.
 
-=item B<unmark bamid [verb]>
+B<unmark bamid [verb]>
 Use this to reset the state for a particular BAM file to NULL, the default
 database value.
 
-=item B<where bamid>
+<where bamid>
 Use this to display the directory of the bam file, 
 the path to the backup direcotry,
 the name of the bam without any path,
 the real host where the file leaves (e.g. B<topmed3>),
 and the index of the hostname (e.g. B<2> for topmed2).
 
-=back
 
 =head1 EXIT
 
@@ -712,7 +718,7 @@ return code of 0. Any error will set a non-zero return code.
 
 =head1 AUTHOR
 
-Written by Terry Gliedt I<E<lt>tpg@umich.eduE<gt>> in 2015 and is
+Written by Terry Gliedt I<E<lt>tpg@umich.eduE<gt>> in 2015-2016 and is
 is free software; you can redistribute it and/or modify it under the
 terms of the GNU General Public License as published by the Free Software
 Foundation; See http://www.gnu.org/copyleft/gpl.html
