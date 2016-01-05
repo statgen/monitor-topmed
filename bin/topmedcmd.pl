@@ -315,6 +315,14 @@ sub Export {
 sub WhatNWDID {
     my ($nwdid) = @_;
 
+    if ($nwdid =~ /^\d+/) {             # If bamid, get NWDID
+        my $sth = DoSQL("SELECT expt_sampleid from $opts{bamfiles_table} WHERE bamid=$nwdid", 0);
+        if ($sth) {
+            my $href = $sth->fetchrow_hashref;
+            $nwdid = $href->{expt_sampleid};
+        }
+    }
+  
     #   Reconstruct partial path to BAM
     my $sth = DoSQL("SELECT runid from $opts{bamfiles_table} WHERE expt_sampleid='$nwdid'", 0);
     my $rowsofdata = $sth->rows();
@@ -700,8 +708,11 @@ B<show arrived>
 Use this to show the bamids for all BAMs that are marked arrived.
 
 B<unmark bamid [verb]>
-Use this to reset the state for a particular BAM file to NULL, the default
+Use this to reset the state for a particular BAM file to the default
 database value.
+
+B<whatnwdid bamid|NWDnnnnnn>
+Use this to get some details for a particular bam.
 
 <where bamid>
 Use this to display the directory of the bam file, 
