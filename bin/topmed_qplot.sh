@@ -9,7 +9,10 @@ console=/net/topmed/working/topmed-output
 gcbin=/net/mario/gotcloud/bin
 gcref=/net/mario/nodeDataMaster/local/ref/gotcloud.ref
 topoutdir=/net/topmed/incoming/qc.results
-mem=${TOPMED_MEM:-8G}
+mem=8G
+if [ "$TOPMED_MEMORY" != "" ]; then mem=$TOPMED_MEMORY; fi
+qos=qplot
+if [ "$TOPMED_QOS" != "" ]; then qos=$TOPMED_QOS; fi
 
 if [ "$1" = "-submit" ]; then
   shift
@@ -22,9 +25,10 @@ if [ "$1" = "-submit" ]; then
   #   Figure where to submit this to run - should be local
   l=(`$topmedcmd where $1`)     # Get bampath backuppath bamname realhost realhostindex
   realhost="${l[3]}"
+  if [ "$TOPMED_HOST" != "" ]; then realhost=$TOPMED_HOST; fi
   realhostindex="${l[4]}"
   slurmp="$realhost-incoming"   # Sometimes we think this should be nomosix
-  slurmqos="$realhost-qplot"
+  slurmqos="$realhost-$qos"
 
   l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-qplot --output=$console/$1-qplot.out $0 $*`)
   if [ "$?" != "0" ]; then

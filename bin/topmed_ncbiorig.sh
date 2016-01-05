@@ -11,6 +11,7 @@ ascpdest='asp-um-sph@gap-submit.ncbi.nlm.nih.gov:protected'
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 topmedxml=/usr/cluster/monitor/bin/topmed_xml.pl
 mem=8G
+if [ "$TOPMED_MEMORY" != "" ]; then mem=$TOPMED_MEMORY; fi
 console=/net/topmed/working/topmed-output
 tmpconsole=/working/topmed-output
 topmeddir=/net/topmed/incoming/topmed
@@ -18,6 +19,8 @@ build=37
 version=secondary
 markverb=sentorig
 jobname=orig
+qos=ncbi
+if [ "$TOPMED_QOS" != "" ]; then qos=$TOPMED_QOS; fi
 
 if [ "$1" = "-submit" ]; then
   shift
@@ -30,9 +33,11 @@ if [ "$1" = "-submit" ]; then
   #   This will usually have files on both topmeds, so it does not matter where it runs
   l=(`$topmedcmd where $1`)     # Get bampath backuppath bamname realhost realhostindex
   realhost="${l[3]}"
+  realhost=topmed
+  if [ "$TOPMED_HOST" != "" ]; then realhost=$TOPMED_HOST; fi
   realhostindex="${l[4]}"
   slurmp="$realhost-incoming"
-  slurmqos="$realhost-ncbi"
+  slurmqos="$realhost-$qos"
 
   #  Submit this script to be run
   l=(`$bindir/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-$jobname --output=$console/$1-$jobname.out $0 $*`)

@@ -10,7 +10,10 @@ ascpdest='asp-um-sph@gap-submit.ncbi.nlm.nih.gov:protected'
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 topmedxml=/usr/cluster/monitor/bin/topmed_xml.pl
 mem=2G
+if [ "$TOPMED_MEMORY" != "" ]; then mem=$TOPMED_MEMORY; fi
 console=/net/topmed/working/topmed-output
+qos=bai                      # This queue is free most of the time
+if [ "$TOPMED_QOS" != "" ]; then qos=$TOPMED_QOS; fi
 
 if [ "$1" = "-submit" ]; then
   shift
@@ -21,9 +24,10 @@ if [ "$1" = "-submit" ]; then
   fi 
 
   #   This is short and sweet, can run anywhere
-  realhost=topmed3
+  realhost=topmed
+  if [ "$TOPMED_HOST" != "" ]; then realhost=$TOPMED_HOST; fi
   slurmp="$realhost-incoming"
-  slurmqos="$realhost-ncbi"
+  slurmqos="$realhost-$qos"
 
   #  Submit this script to be run
   l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-expt --output=$console/$1-sexpt.out $0 $*`)

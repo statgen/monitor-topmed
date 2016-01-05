@@ -9,9 +9,12 @@ samtools=/net/mario/gotcloud/bin/samtools
 ref=/net/mario/gotcloud/gotcloud.ref/hs37d5.fa
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 backupdir=/net/topmed/working/backups
-mem=${TOPMED_MEM:-8G}
+mem=8G
+if [ "$TOPMED_MEMORY" != "" ]; then mem=$TOPMED_MEMORY; fi
 console=/net/topmed/working/topmed-output
 squeezed=n
+qos=cram
+if [ "$TOPMED_QOS" != "" ]; then qos=$TOPMED_QOS; fi
 
 if [ "$1" = "-submit" ]; then
   shift
@@ -24,9 +27,10 @@ if [ "$1" = "-submit" ]; then
   #   Figure where to submit this to run - should be local
   l=(`$topmedcmd where $1`)     # Get bampath backuppath bamname realhost realhostindex
   realhost="${l[3]}"
+  if [ "$TOPMED_HOST" != "" ]; then realhost=$TOPMED_HOST; fi
   realhostindex="${l[4]}"
   slurmp="$realhost-incoming"
-  slurmqos="$realhost-cram"
+  slurmqos="$realhost-$qos"
 
   #  Is this squeezed or not?  For now this is only files from the Broad usually,
   #  however, not quite always.  $qual is the number of distinct base call quality 

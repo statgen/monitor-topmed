@@ -8,7 +8,10 @@
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 topmedrename=/usr/cluster/monitor/bin/topmedrename.pl
 console=/net/topmed/working/topmed-output
-mem=${TOPMED_MEM:-1G}
+mem=1G
+if [ "$TOPMED_MEMORY" != "" ]; then mem=$TOPMED_MEMORY; fi
+qos=verify
+if [ "$TOPMED_QOS" != "" ]; then qos=$TOPMED_QOS; fi
 
 if [ "$1" = "-submit" ]; then
   shift
@@ -21,9 +24,10 @@ if [ "$1" = "-submit" ]; then
   #   Figure where to submit this to run - should be local
   l=(`$topmedcmd where $1`)     # Get bampath backuppath bamname realhost realhostindex
   realhost="${l[3]}"
+  if [ "$TOPMED_HOST" != "" ]; then realhost=$TOPMED_HOST; fi
   realhostindex="${l[4]}"
   slurmp="$realhost-incoming"
-  slurmqos="$realhost-verify"
+  slurmqos="$realhost-$qos"
 
   l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos -J $1-verify --output=$console/$1-verify.out $0 $*`)
   if [ "$?" != "0" ]; then

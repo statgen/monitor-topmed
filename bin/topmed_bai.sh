@@ -6,8 +6,11 @@
 #
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 gcbin=/net/mario/gotcloud/bin
-mem=${TOPMED_MEM:-1G}
+mem=1G
+if [ "$TOPMED_MEMORY" != "" ]; then mem=$TOPMED_MEMORY; fi
 console=/net/topmed/working/topmed-output
+qos=bai
+if [ "$TOPMED_QOS" != "" ]; then qos=$TOPMED_QOS; fi
 
 if [ "$1" = "-submit" ]; then
   shift
@@ -20,9 +23,10 @@ if [ "$1" = "-submit" ]; then
   #   Figure where to submit this to run - should be local
   l=(`$topmedcmd where $1`)     # Get bampath backuppath bamname realhost realhostindex
   realhost="${l[3]}"
+  if [ "$TOPMED_HOST" != "" ]; then realhost=$TOPMED_HOST; fi
   realhostindex="${l[4]}"
   slurmp="$realhost-incoming"
-  slurmqos="$realhost-bai"
+  slurmqos="$realhost-$qos"
 
   l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-bai --output=$console/$1-bai.out $0 $*`)
   if [ "$?" != "0" ]; then
