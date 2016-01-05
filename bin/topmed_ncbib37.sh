@@ -21,7 +21,7 @@ remapdir=/net/topmed/working/schelcj/results
 build=37
 version=primary
 markverb=sentb$build
-jobname=b37
+jobname=b$build
 qos=ncbi
 if [ "$TOPMED_QOS" != "" ]; then qos=$TOPMED_QOS; fi
 
@@ -70,6 +70,8 @@ if [ "$1" = "-xmlonly" ]; then      # We need to resend the XML, not the file
 fi
 bamid=$1
 shift
+$topmedcmd mark $bamid $markverb started
+
 nwdid=`$topmedcmd show $bamid expt_sampleid`
 if [ "$nwdid" = "" ]; then
   echo "Invalid bamid '$bamid'. NWDID not known"

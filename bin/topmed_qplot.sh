@@ -12,6 +12,7 @@ topoutdir=/net/topmed/incoming/qc.results
 mem=8G
 if [ "$TOPMED_MEMORY" != "" ]; then mem=$TOPMED_MEMORY; fi
 qos=qplot
+markverb=qploted
 if [ "$TOPMED_QOS" != "" ]; then qos=$TOPMED_QOS; fi
 
 if [ "$1" = "-submit" ]; then
@@ -36,7 +37,7 @@ if [ "$1" = "-submit" ]; then
     echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-qplot --output=$console/$1-qplot.out $0 $*"
     exit 1
   fi
-  $topmedcmd mark $1 qploted submitted
+  $topmedcmd mark $1 $markverb submitted
   if [ "${l[0]}" = "Submitted" ]; then      # Job was submitted, save jobid
     echo `date` qplot ${l[3]} >> $console/$1.jobids
   fi
@@ -59,7 +60,7 @@ if [ "$homehost" != "" ]; then
 fi
 
 #   Mark this as started
-$topmedcmd mark $bamid qploted started
+$topmedcmd mark $bamid $markverb started
 d=`date +%Y/%m/%d`
 stime=`date +%s`
 s=`hostname`
@@ -67,13 +68,13 @@ echo "#========= $d host=$s $SLURM_JOB_ID $0 bamid=$bamid bamfile=$bamfile =====
 bai=$bamfile.bai
 if [ ! -f $bai ]; then
   echo "BAI '$bai' does not exist"
-  $topmedcmd mark $bamid qploted failed
+  $topmedcmd mark $bamid $markverb failed
   exit 3
   echo "Creating BAI file '$bai'"
   $gcbin/samtools index $bamfile 2>&1
   if [ "$?" != "0" ]; then
     echo "Unable to create BAI file"
-    $topmedcmd mark $bamid qploted failed
+    $topmedcmd mark $bamid $markverb failed
     exit 2
   fi
   etime=`date +%s`
@@ -89,7 +90,7 @@ mkdir -p $outdir
 cd $outdir
 if [ "$?" != "0" ]; then
   echo "Unable to CD to qplot output directory for '$bamid' - $outdir"
-  $topmedcmd mark $bamid qploted failed
+  $topmedcmd mark $bamid $markverb failed
   exit 3
 fi
 
@@ -99,7 +100,7 @@ $gcbin/qplot --reference  $gcref/hs37d5.fa --dbsnp $gcref/dbsnp_142.b37.vcf.gz \
   --label $basebam --stats $basebam.qp.stats --Rcode $basebam.qp.R $bamfile 2>&1
 if [ "$?" != "0" ]; then
   echo "QPLOT failed for '$bamfile'"
-  $topmedcmd mark $bamid qploted failed
+  $topmedcmd mark $bamid $markverb failed
   rm -f $basebam.*
   exit 4
 fi
@@ -113,7 +114,7 @@ $gcbin/verifyBamID --bam  $bamfile --vcf $gcref/hapmap_3.3.b37.sites.vcf.gz	\
   --grid 0.02	--out  $basebam.vb 2>&1
 if [ "$?" != "0" ]; then
   echo "VerifyBAMID failed for '$bamid'"
-  $topmedcmd mark $bamid qploted failed
+  $topmedcmd mark $bamid $markverb failed
   rm -f $basebam.*
   exit 5
 fi
@@ -124,5 +125,5 @@ etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "Command completed in $etime seconds. Created files:"
 ls -la $basebam.*
-$topmedcmd mark $bamid qploted completed
+$topmedcmd mark $bamid $markverb completed
 exit 0

@@ -12,6 +12,7 @@ backupdir=/net/topmed/working/backups
 mem=8G
 if [ "$TOPMED_MEMORY" != "" ]; then mem=$TOPMED_MEMORY; fi
 console=/net/topmed/working/topmed-output
+markverb=cramed
 squeezed=n
 qos=cram
 if [ "$TOPMED_QOS" != "" ]; then qos=$TOPMED_QOS; fi
@@ -48,7 +49,7 @@ if [ "$1" = "-submit" ]; then
     echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-cram --output=$console/$1-cram.out $0 $sq $*"
     exit 1
   fi
-  $topmedcmd mark $1 cramed submitted
+  $topmedcmd mark $1 $markverb submitted
   if [ "${l[0]}" = "Submitted" ]; then      # Job was submitted, save jobid
     $topmedcmd set $1 jobidcram ${l[3]}
   fi
@@ -105,14 +106,14 @@ mkdir -p $backupdir
 cd $backupdir
 if [ "$?" != "0" ]; then
   echo "Unable to CD $backupdir"
-  $topmedcmd mark $bamid cramed failed
+  $topmedcmd mark $bamid $markverb failed
   exit 2
 fi
 s=`hostname`
 echo "#========= '$d' host=$s $SLURM_JOB_ID squeezed=$squeezed $0 bamid=$bamid bamfile=$bamfile backupdir=$backupdir ========="
 
 #   Mark this as started
-$topmedcmd mark $bamid cramed started
+$topmedcmd mark $bamid $markverb started
 stime=`date +%s`
 #   Try to force everything as readonly
 chmod 555 $bamfile 2> /dev/null
@@ -130,7 +131,7 @@ chkname=`basename $bamfile .bam`
 nwdid=`$samtools view -H $bamfile | grep '^@RG' | grep -o 'SM:\S*' | sort -u | cut -d \: -f 2`
 if [ "$nwdid" = "" ]; then
   echo "Unable to extract NWDID from header of '$bamfile'"
-  $topmedcmd mark $bamid cramed failed
+  $topmedcmd mark $bamid $markverb failed
   exit 2
 fi
 newname="$nwdid.src.cram"
@@ -139,7 +140,7 @@ now=`date +%s`
 $samtools flagstat  $bamfile >  ${chkname}.init.stat
 if [ "$?" != "0" ]; then
   echo "Command failed: $samtools flagstat  $bamfile"
-  $topmedcmd mark $bamid cramed failed
+  $topmedcmd mark $bamid $markverb failed
   exit 3
 fi
 s=`date +%s`; s=`expr $s - $now`; echo "samtools flagstat completed in $s seconds"
@@ -152,7 +153,7 @@ else
 fi
 if [ "$?" != "0" ]; then
   echo "Command failed: $bindir/bam squeeze  --in $bamfile ..."
-  $topmedcmd mark $bamid cramed failed
+  $topmedcmd mark $bamid $markverb failed
   exit 1
 fi
 s=`date +%s`; s=`expr $s - $now`; echo "squeeze completed in $s seconds"
@@ -161,7 +162,7 @@ now=`date +%s`
 $samtools index $newname
 if [ "$?" != "0" ]; then
   echo "Command failed: $samtools index $newname"
-  $topmedcmd mark $bamid cramed failed
+  $topmedcmd mark $bamid $markverb failed
   exit 3
 fi
 s=`date +%s`; s=`expr $s - $now`; echo "samtools index completed in $s seconds"
@@ -170,7 +171,7 @@ now=`date +%s`
 $samtools view  -u -T  $ref $newname | $samtools flagstat  - >  ${chkname}.cram.stat
 if [ "$?" != "0" ]; then
   echo "Command failed: $samtools view  -h -T  $ref $newname ..."
-  $topmedcmd mark $bamid cramed failed
+  $topmedcmd mark $bamid $markverb failed
   exit 3
 fi
 s=`date +%s`; s=`expr $s - $now`; echo "samtools view completed in $s seconds"
@@ -179,7 +180,7 @@ diff=`diff  ${chkname}.init.stat  ${chkname}.cram.stat | wc -l`
 if [ "$diff" != "0" ]; then
   echo "Stat for backup CRAM file differs from that for original BAM"
   diff  ${chkname}.init.stat  ${chkname}.cram.stat
-  $topmedcmd mark $bamid cramed failed
+  $topmedcmd mark $bamid $markverb failed
   exit 2
 fi
 echo "Stat for CRAM file matches that of original"
@@ -191,7 +192,7 @@ now=`date +%s`
 md5=`md5sum $newname | awk '{print $1}'`
 if [ "$md5" = "" ]; then
   echo "Command failed: md5sum $newname"
-  $topmedcmd mark $bamid cramed failed
+  $topmedcmd mark $bamid $markverb failed
   exit 3
 fi
 $topmedcmd set $bamid cramchecksum $md5
@@ -206,9 +207,9 @@ echo "BAM to CRAM backup completed in $etime seconds, created $here/$newname"
 $topmedcmd set $bamid expt_sampleid $nwdid
 if [ "$?" != "0" ]; then
   echo "Command failed: $topmedcmd set $bamid expt_sampleid $nwdid"
-  $topmedcmd mark $bamid cramed failed
+  $topmedcmd mark $bamid $markverb failed
   exit 3
 fi
 
 #   All was good
-$topmedcmd mark $bamid cramed completed
+$topmedcmd mark $bamid $markverb completed

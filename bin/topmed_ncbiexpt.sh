@@ -12,6 +12,7 @@ topmedxml=/usr/cluster/monitor/bin/topmed_xml.pl
 mem=2G
 if [ "$TOPMED_MEMORY" != "" ]; then mem=$TOPMED_MEMORY; fi
 console=/net/topmed/working/topmed-output
+markverb=sentexpt
 qos=bai                      # This queue is free most of the time
 if [ "$TOPMED_QOS" != "" ]; then qos=$TOPMED_QOS; fi
 
@@ -36,7 +37,7 @@ if [ "$1" = "-submit" ]; then
     echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-expt --output=$console/$1-sexpt.out $0 $*"
     exit 1
   fi
-  $topmedcmd mark $1 sentexpt submitted
+  $topmedcmd mark $1 $markverb submitted
   if [ "${l[0]}" = "Submitted" ]; then      # Job was submitted, save jobid
     echo `date` expt ${l[3]} >> $console/$1.jobids
   fi
@@ -52,10 +53,12 @@ if [ "$1" = "" ]; then
 fi
 bamid=$1
 shift
+$topmedcmd mark $bamid $markverb started
+
 nwdid=`$topmedcmd show $bamid expt_sampleid`
 if [ "$nwdid" = "" ]; then
   echo "Invalid bamid '$bamid'. NWDID not known"
-  $topmedcmd mark $bamid sentexpt failed
+  $topmedcmd mark $bamid $markverb failed
   exit 2
 fi
 
@@ -65,7 +68,7 @@ echo "#========= $d $SLURM_JOB_ID $0 bamid=$bamid files=$* ========="
 cd $console
 if [ "$?" != "0" ]; then
   echo "Unable to CD to '$console' to create XML file"
-  $topmedcmd mark $bamid sentexpt failed
+  $topmedcmd mark $bamid $markverb failed
   exit 2
 fi
 mkdir XMLfiles 2>/dev/null
@@ -76,7 +79,7 @@ here=`pwd`
 $topmedxml -xmlprefix $here/ -type expt $bamid
 if [ "$?" != "0" ]; then
   echo "Unable to create experiment XML files"
-  $topmedcmd mark $bamid sentexpt failed
+  $topmedcmd mark $bamid $markverb failed
   exit 2
 fi
 
@@ -85,7 +88,7 @@ files=''
 for f in $nwdid-expt.submit.xml $nwdid.expt.xml; do
   if [ ! -f $f ]; then
     echo "Missing XML file '$f'"   
-    $topmedcmd mark $bamid sentexpt failed
+    $topmedcmd mark $bamid $markverb failed
     exit 2
   fi
   files="$files $f"
@@ -95,7 +98,7 @@ done
 tar cf $nwdid-expt.tar $files
 if [ "$?" != "0" ]; then
   echo "Unable to create TAR of XML files"
-  $topmedcmd mark $bamid sentexpt failed
+  $topmedcmd mark $bamid $markverb failed
   exit 2
 fi
 files=$nwdid-expt.tar
@@ -104,11 +107,11 @@ echo "Sending XML files to NCBI - $files"
 $ascpcmd $files $ascpdest
 if [ "$?" = "0" ]; then
   echo "XML files '$files' sent to NCBI"
-  $topmedcmd mark $bamid sentexpt delivered
+  $topmedcmd mark $bamid $markverb delivered
   exit
 fi
 
 echo "FAILED to send XML files to NCBI - $files"
-$topmedcmd mark $bamid sentexpt failed 
+$topmedcmd mark $bamid $markverb failed 
 exit 1
 

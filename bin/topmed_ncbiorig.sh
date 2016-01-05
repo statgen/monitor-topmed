@@ -68,6 +68,7 @@ fi
 bamid=$1
 shift
 
+$topmedcmd mark $bamid $markverb started
 #   Get some values from the database
 nwdid=`$topmedcmd show $bamid expt_sampleid`
 if [ "$nwdid" = "" ]; then

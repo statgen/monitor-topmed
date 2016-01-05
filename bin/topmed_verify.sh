@@ -10,6 +10,7 @@ topmedrename=/usr/cluster/monitor/bin/topmedrename.pl
 console=/net/topmed/working/topmed-output
 mem=1G
 if [ "$TOPMED_MEMORY" != "" ]; then mem=$TOPMED_MEMORY; fi
+markverb=md5verified
 qos=verify
 if [ "$TOPMED_QOS" != "" ]; then qos=$TOPMED_QOS; fi
 
@@ -35,7 +36,7 @@ if [ "$1" = "-submit" ]; then
     echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos -J $1-verify --output=$console/$1-verify.out $0 $*"
     exit 1
   fi
-  $topmedcmd mark $1 md5verified submitted
+  $topmedcmd mark $1 $markverb submitted
   if [ "${l[0]}" = "Submitted" ]; then      # Job was submitted, save jobid
     echo `date` verify ${l[3]} >> $console/$1.jobids
   fi
@@ -57,7 +58,7 @@ tmpfile=/tmp/$$.md5
 echo "$checksum  $bamfile" > $tmpfile
 
 #   Mark this as started
-$topmedcmd mark $bamid md5verified started
+$topmedcmd mark $bamid $markverb started
 d=`date +%Y/%m/%d`
 s=`hostname`
 echo "#========= '$d' host=$s $SLURM_JOB_ID $0 bamid=$bamid checksum=$checksum bamfile=$bamfile ========="
@@ -69,10 +70,10 @@ etime=`expr $etime - $stime`
 echo "Command completed in $etime seconds"
 rm -f $tmpfile
 if [ "$rc" != "0" ]; then
-  $topmedcmd mark $bamid md5verified failed
+  $topmedcmd mark $bamid $markverb failed
   exit 1
 fi
-$topmedcmd mark $bamid md5verified completed
+$topmedcmd mark $bamid $markverb completed
 #   Set bamsize again to be sure
 sz=`ls -L -l $bamfile | awk '{print $5}'`
 $topmedcmd set $bamid bamsize $sz
@@ -80,7 +81,7 @@ $topmedcmd set $bamid bamsize $sz
 #   Rename the BAM file and change the MD5 entry
 $topmedrename $bamid $bamfile
 if [ "$?" != "0" ]; then
-  $topmedcmd mark $bamid md5verified failed
+  $topmedcmd mark $bamid $markverb failed
   exit 1
 fi
 exit
