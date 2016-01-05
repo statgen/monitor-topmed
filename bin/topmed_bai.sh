@@ -75,4 +75,5 @@ etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "Created BAI '$bai' (at second $etime)"
 $topmedcmd mark $bamid baid completed
+echo `date` bai $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
 

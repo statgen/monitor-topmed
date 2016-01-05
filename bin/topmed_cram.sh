@@ -214,3 +214,4 @@ fi
 
 #   All was good
 $topmedcmd mark $bamid $markverb completed
+echo `date` cram $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids

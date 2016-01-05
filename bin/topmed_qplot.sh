@@ -126,4 +126,5 @@ etime=`expr $etime - $stime`
 echo "Command completed in $etime seconds. Created files:"
 ls -la $basebam.*
 $topmedcmd mark $bamid $markverb completed
+  echo `date` qplot $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
 exit 0

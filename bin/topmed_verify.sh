@@ -74,6 +74,8 @@ if [ "$rc" != "0" ]; then
   exit 1
 fi
 $topmedcmd mark $bamid $markverb completed
+echo `date` verify $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
+
 #   Set bamsize again to be sure
 sz=`ls -L -l $bamfile | awk '{print $5}'`
 $topmedcmd set $bamid bamsize $sz

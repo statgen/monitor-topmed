@@ -108,6 +108,7 @@ $ascpcmd $files $ascpdest
 if [ "$?" = "0" ]; then
   echo "XML files '$files' sent to NCBI"
   $topmedcmd mark $bamid $markverb delivered
+  echo `date` expt $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
   exit
 fi
 
