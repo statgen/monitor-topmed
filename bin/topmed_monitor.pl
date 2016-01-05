@@ -72,7 +72,7 @@ our %opts = (
 );
 Getopt::Long::GetOptions( \%opts,qw(
     help realm=s verbose topdir=s center=s runs=s maxjobs=i
-    memory=s partition=s qos=s dryrun suberr
+    memory=s partition=s qos=s topmedhost=s dryrun suberr
     )) || die "Failed to parse options\n";
 
 #   Simple help if requested
@@ -90,9 +90,10 @@ my $dbh = DBConnect($opts{realm});
 my $nowdate = strftime('%Y/%m/%d %H:%M', localtime);
 
 #   Set environment variables for shell scripts that do -submit
-if ($opts{memory})    { $ENV{TOPMED_MEMORY} = $opts{memory}; }
-if ($opts{partition}) { $ENV{TOPMED_PARTITION} = $opts{partition}; }
-if ($opts{qos})       { $ENV{TOPMED_QOS} = $opts{qos}; }
+if ($opts{memory})     { $ENV{TOPMED_MEMORY} = $opts{memory}; }
+if ($opts{topmedhost}) { $ENV{TOPMED_HOST} = $opts{topmedhost}; }
+if ($opts{partition})  { $ENV{TOPMED_PARTITION} = $opts{partition}; }
+if ($opts{qos})        { $ENV{TOPMED_QOS} = $opts{qos}; }
 
 #--------------------------------------------------------------
 #   Get a list of BAMs we have not noticed they arrived yet
@@ -694,6 +695,10 @@ topmed_monitor.pl - Find runs that need some action
 =head1 SYNOPSIS
 
   topmed_monitor.pl verify
+  topmed_monitor.pl -host topmed3 verify   # Force partition 'topmed3-incoming'
+  topmed_monitor.pl -host topmed3 -qos bai verify   # and using QOS 'topmed3-bai'
+  topmed_monitor.pl -memory 10G verify     # Force SLURM memory to be '10G'
+  topmed_monitor.pl -qos bai verify   # Force QOS 'topmed_bai'
 
 =head1 DESCRIPTION
 
@@ -732,17 +737,17 @@ The default for B<-maxjobs> is B<100>.
 =item B<-memory nG>
 
 Force the sbatch --mem setting when submitting a job.
-This requires the SHELL scripts to handle the environment variable.
+This requires the SHELL scripts to handle the environment variable, TOPMED_MEMORY.
 
 =item B<-partition name>
 
 Force the sbatch --partition setting when submitting a job.
-This requires the SHELL scripts to handle the environment variable.
+This requires the SHELL scripts to handle the environment variable, TOPMED_PARTITION.
 
 =item B<-qos name>
 
 Force the sbatch --qos setting when submitting a job.
-This requires the SHELL scripts to handle the environment variable.
+This requires the SHELL scripts to handle the environment variable, TOPMED_QOS.
 
 =item B<-realm NAME>
 
@@ -763,6 +768,11 @@ are not submitted to be run.
 =item B<-topdir PATH>
 
 Specifies the path to where the tree of BAMs exists. This defaults to  B</incoming/topmed>;
+
+=item B<-topmedhost host>
+
+Force the sbatch --partition setting when submitting a job.
+This requires the SHELL scripts to handle the environment variable, TOPMED_HOST.
 
 =item B<-verbose>
 
