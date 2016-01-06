@@ -11,7 +11,7 @@ samtools=/net/mario/gotcloud/bin/samtools
 ascpcmd="$bindir/ascp -i /net/topmed/incoming/study.reference/send2ncbi/topmed-2-ncbi.pri -l 800M -k 1"
 ascpdest='asp-um-sph@gap-submit.ncbi.nlm.nih.gov:protected'
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
-topmedxml=/usr/cluster/monitor/bin/topmed_xml.pl
+topmedxml="/usr/cluster/monitor/bin/topmed_xml.pl -master_email ''"
 mem=8G
 if [ "$TOPMED_MEMORY" != "" ]; then mem=$TOPMED_MEMORY; fi
 console=/net/topmed/working/topmed-output
