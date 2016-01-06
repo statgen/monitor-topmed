@@ -201,12 +201,15 @@ sub ProcessGet {
                 topmed_failures.log
                 topmed_monitor_arrive.log
                 topmed_monitor_verify.log
-                topmed_monitor_backup.log
+                topmed_monitor_b37.log
                 topmed_monitor_bai.log
-                topmed_monitor_qplot.log
                 topmed_monitor_cram.log
+                topmed_monitor_expt.log
                 topmed_monitor_ncbi.log
+                topmed_monitor_orig.log
                 topmed_monitor_phs.log
+                topmed_monitor_qplot.log
+                topmed_monitor_verify.log
                 )) {
                 
                 print "Show $f\n";
