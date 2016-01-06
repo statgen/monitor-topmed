@@ -82,6 +82,9 @@ our %opts = (
     netdir => '/net/topmed',
     incomingdir => 'incoming/topmed',
     backupsdir => 'working/backups/incoming/topmed',
+    ascpcmd => "/usr/cluster/bin/ascp -i ".
+        "/net/topmed/incoming/study.reference/send2ncbi/topmed-2-ncbi.pri -l 800M -k 1",
+    ascpdest => 'asp-um-sph@gap-submit.ncbi.nlm.nih.gov:protected',
     verbose => 0,
 );
 
@@ -105,6 +108,8 @@ if ($#ARGV < 0 || $opts{help}) {
         "$m show bamid colname|run|center\n" .
         "  or\n" .
         "$m export\n" .
+        "  or\n" .
+        "$m send2ncbi files\n" .
         "  or\n" .
         "$m where bamid\n" .
         "  or\n" .
@@ -144,6 +149,7 @@ if ($fcn eq 'unmark')   { UnMark(@ARGV); exit; }
 if ($fcn eq 'set')      { Set(@ARGV); exit; }
 if ($fcn eq 'show')     { Show(@ARGV); exit; }
 if ($fcn eq 'export')   { Export(@ARGV); exit; }
+if ($fcn eq 'send2ncbi')    { Send2NCBI(@ARGV); exit; }
 if ($fcn eq 'where')    { Where(@ARGV); exit; }
 if ($fcn eq 'whatnwdid')  { WhatNWDID(@ARGV); exit; }
 if ($fcn eq 'permit')   { Permit(@ARGV); exit; }
@@ -331,6 +337,49 @@ sub WhatNWDID {
     $sth = DoSQL("SELECT dirname from $opts{runs_table} WHERE runid=$href->{runid}");
     $href = $sth->fetchrow_hashref;
     print "'$nwdid' can be found in run '$href->{dirname}'\n";
+}
+
+#==================================================================
+# Subroutine:
+#   Send2NCBI($files)
+#
+#   Send files to NCBI
+#==================================================================
+sub Send2NCBI {
+    my ($files) = @_;
+
+    my $cmd = "$opts{ascpcmd} $files $opts{ascpdest}";
+    my $errs = "/tmp/Send2NCBI.$$";
+    foreach (1 .. 10) {             # Keep trying for auth errors
+        my $rc = system("$cmd 2> $errs");
+        if (! $rc) {
+            unlink($errs);
+            exit($rc);
+        }
+        #   Send failed. If this is an authentication error, wait and retry
+        my $sleep = 60;
+        if (open(IN, $errs)) {
+            while (<IN>) {
+                if (/Session Stop/) {
+                    print "$Script - $_";
+                    last;
+                }     
+                if (/ascp:/) {
+                    print "$Script - $_";
+                    if (/authenticate/) {
+                        $sleep = 15;
+                        last;
+                    }
+                }
+            }
+            close(IN);
+            if ($sleep) { print "$Script - WARN: ASCP error, wait and retry\n"; }
+        }
+        sleep($sleep);
+    }
+    print "$Script - FATAL: Excessive ASCP fatal errors\n";
+    unlink($errs);
+    exit(3);
 }
 
 #==================================================================

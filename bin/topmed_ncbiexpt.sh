@@ -4,10 +4,8 @@
 #
 #	Send experiment XML for a bamid to NCBI
 #
-bindir=/usr/cluster/bin
-ascpcmd="$bindir/ascp -i /net/topmed/incoming/study.reference/send2ncbi/topmed-2-ncbi.pri -l 800M -k 1"
-ascpdest='asp-um-sph@gap-submit.ncbi.nlm.nih.gov:protected'
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
+ascpcmd="$topmedcmd send2ncbi"
 topmedxml="/usr/cluster/monitor/bin/topmed_xml.pl -master_email ''"
 mem=2G
 if [ "$TOPMED_MEMORY" != "" ]; then mem=$TOPMED_MEMORY; fi
@@ -104,7 +102,7 @@ fi
 files=$nwdid-expt.tar
 
 echo "Sending XML files to NCBI - $files"
-$ascpcmd $files $ascpdest
+$ascpcmd $files
 if [ "$?" = "0" ]; then
   echo "XML files '$files' sent to NCBI"
   $topmedcmd mark $bamid $markverb delivered

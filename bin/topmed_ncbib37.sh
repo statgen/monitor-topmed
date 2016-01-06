@@ -6,11 +6,9 @@
 #
 #	Send the proper set of files to NCBI for the remap b37 bam
 #
-bindir=/usr/cluster/bin
 samtools=/net/mario/gotcloud/bin/samtools
-ascpcmd="$bindir/ascp -i /net/topmed/incoming/study.reference/send2ncbi/topmed-2-ncbi.pri -l 800M -k 1"
-ascpdest='asp-um-sph@gap-submit.ncbi.nlm.nih.gov:protected'
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
+ascpcmd="$topmedcmd send2ncbi"
 topmedxml="/usr/cluster/monitor/bin/topmed_xml.pl -master_email ''"
 mem=8G
 if [ "$TOPMED_MEMORY" != "" ]; then mem=$TOPMED_MEMORY; fi
@@ -184,7 +182,7 @@ if [ "$send" != "xmlonly" ]; then
   echo "Sending data file to NCBI - $sendbam"
   ls -l $sendbam
   stime=`date +%s`
-  $ascpcmd $sendbam $ascpdest
+  $ascpcmd $sendbam
   rc=$?
   rm -f $sendbam
   if [ "$rc" != "0" ]; then
@@ -200,7 +198,7 @@ else
 fi
 
 echo "Sending XML files to NCBI - $files"
-$ascpcmd $files $ascpdest
+$ascpcmd $files
 if [ "$?" = "0" ]; then
   echo "XML files '$files' sent to NCBI"
   $topmedcmd mark $bamid $markverb delivered

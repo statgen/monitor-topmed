@@ -4,11 +4,9 @@
 #
 #	Send the proper set of files to NCBI for the original bams
 #
-bindir=/usr/cluster/bin
 samtools=/net/mario/gotcloud/bin/samtools
-ascpcmd="$bindir/ascp -i /net/topmed/incoming/study.reference/send2ncbi/topmed-2-ncbi.pri -l 800M -k 1"
-ascpdest='asp-um-sph@gap-submit.ncbi.nlm.nih.gov:protected'
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
+ascpcmd="$topmedcmd send2ncbi"
 topmedxml="/usr/cluster/monitor/bin/topmed_xml.pl -master_email ''"
 mem=8G
 if [ "$TOPMED_MEMORY" != "" ]; then mem=$TOPMED_MEMORY; fi
@@ -40,10 +38,10 @@ if [ "$1" = "-submit" ]; then
   slurmqos="$realhost-$qos"
 
   #  Submit this script to be run
-  l=(`$bindir/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-$jobname --output=$console/$1-$jobname.out $0 $*`)
+  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-$jobname --output=$console/$1-$jobname.out $0 $*`)
   if [ "$?" != "0" ]; then
     echo "Failed to submit command to SLURM"
-    echo "CMD=$bindir/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-$jobname --output=$console/$1-$jobname.out $0 $*"
+    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-$jobname --output=$console/$1-$jobname.out $0 $*"
     exit 1
   fi
   $topmedcmd mark $1 $markverb submitted
@@ -180,7 +178,7 @@ if [ "$send" != "xmlonly" ]; then
   echo "Sending data file to NCBI - $sendbam"
   ls -l $sendbam
   stime=`date +%s`
-  $ascpcmd $sendbam $ascpdest
+  $ascpcmd $sendbam
   rc=$?
   rm -f $sendbam
   if [ "$rc" != "0" ]; then
@@ -196,7 +194,7 @@ else
 fi
 
 echo "Sending XML files to NCBI - $files"
-$ascpcmd $files $ascpdest
+$ascpcmd $files
 if [ "$?" = "0" ]; then
   echo "XML files '$files' sent to NCBI"
   $topmedcmd mark $bamid $markverb delivered
