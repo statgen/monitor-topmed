@@ -501,6 +501,94 @@ if ($fcn eq 'findups') {
     exit;
 }
 
+#--------------------------------------------------------------
+#   Convert old jobids records to new format - to show completions
+#--------------------------------------------------------------
+if ($fcn eq 'updatejobids') {
+    chdir('/home/topmed/output') ||
+        die "$Script - Unable to CD to output\n";
+    my $fixed = 0;
+    opendir(my $dh, '.') ||
+        die "$Script - Unable to read directory: $!\n";
+    while (readdir $dh) {
+        if (! /\.out$/) { next; }
+        $fixed += ConvertOut($_);
+    }
+    closedir($dh);
+    print "$Script - Updated $fixed jobids files\n";
+    exit;
+}
+
+#   read *.out file, extracting fields of interest and update associated jobids file
+sub ConvertOut {
+    my ($f) = @_;
+    if (! open(IN,$f)) { return 0; }
+    if ($f !~ /(\d+)-(\w+)\./) { print "$Script - cannot parse filename '$f'\n"; return 0; }
+    my ($bamid, $s) = ($1, $2);
+    my ($date, $slurmid, $totaltime);
+    while (<IN>) {
+        if (/#======.+(201\d\S+) host=\S+ (\d+)/) {
+            ($date, $slurmid) = ($1, $2);
+            next;
+        }
+        if (/#======.+(201\d\S+) (\d+)/) {
+            ($date, $slurmid) = ($1, $2);
+            next;
+        }
+        if (/Command completed in (\d+)/) { $totaltime = $1; next; }
+        if (/Created BAI.+at second (\d+)/) { $totaltime = $1; next; }
+        if (/BAM to CRAM .+ (\d+) sec/) { $totaltime = $1; next; }
+        if (/BAM file sent in (\d+) sec/) { $totaltime = $1; next; }
+        if ((! $totaltime) && /Completed: .+ transferred in (\d+) sec/) {
+            $totaltime = $1;
+            if ($totaltime == 0) { $totaltime = 1; }
+            next;
+        }
+    }
+    close(IN);
+    if (! ($date && $slurmid && $totaltime)) {
+        if ($opts{verbose}) { print "Unable to parse '$f'\n"; }
+        return 0;
+    }
+
+    #   If it has not been done, update *.jobids file adding completion record like this
+    #   Jan 6 13:24:05 EST 2016 verify 18017993 ok 269 secs
+    if ($s eq 'ncbiorig') { $s = 'orig'; }
+    if ($s eq 'ncbiexpt') { $s = 'expt'; }
+    $date =~ s/\'//;
+    if ($date =~ /(\d+)\/(\d+)\/(\d+)/) {
+        my ($y, $m, $d) = ($1, $2, $3);
+        if ($m eq '12') { $m = 'Dec'; }
+        if ($m eq '1')  { $m = 'Jan'; }
+        if ($m eq '1')  { $m = 'Feb'; }
+        $date = "DOW $m $d 12:12:12 EST $y";
+    }
+
+    #   Read the jobids file. If it has a 'ok' record for $s, we are done
+    #   If not, append an OK record
+    $f = "$bamid.jobids";
+    if (! open(IN,$f)) {
+        if ($opts{verbose}) { print "Unable to read file '$f'\n"; }
+        return 0;
+    }
+    my $app = 1;                    # Append an OK or not
+    while (<IN>) {
+        if (/ $s \d+ ok/) { $app = 0; last; }   # OK record already in place
+    }
+    close(IN);
+    if (! $app) { return 0; }       # OK record was found for $s
+    my $line = "$date $s $slurmid ok $totaltime secs\n";
+    if ($opts{verbose}) { print "$f: $line"; }
+    #   Append an OK record
+    if (! open(OUT,'>>' .  $f)) {
+        if ($opts{verbose}) { print "Unable to append to file '$f'\n"; }
+        return 0;
+    }
+    print OUT $line;
+    close(OUT);
+    return 1;
+}
+
 die "Invalid request '$fcn'. Try '$Script --help'\n";
 
 #==================================================================

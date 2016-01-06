@@ -79,6 +79,7 @@ our %opts = (
     centers_table => 'centers',
     permissions_table => 'permissions',
     runs_table => 'runs',
+    step_table => 'steptime',
     netdir => '/net/topmed',
     incomingdir => 'incoming/topmed',
     backupsdir => 'working/backups/incoming/topmed',
@@ -110,6 +111,8 @@ if ($#ARGV < 0 || $opts{help}) {
         "$m export\n" .
         "  or\n" .
         "$m send2ncbi files\n" .
+        "  or\n" .
+        "$m step yyyy/mm/dd stepname slurmid seconds\n" .
         "  or\n" .
         "$m where bamid\n" .
         "  or\n" .
@@ -150,6 +153,7 @@ if ($fcn eq 'set')      { Set(@ARGV); exit; }
 if ($fcn eq 'show')     { Show(@ARGV); exit; }
 if ($fcn eq 'export')   { Export(@ARGV); exit; }
 if ($fcn eq 'send2ncbi')    { Send2NCBI(@ARGV); exit; }
+if ($fcn eq 'step')     { Step(@ARGV); exit; }
 if ($fcn eq 'where')    { Where(@ARGV); exit; }
 if ($fcn eq 'whatnwdid')  { WhatNWDID(@ARGV); exit; }
 if ($fcn eq 'permit')   { Permit(@ARGV); exit; }
@@ -337,6 +341,24 @@ sub WhatNWDID {
     $sth = DoSQL("SELECT dirname from $opts{runs_table} WHERE runid=$href->{runid}");
     $href = $sth->fetchrow_hashref;
     print "'$nwdid' can be found in run '$href->{dirname}'\n";
+}
+
+#==================================================================
+# Subroutine:
+#   Step($yyyymmdd, $step, $slurmid, $sec)
+#
+#   Add record to step table with the number of seconds for successful steps
+#==================================================================
+sub Step {
+    my ($yyyymmdd, $step, $slurmid, $sec) = @_;
+
+    my $sth = DoSQL("SELECT id FROM $opts{step_table} " .
+        "WHERE step='$step' AND slurmid=$slurmid AND stepdate='$yyyymmdd'", 0);
+    my $rowsofdata = $sth->rows();
+    if ($rowsofdata) { return; }        # Already exists, do not insert
+    DoSQL("INSERT INTO $opts{step_table} " .
+        "(step,stepdate,slurmid,seconds) " .
+        "VALUES ('$step', '$yyyymmdd', $slurmid, $sec)", 0);
 }
 
 #==================================================================
@@ -753,8 +775,15 @@ for a particular bam.
 B<set bamid columnname value>
 Use this to set the value for a column for a particular BAM file.
 
+B<send2ncbi filelist>
+Use this to copy data to NCBI with ascp.
+
 B<show arrived>
 Use this to show the bamids for all BAMs that are marked arrived.
+
+B<step yyyy/mm/dd stepname slurmid seconds>
+Update the step database with time for various steps so they can be easily plotted.
+This only applies to successful steps.
 
 B<unmark bamid [verb]>
 Use this to reset the state for a particular BAM file to the default

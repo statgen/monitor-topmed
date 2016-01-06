@@ -138,6 +138,22 @@ CREATE INDEX index_refname ON bamfiles(refname);
 
 
 /* ####################################################
+   Gather run times for steps for easy plotting
+   #################################################### */
+DROP TABLE IF EXISTS steptime;
+CREATE TABLE steptime (
+  id      INT         NOT NULL AUTO_INCREMENT,
+  step    VARCHAR(8) NOT NULL,
+  stepdate CHAR(10) NOT NULL,
+  slurmid INT NOT NULL,
+  seconds INT NOT NULL,
+  PRIMARY KEY  (id)
+);
+
+
+
+
+/* ####################################################
    Remove these some day 
    #################################################### */
 DROP TABLE IF EXISTS studies;
