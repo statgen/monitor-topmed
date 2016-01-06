@@ -93,6 +93,7 @@ for f in $nwdid-expt.submit.xml $nwdid.expt.xml; do
 done
 
 #   Make a TAR of the XML files to send
+stime=`date +%s`
 tar cf $nwdid-expt.tar $files
 if [ "$?" != "0" ]; then
   echo "Unable to create TAR of XML files"
@@ -106,6 +107,8 @@ $ascpcmd $files
 if [ "$?" = "0" ]; then
   echo "XML files '$files' sent to NCBI"
   $topmedcmd mark $bamid $markverb delivered
+  etime=`date +%s`
+  etime=`expr $etime - $stime`
   echo `date` expt $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
   exit
 fi
