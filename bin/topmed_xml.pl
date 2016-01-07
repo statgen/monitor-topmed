@@ -67,7 +67,7 @@ our %opts = (
 
 Getopt::Long::GetOptions( \%opts,qw(
     help nolint realm=s verbose build=s inst_model=s design_description=s
-    run_processing=s xmlprefix=s type=s bamfn=s bamchecksum=s
+    run_processing=s xmlprefix=s type=s bamfn=s bamchecksum=s master_email=s
     )) || die "$Script Failed to parse options\n";
 
 #   Simple help if requested
