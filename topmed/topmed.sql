@@ -77,7 +77,16 @@ CREATE TABLE bamfiles (
   nwdid_known  CHAR(1) DEFAULT 'N',
 
 /* Fields to track state for each step */
-/* See values at top of topmed_monitor.pl for possible states */
+/*
+my $NOTSET    = 0;            # Not set
+my $REQUESTED = 1;            # Task requested
+my $SUBMITTED = 2;            # Task submitted to be run
+my $STARTED   = 3;            # Task started
+my $DELIVERED = 19;           # Data delivered, but not confirmed
+my $COMPLETED = 20;           # Task completed successfully
+my $CANCELLED = 89;           # Task cancelled
+my $FAILED    = 99;           # Task failed
+*/
   state_arrive   INT DEFAULT 0,
   state_md5ver   INT DEFAULT 0,
   state_backup   INT DEFAULT 0,
