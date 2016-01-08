@@ -439,6 +439,12 @@ Generates this output.
 Specifies the INSTRUMENT_MODEL value in the experiment file.
 This defaults to B<HiSeq X Ten>.
 
+=item B<-master_email emailaddress>
+
+Specifies the error and notification Email address to be used when submitting
+XML. The default is B<unattended@umich.edu>.
+Specifying a null string will remove the Email address from the XML.
+
 =item B<-nolint>
 
 Specifies that xmllint should not be run on the XML files.
