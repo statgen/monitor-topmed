@@ -116,6 +116,7 @@ here=`pwd`
 sendbam="$nwdid.recal.$build.bam"
 if [ "$send" != "xmlonly" ]; then
   echo "Creating BAM $sendbam from CRAM $fqremappedcram"
+  sleep `rand -M 120`               # Wait a bit so samtools caching might not screw up
   stime=`date +%s`
   $samtools view -b -@3 -o $sendbam $fqremappedcram 
   if [ "$?" != "0" ]; then

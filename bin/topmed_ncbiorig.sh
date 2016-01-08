@@ -126,6 +126,7 @@ here=`pwd`
 sendbam="$nwdid.src.bam"
 if [ "$send" != "xmlonly" ]; then
   if [ "$center" = "broad" ]; then
+    sleep `rand -M 120`               # Wait a bit so samtools caching might not screw up
     echo "Creating BAM $sendbam from CRAM $fqorigbam"
     $samtools view -b -@3 -o $sendbam $fqorigbam 
     if [ "$?" != "0" ]; then
