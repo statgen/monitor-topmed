@@ -138,16 +138,32 @@ CREATE INDEX index_refname ON bamfiles(refname);
 
 
 /* ####################################################
-   Gather run times for steps for easy plotting
+   Daily statisitics for steps
    #################################################### */
-DROP TABLE IF EXISTS steptime;
-CREATE TABLE steptime (
-  id      INT         NOT NULL AUTO_INCREMENT,
-  step    VARCHAR(8) NOT NULL,
-  stepdate CHAR(10) NOT NULL,
-  slurmid INT NOT NULL,
-  seconds INT NOT NULL,
-  PRIMARY KEY  (id)
+DROP TABLE IF EXISTS stepstats;
+CREATE TABLE stepstats (
+  yyyymmdd CHAR(10) NOT NULL,
+  count_verify      INT DEFAULT 0,
+  avetime_verify    INT DEFAULT 0,
+  count_bai         INT DEFAULT 0,
+  avetime_bai       INT DEFAULT 0,
+  count_qplot       INT DEFAULT 0,
+  avetime_qplot     INT DEFAULT 0,
+  count_cram        INT DEFAULT 0,
+  avetime_cram      INT DEFAULT 0,
+  count_expt        INT DEFAULT 0,
+  avetime_expt      INT DEFAULT 0,
+  ncbicount_expt    INT DEFAULT 0,
+  count_orig        INT DEFAULT 0,
+  avetime_orig      INT DEFAULT 0,
+  ncbicount_orig    INT DEFAULT 0,
+  count_b37         INT DEFAULT 0,
+  avetime_b37       INT DEFAULT 0,
+  ncbicount_b37     INT DEFAULT 0,
+  count_b38         INT DEFAULT 0,
+  avetime_b38       INT DEFAULT 0,
+  ncbicount_b38     INT DEFAULT 0,
+  PRIMARY KEY  (yyyymmdd)
 );
 
 
