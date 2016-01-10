@@ -25,6 +25,8 @@ use TopMed_Get;
 use My_DB;
 use Getopt::Long;
 
+use POSIX qw(strftime tmpnam);
+
 my %STEPS = (                       # List of steps we collect data for
     verify => 1,
     bai => 1,
@@ -35,6 +37,14 @@ my %STEPS = (                       # List of steps we collect data for
     b37 => 1,
     b38 => 1,
 );
+my $NOTSET    = 0;            # Not set
+my $REQUESTED = 1;            # Task requested
+my $SUBMITTED = 2;            # Task submitted to be run
+my $STARTED   = 3;            # Task started
+my $DELIVERED = 19;           # Data delivered, but not confirmed
+my $COMPLETED = 20;           # Task completed successfully
+my $CANCELLED = 89;           # Task cancelled
+my $FAILED    = 99;           # Task failed
 
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
@@ -42,6 +52,7 @@ my %STEPS = (                       # List of steps we collect data for
 our %opts = (
     realm => '/usr/cluster/monitor/etc/.db_connections/topmed',
     stats_table => 'stepstats',
+    bamfiles_table => 'bamfiles',
     outdir => '/net/topmed/working/topmed-output/',
     summaryfile => 'XMLfiles/latest_loaded_files.txt.gz',
     verbose => 0,
@@ -69,10 +80,170 @@ my $dbh = DBConnect($opts{realm});
 #   Execute the command provided
 #--------------------------------------------------------------
 if ($fcn eq 'jobid')    { Jobids(@ARGV); exit; }
-if ($fcn eq 'summary')  { UnMark(@ARGV); exit; }
+if ($fcn eq 'summary')  { Summary(@ARGV, "$opts{outdir}/$opts{summaryfile}"); exit; }
 
 die "$Script  - Invalid function '$fcn'\n";
 exit;
+
+#==================================================================
+# Subroutine:
+#   Summary($file)
+#
+#   Read the NCBI summary file, identifying all BAMs loaded on a date
+#   The loadedbamcount column is the total loaded counts each day
+#   Once the database is initialized nicely with SummaryHistory
+#   we only need get the count for this day and then add it to
+#   the previous database entry - avoiding re-processing everything
+#   everyday -- and relying the the NCBI summary file is consistent
+#==================================================================
+sub Summary {
+    my ($yyyymmdd, $file) = @_;
+
+    #   Figure out the database entry (yyyymmdd) before this one
+    my $sql = "SELECT yyyymmdd,loadedbamcount FROM $opts{stats_table} ORDER BY yyyymmdd DESC";
+    my $sth = DoSQL($sql);
+    my $rowsofdata = $sth->rows();
+    if ($rowsofdata < 2) { die "Not enough data collected for '$yyyymmdd' yet\n"; }
+    my $found = 0;
+    for (my $i=1; $i<=$rowsofdata; $i++) {
+        my $href = $sth->fetchrow_hashref;
+        if ($href->{yyyymmdd} eq $yyyymmdd) { $found++; last; }
+    }
+    if (! $found) { die "Unable to find a record for '$yyyymmdd'\n"; }
+    my $href = $sth->fetchrow_hashref;         # This is the record BEFORe $yyyymmdd
+    my $prevyyyymmdd = $href->{yyyymmdd};
+    my $prevloadedbamcount = $href->{loadedbamcount};
+
+    #   Find all NWDIDnnnnn.src.bam in
+    #   protected 3563129 2014-09-06T09:24:12 NWDnnnnn.src.bam 10844214270 93ed94e9918b868d0ecd7009c3e427e8 = = = loaded BAM etc
+    #     or
+    #   protected NWD792235-remap.37.run.xml ... error RUN_XML - some_error_message
+    my $sum = 0;
+    my ($loaddate, $rc);
+    if ($file =~ /\.gz$/) { $rc = open(IN, "gunzip -c $file |"); }
+    else { $rc = open(IN, $file); }
+    if (! $rc) { die "$Script - Unable to read file '$file': $!\n"; }
+    while (<IN>) {
+        if (! /protected\s+\d+\s+(20\S+)T.+\s+NWD/) { next; }
+        $loaddate = $1;
+        $loaddate =~ s/-/\//g;
+        if ($loaddate le $prevyyyymmdd) { next; }
+        #   This entry is after $prevyyyymmdd
+        if (/protected\s+\d+\s+20.+\s+NWD\S+bam\s+.+\s+loaded\sBAM/) {
+            $sum++;
+            next;
+        }
+    }
+    close(IN);
+    print "Loaded $sum BAMs after $prevyyyymmdd and up to $yyyymmdd\n";
+    $sum += $prevloadedbamcount;
+    DoSQL("UPDATE $opts{stats_table} SET loadedbamcount=$sum WHERE yyyymmdd='$yyyymmdd'");
+}
+
+#==================================================================
+# Subroutine:
+#   SummaryHistory($file)
+#
+#   Read the NCBI summary file, identifying all BAMs loaded to a date
+#   and generate the loadedbamcount in stepstats for the past
+#
+#   This was used just once to create history for stepstats
+#==================================================================
+sub SummaryHistory {
+    my ($yyyymmdd, $file) = @_;
+
+    #   Find all NWDIDnnnnn.src.bam in
+    #   protected 3563129 2014-09-06T09:24:12 NWDnnnnn.src.bam 10844214270 93ed94e9918b868d0ecd7009c3e427e8 = = = loaded BAM etc
+    #     or
+    #   protected NWD792235-remap.37.run.xml ... error RUN_XML - some_error_message
+    my %loadedbydate = ();
+    my ($loaddate, $rc);
+    if ($file =~ /\.gz$/) { $rc = open(IN, "gunzip -c $file |"); }
+    else { $rc = open(IN, $file); }
+    if (! $rc) { die "$Script - Unable to read file '$file': $!\n"; }
+    while (<IN>) {
+        if (! /protected\s+\d+\s+(20\S+)T.+\s+NWD/) { next; }
+        $loaddate = $1;
+        $loaddate =~ s/-/\//g;
+        if ($loaddate lt $yyyymmdd) { next; }
+        if (/protected\s+\d+\s+20.+\s+NWD\S+bam\s+.+=\s+=\s+=\s+loaded\sBAM/) {
+            if (! exists($loadedbydate{$loaddate})) { $loadedbydate{$loaddate} = 0; }
+            $loadedbydate{$loaddate}++;
+            next;
+        }
+    }
+    close(IN);
+    my @ldates = sort keys %loadedbydate;   # List of dates when bams were loaded
+
+    my $sql = "SELECT yyyymmdd FROM $opts{stats_table}";
+    my $sth = DoSQL($sql);
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { die "No rows?\n"; }
+    my @sqlupdates = ();
+    for (my $i=1; $i<=$rowsofdata; $i++) {
+        my $href = $sth->fetchrow_hashref;
+        my $yyyymmdd = $href->{yyyymmdd};
+        #   Get count of all loaded bams until this date
+        my $sum = 0;
+        foreach my $d (@ldates) {
+            if ($d gt $yyyymmdd) { last; }
+            $sum += $loadedbydate{$d};
+        }
+        push @sqlupdates,"UPDATE $opts{stats_table} SET loadedbamcount=$sum WHERE yyyymmdd='$yyyymmdd';";
+    }
+    foreach (@sqlupdates) {
+        print "$_\n";
+    }
+}
+
+#==================================================================
+# Subroutine:
+#   GetSummaryFromBamFiles()
+#
+#   Figure out the count of BAMs that are verified each day
+#   This can be used to set bamcount in the stepstats database
+#
+#   This was used just once to create history for stepstats
+#==================================================================
+sub GetSummaryFromBamFiles {
+    #my ($yyyymmdd) = @_;
+
+    my $sql = "SELECT dateinit FROM $opts{bamfiles_table}";
+    my $sth = DoSQL($sql);
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { die "No rows?\n"; }
+    my $href;
+    my %verifiydates = ();              # Count of bams verified by date
+    for (my $i=1; $i<=$rowsofdata; $i++) {
+        $href = $sth->fetchrow_hashref;
+        my @c = localtime($href->{dateinit});
+        my $yyyymmdd = sprintf('%04d/%02d/%02d', $c[5]+1900, $c[4]+1, $c[3]); 
+        if (! exists($verifiydates{$yyyymmdd})) { $verifiydates{$yyyymmdd} = 0; }
+        $verifiydates{$yyyymmdd}++;
+    }
+    my @vdates = sort keys %verifiydates;   # List of dates when bams were verified
+
+    $sql = "SELECT yyyymmdd FROM $opts{stats_table}";
+    $sth = DoSQL($sql);
+    $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { die "No rows?\n"; }
+    my @sqlupdates = ();
+    for (my $i=1; $i<=$rowsofdata; $i++) {
+        $href = $sth->fetchrow_hashref;
+        my $yyyymmdd = $href->{yyyymmdd};
+        #   Get count of all verified bams until this date
+        my $sum = 0;
+        foreach my $d (@vdates) {
+            if ($d gt $yyyymmdd) { last; }
+            $sum += $verifiydates{$d};
+        }
+        push @sqlupdates,"UPDATE $opts{stats_table} SET bamcount=$sum WHERE yyyymmdd='$yyyymmdd';";
+    }
+
+    foreach (@sqlupdates) {
+        print "$_\n";
+    }
+}
 
 #==================================================================
 # Subroutine:
@@ -87,6 +258,21 @@ sub Jobids {
         'Jan' => '01','Feb' => '02','Mar' => '03','Apr' => '04','May' => '05','Jun' => '06',
         'Jul' => '07','Aug' => '08','Sep' => '09','Oct' => '10','Nov' => '11','Dec' => '12');
     my $tmpfile = "/tmp/Jobids.$$";
+
+    my ($bamcount, $errcount) = (0, 0);             # Today's counts
+    if ($yyyymmdd eq 'today') {
+        $yyyymmdd = strftime('%Y/%m/%d', localtime);
+        my $sql = "SELECT count(*) FROM $opts{bamfiles_table} WHERE state_md5ver=$COMPLETED";
+        my $sth = DoSQL($sql, 0);
+        my $href = $sth->fetchrow_hashref;
+        if ($href->{'count(*)'}) { $bamcount = $href->{'count(*)'}; }
+
+        $sql = "SELECT count(*) FROM $opts{bamfiles_table} WHERE state_ncbiorig=$FAILED OR " .
+            "state_ncbib37=$FAILED OR state_ncbib38=$FAILED";
+        $sth = DoSQL($sql, 0);
+        $href = $sth->fetchrow_hashref;
+        if ($href->{'count(*)'}) { $errcount = $href->{'count(*)'}; }
+    }
 
     if ($yyyymmdd !~ /^(20\d\d)\/(\d\d)\/(\d\d)$/) {
         die "$Script Invalid date '$yyyymmdd' syntax. Try '$Script -help'\n";
@@ -142,7 +328,7 @@ sub Jobids {
     my $sth = DoSQL($sql, 0);
     my $rowsofdata = $sth->rows();
     if ($rowsofdata) {                      # Record exists, do update
-        $sql = "UPDATE $opts{stats_table} SET ";
+        $sql = "UPDATE $opts{stats_table} SET bamcount=$bamcount,errcount=$errcount,";
         foreach my $s (@keys) {
             $sql .= "count_$s=$data{$s}{count},";
             $sql .= "avetime_$s=" . int($data{$s}{totaltime}/$data{$s}{count}) . ',';
@@ -163,11 +349,11 @@ sub Jobids {
         chop($cols);
         chop($vals);
         $sql = "INSERT INTO $opts{stats_table} " .
-            "(yyyymmdd,$cols) " .
-            "VALUES ('$yyyymmdd', $vals)";
+            "(yyyymmdd,bamcount,errcount,$cols) " .
+            "VALUES ('$yyyymmdd',$bamcount,$errcount,$vals)";
         $sth = DoSQL($sql);
     }
-    print "Updated data for '$yyyymmdd' [" . join(',', @keys) . "]\n";
+    print "Updated data for '$yyyymmdd' [bamcount,errcount," . join(',', @keys) . "]\n";
 }
 
 #==================================================================

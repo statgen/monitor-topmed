@@ -32,5 +32,6 @@ if [ "$range" = "" ]; then
   done
 fi
 for yyyymmdd in $range; do
-  /usr/cluster/monitor/bin/topmedstats.pl jobid $yyyymmdd
+  /usr/cluster/monitor/bin/topmedstats.pl jobid   $yyyymmdd
+  /usr/cluster/monitor/bin/topmedstats.pl summary $yyyymmdd
 done
