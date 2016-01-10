@@ -143,7 +143,7 @@ CREATE INDEX index_runid   ON bamfiles(runid);
 CREATE INDEX index_nwdid   ON bamfiles(expt_sampleid);
 CREATE INDEX index_refname ON bamfiles(refname);
 
-# ALTER TABLE bamfiles ADD COLUMN datebai VARCHAR(12) AFTER datebackup;
+/* ALTER TABLE bamfiles ADD COLUMN datebai VARCHAR(12) AFTER datebackup; */
 
 
 /* ####################################################
@@ -172,6 +172,10 @@ CREATE TABLE stepstats (
   count_b38         INT DEFAULT 0,
   avetime_b38       INT DEFAULT 0,
   ncbicount_b38     INT DEFAULT 0,
+
+  bamcount          INT DEFAULT 0,      /* Count of arrived bams */
+  errcount          INT DEFAULT 0,      /* Count of bams sent to NCBI in error */
+  loadedbamcount    INT DEFAULT 0,      /* Count of loaded BAMs at NCBI */
   PRIMARY KEY  (yyyymmdd)
 );
 
