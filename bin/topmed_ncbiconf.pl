@@ -148,8 +148,7 @@ if ($fcn eq 'updatedb') {
     my $centersref = GetCenters();
     CheckEXPT($centersref, "$opts{xmlfilesdir}/$opts{studystatus}");
     CheckEXPT($centersref, "$opts{xmlfilesdir}/$opts{bamsstatus}");
-    CheckORIG($centersref, "$opts{xmlfilesdir}/$opts{bamsstatus}");
-
+    CheckBAMS($centersref, "$opts{xmlfilesdir}/$opts{bamsstatus}");
     exit;
 }
 
@@ -206,13 +205,13 @@ sub CheckEXPT {
 
 #==================================================================
 # Subroutine:
-#   CheckORIG - Check for original BAMs that have completed
+#   CheckBAMS - Check for BAMs that have completed
 #
 # Arguments:
 #   cref - reference to hash of center data
 #   file - log summary file from NCBI
 #==================================================================
-sub CheckORIG {
+sub CheckBAMS {
     my ($cref, $file) = @_;
 
     #   Get hash of all original BAMs delivered to NCBI
