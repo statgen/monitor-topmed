@@ -7,7 +7,7 @@
 samtools=/net/mario/gotcloud/bin/samtools
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 ascpcmd="$topmedcmd send2ncbi"
-topmedxml="/usr/cluster/monitor/bin/topmed_xml.pl -master_email ''"
+topmedxml="/usr/cluster/monitor/bin/topmed_xml.pl"
 mem=8G
 if [ "$TOPMED_MEMORY" != "" ]; then mem=$TOPMED_MEMORY; fi
 console=/net/topmed/working/topmed-output
