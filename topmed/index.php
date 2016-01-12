@@ -254,7 +254,6 @@ if ($fcn == 'errorcheck') {
 if ($fcn == 'logs') {
     print "<center>$SHOWQUEUES &nbsp;&nbsp;&nbsp;</center>\n";
     $cmd = "/usr/cluster/monitor/bin/slurm_query.sh -logs ignored";
-print "$cmd\n";
     print `$cmd`;
     exit;
 }
