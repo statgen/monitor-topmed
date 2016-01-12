@@ -80,7 +80,12 @@ my $dbh = DBConnect($opts{realm});
 #   Execute the command provided
 #--------------------------------------------------------------
 if ($fcn eq 'jobid')    { Jobids(@ARGV); exit; }
-if ($fcn eq 'summary')  { Summary(@ARGV, "$opts{outdir}/$opts{summaryfile}"); exit; }
+if ($fcn eq 'summary')  {
+    my $s = GetSummaryFromBamFiles(@ARGV);
+    if ($s) { DoSQL($s); }
+    Summary(@ARGV, "$opts{outdir}/$opts{summaryfile}");
+    exit;
+}
 
 die "$Script  - Invalid function '$fcn'\n";
 exit;
@@ -100,7 +105,7 @@ sub Summary {
     my ($yyyymmdd, $file) = @_;
 
     #   Figure out the database entry (yyyymmdd) before this one
-    my $sql = "SELECT yyyymmdd,loadedbamcount FROM $opts{stats_table} ORDER BY yyyymmdd DESC";
+    my $sql = "SELECT yyyymmdd,loadedorigbamcount,loadedb37bamcount,loadedb38bamcount FROM $opts{stats_table} ORDER BY yyyymmdd DESC";
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if ($rowsofdata < 2) { die "Not enough data collected for '$yyyymmdd' yet\n"; }
@@ -112,13 +117,17 @@ sub Summary {
     if (! $found) { die "Unable to find a record for '$yyyymmdd'\n"; }
     my $href = $sth->fetchrow_hashref;         # This is the record BEFORe $yyyymmdd
     my $prevyyyymmdd = $href->{yyyymmdd};
-    my $prevloadedbamcount = $href->{loadedbamcount};
+    my $prevloadedorigbamcount = $href->{loadedorigbamcount};
+    my $prevloadedb37bamcount = $href->{loadedb37bamcount};
+    my $prevloadedb38bamcount = $href->{loadedb38bamcount};
 
     #   Find all NWDIDnnnnn.src.bam in
     #   protected 3563129 2014-09-06T09:24:12 NWDnnnnn.src.bam 10844214270 93ed94e9918b868d0ecd7009c3e427e8 = = = loaded BAM etc
     #     or
     #   protected NWD792235-remap.37.run.xml ... error RUN_XML - some_error_message
-    my $sum = 0;
+    my $origsum = 0;
+    my $b37sum = 0;
+    my $b38sum = 0;
     my ($loaddate, $rc);
     if ($file =~ /\.gz$/) { $rc = open(IN, "gunzip -c $file |"); }
     else { $rc = open(IN, $file); }
@@ -129,15 +138,58 @@ sub Summary {
         $loaddate =~ s/-/\//g;
         if ($loaddate le $prevyyyymmdd) { next; }
         #   This entry is after $prevyyyymmdd
-        if (/protected\s+\d+\s+20.+\s+NWD\S+bam\s+.+\s+loaded\sBAM/) {
-            $sum++;
+        if (/protected\s+\d+\s+20.+\s+NWD\S+.src.bam\s+.+\s+loaded\sBAM/) {
+            $origsum++;
+            next;
+        }
+        if (/protected\s+\d+\s+20.+\s+NWD\S+.recal.37.bam\s+.+\s+loaded\sBAM/) {
+            $b37sum++;
+            next;
+        }
+        if (/protected\s+\d+\s+20.+\s+NWD\S+.recal.38.bam\s+.+\s+loaded\sBAM/) {
+            $b38sum++;
             next;
         }
     }
     close(IN);
-    print "Loaded $sum BAMs after $prevyyyymmdd and up to $yyyymmdd\n";
-    $sum += $prevloadedbamcount;
-    DoSQL("UPDATE $opts{stats_table} SET loadedbamcount=$sum WHERE yyyymmdd='$yyyymmdd'");
+    print "Loaded $origsum,$b37sum,$b38sum BAMs after $prevyyyymmdd and up to $yyyymmdd\n";
+    $origsum += $prevloadedorigbamcount;
+    $b37sum += $prevloadedb37bamcount;
+    $b38sum += $prevloadedb38bamcount;
+
+    my $errorigcount = 0;
+    my $errb37count = 0;
+    my $errb38count = 0;
+    $sql = "SELECT count(*) FROM $opts{bamfiles_table} WHERE state_ncbiorig=$FAILED";
+    $sth = DoSQL($sql);
+    $rowsofdata = $sth->rows();
+    if ($rowsofdata > 0) {
+        my $href = $sth->fetchrow_hashref;
+        $errorigcount  = $href->{'count(*)'};
+    }
+    $sql = "SELECT count(*) FROM $opts{bamfiles_table} WHERE state_ncbib37=$FAILED";
+    $sth = DoSQL($sql);
+    $rowsofdata = $sth->rows();
+    if ($rowsofdata > 0) {
+        my $href = $sth->fetchrow_hashref;
+        $errb37count  = $href->{'count(*)'};
+    }
+    $sql = "SELECT count(*) FROM $opts{bamfiles_table} WHERE state_ncbib38=$FAILED";
+    $sth = DoSQL($sql);
+    $rowsofdata = $sth->rows();
+    if ($rowsofdata > 0) {
+        my $href = $sth->fetchrow_hashref;
+        $errb38count  = $href->{'count(*)'};
+    }
+
+    DoSQL("UPDATE $opts{stats_table} SET " .
+        "loadedorigbamcount=$origsum," .
+        "loadedb37bamcount=$b37sum," .
+        "loadedb38bamcount=$b38sum," .
+        "errorigcount=$errorigcount," .
+        "errb37count=$errb37count," .
+        "errb38count=$errb38count" .
+        " WHERE yyyymmdd='$yyyymmdd'");
 }
 
 #==================================================================
@@ -198,15 +250,16 @@ sub SummaryHistory {
 
 #==================================================================
 # Subroutine:
-#   GetSummaryFromBamFiles()
+#   GetSummaryFromBamFiles($ymd)
 #
 #   Figure out the count of BAMs that are verified each day
 #   This can be used to set bamcount in the stepstats database
-#
-#   This was used just once to create history for stepstats
+#   If $ymd is set, return the SQL to update that date only
+#   otherwise print out the SQL for all days so we can create
+#   a history to initialize stepstats
 #==================================================================
 sub GetSummaryFromBamFiles {
-    #my ($yyyymmdd) = @_;
+    my ($ymd) = @_;
 
     my $sql = "SELECT dateinit FROM $opts{bamfiles_table}";
     my $sth = DoSQL($sql);
@@ -237,7 +290,9 @@ sub GetSummaryFromBamFiles {
             if ($d gt $yyyymmdd) { last; }
             $sum += $verifiydates{$d};
         }
-        push @sqlupdates,"UPDATE $opts{stats_table} SET bamcount=$sum WHERE yyyymmdd='$yyyymmdd';";
+        my $s = "UPDATE $opts{stats_table} SET bamcount=$sum WHERE yyyymmdd='$yyyymmdd'";
+        if ($ymd eq $yyyymmdd) { return $s; }       # Surprising exit here
+        push @sqlupdates,"$s;";
     }
 
     foreach (@sqlupdates) {
