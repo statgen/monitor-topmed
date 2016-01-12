@@ -173,9 +173,13 @@ CREATE TABLE stepstats (
   avetime_b38       INT DEFAULT 0,
   ncbicount_b38     INT DEFAULT 0,
 
-  bamcount          INT DEFAULT 0,      /* Count of arrived bams */
-  errcount          INT DEFAULT 0,      /* Count of bams sent to NCBI in error */
-  loadedbamcount    INT DEFAULT 0,      /* Count of loaded BAMs at NCBI */
+  bamcount           INT DEFAULT 0,      /* Count of all arrived bams */
+  errorigcount       INT DEFAULT 0,      /* Count of original bams sent to NCBI in error */
+  loadedorigbamcount INT DEFAULT 0,      /* Count of loaded original BAMs at NCBI */
+  errb37count        INT DEFAULT 0,      /* Count of primary bams sent to NCBI in error */
+  loadedb37bamcount  INT DEFAULT 0,      /* Count of loaded primary BAMs at NCBI */
+  errb38count        INT DEFAULT 0,      /* Count of tertiary bams sent to NCBI in error */
+  loadedb38bamcount  INT DEFAULT 0,      /* Count of loaded tertiary BAMs at NCBI */
   PRIMARY KEY  (yyyymmdd)
 );
 
