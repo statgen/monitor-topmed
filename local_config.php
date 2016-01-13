@@ -58,6 +58,7 @@ if ($MON == 'topmed') {
     $LDB['centers'] = 'centers';            // SQL table names
     $LDB['runs'] = 'runs';
     $LDB['bamfiles'] = 'bamfiles';
+    $LDB['stepstats'] = 'stepstats';
     $LDB['permissions'] = 'permissions';
     $LDB['pulls'] = 'requestfiles';
 
