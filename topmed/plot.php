@@ -50,8 +50,6 @@ $bamcount = 0;
 $sqldata = array();                         // Save all SQL data
 for ($i=0; $i<$numrows; $i++) {
     $row = SQL_Fetch($result);
-    //if ($bamcount < $row['bamcount']) { $bamcount = $row['bamcount']; }
-//print "<!-- ($bamcount < $row)  -->\n";
     array_push($sqldata, $row);
 }
 //  We have saved all SQL data in $sqldata
@@ -62,22 +60,6 @@ if ($fcn == 'whatever') {
     print "<h2 align='center'>TopMed Activity</h2>\n";
     $NCBIBAMDATE = '2016/01/01';            // No BAMs sent to NCBI before this
 
-/*
-  yyyymmdd CHAR(10) NOT NULL,
-  count_expt        INT DEFAULT 0,
-  avetime_expt      INT DEFAULT 0,
-  ncbicount_expt    INT DEFAULT 0,
-  count_orig        INT DEFAULT 0,
-  avetime_orig      INT DEFAULT 0,
-  ncbicount_orig    INT DEFAULT 0,
-  count_b37         INT DEFAULT 0,
-  avetime_b37       INT DEFAULT 0,
-  ncbicount_b37     INT DEFAULT 0,
-  count_b38         INT DEFAULT 0,
-  avetime_b38       INT DEFAULT 0,
-  ncbicount_b38     INT DEFAULT 0,
-*/
-
     //-------------------------------------------------------------------
     //  Details about steps for processing each BAM (non-NCBI)
     //-------------------------------------------------------------------
@@ -85,6 +67,7 @@ if ($fcn == 'whatever') {
         "<p>The following describe the various of steps completed per day " .
         "and the average time per step.</p>\n";
     $legend = array('bams');
+    $title = "Number of Verified BAMs  Max=$bamcount";
     $plotdata = array();
     $bamcount = 0;
     for ($i=0; $i<$numrows; $i++) {
@@ -95,10 +78,10 @@ if ($fcn == 'whatever') {
         array_push($plotdata, $d);
         $bamcount = $row['bamcount'];
     }
-    $title = "Number of BAMs  Max=$bamcount";
     MakePlot($plotdata, $title, $legend);
 
     $legend = array('verify', 'bai', 'qplot', 'cram');
+    $title = "Count of Steps Completed";
     $plotdata = array(); 
     for ($i=0; $i<$numrows; $i++) {
         $row = $sqldata[$i];
@@ -110,9 +93,9 @@ if ($fcn == 'whatever') {
         array_push($d, $row['count_cram']);
         array_push($plotdata, $d);
     }
-    $title = "Count of Steps Completed";
     MakePlot($plotdata, $title, $legend);
 
+    $title = "Ave Completion Time/Step";
     $plotdata = array(); 
     for ($i=0; $i<$numrows; $i++) {
         $row = $sqldata[$i];
@@ -124,7 +107,6 @@ if ($fcn == 'whatever') {
         array_push($d, $row['avetime_cram']);
         array_push($plotdata, $d);
     }
-    $title = "Ave Completion Time/Step";
     MakePlot($plotdata, $title, $legend);
 
     //-------------------------------------------------------------------
@@ -136,6 +118,7 @@ if ($fcn == 'whatever') {
         "original BAMs are recreated from CRAM. <b>b37</b> BAMs are remapped using " .
         "build 37 and are created from CRAMs. <b>b38</b> is similar except using " .
         "build 38.</p>\n";
+    $title = "Daily Count of BAMs Sent to NCBI";
     $legend = array('orig', 'b37', 'b38');
     $plotdata = array(); 
     for ($i=0; $i<$numrows; $i++) {
@@ -148,9 +131,9 @@ if ($fcn == 'whatever') {
         array_push($d, $row['count_b38']);
         array_push($plotdata, $d);
     }
-    $title = "Daily Count of BAMs Sent to NCBI";
     MakePlot($plotdata, $title, $legend);
 
+    $title = "Ave Time to Send BAM to NCBI";
     $plotdata = array(); 
     for ($i=0; $i<$numrows; $i++) {
         $row = $sqldata[$i];
@@ -162,9 +145,9 @@ if ($fcn == 'whatever') {
         array_push($d, $row['avetime_b38']);
         array_push($plotdata, $d);
     }
-    $title = "Ave Time to Send BAM to NCBI";
     MakePlot($plotdata, $title, $legend);
 
+    $title = "Daily Count of loaded BAMs at NCBI";
     $plotdata = array(); 
     for ($i=0; $i<$numrows; $i++) {
         $row = $sqldata[$i];
@@ -176,21 +159,19 @@ if ($fcn == 'whatever') {
         array_push($d, $row['loadedb38bamcount']);
         array_push($plotdata, $d);
     }
-    $title = "Daily Count of loaded BAMs at NCBI";
     MakePlot($plotdata, $title, $legend);
 
+    $title = "Daily Count of BAM Errors Identified at NCBI";
+    $legend = array('totalerrs');
     $plotdata = array(); 
     for ($i=0; $i<$numrows; $i++) {
         $row = $sqldata[$i];
         if ($row['yyyymmdd'] < $NCBIBAMDATE) { continue; }
         $d = array();
         array_push($d, substr($row['yyyymmdd'],5,5));
-        array_push($d, $row['errorigcount']);
-        array_push($d, $row['errb37count']);
-        array_push($d, $row['errb38count']);
+        array_push($d, $row['errcount']);
         array_push($plotdata, $d);
     }
-    $title = "Daily Count of Errors Identified at NCBI";
     MakePlot($plotdata, $title, $legend);
 
     exit;
