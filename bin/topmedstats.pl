@@ -81,8 +81,8 @@ my $dbh = DBConnect($opts{realm});
 #--------------------------------------------------------------
 if ($fcn eq 'jobid')    { Jobids(@ARGV); exit; }
 if ($fcn eq 'summary')  {
-    my $s = GetSummaryFromBamFiles(@ARGV);
-    if ($s) { DoSQL($s); }
+    #my $s = GetSummaryFromBamFiles(@ARGV);
+    #if ($s) { DoSQL($s); }
     Summary(@ARGV, "$opts{outdir}/$opts{summaryfile}");
     exit;
 }
@@ -104,23 +104,6 @@ exit;
 sub Summary {
     my ($yyyymmdd, $file) = @_;
 
-    #   Figure out the database entry (yyyymmdd) before this one
-    my $sql = "SELECT yyyymmdd,loadedorigbamcount,loadedb37bamcount,loadedb38bamcount FROM $opts{stats_table} ORDER BY yyyymmdd DESC";
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if ($rowsofdata < 2) { die "Not enough data collected for '$yyyymmdd' yet\n"; }
-    my $found = 0;
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        if ($href->{yyyymmdd} eq $yyyymmdd) { $found++; last; }
-    }
-    if (! $found) { die "Unable to find a record for '$yyyymmdd'\n"; }
-    my $href = $sth->fetchrow_hashref;         # This is the record BEFORe $yyyymmdd
-    my $prevyyyymmdd = $href->{yyyymmdd};
-    my $prevloadedorigbamcount = $href->{loadedorigbamcount};
-    my $prevloadedb37bamcount = $href->{loadedb37bamcount};
-    my $prevloadedb38bamcount = $href->{loadedb38bamcount};
-
     #   Find all NWDIDnnnnn.src.bam in
     #   protected 3563129 2014-09-06T09:24:12 NWDnnnnn.src.bam 10844214270 93ed94e9918b868d0ecd7009c3e427e8 = = = loaded BAM etc
     #     or
@@ -136,7 +119,8 @@ sub Summary {
         if (! /protected\s+\d+\s+(20\S+)T.+\s+NWD/) { next; }
         $loaddate = $1;
         $loaddate =~ s/-/\//g;
-        if ($loaddate le $prevyyyymmdd) { next; }
+        #if ($loaddate le $prevyyyymmdd) { next; }
+        if ($loaddate ne $prevyyyymmdd) { next; }
         #   This entry is after $prevyyyymmdd
         if (/protected\s+\d+\s+20.+\s+NWD\S+.src.bam\s+.+\s+loaded\sBAM/) {
             $origsum++;
@@ -153,9 +137,6 @@ sub Summary {
     }
     close(IN);
     print "Loaded $origsum,$b37sum,$b38sum BAMs after $prevyyyymmdd and up to $yyyymmdd\n";
-    $origsum += $prevloadedorigbamcount;
-    $b37sum += $prevloadedb37bamcount;
-    $b38sum += $prevloadedb38bamcount;
 
     my $errorigcount = 0;
     my $errb37count = 0;
