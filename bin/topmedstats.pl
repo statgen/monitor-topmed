@@ -120,7 +120,7 @@ sub Summary {
         $loaddate = $1;
         $loaddate =~ s/-/\//g;
         #if ($loaddate le $prevyyyymmdd) { next; }
-        if ($loaddate ne $prevyyyymmdd) { next; }
+        if ($loaddate ne $yyyymmdd) { next; }
         #   This entry is after $prevyyyymmdd
         if (/protected\s+\d+\s+20.+\s+NWD\S+.src.bam\s+.+\s+loaded\sBAM/) {
             $origsum++;
@@ -136,14 +136,14 @@ sub Summary {
         }
     }
     close(IN);
-    print "Loaded $origsum,$b37sum,$b38sum BAMs after $prevyyyymmdd and up to $yyyymmdd\n";
+    print "Loaded $origsum,$b37sum,$b38sum BAMs on $yyyymmdd\n";
 
     my $errorigcount = 0;
     my $errb37count = 0;
     my $errb38count = 0;
-    $sql = "SELECT count(*) FROM $opts{bamfiles_table} WHERE state_ncbiorig=$FAILED";
-    $sth = DoSQL($sql);
-    $rowsofdata = $sth->rows();
+    my $sql = "SELECT count(*) FROM $opts{bamfiles_table} WHERE state_ncbiorig=$FAILED";
+    my $sth = DoSQL($sql);
+    my $rowsofdata = $sth->rows();
     if ($rowsofdata > 0) {
         my $href = $sth->fetchrow_hashref;
         $errorigcount  = $href->{'count(*)'};
@@ -295,19 +295,8 @@ sub Jobids {
         'Jul' => '07','Aug' => '08','Sep' => '09','Oct' => '10','Nov' => '11','Dec' => '12');
     my $tmpfile = "/tmp/Jobids.$$";
 
-    my ($bamcount, $errcount) = (0, 0);             # Today's counts
     if ($yyyymmdd eq 'today') {
         $yyyymmdd = strftime('%Y/%m/%d', localtime);
-        my $sql = "SELECT count(*) FROM $opts{bamfiles_table} WHERE state_md5ver=$COMPLETED";
-        my $sth = DoSQL($sql, 0);
-        my $href = $sth->fetchrow_hashref;
-        if ($href->{'count(*)'}) { $bamcount = $href->{'count(*)'}; }
-
-        $sql = "SELECT count(*) FROM $opts{bamfiles_table} WHERE state_ncbiorig=$FAILED OR " .
-            "state_ncbib37=$FAILED OR state_ncbib38=$FAILED";
-        $sth = DoSQL($sql, 0);
-        $href = $sth->fetchrow_hashref;
-        if ($href->{'count(*)'}) { $errcount = $href->{'count(*)'}; }
     }
 
     if ($yyyymmdd !~ /^(20\d\d)\/(\d\d)\/(\d\d)$/) {
@@ -316,6 +305,29 @@ sub Jobids {
     my ($y, $m, $d) = ($1, $2, $3);
     chdir($opts{outdir}) ||
         die "$Script - Unable to CD to '$opts{outdir}: $!\n";
+
+    #   Get counts of bams and errors sending bams, but just once
+    my ($sql, $sth, $href, $rowsofdata);
+    $sql = "SELECT yyyymmdd FROM $opts{stats_table} WHERE yyyymmdd='$yyyymmdd'";
+    $sth = DoSQL($sql, 0);
+    $rowsofdata = $sth->rows();
+    if (! $rowsofdata) {
+        my ($bamcount, $errcount) = (0, 0);             # Today's counts
+        $sql = "SELECT count(*) FROM $opts{bamfiles_table} WHERE state_md5ver=$COMPLETED";
+        $sth = DoSQL($sql, 0);
+        $href = $sth->fetchrow_hashref;
+        if ($href->{'count(*)'}) { $bamcount = $href->{'count(*)'}; }
+        $sql = "SELECT count(*) FROM $opts{bamfiles_table} WHERE state_ncbiorig=$FAILED OR " .
+            "state_ncbib37=$FAILED OR state_ncbib38=$FAILED";
+        $sth = DoSQL($sql, 0);
+        $href = $sth->fetchrow_hashref;
+        if ($href->{'count(*)'}) { $errcount = $href->{'count(*)'}; }
+        #   INSERT this row
+        $sql = "INSERT INTO $opts{stats_table} " .
+            "(yyyymmdd,bamcount,errcount) VALUES ('$yyyymmdd',$bamcount,$errcount)";
+        $sth = DoSQL($sql);
+        print "Created record for '$yyyymmdd' [$bamcount,$errcount]\n";
+    }
 
     #   Get all OK files from jobids files and extract dates we want
     #   Lines could look like:
@@ -358,38 +370,15 @@ sub Jobids {
         }
     }
 
-    #   Since I can't seem to figure out when UPDATE fails,
-    #   see if the record exists
-    my $sql = "SELECT yyyymmdd FROM $opts{stats_table} WHERE yyyymmdd='$yyyymmdd'";
-    my $sth = DoSQL($sql, 0);
-    my $rowsofdata = $sth->rows();
-    if ($rowsofdata) {                      # Record exists, do update
-        $sql = "UPDATE $opts{stats_table} SET bamcount=$bamcount,errcount=$errcount,";
-        foreach my $s (@keys) {
-            $sql .= "count_$s=$data{$s}{count},";
-            $sql .= "avetime_$s=" . int($data{$s}{totaltime}/$data{$s}{count}) . ',';
-        }
-        chop($sql);
-        $sql .= " WHERE yyyymmdd='$yyyymmdd'";
-        $sth = DoSQL($sql);
+    $sql = "UPDATE $opts{stats_table} SET ";
+    foreach my $s (@keys) {
+        $sql .= "count_$s=$data{$s}{count},";
+        $sql .= "avetime_$s=" . int($data{$s}{totaltime}/$data{$s}{count}) . ',';
     }
-    else {                                  # No record, do insert
-        my $cols = '';
-        my $vals = '';
-        foreach my $s (@keys) {
-            $cols .= "count_$s,";
-            $vals .= $data{$s}{count} . ',';
-            $cols .= "avetime_$s,";
-            $vals .= int($data{$s}{totaltime}/$data{$s}{count}) . ',';
-        }
-        chop($cols);
-        chop($vals);
-        $sql = "INSERT INTO $opts{stats_table} " .
-            "(yyyymmdd,bamcount,errcount,$cols) " .
-            "VALUES ('$yyyymmdd',$bamcount,$errcount,$vals)";
-        $sth = DoSQL($sql);
-    }
-    print "Updated data for '$yyyymmdd' [bamcount,errcount," . join(',', @keys) . "]\n";
+    chop($sql);
+    $sql .= " WHERE yyyymmdd='$yyyymmdd'";
+    $sth = DoSQL($sql);
+    print "Updated data for '$yyyymmdd' [" . join(',', @keys) . "]\n";
 }
 
 #==================================================================
