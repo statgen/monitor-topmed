@@ -26,6 +26,8 @@ $JS['SPACER'] = "&nbsp;&nbsp;&nbsp;&nbsp;";
 $JS['CLOSE'] = "<p align='right'><font size='-1'><a href='javascript:window.close()'>Close</a>" . $JS['SPACER'];
 $JS['BACK'] = "<p align='right'><font size='-1'><a href='javascript:history.back()'>Back</a>" . $JS['SPACER'];
 
+$COMPLETED = 20;            // Task completed successfully
+
 //-------------------------------------------------------------------
 //  Get parameters passed in via normal invocation
 //-------------------------------------------------------------------
@@ -44,9 +46,12 @@ $HTML = '';
 $sql = 'SELECT * FROM ' . $LDB['stepstats'];
 $result = SQL_Query($sql);
 $numrows = SQL_NumRows($result);
+$bamcount = 0;
 $sqldata = array();                         // Save all SQL data
 for ($i=0; $i<$numrows; $i++) {
     $row = SQL_Fetch($result);
+    //if ($bamcount < $row['bamcount']) { $bamcount = $row['bamcount']; }
+//print "<!-- ($bamcount < $row)  -->\n";
     array_push($sqldata, $row);
 }
 //  We have saved all SQL data in $sqldata
@@ -79,6 +84,20 @@ if ($fcn == 'whatever') {
     print "<h4>Processing Steps Before Sending to NCBI</h4>\n" .
         "<p>The following describe the various of steps completed per day " .
         "and the average time per step.</p>\n";
+    $legend = array('bams');
+    $plotdata = array();
+    $bamcount = 0;
+    for ($i=0; $i<$numrows; $i++) {
+        $row = $sqldata[$i];
+        $d = array();
+        array_push($d, substr($row['yyyymmdd'],5,5));
+        array_push($d, $row['bamcount']);
+        array_push($plotdata, $d);
+        $bamcount = $row['bamcount'];
+    }
+    $title = "Number of BAMs  Max=$bamcount";
+    MakePlot($plotdata, $title, $legend);
+
     $legend = array('verify', 'bai', 'qplot', 'cram');
     $plotdata = array(); 
     for ($i=0; $i<$numrows; $i++) {
@@ -91,7 +110,7 @@ if ($fcn == 'whatever') {
         array_push($d, $row['count_cram']);
         array_push($plotdata, $d);
     }
-    $title = "Count of Steps Completed per BAM";
+    $title = "Count of Steps Completed";
     MakePlot($plotdata, $title, $legend);
 
     $plotdata = array(); 
@@ -105,7 +124,7 @@ if ($fcn == 'whatever') {
         array_push($d, $row['avetime_cram']);
         array_push($plotdata, $d);
     }
-    $title = "Ave Seconds for Steps Completed per BAM";
+    $title = "Ave Completion Time/Step";
     MakePlot($plotdata, $title, $legend);
 
     //-------------------------------------------------------------------
@@ -129,7 +148,7 @@ if ($fcn == 'whatever') {
         array_push($d, $row['count_b38']);
         array_push($plotdata, $d);
     }
-    $title = "Count of BAMs Sent to NCBI";
+    $title = "Daily Count of BAMs Sent to NCBI";
     MakePlot($plotdata, $title, $legend);
 
     $plotdata = array(); 
@@ -157,7 +176,7 @@ if ($fcn == 'whatever') {
         array_push($d, $row['loadedb38bamcount']);
         array_push($plotdata, $d);
     }
-    $title = "Count of loaded BAMs at NCBI";
+    $title = "Daily Count of loaded BAMs at NCBI";
     MakePlot($plotdata, $title, $legend);
 
     $plotdata = array(); 
@@ -171,7 +190,7 @@ if ($fcn == 'whatever') {
         array_push($d, $row['errb38count']);
         array_push($plotdata, $d);
     }
-    $title = "Count of Errors Sending BAMs to NCBI";
+    $title = "Daily Count of Errors Identified at NCBI";
     MakePlot($plotdata, $title, $legend);
 
     exit;
