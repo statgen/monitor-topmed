@@ -174,6 +174,7 @@ CREATE TABLE stepstats (
   ncbicount_b38     INT DEFAULT 0,
 
   bamcount           INT DEFAULT 0,      /* Count of all arrived bams */
+  errcount           INT DEFAULT 0,      /* Count of all errors for bams */
   errorigcount       INT DEFAULT 0,      /* Count of original bams sent to NCBI in error */
   loadedorigbamcount INT DEFAULT 0,      /* Count of loaded original BAMs at NCBI */
   errb37count        INT DEFAULT 0,      /* Count of primary bams sent to NCBI in error */
