@@ -40,16 +40,28 @@ extract (isolate_parms($parmcols));
 DB_Connect($LDB['realm']);
 if (! $fcn)    { $fcn = 'whatever'; }
 
+$totalcompletedbams = '';
+$sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . ' WHERE state_ncbiorig=20';
+$result = SQL_Query($sql);
+$row = SQL_Fetch($result);
+$totalcompletedbams .= $row['count(*)'] . '/';
+$sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . ' WHERE state_ncbib37=20';
+$result = SQL_Query($sql);
+$row = SQL_Fetch($result);
+$totalcompletedbams .= $row['count(*)'] . '/';
+$sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . ' WHERE state_ncbib38=20';
+$result = SQL_Query($sql);
+$row = SQL_Fetch($result);
+$totalcompletedbams .= $row['count(*)'];
 
-$HTML = '';
-
+$bamcount = 0;
 $sql = 'SELECT * FROM ' . $LDB['stepstats'];
 $result = SQL_Query($sql);
 $numrows = SQL_NumRows($result);
-$bamcount = 0;
 $sqldata = array();                         // Save all SQL data
 for ($i=0; $i<$numrows; $i++) {
     $row = SQL_Fetch($result);
+    $bamcount = $row['bamcount'];
     array_push($sqldata, $row);
 }
 //  We have saved all SQL data in $sqldata
@@ -107,7 +119,7 @@ if ($fcn == 'whatever') {
         array_push($d, $row['avetime_cram']);
         array_push($plotdata, $d);
     }
-    MakePlot($plotdata, $title, $legend);
+    MakePlot($plotdata, $title, $legend, 'Seconds');
 
     //-------------------------------------------------------------------
     //  Details about steps sending data to NCBI
@@ -131,7 +143,7 @@ if ($fcn == 'whatever') {
         array_push($d, $row['count_b38']);
         array_push($plotdata, $d);
     }
-    MakePlot($plotdata, $title, $legend);
+    MakePlot($plotdata, $title, $legend, '', 'y');
 
     $title = "Ave Time to Send BAM to NCBI";
     $plotdata = array(); 
@@ -145,9 +157,9 @@ if ($fcn == 'whatever') {
         array_push($d, $row['avetime_b38']);
         array_push($plotdata, $d);
     }
-    MakePlot($plotdata, $title, $legend);
+    MakePlot($plotdata, $title, $legend, 'Seconds', 'y');
 
-    $title = "Daily Count of loaded BAMs at NCBI";
+    $title = "Daily Count of BAMs loaded at NCBI   Totals=$totalcompletedbams";
     $plotdata = array(); 
     for ($i=0; $i<$numrows; $i++) {
         $row = $sqldata[$i];
@@ -159,9 +171,9 @@ if ($fcn == 'whatever') {
         array_push($d, $row['loadedb38bamcount']);
         array_push($plotdata, $d);
     }
-    MakePlot($plotdata, $title, $legend);
+    MakePlot($plotdata, $title, $legend, '', 'y');
 
-    $title = "Daily Count of BAM Errors Identified at NCBI";
+    $title = "Total Count of Errors Sending BAMs to NCBI";
     $legend = array('totalerrs');
     $plotdata = array(); 
     for ($i=0; $i<$numrows; $i++) {
@@ -172,7 +184,7 @@ if ($fcn == 'whatever') {
         array_push($d, $row['errcount']);
         array_push($plotdata, $d);
     }
-    MakePlot($plotdata, $title, $legend);
+    MakePlot($plotdata, $title, $legend, '', 'y');
 
     exit;
 }
@@ -183,11 +195,13 @@ Nice_Exit("How'd you do that?");
 exit;
 
 /*---------------------------------------------------------------
-#   MakePlot($plotdata, $title, $legend)
+#   MakePlot($plotdata, $title, $legend, $ytitle, $ypoints)
 #
 #   Generate a plot in the current HTMNL stream
+#   $ytitle could be the title onn the Y axis
+#   $ypoints is a boolean if the Y values should be annotated on the plot
 ---------------------------------------------------------------*/
-function MakePlot($plotdata, $title, $legend) {
+function MakePlot($plotdata, $title, $legend, $ytitle='', $ypoints='') {
     global $JS;
 
     $plot = new PHPlot(600, 240);
@@ -202,6 +216,13 @@ function MakePlot($plotdata, $title, $legend) {
     $plot->SetLegend($legend);
     $plot->SetLegendPixels(45, 25);
     $plot->SetTitle($title);
+    if ($ypoints) { $plot->SetYDataLabelPos('plotin'); }
+    if ($ytitle) {
+        $plot->SetYTitle($ytitle);
+        // With Y data labels, we don't need Y ticks or their labels, so turn them off.
+        //$plot->SetYTickLabelPos('none');
+        //$plot->SetYTickPos('none');
+    }
     $plot->DrawGraph();
     print "<img src=\""; print $plot->EncodeImage(); print "\" alt='$title'>\n";
     print $JS['VSPACER'] . "\n";
