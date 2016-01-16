@@ -226,16 +226,14 @@ sub CheckBAMS {
     my %nwdid2errormsg = ();
     my %completed = ();
     $completed{orig} = $completed{b37} = $completed{b38} = 0;
-    my $errors = 0;
     my $rc;
     if ($file =~ /\.gz$/) { $rc = open(IN, "gunzip -c $file |"); }
     else { $rc = open(IN, $file); }
     if (! $rc) { die "$Script - Unable to read file '$file': $!\n"; }
     while (<IN>) {
-        if (/protected\s+.+\s+(NWD\S+.run.xml)\s+.+\s+error\s+RUN_XML\s+-\s+(\S+)/) {
+        if (/protected\s+.+\s+(NWD\d+\S*.run.xml)\s+.+\s+error\s+RUN_XML\s+-\s+(\S+)/) {
             my ($x, $msg) = ($1, $2);
             $msg =~ s/_/ /g;
-            if ($x =~ /(NWD\d+)/) { $x = $1; }      # Isolate NWDID
             $nwdid2errormsg{$x} .= $msg . "\n";
             next;
         }
@@ -255,13 +253,34 @@ sub CheckBAMS {
     close(IN);
 
     #   Found list of NWDIDs in error
-    foreach my $nwdid (keys %nwdid2errormsg) {
-        #   This NWDID was in eror
-        if ($opts{verbose}) { print "  FAILED: $nwdid - $nwdid2errormsg{$nwdid}"; }
-        DoSQL("UPDATE $opts{bamfiles_table} SET state_ncbiorig=$FAILED WHERE expt_sampleid='$nwdid'");
+    #   If this changes the state for the NWDID, update the database
+    #   Messages we've seen so far:
+    #     protected	...	NWD792235-remap.37.run.xml	...	error_msg
+    #     protected	...	NWD539447-secondary.37.run.xml	...	Updates_are_prohibited_for_withdrawn_Run(SRR2173553)
+    my $errors = 0;
+    foreach my $key (keys %nwdid2errormsg) {
+        if ($opts{verbose}) { print "  FAILED: $key - $nwdid2errormsg{$key}"; }
+        #   Get actual NWDID
+        my $nwdid = $key;
+        my $statecol = '';
+        if ($key =~ /(NWD\d+)/) { $nwdid = $1; }
+        else { die "Unable to isolate NWDID:  NWDID=$nwdid Errormsg=$nwdid2errormsg{$key}\n"; }
+        #   Figure out state column name
+        if ($key =~ /remap.37/) { $statecol = 'state_ncbib37'; }
+        if ($key =~ /remap.38/) { $statecol = 'state_ncbib38'; }
+        if ($key =~ /secondary/) { $statecol = 'state_ncbiorig'; }
+        if (! $statecol) { die "Unable to figure out database column  NWDID=$nwdid Errormsg=$nwdid2errormsg{$key}\n"; }
+        #   Now see if we already knew about this error
+        my $sql = "SELECT $statecol FROM $opts{bamfiles_table} " .
+                "WHERE expt_sampleid='$nwdid' AND $statecol!=$FAILED";
+        my $sth = DoSQL($sql);
+        my $rowsofdata = $sth->rows();
+        if (! $rowsofdata) { next; }            # Already knew about this error
+        DoSQL("UPDATE $opts{bamfiles_table} SET $statecol=$FAILED WHERE expt_sampleid='$nwdid'");
+        print "$nowdate  New error detected - failure for '$nwdid' $statecol\n";
         $errors++;
     }
-    if ($errors) { print "$nowdate  $errors original BAMs marked as FAILED\n"; }
+    if ($errors) { print "$nowdate  $errors new BAMs marked as FAILED\n"; }
 
     #   Found list of loaded NWDIDs
     foreach my $nwdid (keys %loadednwdids) {
