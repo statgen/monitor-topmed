@@ -210,9 +210,13 @@ sub ProcessGet {
                 topmed_monitor_qplot.log
                 topmed_monitor_verify.log
                 )) {
-                
-                print "Show $f\n";
-                $s .= "<b>$f</b>\n" . `tail -6 $f`;
+                $s .= "<b>Showing $f</b>\n" . `tail -6 $f`;
+            }
+            #   Show more details for logs we are really interested in at the moment
+            foreach my $f (qw(
+                topmed_monitor_ncbi.log
+                )) {
+                  $s .= "<pre><b>More Details on $f</b>\n" . `tail -60 $f` . "</pre>$f\n";
             }
         }
         SendText($conn, $s);
