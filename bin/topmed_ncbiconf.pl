@@ -271,6 +271,7 @@ sub CheckBAMS {
         if ($key =~ /secondary/) { $statecol = 'state_ncbiorig'; }
         if (! $statecol) { die "Unable to figure out database column  NWDID=$nwdid Errormsg=$nwdid2errormsg{$key}\n"; }
         #   Now see if we already knew about this error
+        delete($loadednwdids{$nwdid});          # Make sure we do not treat this as loaded
         my $sql = "SELECT $statecol FROM $opts{bamfiles_table} " .
                 "WHERE expt_sampleid='$nwdid' AND $statecol!=$FAILED";
         my $sth = DoSQL($sql);
