@@ -234,7 +234,7 @@ sub CheckBAMS {
         if (/protected\s+.+\s+(NWD\d+\S*.run.xml)\s+.+\s+error\s+RUN_XML\s+-\s+(\S+)/) {
             my ($x, $msg) = ($1, $2);
             $msg =~ s/_/ /g;
-            $nwdid2errormsg{$x} .= $msg . "\n";
+            $nwdid2errormsg{$x} .= $x . ': ' . $msg . "\n";
             next;
         }
         if (/protected\s+.+\s+(NWD\S+).src.bam\s+.+=\s+=\s+=\s+loaded\sBAM/) {
