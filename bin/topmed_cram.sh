@@ -53,7 +53,6 @@ if [ "$1" = "-submit" ]; then
   if [ "${l[0]}" = "Submitted" ]; then      # Job was submitted, save job details
     echo `date` cram ${l[3]} $slurmp $slurmqos $mem >> $console/$1.jobids
   fi
-  fi
   exit
 fi
 
