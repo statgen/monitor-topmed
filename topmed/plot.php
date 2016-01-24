@@ -54,14 +54,14 @@ $result = SQL_Query($sql);
 $row = SQL_Fetch($result);
 $totalcompletedbams .= $row['count(*)'];
 
-$bamcount = 0;
+$totalbamcount = 0;
 $sql = 'SELECT * FROM ' . $LDB['stepstats'];
 $result = SQL_Query($sql);
 $numrows = SQL_NumRows($result);
 $sqldata = array();                         // Save all SQL data
 for ($i=0; $i<$numrows; $i++) {
     $row = SQL_Fetch($result);
-    $bamcount = $row['bamcount'];
+    $totalbamcount = $row['bamcount'];
     array_push($sqldata, $row);
 }
 //  We have saved all SQL data in $sqldata
@@ -76,24 +76,38 @@ if ($fcn == 'whatever') {
     //  Details about steps for processing each BAM (non-NCBI)
     //-------------------------------------------------------------------
     print "<h4>Processing Steps Before Sending to NCBI</h4>\n" .
-        "<p>The following describe the various of steps completed per day " .
-        "and the average time per step.</p>\n";
+        "<p>The following describe the various of steps to process a BAM.</p>\n";
     $legend = array('bams');
-    $title = "Number of Verified BAMs  Max=$bamcount";
+    $title = "Daily Count of Verified BAMs  Max=$totalbamcount";
     $plotdata = array();
-    $bamcount = 0;
     for ($i=0; $i<$numrows; $i++) {
         $row = $sqldata[$i];
         $d = array();
         array_push($d, substr($row['yyyymmdd'],5,5));
         array_push($d, $row['bamcount']);
         array_push($plotdata, $d);
-        $bamcount = $row['bamcount'];
     }
     MakePlot($plotdata, $title, $legend);
 
-    $legend = array('verify', 'bai', 'qplot', 'cram');
-    $title = "Count of Steps Completed";
+    // Plot coounts of steps not completed 
+    $legend = array('ncbib38', 'ncbib37', 'ncbiorig', 'b38', 'b37', 'cram', 'qplot', 'bai', 'md5ver', 'arrive');    // Reversed
+    $title = "Steps Not Completed for $totalbamcount BAMs";
+    $plotdata = array(); 
+    foreach ($legend as &$c) {  
+        $sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE state_$c!=20";
+        $result = SQL_Query($sql);
+        $row = SQL_Fetch($result);
+        $d = array();
+        array_push($d, $c);
+        array_push($d, $row['count(*)']);
+        array_push($plotdata, $d);
+    }
+    //MakePlot($plotdata, $title, $legend, '', 'y', 'bars', 'text-data-yx');
+    MakePlot($plotdata, $title, $legend, '', 'y', 'bars', 'text-data-yx');
+
+    $legend = array('b38', 'b37', 'cram', 'qplot', 'bai', 'md5ver', 'arrive');
+    $legend = array('cram', 'qplot', 'bai', 'md5ver', 'arrive');
+     $title = "Daily Count of Steps Completed";
     $plotdata = array(); 
     for ($i=0; $i<$numrows; $i++) {
         $row = $sqldata[$i];
@@ -173,7 +187,7 @@ if ($fcn == 'whatever') {
     }
     MakePlot($plotdata, $title, $legend, '', 'y');
 
-    $title = "Total Count of Errors Sending BAMs to NCBI";
+    $title = "Daily Count of Errors When Sending BAMs to NCBI";
     $legend = array('totalerrs');
     $plotdata = array(); 
     for ($i=0; $i<$numrows; $i++) {
@@ -195,28 +209,43 @@ Nice_Exit("How'd you do that?");
 exit;
 
 /*---------------------------------------------------------------
-#   MakePlot($plotdata, $title, $legend, $ytitle, $ypoints)
+#   MakePlot($plotdata, $title, $legend, $ytitle, $ypoints, $type, $datatype)
 #
 #   Generate a plot in the current HTMNL stream
 #   $ytitle could be the title onn the Y axis
 #   $ypoints is a boolean if the Y values should be annotated on the plot
+#   $type should be lines or bars
+#   $datatype should be text-data or text-data-yx
 ---------------------------------------------------------------*/
-function MakePlot($plotdata, $title, $legend, $ytitle='', $ypoints='') {
+function MakePlot($plotdata, $title, $legend, $ytitle='', $ypoints='', $type='lines', $datatype='text-data') {
     global $JS;
+    $ymax = 240;
+    $xmax = 600;
 
-    $plot = new PHPlot(600, 240);
+    $plot = new PHPlot($xmax, $ymax);
     $plot->SetFailureImage(False);  // No error images
     $plot->SetPrintImage(False);    // No automatic output
     $plot->SetImageBorderType('plain');
-    $plot->SetPlotType('lines');
-    $plot->SetDataType('text-data');
+    $plot->SetPlotType($type);
+    $plot->SetDataType($datatype);
     $plot->SetDataValues($plotdata);
-    $plot->SetXLabelAngle(90);
     $plot->SetLineWidths(3);
-    $plot->SetLegend($legend);
-    $plot->SetLegendPixels(45, 25);
+    if ($datatype == 'text-data-yx') {
+        $plot->SetYTickPos('none');
+        //$plot->SetXTickPos('none');
+        //$plot->SetXTickLabelPos('none');
+        //$plot->SetXDataLabelPos('plotin');
+        //$plot->SetLegendPixels($xmax-85, 5);
+        if ($ypoints) { $plot->SetXDataLabelPos('plotin'); }
+    }
+    else {
+        $plot->SetLegend($legend);
+        $plot->SetXLabelAngle(90);
+        $plot->SetLegendPixels(45, 25);
+        //$plot->SetLegendPosition(0, 0, 'plot', 0, 0, 5, 5);
+        if ($ypoints) { $plot->SetYDataLabelPos('plotin'); }
+    }
     $plot->SetTitle($title);
-    if ($ypoints) { $plot->SetYDataLabelPos('plotin'); }
     if ($ytitle) {
         $plot->SetYTitle($ytitle);
         // With Y data labels, we don't need Y ticks or their labels, so turn them off.
