@@ -90,7 +90,7 @@ if ($fcn == 'whatever') {
     MakePlot($plotdata, $title, $legend);
 
     // Plot coounts of steps not completed 
-    $legend = array('ncbib38', 'ncbib37', 'ncbiorig', 'b38', 'b37', 'cram', 'qplot', 'bai', 'md5ver', 'arrive');    // Reversed
+    $legend = array('ncbib38', 'ncbib37', 'ncbiorig', 'ncbiexpt', 'b38', 'b37', 'cram', 'qplot', 'bai', 'md5ver', 'arrive');    // Reversed
     $title = "Steps Not Completed for $totalbamcount BAMs";
     $plotdata = array(); 
     foreach ($legend as &$c) {  
