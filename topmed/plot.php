@@ -20,13 +20,22 @@ include_once 'phplot.php';
 
 //print "<!-- _POST=\n"; print_r($_POST); print " -->\n";
 
+$NOTSET = 0;                // Not set
+$REQUESTED = 1;             // Task requested
+$SUBMITTED = 2;             // Task submitted to be run
+$STARTED   = 3;             // Task started
+$DELIVERED = 19;            // Data delivered, but not confirmed
+$COMPLETED = 20;            // Task completed successfully
+$CANCELLED = 89;            // Task cancelled
+$FAILED    = 99;            // Task failed
+
+$LASTNDAYS = 20;            // How many days of data to plot
+
 //  Handy javascript fragments
 $JS['VSPACER'] = "<br/><br/>";
 $JS['SPACER'] = "&nbsp;&nbsp;&nbsp;&nbsp;";
 $JS['CLOSE'] = "<p align='right'><font size='-1'><a href='javascript:window.close()'>Close</a>" . $JS['SPACER'];
 $JS['BACK'] = "<p align='right'><font size='-1'><a href='javascript:history.back()'>Back</a>" . $JS['SPACER'];
-
-$COMPLETED = 20;            // Task completed successfully
 
 //-------------------------------------------------------------------
 //  Get parameters passed in via normal invocation
@@ -41,15 +50,15 @@ DB_Connect($LDB['realm']);
 if (! $fcn)    { $fcn = 'whatever'; }
 
 $totalcompletedbams = '';
-$sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . ' WHERE state_ncbiorig=20';
+$sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE state_ncbiorig=$COMPLETED";
 $result = SQL_Query($sql);
 $row = SQL_Fetch($result);
 $totalcompletedbams .= $row['count(*)'] . '/';
-$sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . ' WHERE state_ncbib37=20';
+$sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE state_ncbib37=$COMPLETED";
 $result = SQL_Query($sql);
 $row = SQL_Fetch($result);
 $totalcompletedbams .= $row['count(*)'] . '/';
-$sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . ' WHERE state_ncbib38=20';
+$sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE state_ncbib38=$COMPLETED";
 $result = SQL_Query($sql);
 $row = SQL_Fetch($result);
 $totalcompletedbams .= $row['count(*)'];
@@ -70,7 +79,18 @@ for ($i=0; $i<$numrows; $i++) {
 if ($fcn == 'whatever') {
     print doheader($HDR['title'], 1);
     print "<h2 align='center'>TopMed Activity</h2>\n";
-    $NCBIBAMDATE = '2016/01/01';            // No BAMs sent to NCBI before this
+    $yyyy = date('Y');
+    $mm = date('m');
+    $dd = sprintf('%02d', date('d') - $LASTNDAYS);
+    if ($dd < 0) {
+        $dd = sprintf('%02d', 30 - date('d'));
+        $mm = sprintf('%02d', date('m') - 1);
+    }
+    if ($mm == '00') {
+        $mm = '12';
+        $yyyy--;
+    }
+    $NCBIBAMDATE = $yyyy . '/' . $mm . '/' . $dd;   // No BAMs sent to NCBI before this
 
     //-------------------------------------------------------------------
     //  Details about steps for processing each BAM (non-NCBI)
@@ -82,6 +102,7 @@ if ($fcn == 'whatever') {
     $plotdata = array();
     for ($i=0; $i<$numrows; $i++) {
         $row = $sqldata[$i];
+        if ($row['yyyymmdd'] < $NCBIBAMDATE) { continue; }
         $d = array();
         array_push($d, substr($row['yyyymmdd'],5,5));
         array_push($d, $row['bamcount']);
@@ -89,12 +110,13 @@ if ($fcn == 'whatever') {
     }
     MakePlot($plotdata, $title, $legend);
 
-    // Plot coounts of steps not completed 
+/*
+    // Plot counts of steps not completed 
     $legend = array('ncbib38', 'ncbib37', 'ncbiorig', 'ncbiexpt', 'b38', 'b37', 'cram', 'qplot', 'bai', 'md5ver', 'arrive');    // Reversed
     $title = "Steps Not Completed for $totalbamcount BAMs";
     $plotdata = array(); 
     foreach ($legend as &$c) {  
-        $sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE state_$c!=20";
+        $sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE state_$c!=$COMPLETED";
         $result = SQL_Query($sql);
         $row = SQL_Fetch($result);
         $d = array();
@@ -102,21 +124,60 @@ if ($fcn == 'whatever') {
         array_push($d, $row['count(*)']);
         array_push($plotdata, $d);
     }
-    //MakePlot($plotdata, $title, $legend, '', 'y', 'bars', 'text-data-yx');
     MakePlot($plotdata, $title, $legend, '', 'y', 'bars', 'text-data-yx');
+*/
 
-    $legend = array('b38', 'b37', 'cram', 'qplot', 'bai', 'md5ver', 'arrive');
-    $legend = array('cram', 'qplot', 'bai', 'md5ver', 'arrive');
-     $title = "Daily Count of Steps Completed";
+    // Plot totals of all states for each step
+    $legend = array('ncbib38', 'ncbib37', 'ncbiorig', 'ncbiexpt', 'b38', 'b37', 'cram', 'qplot', 'bai');    // Reversed
+    $title = "Counts for Each Step [$totalbamcount Verified BAMs]";
+    $plotdata = array();
+    $s = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . ' ';
+    foreach ($legend as &$c) {  
+        $d = array();
+        array_push($d, $c);
+        $sql = $s . " WHERE state_$c=$COMPLETED";
+        $result = SQL_Query($sql);
+        $row = SQL_Fetch($result);
+        array_push($d, $row['count(*)']);
+
+        $sql = $s . " WHERE state_$c=$FAILED OR state_$c=$CANCELLED";
+        $result = SQL_Query($sql);
+        $row = SQL_Fetch($result);
+        array_push($d, $row['count(*)']);
+
+        $sql = $s . " WHERE state_$c=$SUBMITTED OR state_$c=$STARTED OR state_$c=$DELIVERED";
+        $result = SQL_Query($sql);
+        $row = SQL_Fetch($result);
+        array_push($d, $row['count(*)']);
+
+        $sql = $s . " WHERE state_$c=$NOTSET OR state_$c=$REQUESTED";
+        $result = SQL_Query($sql);
+        $row = SQL_Fetch($result);
+        array_push($d, $row['count(*)']);
+
+        //print "<pre>$c Data=\n"; print_r($d); print "\n</pre>\n";
+        array_push($plotdata, $d);
+    }
+    $legend = array();
+    MakePlot($plotdata, $title, $legend, '', 'y', 'stackedbars', 'text-data-yx');
+    print "<p><font color='DarkGreen'><b>Completed</b></font>, " .
+        "<font color='red'><b>Failed/Canceled</b></font>, " .
+        "<font color='SlateBlue'><b>In Process</b></font> (submitted, running), or " .
+        "<font color='gray'><b>Not Started</b></font> " .
+        "</br><br></p>\n";
+
+    $legend = array('cram', 'qplot', 'bai', 'md5ver');
+    $title = "Daily Count of Steps Completed";
     $plotdata = array(); 
     for ($i=0; $i<$numrows; $i++) {
         $row = $sqldata[$i];
+        if ($row['yyyymmdd'] < $NCBIBAMDATE) { continue; }
         $d = array();
         array_push($d, substr($row['yyyymmdd'],5,5));
-        array_push($d, $row['count_verify']);
-        array_push($d, $row['count_bai']);
-        array_push($d, $row['count_qplot']);
         array_push($d, $row['count_cram']);
+        array_push($d, $row['count_qplot']);
+        array_push($d, $row['count_bai']);
+        array_push($d, $row['count_verify']);
         array_push($plotdata, $d);
     }
     MakePlot($plotdata, $title, $legend);
@@ -125,12 +186,13 @@ if ($fcn == 'whatever') {
     $plotdata = array(); 
     for ($i=0; $i<$numrows; $i++) {
         $row = $sqldata[$i];
+        if ($row['yyyymmdd'] < $NCBIBAMDATE) { continue; }
         $d = array();
         array_push($d, substr($row['yyyymmdd'],5,5));
-        array_push($d, $row['avetime_verify']);
-        array_push($d, $row['avetime_bai']);
-        array_push($d, $row['avetime_qplot']);
         array_push($d, $row['avetime_cram']);
+        array_push($d, $row['avetime_qplot']);
+        array_push($d, $row['avetime_bai']);
+        array_push($d, $row['avetime_verify']);
         array_push($plotdata, $d);
     }
     MakePlot($plotdata, $title, $legend, 'Seconds');
@@ -236,6 +298,7 @@ function MakePlot($plotdata, $title, $legend, $ytitle='', $ypoints='', $type='li
         //$plot->SetXTickLabelPos('none');
         //$plot->SetXDataLabelPos('plotin');
         //$plot->SetLegendPixels($xmax-85, 5);
+        $plot->SetDataColors(array('DarkGreen', 'red', 'SlateBlue', 'gray'));
         if ($ypoints) { $plot->SetXDataLabelPos('plotin'); }
     }
     else {
