@@ -29,25 +29,18 @@ $COMPLETED = 20;            // Task completed successfully
 $CANCELLED = 89;            // Task cancelled
 $FAILED    = 99;            // Task failed
 
-$LASTNDAYS = 20;            // How many days of data to plot
-
-//  Handy javascript fragments
-$JS['VSPACER'] = "<br/><br/>";
-$JS['SPACER'] = "&nbsp;&nbsp;&nbsp;&nbsp;";
-$JS['CLOSE'] = "<p align='right'><font size='-1'><a href='javascript:window.close()'>Close</a>" . $JS['SPACER'];
-$JS['BACK'] = "<p align='right'><font size='-1'><a href='javascript:history.back()'>Back</a>" . $JS['SPACER'];
-
 //-------------------------------------------------------------------
 //  Get parameters passed in via normal invocation
 //-------------------------------------------------------------------
-//print doheader($HDR['title'], 1);
+print doheader($HDR['title'], 1);
 
 //  Real parameters for each form, default is ''
-$parmcols = array('fcn');
+$parmcols = array('fcn', 'lastdays');
 extract (isolate_parms($parmcols));
 
 DB_Connect($LDB['realm']);
-if (! $fcn)    { $fcn = 'whatever'; }
+if (! $fcn)    { $fcn = 'plot'; }
+if (! $lastdays)   { $lastdays = 20; }
 
 $totalcompletedbams = '';
 $sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE state_ncbiorig=$COMPLETED";
@@ -76,60 +69,31 @@ for ($i=0; $i<$numrows; $i++) {
 //  We have saved all SQL data in $sqldata
 
 
-if ($fcn == 'whatever') {
-    print doheader($HDR['title'], 1);
-    print "<h2 align='center'>TopMed Activity</h2>\n";
-    $yyyy = date('Y');
-    $mm = date('m');
-    $dd = sprintf('%02d', date('d') - $LASTNDAYS);
-    if ($dd < 0) {
-        $dd = sprintf('%02d', 30 - date('d'));
-        $mm = sprintf('%02d', date('m') - 1);
-    }
-    if ($mm == '00') {
-        $mm = '12';
-        $yyyy--;
-    }
-    $NCBIBAMDATE = $yyyy . '/' . $mm . '/' . $dd;   // No BAMs sent to NCBI before this
-
+//-------------------------------------------------------------------
+//  Generate all interesting plots
+//-------------------------------------------------------------------
+if ($fcn == 'plot') {
+    $NCBIBAMDATE = date('Y/m/d', strtotime("-$lastdays days"));
+    //print "NCBIBAMDATE=$NCBIBAMDATE<br>\n";
     //-------------------------------------------------------------------
     //  Details about steps for processing each BAM (non-NCBI)
     //-------------------------------------------------------------------
-    print "<h4>Processing Steps Before Sending to NCBI</h4>\n" .
-        "<p>The following describe the various of steps to process a BAM.</p>\n";
-    $legend = array('bams');
-    $title = "Daily Count of Verified BAMs  Max=$totalbamcount";
-    $plotdata = array();
-    for ($i=0; $i<$numrows; $i++) {
-        $row = $sqldata[$i];
-        if ($row['yyyymmdd'] < $NCBIBAMDATE) { continue; }
-        $d = array();
-        array_push($d, substr($row['yyyymmdd'],5,5));
-        array_push($d, $row['bamcount']);
-        array_push($plotdata, $d);
-    }
-    MakePlot($plotdata, $title, $legend);
-
-/*
-    // Plot counts of steps not completed 
-    $legend = array('ncbib38', 'ncbib37', 'ncbiorig', 'ncbiexpt', 'b38', 'b37', 'cram', 'qplot', 'bai', 'md5ver', 'arrive');    // Reversed
-    $title = "Steps Not Completed for $totalbamcount BAMs";
-    $plotdata = array(); 
-    foreach ($legend as &$c) {  
-        $sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE state_$c!=$COMPLETED";
-        $result = SQL_Query($sql);
-        $row = SQL_Fetch($result);
-        $d = array();
-        array_push($d, $c);
-        array_push($d, $row['count(*)']);
-        array_push($plotdata, $d);
-    }
-    MakePlot($plotdata, $title, $legend, '', 'y', 'bars', 'text-data-yx');
-*/
-
+    print "<form action='" . $_SERVER['PHP_SELF'] . "' method='post'>\n" .
+        "<b><input type='submit' value=' Generate Plots '>\n" .
+        "<input type='text' name='lastdays' value='$lastdays' size='2'>\n" .
+        "days </form>" .
+        "</b></br>\n";   
+        
     // Plot totals of all states for each step
-    $legend = array('ncbib38', 'ncbib37', 'ncbiorig', 'ncbiexpt', 'b38', 'b37', 'cram', 'qplot', 'bai');    // Reversed
-    $title = "Counts for Each Step [$totalbamcount Verified BAMs]";
+    print "<p><b>Legend: <font size='-1'>" .
+        "<font color='DarkGreen'>Completed</font>, " .
+        "<font color='red'>Failed/Canceled</font>, " .
+        "<font color='SlateBlue'>In Process</font> (submitted, running, delivered), or " .
+        "<font color='gray'>Not Started</font> " .
+        "</font></b></p>\n";
+    $legend = array('ncbib38', 'ncbib37', 'ncbiorig', 'ncbiexpt',
+        'b38', 'b37', 'cram', 'qplot', 'bai');    // Reversed
+    $title = "State for Each Step [$totalbamcount Verified BAMs]";
     $plotdata = array();
     $s = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . ' ';
     foreach ($legend as &$c) {  
@@ -159,12 +123,7 @@ if ($fcn == 'whatever') {
         array_push($plotdata, $d);
     }
     $legend = array();
-    MakePlot($plotdata, $title, $legend, '', 'y', 'stackedbars', 'text-data-yx');
-    print "<p><font color='DarkGreen'><b>Completed</b></font>, " .
-        "<font color='red'><b>Failed/Canceled</b></font>, " .
-        "<font color='SlateBlue'><b>In Process</b></font> (submitted, running), or " .
-        "<font color='gray'><b>Not Started</b></font> " .
-        "</br><br></p>\n";
+    MakePlot($plotdata, $title, $legend, '', '', 'stackedbars', 'text-data-yx');
 
     $legend = array('cram', 'qplot', 'bai', 'md5ver');
     $title = "Daily Count of Steps Completed";
@@ -201,11 +160,13 @@ if ($fcn == 'whatever') {
     //  Details about steps sending data to NCBI
     //-------------------------------------------------------------------
     print "<h4>Sending BAMs to NCBI</h4>\n" .
-        "<p>The following describe the number of various BAMs and verage send times " .
-        "for the three types of BAMs  <b>orig</b> are the original BAMs (BROAD " .
-        "original BAMs are recreated from CRAM. <b>b37</b> BAMs are remapped using " .
-        "build 37 and are created from CRAMs. <b>b38</b> is similar except using " .
-        "build 38.</p>\n";
+        "<p><font size='-1'>" .
+        "The following describe the number of various BAMs and average send times " .
+        "for the three types of BAMs:  <b>orig</b> are the original BAMs (BROAD " .
+        "original BAMs are recreated from CRAM. <b>b37</b> are BAMs remapped using " .
+        "build 37 and are created from CRAMs and <b>b38</b> is similar except using " .
+        "build 38." .
+        "</font></p>\n";
     $title = "Daily Count of BAMs Sent to NCBI";
     $legend = array('orig', 'b37', 'b38');
     $plotdata = array(); 
@@ -249,8 +210,13 @@ if ($fcn == 'whatever') {
     }
     MakePlot($plotdata, $title, $legend, '', 'y');
 
+    print "<p><font size='-1'>" .
+        "Failure rates at NCBI for BAMs that are sent are surprisingly high. " .
+        "Here are the daily counts of errors. Once we figure out how to avoid " .
+        "these errors, this count should plunge to zero, we hope." .
+        "</font></p>\n";
     $title = "Daily Count of Errors When Sending BAMs to NCBI";
-    $legend = array('totalerrs');
+    $legend = array();
     $plotdata = array(); 
     for ($i=0; $i<$numrows; $i++) {
         $row = $sqldata[$i];
@@ -262,6 +228,7 @@ if ($fcn == 'whatever') {
     }
     MakePlot($plotdata, $title, $legend, '', 'y');
 
+    print dofooter($HDR['footer']);
     exit;
 }
 
@@ -317,7 +284,7 @@ function MakePlot($plotdata, $title, $legend, $ytitle='', $ypoints='', $type='li
     }
     $plot->DrawGraph();
     print "<img src=\""; print $plot->EncodeImage(); print "\" alt='$title'>\n";
-    print $JS['VSPACER'] . "\n";
+    print "<br/><br/>\n";
 }
 
 ?>
