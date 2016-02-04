@@ -67,21 +67,21 @@ our %opts = (
 
 Getopt::Long::GetOptions( \%opts,qw(
     help nolint realm=s verbose build=s inst_model=s design_description=s
-    run_processing=s xmlprefix=s type=s bamfn=s bamchecksum=s master_email=s
+    run_processing=s xmlprefix=s type=s bamchecksum=s master_email=s
     )) || die "$Script Failed to parse options\n";
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
     warn "$Script [options -type expt] bamid\n" .
         "  or\n" .
-        "$Script [options -type run ] bamid bamfn checksum\n" .
+        "$Script [options -type run ] bamid filename checksum\n" .
         "\n" .
         "Create XML files necessary to submit data to NCBI'.\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
     exit 1;
 }
-my ($bamid, $bamfn, $checksum) = @ARGV;
+my ($bamid, $filename, $checksum) = @ARGV;
 
 if ($opts{type} ne 'secondary' && $opts{type} ne 'remap' && $opts{type} ne 'expt') {
     die "$Script Invalid option 'type' ($opts{type}). Must be 'secondary', 'remap' or 'expt'\n";
@@ -138,40 +138,43 @@ if ($opts{type} eq 'expt') {
     exit;
 }
 
-if ((! $bamfn) || (! $checksum)) { die "$Script BAM filename or CHECKSUM not provided\n"; }
+if ((! $filename) || (! $checksum)) { die "$Script filename or CHECKSUM not provided\n"; }
 
 my $submitfile = $opts{xmlprefix} . "$href->{expt_sampleid}-$opts{type}.$opts{build}.submit.xml";
 my $runfile = $opts{xmlprefix} . "$href->{expt_sampleid}-$opts{type}.$opts{build}.run.xml";
 CreateSubmit($submitfile, "$href->{expt_sampleid}.run.$opts{type}.submit", 'run', $runfile);
 RunLINT($submitfile, 'submission');
-CreateRun($runfile, $href, $bamfn, $checksum);
+CreateRun($runfile, $href, $filename, $checksum);
 RunLINT($runfile, 'run' );
 exit;
 
 #==================================================================
 # Subroutine:
-#   CreateRun($f, $href, $bamfn, $checksum)
+#   CreateRun($f, $href, $filename, $checksum)
 #
 #   Create XML file of run information
 #   References global data
 #==================================================================
 sub CreateRun {
-    my ($f, $href, $bamfn, $checksum) = @_;
+    my ($f, $href, $filename, $checksum) = @_;
     my ($processingfile, $title);
-    $bamfn = basename($bamfn);                  # No fully qualified path
+    $filename = basename($filename);            # No fully qualified path
 
     if ($opts{type} eq 'secondary') {           # Original bam
         $processingfile = "$opts{processingsectiondir}/$center.run_processing.txt";
         $title = "Secondary mapping Build $opts{build} for $href->{expt_sampleid} [$href->{bamid}]";
-        if ($bamfn =~ /(^NWD\d+)/) {            # BAM we send should be called NWDxxxxx.src.bam
-            $bamfn = $1 . '.src.bam';
+        if ($filename =~ /(^NWD\d+)/) {         # BAM we send should be called NWDxxxxx.src.bam
+            $filename = $1 . '.src.bam';
         }
     }
     else {
-        if (! defined($bamfn)) { die "$Script BAM file not provided for RUN XML\n"; }
-        if (! defined($checksum)) { die "$Script Checksum not provided for bam '$bamfn'\n"; }
+        if (! defined($filename)) { die "$Script filename not provided for RUN XML\n"; }
+        if (! defined($checksum)) { die "$Script Checksum not provided for file '$filename'\n"; }
         $processingfile =  "$opts{processingsectiondir}/um$opts{build}.run_processing.txt";
-        $title = "Primary mapping Build $opts{build} for $href->{expt_sampleid} [$href->{bamid}]";
+        $title = 'Undefined';
+        if ($opts{type} eq 'remap') { $title = 'Remapped file'; }
+        if ($opts{type} eq 'primary') { $title = 'Primary mapping'; }
+        $title .= " Build $opts{build} for $href->{expt_sampleid} [$href->{bamid}]";
     }
 
     #   Read in fixed XML data for all files in this run
@@ -186,7 +189,9 @@ sub CreateRun {
         die "$Script Unable to create file '$f': $!\n";
     print OUT "<?xml\n  version = \"1.0\"\n  encoding = \"UTF-8\"?>\n";
     print OUT "<RUN_SET\n" . $opts{xmlns_run};
-    my $xml = GenRUNXML($checksum, $title, "$href->{expt_sampleid}-expt", $runlines, $bamfn, $checksum);
+    my $refname = "$href->{expt_sampleid}-expt";
+    if ($center eq 'nygc') { $refname = $href->{expt_sampleid}; }   # Hack because we did not create expt
+    my $xml = GenRUNXML($checksum, $title, $refname, $runlines, $filename, $checksum);
     print OUT $xml . "</RUN_SET>\n";
     close(OUT);
     print "  Created Run XML $f\n";
@@ -201,6 +206,8 @@ sub CreateRun {
 sub GenRUNXML {
     my ($alias, $title, $refname, $runlines, $filename, $checksum) = @_;
 
+    my $ext = 'bam';
+    if ($filename =~ /\.(\w+)$/) { $ext = $1; }  # Should be cram or bam
     my $xml .= "<RUN\n" .
         "  alias = \"$alias\"\n" .
         "  center_name = \"$centerdesc\"\n" .
@@ -215,7 +222,7 @@ sub GenRUNXML {
         "  <FILES>\n" .
         "    <FILE\n" .
         "      filename = \"$filename\"\n" .
-        "      filetype = \"bam\"\n" .
+        "      filetype = \"$ext\"\n" .
         "      checksum_method = \"MD5\"\n" .
         "      checksum = \"$checksum\"></FILE>\n" .
         "  </FILES>\n" .
@@ -257,7 +264,7 @@ sub CreateExpt {
 # Subroutine:
 #   $xmlstring = Experiment($href)
 #
-#   Create XML EXPERIMENT clause for this BAM
+#   Create XML EXPERIMENT clause for this file
 #
 #   Returns:  string of XML or null if there was an error
 #==================================================================
@@ -487,10 +494,9 @@ The XML files will normally begin with the NWDID.
 
 Specifies the bam database identifier, e.g. B<5467>.
 
-=item B<bamfn>
+=item B<filename>
 
-Specifies the filename of the bam file.
-We assume the bamfile has been created from the cram if necessary.
+Specifies the filename of the BAM or CRAM file.
 Be sure you have specified the correct B<build> for this file.
 This is not verified.
 
@@ -508,7 +514,7 @@ return code of 0. Any error will set a non-zero return code.
 
 =head1 AUTHOR
 
-Written by Terry Gliedt I<E<lt>tpg@umich.eduE<gt>> in 2015 and is
+Written by Terry Gliedt I<E<lt>tpg@umich.eduE<gt>> in 2015-2016 and is
 is free software; you can redistribute it and/or modify it under the
 terms of the GNU General Public License as published by the Free Software
 Foundation; See http://www.gnu.org/copyleft/gpl.html
