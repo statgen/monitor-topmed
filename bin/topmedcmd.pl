@@ -82,6 +82,7 @@ our %opts = (
     netdir => '/net/topmed',
     incomingdir => 'incoming/topmed',
     backupsdir => 'working/backups/incoming/topmed',
+    resultsdir => 'working/schelcj/results',
     ascpcmd => "/usr/cluster/bin/ascp -i ".
         "/net/topmed/incoming/study.reference/send2ncbi/topmed-2-ncbi.pri -l 800M -k 1",
     ascpdest => 'asp-um-sph@gap-submit.ncbi.nlm.nih.gov:protected',
@@ -90,7 +91,7 @@ our %opts = (
 
 Getopt::Long::GetOptions( \%opts,qw(
     help realm=s verbose center=s runs=s
-    )) || die "Failed to parse options\n";
+    )) || die "$Script - Failed to parse options\n";
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
@@ -111,7 +112,7 @@ if ($#ARGV < 0 || $opts{help}) {
         "  or\n" .
         "$m send2ncbi files\n" .
         "  or\n" .
-        "$m where bamid\n" .
+        "$m where bamid bam|backup|b37|b38\n" .
         "  or\n" .
         "$m whatnwdid NWDnnnnn\n" .
         "  or\n" .
@@ -173,7 +174,7 @@ sub Mark {
         }
     }
     if (($bamid !~ /^\d+$/) || (! exists($VALIDVERBS{$op})) || (! exists($VALIDSTATUS{$state}))) {
-        die "$Script Invalid 'mark' syntax. Try '$Script -help'\n";
+        die "$Script - Invalid 'mark' syntax. Try '$Script -help'\n";
     }
 
     #   Make sure this is a bam we know
@@ -237,7 +238,7 @@ sub Mark {
     if ($done) {
         if ($opts{verbose}) { print "$Script  'mark $bamid $op $state'  successful\n"; } 
     }
-    else { die "$Script Invalid state '$state' for '$op'. Try '$Script -help'\n"; }
+    else { die "$Script - Invalid state '$state' for '$op'. Try '$Script -help'\n"; }
 }
 
 #==================================================================
@@ -249,7 +250,7 @@ sub Mark {
 sub UnMark {
     my ($bamid, $op) = @_;
     if (($bamid !~ /^\d+$/) || (! exists($VALIDVERBS{$op}))) {
-        die "$Script Invalid 'unmark' syntax. Try '$Script -help'\n";
+        die "$Script - Invalid 'unmark' syntax. Try '$Script -help'\n";
     }
 
     #   Make sure this is a bam we know
@@ -384,19 +385,27 @@ sub Send2NCBI {
 
 #==================================================================
 # Subroutine:
-#   Where($bamid)
+#   Where($bamid, $set)
 #
-#   Print path to bamid, path to the backup directory, bamname, real host of bamname, numeric part of realhost
+#   Print paths to various things for bamid based on $set
+#     bam       Print directory where BAM actually exists, no symlink
+#     backup    Print directory for backups and file (might not exist)
+#     b37       Print directory for remapped b37 and file (might not exist)
+#     b38       Print directory for remapped b38 and file (might not exist)
 #==================================================================
 sub Where {
-    my ($bamid) = @_;
+    my ($bamid, $set) = @_;
+    if ((! defined($set) || ! $set)) { $set = 'unset'; }    # Default
 
-    #   Reconstruct partial path to BAM
-    my $sth = DoSQL("SELECT runid,bamname from $opts{bamfiles_table} WHERE bamid=$bamid", 0);
+    #   Get values of interest from the database
+    my $sth = DoSQL("SELECT runid,bamname,cramname,piname,expt_sampleid from $opts{bamfiles_table} WHERE bamid=$bamid", 0);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
     my $href = $sth->fetchrow_hashref;
     my $bamname = $href->{bamname};
+    my $cramname = $href->{cramname};
+    my $piname = $href->{piname};
+    my $nwdid = $href->{expt_sampleid};
     my $runid = $href->{runid};
     $sth = DoSQL("SELECT centerid,dirname from $opts{runs_table} WHERE runid=$runid", 0);
     $rowsofdata = $sth->rows();
@@ -410,35 +419,98 @@ sub Where {
     $href = $sth->fetchrow_hashref;
     my $centername = $href->{centername};
 
-    #   The BAM is in one of those $opts{netdir} trees where center is not a symlink
-    my $bamfdir = '';
-    foreach ('', '2', '3', '4') {
-        $bamfdir = "$opts{netdir}$_/$opts{incomingdir}/$centername";
-        if (! -l $bamfdir) { last; }        # Found non-symlink to center directory
+    #   BAM is in one of those $opts{netdir} trees where without a symlink
+    if ($set eq 'bam') {
+        my $bamfdir = '';
+        foreach ('', '2', '3', '4') {
+            $bamfdir = "$opts{netdir}$_/$opts{incomingdir}/$centername";
+            if (! -l $bamfdir) { last; }        # Found non-symlink to center directory
+        }
+        if (! $bamfdir) { die "$Script - BAMID=$bamid Unable to find real directory for '$centername'\n"; }
+        print $bamfdir .= '/' . $rundir . "\n";
+        exit;
     }
-    if (! $bamfdir) { die "BAMID=$bamid Unable to find real directory for '$centername'\n"; }
-    $bamfdir .= '/' . $rundir;
+ 
+    #   Try to guess where the backup CRAM lives
+    if ($set eq 'backup') {
+        my $bakbamfdir = '';
+        my $bakfile = '';
+        foreach ('', '2', '3', '4') {
+            $bakbamfdir = "$opts{netdir}$_/$opts{backupsdir}/$centername";
+            $bakfile = "$bakbamfdir/$rundir/$cramname";
+            if (! -l $bakbamfdir) { last; }     # Found non-symlink to backup file
+        }
+        if (! -d $bakbamfdir) { $bakbamfdir = 'none'; }
+        else { $bakbamfdir .= '/' . $rundir; }
+        print "$bakbamfdir $bakfile\n";         # Note that file might not really exist
+        exit;
+    }
 
-    #   Because we can't really plan very well, some files in a directory might actually
-    #   live on some other host. All center directories and files should 'look' the
-    #   same on all hosts, but some directories can have files scattered all over the place.
-    my $realbamname = realpath("$bamfdir/$bamname");    # e.g. /net/topmed2/incoming/topmed/broad/2015jun22/xxxx
-    my $realhost = 'unknown';
-    if ($realbamname =~ /^($opts{netdir}\d*)\//)  { $realhost = substr($1,5); } # e.g. topmedN
-    my $realhostindex = '';
-    if ($realhost =~ /(\d)/)  { $realhostindex = $1; }     # e.g. 2
+    #   Try to guess where the b37 remapped CRAM lives
+    if ($set eq 'b37') {
+        my $b37fdir = '';
+        my $b37file = '';
+        foreach ('', '2', '3', '4') {
+            $b37fdir = "$opts{netdir}$_/$opts{resultsdir}/$centername/$piname/$nwdid/bams";
+            $b37file = "$b37fdir/$nwdid.recal.cram";
+            if (! -l $b37fdir) { last; }        # Found non-symlink to remapped file
+        }
+        if (! -d $b37fdir) { $b37fdir = 'none'; }
+        print "$b37fdir $b37file\n";            # Note that file might not really exist
+        exit;
+    }
 
-    #   The backup for the BAM is in another tree, also not a symlink
-    my $bakbamfdir = $opts{netdir};
-    if ($realhostindex eq '') { $bakbamfdir = $opts{netdir} . '2'; }
-    if ($realhostindex eq '2') { $bakbamfdir = $opts{netdir} . ''; }
-    if ($realhostindex eq '3') { $bakbamfdir = $opts{netdir} . '3'; }   # No idea what to do here
-    if ($realhostindex eq '4') { $bakbamfdir = $opts{netdir} . 'x4'; }  # No idea what to do here
-    $bakbamfdir = "$bakbamfdir/$opts{backupsdir}/$centername";
-    if (-l $bakbamfdir) { die "BAMID=$bamid bamdir=$bamfdir Backup directory may not be a symlink for '$bakbamfdir'\n"; }
-    $bakbamfdir .= '/' . $rundir;
+    #   Try to guess where the b38 remapped CRAM lives -- this likely needs to be corrected
+    if ($set eq 'b38') {
+        my $b38fdir = '';
+        my $b38file = '';
+        foreach ('', '2', '3', '4') {
+            $b38fdir = "$opts{netdir}$_/$opts{resultsdir}/$centername/$piname/$nwdid/bams";
+            $b38file = "$b38fdir/$nwdid.recal.cram";
+            if (! -l $b38fdir) { last; }        # Found non-symlink to remapped file
+        }
+        if (! -d $b38fdir) { $b38fdir = 'none'; }
+        print "$b38fdir $b38file\n";            # Note that file might not really exist
+        exit;
+    }
 
-    print "$bamfdir $bakbamfdir $bamname $realhost $realhostindex\n";
+    #
+    #   This is the original obsolete code - it should be removed after April 2016
+    #
+    if ($set eq 'unset') {
+        #   The BAM is in one of those $opts{netdir} trees where center is not a symlink
+        my $bamfdir = '';
+        foreach ('', '2', '3', '4') {
+            $bamfdir = "$opts{netdir}$_/$opts{incomingdir}/$centername";
+            if (! -l $bamfdir) { last; }        # Found non-symlink to center directory
+        }
+        if (! $bamfdir) { die "BAMID=$bamid Unable to find real directory for '$centername'\n"; }
+        $bamfdir .= '/' . $rundir;
+
+        #   Because we can't really plan very well, some files in a directory might actually
+        #   live on some other host. All center directories and files should 'look' the
+        #   same on all hosts, but some directories can have files scattered all over the place.
+        my $realbamname = realpath("$bamfdir/$bamname");    # e.g. /net/topmed2/incoming/topmed/broad/2015jun22/xxxx
+        my $realhost = 'unknown';
+        if ($realbamname =~ /^($opts{netdir}\d*)\//)  { $realhost = substr($1,5); } # e.g. topmedN
+        my $realhostindex = '';
+        if ($realhost =~ /(\d)/)  { $realhostindex = $1; }     # e.g. 2
+
+        #   The backup for the BAM is in another tree, also not a symlink
+        my $bakbamfdir = $opts{netdir};
+        if ($realhostindex eq '') { $bakbamfdir = $opts{netdir} . '2'; }
+        if ($realhostindex eq '2') { $bakbamfdir = $opts{netdir} . ''; }
+        if ($realhostindex eq '3') { $bakbamfdir = $opts{netdir} . '3'; }   # No idea what to do here
+        if ($realhostindex eq '4') { $bakbamfdir = $opts{netdir} . 'x4'; }  # No idea what to do here
+        $bakbamfdir = "$bakbamfdir/$opts{backupsdir}/$centername";
+        if (-l $bakbamfdir) { die "BAMID=$bamid bamdir=$bamfdir Backup directory may not be a symlink for '$bakbamfdir'\n"; }
+        $bakbamfdir .= '/' . $rundir;
+
+        print "$bamfdir $bakbamfdir $bamname $realhost $realhostindex\n";
+        exit;
+    }
+
+    die "$Script - Unknown Where option '$set'\n";
 }
 
 #==================================================================
@@ -567,7 +639,7 @@ sub GetBamidInfo {
 sub Set {
     my ($bamid, $col, $val) = @_;
     if ($bamid !~ /^\d+$/){
-        die "$Script Invalid 'set' syntax. Try '$Script -help'\n";
+        die "$Script - Invalid 'set' syntax. Try '$Script -help'\n";
     }
 
     #   Make sure this is a bam we know
@@ -591,7 +663,7 @@ sub Show {
     if ($bamid eq 'arrived') { return ShowArrived($bamid); }
 
     if ($bamid !~ /^\d+$/){
-        die "$Script Invalid 'show' syntax. Try '$Script -help'\n";
+        die "$Script - Invalid 'show' syntax. Try '$Script -help'\n";
     }
 
     my $sth = DoSQL("SELECT bamid,runid from $opts{bamfiles_table} WHERE bamid=$bamid", 0);
@@ -684,7 +756,10 @@ topmedcmd.pl - Update the database for NHLBI TopMed
 
   topmedcmd.pl set 33 jobidqplot 123445    # Set jobidqplot in bamfiles
  
-  topmedcmd.pl where 2199                  # Returns path to bam, path to backup, bamname
+  topmedcmd.pl where 2199 bam              # Returns real path to bam
+  topmedcmd.pl where 2199 backup           # Returns path to backups directory and to backup file
+  topmedcmd.pl where 2199 b37              # Returns path to remapped b37 directory and to file
+  topmedcmd.pl where 2199 b38              # Returns path to remapped b38 directory and to file
 
   topmedcmd.pl permit add bai braod 2015oct18   # Stop bai job submissions for a run
   topmedcmd.pl permit remove 12             # Remove a permit control
@@ -766,13 +841,14 @@ database value.
 B<whatnwdid bamid|NWDnnnnnn>
 Use this to get some details for a particular bam.
 
-<where bamid>
-Use this to display the directory of the bam file, 
-the path to the backup direcotry,
-the name of the bam without any path,
-the real host where the file leaves (e.g. B<topmed3>),
-and the index of the hostname (e.g. B<2> for topmed2).
-
+B<where bamid bam|backup|b37|b38>
+If B<bam> was specified, display the path to the real bam file, not one that is symlinked.
+If B<backup> was specified, display the path to the backup directory (or 'none')
+and the path to the backup file (which may not exist).
+If B<b37> was specified, display the path to the directory of remapped data for build 37 (or 'none')
+and the path to the remapped file (which may not exist).
+If B<b38> was specified, display the path to the directory of remapped data for build 38 (or 'none')
+and the path to the remapped file (which may not exist).
 
 =head1 EXIT
 
