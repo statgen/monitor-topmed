@@ -636,7 +636,7 @@ sub BatchSubmit {
     my ($cmd) = @_;
     $opts{maxjobs}--;
     if ($opts{maxjobs} < 0) { return; }
-    if ($opts{maxjobs} == 0) { print "Limit of jobs to be submitted has been reached\n"; }
+    if ($opts{maxjobs} == 0 && $opts{verbose}) { print "Limit of jobs to be submitted has been reached\n"; }
     if ($opts{dryrun}) { print "dryrun => $cmd\n"; return; }
     my $rc = system("$cmd 2>&1");
     $rc = $rc >> 8;
