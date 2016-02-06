@@ -331,13 +331,14 @@ sub WhatNWDID {
     }
   
     #   Reconstruct partial path to BAM
-    my $sth = DoSQL("SELECT runid from $opts{bamfiles_table} WHERE expt_sampleid='$nwdid'", 0);
+    my $sth = DoSQL("SELECT runid,bamid from $opts{bamfiles_table} WHERE expt_sampleid='$nwdid'", 0);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - NWDID '$nwdid' is unknown\n"; }
     my $href = $sth->fetchrow_hashref;
+    my $bamid = $href->{bamid};
     $sth = DoSQL("SELECT dirname from $opts{runs_table} WHERE runid=$href->{runid}");
     $href = $sth->fetchrow_hashref;
-    print "'$nwdid' can be found in run '$href->{dirname}'\n";
+    print "$nwdid/$bamid can be found in run '$href->{dirname}'\n";
 }
 
 #==================================================================
@@ -388,8 +389,8 @@ sub Send2NCBI {
 #   Where($bamid, $set)
 #
 #   Print paths to various things for bamid based on $set
-#     bam       Print directory where BAM actually exists, no symlink
-#     backup    Print directory for backups and file (might not exist)
+#     bam       Print directory where BAM actually exists, no symlink, and host for BAM
+#     backup    Print directory for backups and file (might not exist) and host for backup
 #     b37       Print directory for remapped b37 and file (might not exist)
 #     b38       Print directory for remapped b38 and file (might not exist)
 #==================================================================
@@ -422,12 +423,14 @@ sub Where {
     #   BAM is in one of those $opts{netdir} trees where without a symlink
     if ($set eq 'bam') {
         my $bamfdir = '';
+        my $bamhost = '';
         foreach ('', '2', '3', '4') {
             $bamfdir = "$opts{netdir}$_/$opts{incomingdir}/$centername";
             if (! -l $bamfdir) { last; }        # Found non-symlink to center directory
         }
         if (! $bamfdir) { die "$Script - BAMID=$bamid Unable to find real directory for '$centername'\n"; }
-        print $bamfdir .= '/' . $rundir . "\n";
+        if ($bamfdir =~ /^\/net\/(\w+)/) { $bamhost = $1; }
+        print "$bamfdir/$rundir $bamhost\n";
         exit;
     }
  
@@ -435,14 +438,18 @@ sub Where {
     if ($set eq 'backup') {
         my $bakbamfdir = '';
         my $bakfile = '';
+        my $backuphost = '';
         foreach ('', '2', '3', '4') {
             $bakbamfdir = "$opts{netdir}$_/$opts{backupsdir}/$centername";
             $bakfile = "$bakbamfdir/$rundir/$cramname";
             if (! -l $bakbamfdir) { last; }     # Found non-symlink to backup file
         }
-        if (! -d $bakbamfdir) { $bakbamfdir = 'none'; }
-        else { $bakbamfdir .= '/' . $rundir; }
-        print "$bakbamfdir $bakfile\n";         # Note that file might not really exist
+        if (! -d $bakbamfdir) { $bakbamfdir = $backuphost = 'none'; }
+        else {
+            $bakbamfdir .= '/' . $rundir;
+            if ($bakbamfdir =~ /^\/net\/(\w+)/) { $backuphost = $1; }
+        }
+        print "$bakbamfdir $bakfile $backuphost\n";     # Note that file might not really exist
         exit;
     }
 
@@ -756,8 +763,8 @@ topmedcmd.pl - Update the database for NHLBI TopMed
 
   topmedcmd.pl set 33 jobidqplot 123445    # Set jobidqplot in bamfiles
  
-  topmedcmd.pl where 2199 bam              # Returns real path to bam
-  topmedcmd.pl where 2199 backup           # Returns path to backups directory and to backup file
+  topmedcmd.pl where 2199 bam              # Returns real path to bam and host of bam
+  topmedcmd.pl where 2199 backup           # Returns path to backups directory and to backup file and host
   topmedcmd.pl where 2199 b37              # Returns path to remapped b37 directory and to file
   topmedcmd.pl where 2199 b38              # Returns path to remapped b38 directory and to file
 
@@ -842,9 +849,11 @@ B<whatnwdid bamid|NWDnnnnnn>
 Use this to get some details for a particular bam.
 
 B<where bamid bam|backup|b37|b38>
-If B<bam> was specified, display the path to the real bam file, not one that is symlinked.
+If B<bam> was specified, display the path to the real bam file, not one that is symlinked
+and the host where the bam exists (or null string).
 If B<backup> was specified, display the path to the backup directory (or 'none')
-and the path to the backup file (which may not exist).
+and the path to the backup file (which may not exist)
+and the host where the backup BAM file should exist (or null string).
 If B<b37> was specified, display the path to the directory of remapped data for build 37 (or 'none')
 and the path to the remapped file (which may not exist).
 If B<b38> was specified, display the path to the directory of remapped data for build 38 (or 'none')
