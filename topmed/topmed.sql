@@ -29,6 +29,8 @@ INSERT INTO centers (centername,centerdesc,designdesc) VALUES('broad', 'Broad In
 INSERT INTO centers (centername,centerdesc,designdesc) VALUES('illumina', 'Illumina Fast Track Services','PCR-Free Paired-end libraries are manually generated from 500ng-1ug of gDNA using the Illumina TruSeq DNA Sample Preparation Kit (Catalog #: FC-121-2001), based on the protocol in the TruSeq DNA PCR-Free Sample Preparation Guide.  Pre-fragmentation gDNA cleanup is performed using paramagnetic sample purification beads (Agencourt (TM) AMPure (TM) XP reagents, Beckman Coulter).  Samples are fragmented and libraries are size selected following fragmentation and end-repair using paramagnetic sample purification beads, targeting short inserts.  Final libraries are quality controlled for size using a gel electrophoretic separation system and are quantified.');
 INSERT INTO centers (centername,centerdesc,designdesc) VALUES('nygc', 'New York Genome Center','Whole genome sequencing using Illumina TruSeq PCR-free DNA library preparation with 500ng input DNA, sequenced to >30x mean coverage with 2x150bp reads on HiSeq X.');
 INSERT INTO centers (centername,centerdesc,designdesc) VALUES('uw', 'University of Washington Genome Sciences','equivalent to Illumina TruSeq PCR-free DNA sample prep');
+INSERT INTO centers (centername,centerdesc,designdesc) VALUES('baylor', 'UNKNOWN center','UNKNOWN Design Desc');
+
 
 /* Lists all runs (directories of data). Must be tied to a center */
 DROP TABLE IF EXISTS runs;
