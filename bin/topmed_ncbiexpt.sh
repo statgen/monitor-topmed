@@ -9,6 +9,8 @@ ascpcmd="$topmedcmd send2ncbi"
 topmedxml="/usr/cluster/monitor/bin/topmed_xml.pl"
 mem=2G
 if [ "$TOPMED_MEMORY" != "" ]; then mem=$TOPMED_MEMORY; fi
+realhost=topmed
+if [ "$TOPMED_HOST" != "" ]; then realhost=$TOPMED_HOST; fi
 console=/net/topmed/working/topmed-output
 markverb=sentexpt
 qos=bai                      # This queue is free most of the time
@@ -21,10 +23,6 @@ if [ "$1" = "-submit" ]; then
   if [ "$?" = "0" ]; then
     exit 4
   fi 
-
-  #   This is short and sweet, can run anywhere
-  realhost=topmed
-  if [ "$TOPMED_HOST" != "" ]; then realhost=$TOPMED_HOST; fi
   slurmp="$realhost-incoming"
   slurmqos="$realhost-$qos"
 
