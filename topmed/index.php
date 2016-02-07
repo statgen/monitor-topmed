@@ -838,7 +838,7 @@ function GetCenters() {
     $result = SQL_Query($sql);
     $numrows = SQL_NumRows($result);
     $CENTERID2NAME = array();               // Hash of centerid to names
-    $CENTERID2NAME = array();               // Hash of names to centerid
+    $CENTERNAME2ID = array();               // Hash of names to centerid
     $CENTERS = array();                     // Array of names
     for ($j=0; $j<=$numrows; $j++) {
         $row = SQL_Fetch($result);
