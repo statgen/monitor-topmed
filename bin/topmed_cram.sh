@@ -11,6 +11,8 @@ topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 backupdir=/net/topmed/working/backups
 mem=8G
 if [ "$TOPMED_MEMORY" != "" ]; then mem=$TOPMED_MEMORY; fi
+realhost=topmed
+#if [ "$TOPMED_HOST" != "" ]; then realhost=$TOPMED_HOST; fi
 console=/net/topmed/working/topmed-output
 markverb=cramed
 squeezed=n
@@ -26,10 +28,10 @@ if [ "$1" = "-submit" ]; then
   fi 
 
   #   Figure where to submit this to run - should be local
-  l=(`$topmedcmd where $1`)     # Get bampath backuppath bamname realhost realhostindex
-  realhost="${l[3]}"
+  l=(`$topmedcmd where $1 backup`)     # Get backupdir and backupfile and host
+  h="${l[2]}"
+  if [ "$h" != "" ]; then realhost=$h; fi
   if [ "$TOPMED_HOST" != "" ]; then realhost=$TOPMED_HOST; fi
-  realhostindex="${l[4]}"
   slurmp="$realhost-incoming"
   slurmqos="$realhost-$qos"
 
@@ -72,34 +74,9 @@ fi
 bamid=$1
 bamfile=$2
 
-#   This is a bit of a hack to insure backups of data on topmed
-#   go to topmed2 and vice versa
-homehost=`echo $2 | cut -d / -f 3`      # Should be topmed/topmed2
-if [ "$homehost" != "" ]; then
-  if [ "$homehost" = "topmed" ]; then
-    homehost=topmed2
-  fi
-  if [ "$homehost" = "topmed2" ]; then
-    homehost=topmed
-  fi
-  backupdir=/net/$homehost/working/backups
-fi
-
-#   Now calc destination directory
-l=(`$topmedcmd where $bamid`)           # Get bampath backuppath bamname
-bampath="${l[0]}"
-backupdir="${l[1]}"
-bamname="${l[2]}"
-
-if [ "$bampath/$bamname" != "$bamfile" ]; then
-  echo ""
-  echo ""
-  echo "This sure looks wrong - the input is not where I think it should be. Continuing anyway"
-  echo "  input    bamfile=$bamfile"
-  echo "  expected bamfile=$bampath/$bamname"
-  echo ""
-  echo ""
-fi
+#   Get destination directory for backup files
+l=(`$topmedcmd where $1 backup`)        # Get backupdir and backupfile and host
+backupdir="${l[0]}"
 
 d=`date +%Y/%m/%d`
 mkdir -p $backupdir
