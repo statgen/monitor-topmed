@@ -340,8 +340,9 @@ if ($fcn eq 'sexpt') {
             for (my $i=1; $i<=$rowsofdata; $i++) {
                 my $href = $sth->fetchrow_hashref;
                 
-                #   Only do if this NWDID if it has been verified and we did something with it
+                #   Only do if this NWDID if all the local steps have completed
                 if ($href->{state_qplot} != $COMPLETED) { next; }
+                if ($href->{state_cram} != $COMPLETED) { next; }
 
                 #   Check important fields for this BAM are possibly correct
                 my $skip = 0;
