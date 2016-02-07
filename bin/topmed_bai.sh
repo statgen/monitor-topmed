@@ -8,6 +8,8 @@ topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 gcbin=/net/mario/gotcloud/bin
 mem=1G
 if [ "$TOPMED_MEMORY" != "" ]; then mem=$TOPMED_MEMORY; fi
+realhost=topmed
+#if [ "$TOPMED_HOST" != "" ]; then realhost=$TOPMED_HOST; fi
 console=/net/topmed/working/topmed-output
 qos=bai
 if [ "$TOPMED_QOS" != "" ]; then qos=$TOPMED_QOS; fi
@@ -21,10 +23,10 @@ if [ "$1" = "-submit" ]; then
   fi 
 
   #   Figure where to submit this to run - should be local
-  l=(`$topmedcmd where $1`)     # Get bampath backuppath bamname realhost realhostindex
-  realhost="${l[3]}"
+  l=(`$topmedcmd where $1 bam`)         # Get pathofbam and host for bam
+  h="${l[1]}"
+  if [ "$h" != "" ]; then realhost=$h; fi
   if [ "$TOPMED_HOST" != "" ]; then realhost=$TOPMED_HOST; fi
-  realhostindex="${l[4]}"
   slurmp="$realhost-incoming"
   slurmqos="$realhost-$qos"
 
