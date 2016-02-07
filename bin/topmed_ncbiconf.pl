@@ -241,14 +241,28 @@ sub CheckBAMS {
             $loadednwdids{$1} = 'orig';
             next;
         }
-        if (/protected\s+.+\s+(NWD\S+).recal.37.bam\s+.+=\s+=\s+=\s+loaded\sBAM/) { 
+        if (/protected\s+.+\s+(NWD\S+).src.cram\s+.+=\s+=\s+=\s+loaded\sBAM/) {
+            $loadednwdids{$1} = 'orig';
+            next;
+        }
+        if (/protected\s+.+\s+(NWD\S+).recal.37.cram\s+.+=\s+=\s+=\s+loaded\sBAM/) { 
             $loadednwdids{$1} = 'b37';
             next;
         }
-        if (/protected\s+.+\s+(NWD\S+).recal.38.bam\s+.+=\s+=\s+=\s+loaded\sBAM/) { 
+        if (/protected\s+.+\s+(NWD\S+).recal.38.cram\s+.+=\s+=\s+=\s+loaded\sBAM/) { 
             $loadednwdids{$1} = 'b38';
             next;
         }
+        #   This is because an NCBI column is not set as expected 
+        if (/protected\s+.+\s+(NWD\S+).src.cram\s+.+=\s+=\s+=\s+loaded\sUNKNOWN/) {
+            $loadednwdids{$1} = 'orig';
+            next;
+        }
+        if (/protected\s+.+\s+(NWD\S+).recal.37.cram\s+.+=\s+=\s+=\s+loaded\sUNKNOWN/) { 
+            $loadednwdids{$1} = 'b37';
+            next;
+        }
+
     }
     close(IN);
 
