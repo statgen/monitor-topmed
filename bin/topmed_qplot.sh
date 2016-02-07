@@ -11,9 +11,11 @@ gcref=/net/mario/nodeDataMaster/local/ref/gotcloud.ref
 topoutdir=/net/topmed/incoming/qc.results
 mem=8G
 if [ "$TOPMED_MEMORY" != "" ]; then mem=$TOPMED_MEMORY; fi
+realhost=topmed
+#if [ "$TOPMED_HOST" != "" ]; then realhost=$TOPMED_HOST; fi
 qos=qplot
-markverb=qploted
 if [ "$TOPMED_QOS" != "" ]; then qos=$TOPMED_QOS; fi
+markverb=qploted
 
 if [ "$1" = "-submit" ]; then
   shift
@@ -24,11 +26,11 @@ if [ "$1" = "-submit" ]; then
   fi 
 
   #   Figure where to submit this to run - should be local
-  l=(`$topmedcmd where $1`)     # Get bampath backuppath bamname realhost realhostindex
-  realhost="${l[3]}"
+  l=(`$topmedcmd where $1 bam`)         # Get pathofbam and host for bam
+  h="${l[1]}"
+  if [ "$h" != "" ]; then realhost=$h; fi
   if [ "$TOPMED_HOST" != "" ]; then realhost=$TOPMED_HOST; fi
-  realhostindex="${l[4]}"
-  slurmp="$realhost-incoming"   # Sometimes we think this should be nomosix
+  slurmp="$realhost-incoming"
   slurmqos="$realhost-$qos"
 
   l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-qplot --output=$console/$1-qplot.out $0 $*`)
@@ -53,11 +55,6 @@ if [ "$2" = "" ]; then
 fi
 bamid=$1
 bamfile=$2
-
-homehost=`echo $bamfile | cut -d / -f 3`    # Should be topmed or topmned2
-if [ "$homehost" != "" ]; then
-  console=/net/$homehost/working/topmed-output
-fi
 
 #   Mark this as started
 $topmedcmd mark $bamid $markverb started
