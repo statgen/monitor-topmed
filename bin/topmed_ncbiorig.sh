@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-#   topmed_ncbiorig.sh -submit [-xmlonly] bamid
+#   topmed_ncbiorig.sh -submit bamid
 #
 #	Send the proper set of files to NCBI for the original bams
 #
@@ -10,6 +10,8 @@ ascpcmd="$topmedcmd send2ncbi"
 topmedxml="/usr/cluster/monitor/bin/topmed_xml.pl"
 mem=8G
 if [ "$TOPMED_MEMORY" != "" ]; then mem=$TOPMED_MEMORY; fi
+realhost=topmed
+#if [ "$TOPMED_HOST" != "" ]; then realhost=$TOPMED_HOST; fi
 console=/net/topmed/working/topmed-output
 tmpconsole=/working/topmed-output
 topmeddir=/net/topmed/incoming/topmed
@@ -28,12 +30,11 @@ if [ "$1" = "-submit" ]; then
     exit 4
   fi 
 
-  #   This will usually have files on both topmeds, so it does not matter where it runs
-  l=(`$topmedcmd where $1`)     # Get bampath backuppath bamname realhost realhostindex
-  realhost="${l[3]}"
-  realhost=topmed
+  #   Figure where to submit this to run - does not need to be local
+  l=(`$topmedcmd where $1 bam`)         # Get pathofbam and host for bam
+  h="${l[1]}"
+  if [ "$h" != "" ]; then realhost=$h; fi
   if [ "$TOPMED_HOST" != "" ]; then realhost=$TOPMED_HOST; fi
-  realhostindex="${l[4]}"
   slurmp="$realhost-incoming"
   slurmqos="$realhost-$qos"
 
@@ -53,15 +54,10 @@ fi
 
 if [ "$1" = "" ]; then
   me=`basename $0`
-  echo "Usage: $me [-submit] [-xmlonly] bamid"
+  echo "Usage: $me [-submit] bamid"
   echo ""
   echo "Send original BAM files to NCBI"
   exit 1
-fi
-send=all
-if [ "$1" = "-xmlonly" ]; then      # We need to resend the XML, not the file
-  shift
-  send=xmlonly
 fi
 bamid=$1
 shift
@@ -80,33 +76,13 @@ if [ "$center" = "" ]; then
   $topmedcmd mark $bamid $markverb failed
   exit 2
 fi
-run=`$topmedcmd show $bamid run`
-if [ "$run" = "" ]; then
-  echo "Invalid bamid '$bamid'. RUN not known"
-  $topmedcmd mark $bamid $markverb failed
-  exit 2
-fi
 origbam=`$topmedcmd show $bamid bamname`
 if [ "$origbam" = "" ]; then
   echo "Invalid bamid '$bamid'. BAMNAME not known"
   $topmedcmd mark $bamid $markverb failed
   exit 2
 fi
-checksum=`$topmedcmd show $bamid checksum`
-if [ "$checksum" = "" ]; then
-  echo "Invalid bamid '$bamid'. CHECKSUM not known"
-  $topmedcmd mark $bamid $markverb failed
-  exit 2
-fi
-fqorigbam=$topmeddir/$center/$run/$origbam
-if [ ! -f "$fqorigbam" ]; then
-  echo "Original BAM for bamid '$bamid' ($fqorigbam) not found"
-  $topmedcmd mark $bamid $markverb failed
-  exit 2
-fi
 
-d=`date +%Y/%m/%d`
-echo "#========= $d $SLURM_JOB_ID $0 bamid=$bamid file=$origbam ========="
 #   Go to our working directory
 cd $tmpconsole
 if [ "$?" != "0" ]; then
@@ -118,37 +94,35 @@ mkdir XMLfiles 2>/dev/null
 cd XMLfiles
 here=`pwd`
 
-#   If necessary, create the BAM file to be sent
-#   samtools view by default writes to std out.  Could use option "-o *.bam" to
-#   suppress this and specify the output file name in the options to samtools.
-#   Option "-@" tells how many extra threads to use for compression when writing
-#   a .bam file.  I'm just guessing 3 -- meaning 4 threads total, including the main one.
-sendbam="$nwdid.src.bam"
-if [ "$send" != "xmlonly" ]; then
-  if [ "$center" = "broad" ]; then
-    sleep `rand -M 120`               # Wait a bit so samtools caching might not screw up
-    echo "Creating BAM $sendbam from CRAM $fqorigbam"
-    $samtools view -b -@3 -o $sendbam $fqorigbam 
-    if [ "$?" != "0" ]; then
-      echo "Unable to create BAM: $samtools .. $sendbam $fqorigbam"
-      $topmedcmd mark $bamid $markverb failed
-      exit 2
-    fi
-  else
-    ln -fs $fqorigbam $sendbam
-    l=`head -1 $sendbam`
-    if [ "$l" = "" ]; then
-      echo "Unable to find original BAM file: $fqorigbam"
-      $topmedcmd mark $bamid $markverb failed
-      exit 2
-    fi
-  fi
+#   Figure out what file to send. Either a BAM or a CRAM
+if [ "$center" = "broad" ]; then
+  l=(`$topmedcmd where $1 backup`)      # Get backupdir and backupfile and host
+  sendfile="${l[1]}"
+  ln -sf $sendfile `basename $sendfile`
+  checksum=`$topmedcmd show $bamid cramchecksum`
 else
-  echo "XMLONLY - $sendbam not created"
+  l=(`$topmedcmd where $1 bam`)         # Get pathofbam and host for bam
+  sendfile=$origbam
+  ln -sf ${l[0]}/$origbam $origbam
+  checksum=`$topmedcmd show $bamid checksum`
+fi
+if [ "$checksum" = "" ]; then
+  echo "Invalid bamid '$bamid'. CHECKSUM not known"
+  $topmedcmd mark $bamid $markverb failed
+  exit 2
 fi
 
+if [ ! -f "$sendfile" ]; then
+  echo "Original BAM for bamid '$bamid' ($sendfile) not found"
+  $topmedcmd mark $bamid $markverb failed
+  exit 2
+fi
+
+d=`date +%Y/%m/%d`
+echo "#========= $d $SLURM_JOB_ID $0 bamid=$bamid file=$sendfile ========="
+
 #   Create the XML to be sent
-$topmedxml -xmlprefix $here/ -type $version $bamid $fqorigbam $checksum
+$topmedxml -xmlprefix $here/ -type $version $bamid $sendfile $checksum
 if [ "$?" != "0" ]; then
   echo "Unable to create $version run XML files"
   $topmedcmd mark $bamid $markverb failed
@@ -175,24 +149,20 @@ if [ "$?" != "0" ]; then
 fi
 files=$nwdid-$version.$build.tar
 
-if [ "$send" != "xmlonly" ]; then
-  echo "Sending data file to NCBI - $sendbam"
-  ls -l $sendbam
-  stime=`date +%s`
-  $ascpcmd $sendbam
-  rc=$?
-  rm -f $sendbam
-  if [ "$rc" != "0" ]; then
-    echo "FAILED to send data file '$sendbam'"
-    $topmedcmd mark $bamid $markverb failed
-    exit 2
-  fi
-  etime=`date +%s`
-  etime=`expr $etime - $stime`
-  echo "BAM file sent in $etime seconds"
-else
-  echo "XMLONLY - $sendbam not sent"
+echo "Sending data file to NCBI - $sendfile"
+ls -l $sendfile
+stime=`date +%s`
+$ascpcmd $sendfile
+rc=$?
+rm -f $sendfile
+if [ "$rc" != "0" ]; then
+  echo "FAILED to send data file '$sendfile'"
+  $topmedcmd mark $bamid $markverb failed
+  exit 2
 fi
+etime=`date +%s`
+etime=`expr $etime - $stime`
+echo "File sent in $etime seconds"
 
 echo "Sending XML files to NCBI - $files"
 $ascpcmd $files
