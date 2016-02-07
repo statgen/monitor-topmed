@@ -1,10 +1,8 @@
 #!/bin/bash
 #
-#   topmed_ncbib37.sh -submit [-xmlonly] bamid
+#   topmed_ncbib37.sh -submit bamid
 #
-#   e.g. topmed_ncbib37.sh -xmlonly 11303   (for nygc 11302 NWD792235)
-#
-#	Send the proper set of files to NCBI for the remap b37 bam
+#	Send the proper set of files to NCBI for the remapped bam build 37
 #
 samtools=/net/mario/gotcloud/bin/samtools
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
@@ -12,12 +10,14 @@ ascpcmd="$topmedcmd send2ncbi"
 topmedxml="/usr/cluster/monitor/bin/topmed_xml.pl"
 mem=8G
 if [ "$TOPMED_MEMORY" != "" ]; then mem=$TOPMED_MEMORY; fi
+realhost=topmed
+if [ "$TOPMED_HOST" != "" ]; then realhost=$TOPMED_HOST; fi
 console=/net/topmed/working/topmed-output
 tmpconsole=/working/topmed-output
 topmeddir=/net/topmed/incoming/topmed
-remapdir=/net/topmed/working/schelcj/results
+remapdir="/net/topmed/working/schelcj/results /net/topmed2/working/schelcj/results /net/topmed3/working/schelcj/results /net/topmed4/working/schelcj/results"
 build=37
-version=primary
+version=remap
 markverb=sentb$build
 jobname=b$build
 qos=ncbi
@@ -30,13 +30,6 @@ if [ "$1" = "-submit" ]; then
   if [ "$?" = "0" ]; then
     exit 4
   fi 
-
-  #   This will usually have files on both topmeds, so it does not matter where it runs
-  l=(`$topmedcmd where $1`)     # Get bampath backuppath bamname realhost realhostindex
-  realhost="${l[3]}"
-  realhost=topmed3
-  if [ "$TOPMED_HOST" != "" ]; then realhost=$TOPMED_HOST; fi
-  realhostindex="${l[4]}"
   slurmp="$realhost-incoming"
   slurmqos="$realhost-$qos"
 
@@ -56,20 +49,15 @@ fi
 
 if [ "$1" = "" ]; then
   me=`basename $0`
-  echo "Usage: $me [-submit] [-xmlonly] bamid"
+  echo "Usage: $me [-submit] bamid"
   echo ""
-  echo "Send Remapped Build $build BAM file to NCBI"
+  echo "Send Remapped Build $build CRAM file to NCBI"
   exit 1
-fi
-send=all
-if [ "$1" = "-xmlonly" ]; then      # We need to resend the XML, not the file
-  shift
-  send=xmlonly
 fi
 bamid=$1
 shift
 $topmedcmd mark $bamid $markverb started
-
+#   Get some values from the database
 nwdid=`$topmedcmd show $bamid expt_sampleid`
 if [ "$nwdid" = "" ]; then
   echo "Invalid bamid '$bamid'. NWDID not known"
@@ -88,15 +76,7 @@ if [ "$piname" = "" ]; then
   $topmedcmd mark $bamid $markverb failed
   exit 2
 fi
-fqremappedcram="$remapdir/$center/$piname/$nwdid/bams/$nwdid.recal.cram"
-if [ ! -f "$fqremappedcram" ]; then
-  echo "Remapped CRAM for bamid '$bamid' ($fqremappedcram) not found"
-  $topmedcmd mark $bamid $markverb failed
-  exit 2
-fi
 
-d=`date +%Y/%m/%d`
-echo "#========= $d $SLURM_JOB_ID $0 bamid=$bamid file=$fqremappedcram ========="
 #   Go to our working directory
 cd $tmpconsole
 if [ "$?" != "0" ]; then
@@ -108,60 +88,53 @@ mkdir XMLfiles 2>/dev/null
 cd XMLfiles
 here=`pwd`
 
-#   Create the BAM file to be sent
-#   samtools view by default writes to std out.  Could use option "-o *.bam" to
-#   suppress this and specify the output file name in the options to samtools.
-#   Option "-@" tells how many extra threads to use for compression when writing
-#   a .bam file.  I'm just guessing 3 -- meaning 4 threads total, including the main one.
-sendbam="$nwdid.recal.$build.bam"
-if [ "$send" != "xmlonly" ]; then
-  echo "Creating BAM $sendbam from CRAM $fqremappedcram"
-  sleep `rand -M 120`               # Wait a bit so samtools caching might not screw up
-  stime=`date +%s`
-  $samtools view -b -@3 -o $sendbam $fqremappedcram 
-  if [ "$?" != "0" ]; then
-    echo "Unable to create BAM: $samtools .. $sendbam $fqremappedcram"
-    $topmedcmd mark $bamid $markverb failed
-    exit 2
+#   Figure out what file to send
+sendfile=doesnotexist
+for d in $remapdir; do
+  dd="$d/$center/$piname/$nwdid/bams"
+  if [ -f "$dd/$nwdid.recal.cram" ]; then
+    ln -sf $dd/$nwdid.recal.cram $nwdid.recal.$build.cram
+    sendfile=$nwdid.recal.$build.cram
+    break;
   fi
-  etime=`date +%s`
-  etime=`expr $etime - $stime`
-  echo "BAM created from CRAM in $etime seconds"
-
-  #   Calculate the MD5 for the bam
-  echo "Calculating MD5 for new bam"
+done
+if [ ! -f "$sendfile" ]; then
+  echo "Remapped CRAM Build $build for bamid '$bamid' not found"
+  $topmedcmd mark $bamid $markverb failed
+  exit 2
+fi
+checksum=`$topmedcmd show $bamid cramb37checksum`
+if [ "$checksum" = "" ]; then
+  echo "Calculating MD5 for CRAM"
   stime=`date +%s`
-  checksum=`md5sum $sendbam | awk '{print $1}'`
+  checksum=`md5sum $sendfile | awk '{print $1}'`
   if [ "$checksum" = "" ]; then
-    echo "Unable to calculate the MD5 for the new BAM: md5sum $sendbam"
+    echo "Unable to calculate the MD5 for CRAM: md5sum $sendfile"
     $topmedcmd mark $bamid $markverb failed
     exit 3
   fi
-  $topmedcmd set $bamid b37bamchecksum $checksum
+  $topmedcmd set $bamid cramb37checksum $checksum
   etime=`date +%s`
   etime=`expr $etime - $stime`
-  echo "MD5 calculated from CRAM in $etime seconds"
+  echo "MD5 calculated for CRAM in $etime seconds"
 else
-  echo "XMLONLY - $sendbam not created"
-  checksum=`$topmedcmd show $bamid b37bamchecksum`
-  if [ "$checksum" = "" ]; then
-    echo "Invalid bamid '$bamid'. b37bamchecksum not known"
-    $topmedcmd mark $bamid $markverb failed
-    exit 2
-  fi
+  echo "Obtained cramb37checksum for bamid $bamid from database ($checksum)"
 fi
 
+d=`date +%Y/%m/%d`
+echo "#========= $d $SLURM_JOB_ID $0 bamid=$bamid file=$sendfile ========="
+
 #   Create the XML to be sent
-$topmedxml -xmlprefix $here/ -type remap $bamid $here/$sendbam $checksum
+$topmedxml -xmlprefix $here/ -type $version $bamid $sendfile $checksum
 if [ "$?" != "0" ]; then
-  echo "Unable to create remap run XML files"
+  echo "Unable to create $version run XML files"
   $topmedcmd mark $bamid $markverb failed
   exit 2
 fi
 
 #   Check files we created
 files=''
-for f in $nwdid-remap.$build.submit.xml $nwdid-remap.$build.run.xml; do
+for f in $nwdid-$version.$build.submit.xml $nwdid-$version.$build.run.xml; do
   if [ ! -f $f ]; then
     echo "Missing XML file '$f'"   
     $topmedcmd mark $bamid $markverb failed
@@ -171,32 +144,29 @@ for f in $nwdid-remap.$build.submit.xml $nwdid-remap.$build.run.xml; do
 done
 
 #   Make a TAR of the XML files to send
-tar cf $nwdid-remap.$build.tar $files
+tar cf $nwdid-$version.$build.tar $files
 if [ "$?" != "0" ]; then
   echo "Unable to create TAR of XML files"
-  $topmedcmd mark $bamid sentexpt failed
+  $topmedcmd mark $bamid $markverb failed
   exit 2
 fi
-files=$nwdid-remap.$build.tar
+files=$nwdid-$version.$build.tar
 
-if [ "$send" != "xmlonly" ]; then
-  echo "Sending data file to NCBI - $sendbam"
-  ls -l $sendbam
-  stime=`date +%s`
-  $ascpcmd $sendbam
-  rc=$?
-  rm -f $sendbam
-  if [ "$rc" != "0" ]; then
-    echo "FAILED to send data file '$sendbam'"
-    $topmedcmd mark $bamid $markverb failed
-    exit 2
-  fi
-  etime=`date +%s`
-  etime=`expr $etime - $stime`
-  echo "BAM file sent in $etime seconds"
-else
-  echo "XMLONLY - $sendbam not sent"
+echo "Sending data file to NCBI - $sendfile"
+ls -l $sendfile
+
+stime=`date +%s`
+$ascpcmd $sendfile
+rc=$?
+rm -f $sendfile
+if [ "$rc" != "0" ]; then
+  echo "FAILED to send data file '$sendfile'"
+  $topmedcmd mark $bamid $markverb failed
+  exit 2
 fi
+etime=`date +%s`
+etime=`expr $etime - $stime`
+echo "File sent in $etime seconds"
 
 echo "Sending XML files to NCBI - $files"
 $ascpcmd $files
