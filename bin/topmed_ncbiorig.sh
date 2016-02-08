@@ -96,12 +96,12 @@ here=`pwd`
 
 #   Figure out what file to send. Either a BAM or a CRAM
 if [ "$center" = "broad" ]; then
-  l=(`$topmedcmd where $1 backup`)      # Get backupdir and backupfile and host
+  l=(`$topmedcmd where $bamid backup`)      # Get backupdir and backupfile and host
   sendfile="${l[1]}"
   ln -sf $sendfile `basename $sendfile`
   checksum=`$topmedcmd show $bamid cramchecksum`
 else
-  l=(`$topmedcmd where $1 bam`)         # Get pathofbam and host for bam
+  l=(`$topmedcmd where $bamid bam`)         # Get pathofbam and host for bam
   sendfile=$origbam
   ln -sf ${l[0]}/$origbam $origbam
   checksum=`$topmedcmd show $bamid checksum`
