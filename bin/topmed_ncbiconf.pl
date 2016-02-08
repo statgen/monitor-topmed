@@ -217,6 +217,8 @@ sub CheckBAMS {
     #   Get hash of all original BAMs delivered to NCBI
     my $nwd2bamid = GetNWDlist($cref, 'state_ncbiorig');
     if (! %{$nwd2bamid}) { print "$Script - No original BAMs have been delivered\n"; return; }
+    my $yesterday = strftime('%Y-%m-%d', localtime(time()-86400));
+    my $today = strftime('%Y-%m-%d', localtime);
 
     #   Find all NWDIDnnnnn.src.bam in
     #   protected 3563129 2014-09-06T09:24:12 NWDnnnnn.src.bam 10844214270 93ed94e9918b868d0ecd7009c3e427e8 = = = loaded BAM etc
@@ -231,38 +233,50 @@ sub CheckBAMS {
     else { $rc = open(IN, $file); }
     if (! $rc) { die "$Script - Unable to read file '$file': $!\n"; }
     while (<IN>) {
-        if (/protected\s+.+\s+(NWD\d+\S*.run.xml)\s+.+\s+error\s+RUN_XML\s+-\s+(\S+)/) {
-            my ($x, $msg) = ($1, $2);
-            $msg =~ s/_/ /g;
-            $nwdid2errormsg{$x} .= $x . ': ' . $msg . "\n";
+        chomp();
+        #   [0]=protected [2]=date [3]=NWDnnnnnn [9]=error|loaded [10]=BAM|CRAM|UKNOWN [12]=message
+        my @cols = split(' ',$_);
+        if ($cols[0] ne 'protected') { next; }
+        if ($cols[9] eq 'error') {
+            #   Only show error message for the last few days
+            if (substr($cols[2],0,10) eq $today || substr($cols[2],0,10) eq $yesterday) {
+                $cols[12] =~ s/_/ /g;
+                $nwdid2errormsg{$cols[3]} .= $cols[3] . ': ' . $cols[12] . "\n";
+            }
             next;
         }
-        if (/protected\s+.+\s+(NWD\S+).src.bam\s+.+=\s+=\s+=\s+loaded\sBAM/) {
-            $loadednwdids{$1} = 'orig';
-            next;
-        }
-        if (/protected\s+.+\s+(NWD\S+).src.cram\s+.+=\s+=\s+=\s+loaded\sBAM/) {
-            $loadednwdids{$1} = 'orig';
-            next;
-        }
-        if (/protected\s+.+\s+(NWD\S+).recal.37.cram\s+.+=\s+=\s+=\s+loaded\sBAM/) { 
-            $loadednwdids{$1} = 'b37';
-            next;
-        }
-        if (/protected\s+.+\s+(NWD\S+).recal.38.cram\s+.+=\s+=\s+=\s+loaded\sBAM/) { 
-            $loadednwdids{$1} = 'b38';
-            next;
-        }
-        #   This is because an NCBI column is not set as expected 
-        if (/protected\s+.+\s+(NWD\S+).src.cram\s+.+=\s+=\s+=\s+loaded\sUNKNOWN/) {
-            $loadednwdids{$1} = 'orig';
-            next;
-        }
-        if (/protected\s+.+\s+(NWD\S+).recal.37.cram\s+.+=\s+=\s+=\s+loaded\sUNKNOWN/) { 
-            $loadednwdids{$1} = 'b37';
-            next;
-        }
+        my ($nwd, $suffix) = qw(unknown badsiffix);
+        if ($cols[9] ne 'loaded') { next; }
 
+        #   Found data from our project
+        if ($cols[3] !~ /(NWD\d+)\.(.+)/) {     # Break into NWDnnnnnn and suffix
+            next;
+        }
+        $nwd = $1;
+        $suffix = $2;
+
+        #   Note that cols[10] can be UNKNOWN because of a bug at NCBI 
+        if ($suffix eq 'src.bam' && $cols[10] eq 'BAM') {
+            $loadednwdids{$nwd} = 'orig';
+            next;
+        }
+        if ($suffix eq 'src.cram' && ($cols[10] eq 'CRAM' || $cols[10] eq 'UNKNOWN')) {
+            $loadednwdids{$nwd} = 'orig';
+            next;
+        }
+        #   This was a bug of mine when we sent files of the wrong name
+        if ($suffix eq 'recal.bam' && $cols[10] eq 'BAM') {
+            $loadednwdids{$nwd} = 'b37';
+            next;
+        }
+        if ($suffix eq 'recal.37.cram' && ($cols[10] eq 'CRAM' || $cols[10] eq 'UNKNOWN')) {
+            $loadednwdids{$nwd} = 'b37';
+            next;
+        }
+        if ($suffix eq 'recal.38.cram' && ($cols[10] eq 'CRAM' || $cols[10] eq 'UNKNOWN')) {
+            $loadednwdids{$nwd} = 'b38';
+            next;
+        }
     }
     close(IN);
 
@@ -280,12 +294,15 @@ sub CheckBAMS {
         if ($key =~ /(NWD\d+)/) { $nwdid = $1; }
         else { die "Unable to isolate NWDID:  NWDID=$nwdid Errormsg=$nwdid2errormsg{$key}\n"; }
         #   Figure out state column name
+        if ($key =~ /xml/)      { $statecol = 'xmlerror'; }
         if ($key =~ /remap.37/) { $statecol = 'state_ncbib37'; }
         if ($key =~ /remap.38/) { $statecol = 'state_ncbib38'; }
         if ($key =~ /secondary/) { $statecol = 'state_ncbiorig'; }
-        if (! $statecol) { die "Unable to figure out database column  NWDID=$nwdid Errormsg=$nwdid2errormsg{$key}\n"; }
+        if (! $statecol) { die "Unable to figure out database column '$key' NWDID=$nwdid Errormsg=$nwdid2errormsg{$key}\n"; }
         #   Now see if we already knew about this error
         delete($loadednwdids{$nwdid});          # Make sure we do not treat this as loaded
+        $errors++;
+        if ($statecol eq 'xmlerror') { next; }  # Fake error, count it but no DB update
         my $sql = "SELECT $statecol FROM $opts{bamfiles_table} " .
                 "WHERE expt_sampleid='$nwdid' AND $statecol!=$FAILED";
         my $sth = DoSQL($sql);
@@ -293,13 +310,12 @@ sub CheckBAMS {
         if (! $rowsofdata) { next; }            # Already knew about this error
         DoSQL("UPDATE $opts{bamfiles_table} SET $statecol=$FAILED WHERE expt_sampleid='$nwdid'");
         print "$nowdate  New error detected - failure for '$nwdid' $statecol\n";
-        $errors++;
     }
     if ($errors) { print "$nowdate  $errors new BAMs marked as FAILED\n"; }
 
     #   Found list of loaded NWDIDs
     foreach my $nwdid (keys %loadednwdids) {
-        if (! exists($nwd2bamid->{$nwdid})) { next; }
+        if (! exists($nwd2bamid->{$nwdid})) { next; }   # Something we've seen already
         #   This NWDID is known
         my $v = $loadednwdids{$nwdid};
         if ($opts{verbose}) { print "  Completed $v BAM for $nwdid (bamid=$nwd2bamid->{$nwdid})\n"; }
