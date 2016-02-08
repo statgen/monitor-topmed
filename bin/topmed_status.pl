@@ -134,7 +134,7 @@ if ($fcn eq 'runstatus') {
                     $s .= "$attributes2letter{$a}=processing,";
                     next;
                 }
-                if ($counts{$a}{done} >= $numberbams) {
+                if ($numberbams && $counts{$a}{done} >= $numberbams) {
                     $s .= "$attributes2letter{$a}=done,";
                     next;
                 }
