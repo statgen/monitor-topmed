@@ -99,7 +99,7 @@ for d in $remapdir; do
   fi
 done
 if [ ! -f "$sendfile" ]; then
-  echo "Remapped CRAM Build $build for bamid '$bamid' not found"
+  echo "Remapped CRAM for Build $build for bamid '$bamid' not found ($sendfile)"
   $topmedcmd mark $bamid $markverb failed
   exit 2
 fi
