@@ -44,7 +44,6 @@ our %opts = (
     topmedcmd => "$topmedbin/topmedcmd.pl",
     topmedarrive => "$topmedbin/topmed_arrive.sh",
     topmedverify => "$topmedbin/topmed_verify.sh",
-    topmedbackup => "$topmedbin/topmed_backup.sh",
     topmedcram   => "$topmedbin/topmed_cram.sh",
     topmedbai    => "$topmedbin/topmed_bai.sh",
     topmedqplot  => "$topmedbin/topmed_qplot.sh",
@@ -61,6 +60,7 @@ our %opts = (
     topdir  => '/net/topmed/incoming/topmed',
     topdir2 => '/net/topmed2/incoming/topmed',
     topdir3 => '/net/topmed3/incoming/topmed',
+    topdir4 => '/net/topmed4/incoming/topmed',
     backupdir => '/working/backups/incoming/topmed',
     resultsdir => '/incoming/qc.results',    
     dryrun => 0,
@@ -77,7 +77,7 @@ Getopt::Long::GetOptions( \%opts,qw(
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$Script [options] arrive|verify|backup|bai|qplot|cram|sexpt|sorig|sb37|sb38\n" .
+    warn "$Script [options] arrive|verify|bai|qplot|cram|sexpt|sorig|sb37|sb38\n" .
         "Find runs which need some action and queue a request to do it.\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
@@ -206,40 +206,6 @@ if ($fcn eq 'bai') {
                 if ($href->{state_bai} != $NOTSET && $href->{state_bai} != $REQUESTED) { next; }
                 #   Run the command
                 BatchSubmit("$opts{topmedbai} -submit $href->{bamid} $f");
-            }
-        }
-    }
-    ShowSummary($fcn);
-    exit;
-}
-
-#--------------------------------------------------------------
-#   Get a list of BAMs that have not been backed up
-#--------------------------------------------------------------
-if ($fcn eq 'backup') {
-    #   Get all the known centers in the database
-    my $centersref = GetCenters();
-    foreach my $cid (keys %{$centersref}) {
-        my $centername = $centersref->{$cid};
-        my $runsref = GetRuns($cid) || next;
-        #   For each run, see if there are bamfiles to be backed up
-        foreach my $runid (keys %{$runsref}) {
-            my $dirname = $runsref->{$runid};
-            #   Get list of all bams that have not yet arrived properly
-            my $sql = "SELECT bamid,bamname,state_md5ver,state_backup FROM " .
-                $opts{bamfiles_table} . " WHERE runid='$runid'";
-            my $sth = DoSQL($sql);
-            my $rowsofdata = $sth->rows();
-            if (! $rowsofdata) { next; }
-            for (my $i=1; $i<=$rowsofdata; $i++) {
-                my $href = $sth->fetchrow_hashref;
-                my $f = $opts{topdir} . "/$centername/$dirname/" . $href->{bamname};
-                #   Only do bai if file has been verified
-                if ($href->{state_md5ver} != $COMPLETED) { next; }
-                if ($opts{suberr} && $href->{state_backup} == $FAILED) { $href->{state_backup} = $REQUESTED; }
-                if ($href->{state_backup} != $NOTSET && $href->{state_backup} != $REQUESTED) { next; }
-                #   Run the command
-                BatchSubmit("$opts{topmedbackup} -submit $href->{bamid} $f");
             }
         }
     }
@@ -678,7 +644,7 @@ sub ShowSummary {
 #==================================================================
 sub FindPrefix {
     my ($f) = @_;
-    foreach my $pfx ('topdir','topdir2','topdir3') {                    
+    foreach my $pfx ('topdir','topdir2','topdir3', 'topdir4') {                    
         if (-f "$opts{$pfx}/$f") { return $opts{$pfx}; }
     }
     return '';
@@ -785,7 +751,7 @@ Provided for developers to see additional information.
 
 =over 4
 
-=item B<arrive | verify | backup | bai | qplot | cram | sexpt | sorig | sb37 | sb38>
+=item B<arrive | verify | bai | qplot | cram | sexpt | sorig | sb37 | sb38>
 
 Directs this program to look for runs that have not been through the process name
 you provided and to queue a request they be verified.
