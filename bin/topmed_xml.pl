@@ -190,7 +190,15 @@ sub CreateRun {
     print OUT "<?xml\n  version = \"1.0\"\n  encoding = \"UTF-8\"?>\n";
     print OUT "<RUN_SET\n" . $opts{xmlns_run};
     my $refname = "$href->{expt_sampleid}-expt";
-    if ($center eq 'nygc') { $refname = $href->{expt_sampleid}; }   # Hack because we did not create expt
+    #   What a POS.  NYGC created their own experiments, so we need to know what
+    #   they used for the name. Oh, except for three particular samples :-((
+    if ($center eq 'nygc' &&
+        ($href->{expt_sampleid} ne 'NWD433184' &&
+        $href->{expt_sampleid} ne 'NWD143123' &&
+        $href->{expt_sampleid} ne 'NWD901849')
+        ) {
+        $refname = $href->{expt_sampleid};
+    }
     my $xml = GenRUNXML($checksum, $title, $refname, $runlines, $filename, $checksum);
     print OUT $xml . "</RUN_SET>\n";
     close(OUT);
