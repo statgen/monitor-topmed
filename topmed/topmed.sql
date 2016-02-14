@@ -1,6 +1,17 @@
 /* --------------------------------------------------------------
 #       NHLBI TopMed tracking entries
-#
+#--------------------------------------------------------------- 
+create database nhlbi;
+GRANT ALL    ON nhlbi.* TO sqlnhlbi@"localhost"   IDENTIFIED BY 'password';
+GRANT SELECT ON nhlbi.* TO sqlnhlbiro@"localhost" IDENTIFIED BY 'password';
+flush privileges;
+
+#   Clone the old database to the new
+mysqldump -u sqlnhlbi --password=g9X+6iaO -h f-db nhlbi > /tmp/nhlbi.sql
+mysql -u sqlnhlbi --password=g9X+6iaO -h localhost nhlbi < /tmp/nhlbi.sql
+*/
+
+/* --------------------------------------------------------------
 #   Do not delete columns without telling Chris so he can fix mapping
 #--------------------------------------------------------------- */
 /* This table is used to control when/if an operation is permitted
@@ -151,41 +162,6 @@ CREATE INDEX index_refname ON bamfiles(refname);
 /* ####################################################
    Daily statisitics for steps
    #################################################### */
-DROP TABLE IF EXISTS stepstats;
-CREATE TABLE stepstats (
-  yyyymmdd CHAR(10) NOT NULL,
-  count_verify      INT DEFAULT 0,
-  avetime_verify    INT DEFAULT 0,
-  count_bai         INT DEFAULT 0,
-  avetime_bai       INT DEFAULT 0,
-  count_qplot       INT DEFAULT 0,
-  avetime_qplot     INT DEFAULT 0,
-  count_cram        INT DEFAULT 0,
-  avetime_cram      INT DEFAULT 0,
-  count_expt        INT DEFAULT 0,
-  avetime_expt      INT DEFAULT 0,
-  ncbicount_expt    INT DEFAULT 0,
-  count_orig        INT DEFAULT 0,
-  avetime_orig      INT DEFAULT 0,
-  ncbicount_orig    INT DEFAULT 0,
-  count_b37         INT DEFAULT 0,
-  avetime_b37       INT DEFAULT 0,
-  ncbicount_b37     INT DEFAULT 0,
-  count_b38         INT DEFAULT 0,
-  avetime_b38       INT DEFAULT 0,
-  ncbicount_b38     INT DEFAULT 0,
-
-  bamcount           INT DEFAULT 0,      /* Count of all arrived bams */
-  errcount           INT DEFAULT 0,      /* Count of all errors for bams */
-  errorigcount       INT DEFAULT 0,      /* Count of original bams sent to NCBI in error */
-  loadedorigbamcount INT DEFAULT 0,      /* Count of loaded original BAMs at NCBI */
-  errb37count        INT DEFAULT 0,      /* Count of primary bams sent to NCBI in error */
-  loadedb37bamcount  INT DEFAULT 0,      /* Count of loaded primary BAMs at NCBI */
-  errb38count        INT DEFAULT 0,      /* Count of tertiary bams sent to NCBI in error */
-  loadedb38bamcount  INT DEFAULT 0,      /* Count of loaded tertiary BAMs at NCBI */
-  PRIMARY KEY  (yyyymmdd)
-);
-
 
 
 
