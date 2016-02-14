@@ -11,13 +11,17 @@
 # terms of the GNU General Public License as published by the Free Software
 # Foundation; See http://www.gnu.org/copyleft/gpl.html
 #################################################################*/
-$MON='topmed'; include_once '../local_config.php';
-include_once '../common.php';
-include_once '../header.php';
-include_once '../DBMySQL.php';
-include_once "../edit.php";
+$MON='topmed'; include_once 'local_config.php';
+include_once 'common.php';
+include_once 'header.php';
+include_once 'DBMySQL.php';
+include_once "edit.php";
 
 //print "<!-- _POST=\n"; print_r($_POST); print " -->\n";
+
+// Hack to tell if we are on statgen or not
+if ( file_exists('/exports/monitor/index.html')) { $oldsite = 1; }
+else { $oldsite = 0; }
 
 $qurl =  $_SERVER['SCRIPT_NAME'] . "?fcn=queue'";
 $STATUSLETTERS =  "<i><b>A</b>=File Arrived, <b>5</b>=MD5 Verified, <b>C</b>=BAM=>CRAM, <b>I</b>=BAI created<br/>" .
@@ -35,19 +39,26 @@ $SHOWQUEUES = "STATUS: &nbsp;&nbsp;&nbsp;" .
 
     "<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=df' " .
     "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=df\",680,720); " .
-    "return false;'>Disk Usage</a> &nbsp;&nbsp;&nbsp;" .
+    "return false;'>Disk Usage</a> &nbsp;&nbsp;&nbsp;";
 
     //"<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=errorcheck' " .
     //"onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=errorcheck\",680,720); " .
     //"return false;'>Error Check</a> &nbsp;&nbsp;&nbsp;" .
 
-    "<a href='https://statgen.sph.umich.edu/monitor/topmed/loadedfiles.txt' target='blank'> " .
-    " NCBI Log</a> &nbsp;&nbsp;&nbsp;" .
+    //"<a href='/topmed/loadedfiles.txt' target='blank'> " .
+    //" NCBI Log</a> &nbsp;&nbsp;&nbsp;" .
 
-    "<a href='https://statgen.sph.umich.edu/monitor/topmed/plot.php' target='plots'> " .
-    " Plots</a> &nbsp;&nbsp;&nbsp;" .
+    if ($oldsite) { 
+        $SHOWQUEUES .= "<a href='/monitor/topmed/plot.php' target='plots'> " .
+            " Plots</a> &nbsp;&nbsp;&nbsp;" .
+            "<a href='http://gcsdev.sph.umich.edu/topmed/' target='newcode'> New Site </a> &nbsp;&nbsp;&nbsp;";
+    }
+    else {
+        $SHOWQUEUES .= "<a href='/topmed/plot.php' target='plots'> " .
+            " Plots</a> &nbsp;&nbsp;&nbsp;";
+    }
 
-    "<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=logs' " .
+    $SHOWQUEUES .="<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=logs' " .
     "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=logs\",680,720); " .
     "return false;'>Tail Logs</a>";
 
@@ -120,6 +131,19 @@ $state2str = array(         // Values here are class for SPAN tag
     $FAILED => 'failed'
 );
 
+$NODELIST = array('topmed', 'topmed2', 'topmed3', 'topmed4');
+$TOPMEDJOBNAMES = array('verify', 'bai', 'qplot', 'cram', 'expt', 'orig', 'b37', 'b38');
+$LOGFILES = array('topmed_init.log',
+    'topmed_monitor_arrive.log',
+    'topmed_monitor_bai.log',
+    'topmed_monitor_cram.log',
+    'topmed_monitor_expt.log',
+    'topmed_monitor_ncbi.log',
+    'topmed_monitor_orig.log',
+    'topmed_monitor_phs.log',
+    'topmed_monitor_qplot.log',
+    'topmed_monitor_verify.log',
+    'topmed_monitor_b37.log' );
 
 //  These columns are state values to be converted to people readable strings
 //  See DateState() for possible values
@@ -150,12 +174,21 @@ $SHOWQUEUES .= " &nbsp;&nbsp;&nbsp; <a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn
     "return false;'>Control Jobs</a>";
 }
 print doheader($HDR['title'], 1);
+
 if ($iammgr) {
     $s = "<b>See TOPMed monitor docs " .
         "<a href='https://statgen.sph.umich.edu/wiki/NHLBI_automation_steps' target='_blank'>" .
         "here</a>.</b>\n";
+    if (! $oldsite) {
+        $s .= "<font color='red'>New Web Site, Not Everything Works</font></br>\n";
+    }
 }
-else { $s = ''; }
+else {
+    $s = '';
+    if (! $oldsite) {
+        $s .= "<font color='red'>New Web Site, Not Everything Works</font></br>\n";
+    }
+}
 print "<p class='intro'>The <a href='http://www.nhlbi.nih.gov/'>NHLBI</a> provides " .
     "science-based, plain-language information related to heart, lung " .
     "and blood diseases and conditions and sleep disorders.\n" .
@@ -163,7 +196,7 @@ print "<p class='intro'>The <a href='http://www.nhlbi.nih.gov/'>NHLBI</a> provid
     "(<a href='mailto:tblackw@umich.edu'>tblackw@umich.edu</a>). $s</p>\n";
 
 //  Real parameters for each form, default is ''
-$parmcols = array('fcn', 'maxdir', 'sortby', 'desc', 'center',
+$parmcols = array('fcn', 'maxdir', 'desc', 'center',
     'run', 'runid', 'bamid', 'centerid', 'fetchpath', 'hostname', 'col',
     'op', 'id');
 extract (isolate_parms($parmcols));
@@ -185,8 +218,7 @@ if ($fcn == 'queue') {              // This cannot work until statgen can run sq
     exit;
 }
 if ($fcn == 'runs') {
-    if (! $desc) { $desc = 'down'; }
-    print ViewRuns($center, $maxdir, 'runid', $desc, $iammgr);
+    print ViewRuns($center, $maxdir, $iammgr);
     print dofooter($HDR['footer']);
     exit;
 }
@@ -213,7 +245,6 @@ if ($fcn == 'reqshow') {
     exit;
 }
 if ($fcn == 'permit') {
-print "<!-- _POST=\n"; print_r($_POST); print " -->\n";
     $h = HandlePermit($op, $center, $run, $id);
     print ControlJobs($h);
     print dofooter($HDR['footer']);
@@ -227,37 +258,45 @@ if ($fcn == 'control') {
 
 if ($fcn == 'showqlocal') {
     print "<center>$SHOWQUEUES &nbsp;&nbsp;&nbsp;</center>\n";
-    print ShowSLURM('topmed-incoming');
-    print ShowSLURM('topmed2-incoming');
-    print ShowSLURM('topmed3-incoming');
-    //print ShowSLURM('topmed4-incoming');
-    exit;
-}
-
-if ($fcn == 'showqrmt') {
-    print "<center>$SHOWQUEUES &nbsp;&nbsp;&nbsp;</center>\n";
-    print ShowSLURM('nomosix');
+    if ($oldsite) {
+        foreach ($NODELIST as $n) {
+            $cmd = "/usr/cluster/monitor/bin/slurm_query.sh -squeue ${n}-incoming";
+            print `$cmd`;
+        }
+        exit;
+    }
+    foreach ($NODELIST as $n) { print ShowSLURMIcoming($n); }
     exit;
 }
 
 if ($fcn == 'df') {
     print "<center>$SHOWQUEUES &nbsp;&nbsp;&nbsp;</center>\n";
-    $cmd = "/usr/cluster/monitor/bin/slurm_query.sh -df ignored";
-    print `$cmd`;
-    exit;
-}
-
-if ($fcn == 'errorcheck') {
-    print "<center>$SHOWQUEUES &nbsp;&nbsp;&nbsp;</center>\n";
-    $cmd = "/usr/cluster/monitor/bin/slurm_query.sh -errorcheck ignored";
-    print `$cmd`;
+    if ($oldsite) {
+        $cmd = "/usr/cluster/monitor/bin/slurm_query.sh -df ignored";
+        print `$cmd`;
+        exit;
+    }
+    $cmd = "df -h";
+    foreach ($NODELIST as $n) { $cmd .= " /net/$n/incoming /net/$n/working";  }
+    print "<pre>" . `$cmd` . "</pre>\n";
     exit;
 }
 
 if ($fcn == 'logs') {
     print "<center>$SHOWQUEUES &nbsp;&nbsp;&nbsp;</center>\n";
-    $cmd = "/usr/cluster/monitor/bin/slurm_query.sh -logs ignored";
-    print `$cmd`;
+    if ($oldsite) {
+        $cmd = "/usr/cluster/monitor/bin/slurm_query.sh -logs ignored";
+        print `$cmd`;
+        exit;
+    }
+    $d = '/net/topmed/working/topmed-output';
+    if (! chdir($d)) {
+        print Emsg("Unable to find logs in '$d'", 1) . "<br/>\n";
+        exit;
+    }
+    $s = '<pre>';
+    foreach ($LOGFILES as $f) { $s .= "<b>Showing $f</b>\n" . `tail -6 $f`; }
+    print "$s</pre>\n";
     exit;
 }
 
@@ -437,10 +476,10 @@ function ViewPullQueue($cid, $onlyactive=1) {
 }
 
 /*---------------------------------------------------------------
-#   html = ViewRuns($center, $maxdirs, $sortby, $desc, $iammgr)
+#   html = ViewRuns($center, $maxdirs, $iammgr)
 #   Show summary of directories of runs
 ---------------------------------------------------------------*/
-function ViewRuns($center, $maxdirs, $sortby, $desc, $iammgr) {
+function ViewRuns($center, $maxdirs, $iammgr) {
     global $LDB, $CENTERS, $CENTERID2NAME, $CENTERNAME2ID, $RUNNOTE, $SHOWQUEUES;
     $hdrcols  = array('dirname', 'status', 'bamcount', 'dateinit', 'datecomplete');
 
@@ -462,28 +501,12 @@ function ViewRuns($center, $maxdirs, $sortby, $desc, $iammgr) {
     }
     $html .= "<br/>$SHOWQUEUES</center>\n";
 
-    $sql = 'SELECT * FROM ' . $LDB['runs'];
-    if ($center != 'all') { $sql .= ' WHERE centerid=' . $CENTERNAME2ID[$center]; }
-    if ($sortby) {
-        $sql .= " ORDER BY $sortby";
-        if ($desc == 'down' || $desc == '') { $sql .= ' DESC'; }
-        if ($desc == 'up') { $sql .= ' ASC'; }
-    }
-    if ($maxdirs) { $sql .= " LIMIT $maxdirs"; }
-    $result = SQL_Query($sql);
-    $numrows = SQL_NumRows($result);
-    $rows = array();                        // Save DB info for later display
     $centers2show = array();                // Get list of centers for this query
-    for ($i=0; $i<$numrows; $i++) {
-        $row = SQL_Fetch($result);
-        $c = $CENTERID2NAME[$row['centerid']];
-        $centers2show[$c] = 1;              // Collect center names
-        $rows[$row['runid']] = $row;
-    }
-    krsort($centers2show);
+    if ($center == 'all') { $centers2show = $CENTERS; }
+    else { array_push($centers2show, $center); }
 
-    //  For each center, show details from memory database ($rows)
-    foreach ($centers2show as $centr => $val) {
+    //  For each center, show details from database ($rows)
+    foreach ($centers2show as $centr) {
         $cid = $CENTERNAME2ID[$centr];
         $html .= "<br><div class='indent'><b>" . strtoupper($centr);
         if ($iammgr) {
@@ -503,7 +526,18 @@ function ViewRuns($center, $maxdirs, $sortby, $desc, $iammgr) {
         if ($iammgr) { $html .= "<th>&nbsp;</th>"; }
         $html .= "</tr>\n";
 
-        //  Walk through database showing data for this center
+        //  Walk through database getting data for this center
+        $sql = 'SELECT * FROM ' . $LDB['runs'] . " WHERE centerid=$cid";
+        if ($maxdirs) { $sql .= " LIMIT $maxdirs"; }
+        $result = SQL_Query($sql);
+        $numrows = SQL_NumRows($result);
+        $rows = array();            // Save DB info for later display
+        $centers2show = array();    // Get list of centers for this query
+        for ($i=0; $i<$numrows; $i++) {
+            $row = SQL_Fetch($result);
+            $rows[$row['runid']] = $row;
+        }
+
         reset($rows);
         foreach ($rows as $id => $row) {
             if ($row['centerid'] != $cid) { continue; }
@@ -650,13 +684,58 @@ function ViewBams($runid, $maxdirs, $iammgr) {
 }
 
 /*---------------------------------------------------------------
-#   html = ShowSLURM($q)
-#   Show summary of relevant SLURM queues
+#   html = ShowSLURMIcoming($host)
+#   Show summary of SLURM queues for this host
 ---------------------------------------------------------------*/
-function ShowSLURM($q) {
-    $cmd = "/usr/cluster/monitor/bin/slurm_query.sh -squeue $q";
-    $h = `$cmd`;
-    return $h;
+function ShowSLURMIcoming($host) {
+    global $TOPMEDJOBNAMES;
+    $JOBSTOSHOW = 10;
+
+    //  Get state for this machine
+    $cmd = "/usr/cluster/bin/scontrol show node $host | grep State=";
+    $results = `$cmd`;
+    $nodestate = 'State=Node not known';
+    $nodestate = 'State=Fix scontrol, Sean';
+
+    #   This should work too, returning something like 'State=MIXED'
+    #   except gcsdev does not work. Somehow the 48109 port is blocked maybe?
+    #$results = `/usr/bin/wget -o /dev/null -O $tmpfile.0 $url/shownode/$h`;
+
+    if (preg_match('/(State=\S+)/', $results, $m)) { $nodestate = $m[1]; }
+    if (preg_match('/DRAIN/', $nodestate)) { $nodestate = "<font color=red>$nodestate</font>"; }
+
+    //  Get number jobs queued
+    $tmpfile = '/tmp/tempfile.topmed';
+    $partition = "${host}-incoming";
+    $cmd = "/usr/cluster/bin/squeue --format '%A %.14j %.3t %.10M %R' -p $partition > $tmpfile";
+    system($cmd);
+    $cmd = "wc -l $tmpfile";
+    $results = `$cmd`;
+    $queuesize = 'empty';
+    if (preg_match('/(\d+) /', $results, $m)) { $queuesize = $m[1] - 1; }
+    print "<p>Partition <b>$partition</b> has $queuesize jobs queued &nbsp;&nbsp;&nbsp;&nbsp;  $nodestate\n";
+
+    //  Show summary of topmed-related jobs of interest
+    if ($queuesize) {
+        reset($TOPMEDJOBNAMES);
+        foreach ($TOPMEDJOBNAMES as $t) {
+            $cmd = "grep $t $tmpfile | wc -l";
+            if (preg_match('/(\d+)/', `$cmd`, $m)) { $queued = $m[1]; }
+            else { $queued = '?'; }
+            if ($queued == 0) { continue; }
+            $cmd = "grep $t $tmpfile | grep ' R ' | wc -l";
+            if (preg_match('/(\d+)/', `$cmd`, $m)) { $r = $m[1]; }
+            else { $r = '?'; }
+            print "<br/>&nbsp;&nbsp;&nbsp; $t jobs: $queued queued ($r running)\n";
+        }
+    
+        //  Show a few queued jobs
+        $cmd = "tail -$JOBSTOSHOW $tmpfile";
+        print "<br/>Last $JOBSTOSHOW queued jobs are:</p><pre>";
+        print `$cmd`;
+        print "</pre>\n";
+  }
+  unlink($tmpfile);
 }
 
 /*---------------------------------------------------------------
@@ -834,13 +913,13 @@ function HandlePermit($op, $center, $run, $id) {
 function GetCenters() {
     global $LDB, $CENTERID2NAME, $CENTERNAME2ID, $CENTERS;
 
-    $sql = 'SELECT * FROM ' . $LDB['centers'];
+    $sql = 'SELECT * FROM ' . $LDB['centers'] . ' ORDER BY centername ASC';
     $result = SQL_Query($sql);
     $numrows = SQL_NumRows($result);
     $CENTERID2NAME = array();               // Hash of centerid to names
     $CENTERNAME2ID = array();               // Hash of names to centerid
     $CENTERS = array();                     // Array of names
-    for ($j=0; $j<=$numrows; $j++) {
+    for ($j=0; $j<$numrows; $j++) {
         $row = SQL_Fetch($result);
         $i = $row['centerid'];
         $n = $row['centername'];

@@ -11,11 +11,10 @@
 # terms of the GNU General Public License as published by the Free Software
 # Foundation; See http://www.gnu.org/copyleft/gpl.html
 #################################################################*/
-$MON='topmed'; include_once '../local_config.php';
-include_once '../common.php';
-include_once '../header.php';
-include_once '../DBMySQL.php';
-include_once "../edit.php";
+$MON='topmed'; include_once 'local_config.php';
+include_once 'common.php';
+include_once 'header.php';
+include_once 'DBMySQL.php';
 include_once 'phplot.php';
 
 //print "<!-- _POST=\n"; print_r($_POST); print " -->\n";
