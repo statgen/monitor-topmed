@@ -95,7 +95,7 @@ if ($opts{fetchfiles}) {
     my $report = 'NCBI_SRA_Files_Full_UM-SPH_';
     my $rc = 1;
     #   Just for consistency's sake, the first of the month is different
-    if ($d eq '01') {                       # The first of the month is different
+    if ($d eq '01') {
         my $f = $report . $ym . $d . '.gz';
         $cmd = "$opts{ascpcmd} $ascphost:$opts{ascpinfiles}/$f .";
         $rc = system($cmd);
@@ -119,6 +119,8 @@ if ($opts{fetchfiles}) {
         }
     }
     if ($rc) {                              # Pretty lost, get all files and use last loaded file
+        # Here is command:  /usr/cluster/bin/ascp -i /net/topmed/incoming/study.reference/send2ncbi/topmed-2-ncbi.pri \
+        #   -Q -l 200m -k 1 -q asp-um-sph@gap-submit.ncbi.nlm.nih.gov:outgoing/Files .
         $cmd = "$opts{ascpcmd} $ascphost:$opts{ascpinfiles} .";   # Creates directory Files
         $rc = system($cmd);
         if ($rc != 0) { 
