@@ -110,18 +110,31 @@ exit;
 #==================================================================
 # Subroutine:
 #   CreateRun - Add details on this run to the database
-#   It's not complete, but it can get us going
+#   Make sure this directory is runnable. If not, no new runid
 #
 # Arguments:
 #   d - directory (e.g. run name)
 #   cid - center id
 #
 # Returns:
-#   runid
+#   runid or undef
 #==================================================================
 sub CreateRun {
     my ($cid, $d) = @_;
+    #   Try to write in this directory. Can't trust the users
+    my $touchfile = '.test';
+    if ( ! open(TOUCH, '>' . $touchfile)) {
+        if ($opts{verbose}) { print "$Script - Ignoring non-writable directory '$d'\n"; }
+        return undef();
+    }
+    if ( ! print TOUCH 'test if writable') {
+        if ($opts{verbose}) { print "$Script - Ignoring non-writable directory '$d'\n"; }
+        return undef();
+    }
+    close(TOUCH);
+    unlink($touchfile);
 
+    #   Directory is writable, create SQL record
     my $sql = "INSERT INTO $opts{runs_table} " .
         "(centerid,dirname,comments,bamcount,dateinit) " .
         "VALUES($cid,'$d','',0,'$nowdate')";
@@ -129,9 +142,6 @@ sub CreateRun {
     my $runid = $sth->{mysql_insertid};
     print "$Script - Added run '$d'\n";
     $opts{runcount}++;
-    #   Try to force permissions so things can work later. Can't trust the users
-    chmod(0775, $d) ||
-        print "$Script Unable to force permissions for '$d'. Too bad for you.\n"; 
     return $runid;
 }
 
