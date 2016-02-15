@@ -519,7 +519,7 @@ function ViewRuns($center, $maxdirs, $iammgr) {
         }
         $html .= "</b></div>\n";
         //  Build start of table for each center
-        $html .= "<table align='center' width='90%' border='1'><tr>\n";
+        $html .= "<table align='center' width='100%' border='1'><tr>\n";
         foreach ($hdrcols as $c) {
             $html .= "<th class='heading'>" . ucfirst($c) . "</th>\n";
         }
@@ -650,7 +650,7 @@ function ViewBams($runid, $maxdirs, $iammgr) {
         "<a href='$url'>$center</a></h3>\n";
     $html .= "<p align='center'/>$SHOWQUEUES</p>\n";
 
-    $html .= "<table align='center' width='90%' border='1'><tr>\n";
+    $html .= "<table align='center' width='100%' border='1'><tr>\n";
     foreach ($hdrcols as $c) {
         $html .= "<th class='heading'>" . ucfirst($c) . "</th>\n";
     }
@@ -1001,7 +1001,7 @@ function ShortForm($n) {
 ---------------------------------------------------------------*/
 function ShowTable($table, $sql='', $tfoot=0) {
 
-    $h = "<font size='-1'> <table align='center' border='1' width='80%'>\n";
+    $h = "<font size='-1'> <table align='center' border='1' width='90%'>\n";
     //  Builder header for columns in table
     $desc = SQL_Desc($table);
     if (count($desc) <= 0) { return Emsg("Unable to figure out columns in '$table'", 1); }
