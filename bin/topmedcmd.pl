@@ -274,7 +274,7 @@ sub Export {
     #my ($center, $run) = @_;
 
     #   Generate header for CSV file
-    my @cols = qw(bamname studyname piname expt_sampleid);
+    my @cols = qw(bamname studyname piname expt_sampleid state_b37 state_b38);
     my $s = 'CENTER,DIRNAME,';
     foreach (@cols) { $s .= uc($_) . ','; }
     print $s . "FULLPATH\n";
