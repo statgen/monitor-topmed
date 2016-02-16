@@ -236,9 +236,32 @@ sub CheckBAMS {
     if (! $rc) { die "$Script - Unable to read file '$file': $!\n"; }
     while (<IN>) {
         chomp();
-        #   [0]=protected [2]=date [3]=NWDnnnnnn [9]=error|loaded [10]=BAM|CRAM|UKNOWN [12]=message
+        #   [0]=protected [2]=date [3]=NWDnnnnnn [5]=checksum [9]=error|loaded|received [10]=BAM|CRAM|UKNOWN [12]=message
         my @cols = split(' ',$_);
         if ($cols[0] ne 'protected') { next; }
+        if ($cols[3] !~ /(NWD\d+)\.(.+)/) { next; }     # Break into NWDnnnnnn and suffix
+        my ($nwd, $suffix) = ($1, $2);
+
+        #   Watch for a couple of statuses of interest
+        if ($cols[9] eq 'received') {               # If NCBI checksum != our checksum, mark in error
+            my $dbcol = 'checksum';                 # Figure out which db column to compare
+            if ($suffix ne 'src.bam') {
+                if ($suffix eq 'src.cram')      { $dbcol = 'cramchecksum'; }
+                if ($suffix eq 'recal.bam')     { $dbcol = 'checksum'; }  # My bug
+                if ($suffix eq 'recal.37.cram') { $dbcol = 'b37bamchecksum'; }
+                if ($suffix eq 'recal.38.cram') { $dbcol = 'b38bamchecksum'; }
+            }
+            my $sql = "SELECT bamid,$dbcol FROM $opts{bamfiles_table} WHERE expt_sampleid='$nwd'";
+            my $sth = DoSQL($sql);
+            my $rowsofdata = $sth->rows();
+            if (! $rowsofdata) { next; }            # How can this happen?  Ignore it
+            my $href = $sth->fetchrow_hashref;
+            if ($cols[5] eq $href->{$dbcol}) { next; }
+            #   Somehow NCBI checksum is wrong, mark as failed
+            $nwdid2errormsg{$cols[3]} = $cols[3] . ": NCBI checksum is incorrect\n";
+            next;
+        }
+    
         if ($cols[9] eq 'error') {
             #   Only show error message for the last few days
             if (substr($cols[2],0,10) eq $today || substr($cols[2],0,10) eq $yesterday) {
@@ -247,16 +270,9 @@ sub CheckBAMS {
             }
             next;
         }
-        my ($nwd, $suffix) = qw(unknown badsiffix);
         if ($cols[9] ne 'loaded') { next; }
 
         #   Found data from our project
-        if ($cols[3] !~ /(NWD\d+)\.(.+)/) {     # Break into NWDnnnnnn and suffix
-            next;
-        }
-        $nwd = $1;
-        $suffix = $2;
-
         #   Note that cols[10] can be UNKNOWN because of a bug at NCBI 
         if ($suffix eq 'src.bam' && $cols[10] eq 'BAM') {
             $loadednwdids{$nwd} = 'orig';
@@ -287,7 +303,9 @@ sub CheckBAMS {
     #   Messages we've seen so far:
     #     protected	...	NWD792235-remap.37.run.xml	...	error_msg
     #     protected	...	NWD539447-secondary.37.run.xml	...	Updates_are_prohibited_for_withdrawn_Run(SRR2173553)
+    #     protected ... NWD139587.something ... NCBI checksum is incorrect  (internally generated error)
     my $errors = 0;
+    my $checksumerrors = 0;
     foreach my $key (keys %nwdid2errormsg) {
         if ($opts{verbose}) { print "  FAILED: $key - $nwdid2errormsg{$key}"; }
         #   Get actual NWDID
@@ -296,15 +314,32 @@ sub CheckBAMS {
         if ($key =~ /(NWD\d+)/) { $nwdid = $1; }
         else { die "Unable to isolate NWDID:  NWDID=$nwdid Errormsg=$nwdid2errormsg{$key}\n"; }
         #   Figure out state column name
-        if ($key =~ /xml/)      { $statecol = 'xmlerror'; }
-        if ($key =~ /remap.37/) { $statecol = 'state_ncbib37'; }
-        if ($key =~ /remap.38/) { $statecol = 'state_ncbib38'; }
-        if ($key =~ /secondary/) { $statecol = 'state_ncbiorig'; }
+        if ($key =~ /xml/)        { $statecol = 'xmlerror'; }
+        if ($key =~ /recal.37/)   { $statecol = 'state_ncbib37'; }    # My bug
+        if ($key =~ /recal.bam/)  { $statecol = 'state_ncbib37'; }    # My bug
+        if ($key =~ /recal.cram/) { $statecol = 'state_ncbib37'; }    # My bug
+        if ($key =~ /remap.37/)   { $statecol = 'state_ncbib37'; }
+        if ($key =~ /remap.38/)   { $statecol = 'state_ncbib38'; }
+        if ($key =~ /secondary/)  { $statecol = 'state_ncbiorig'; }
+        if ($key =~ /src.bam/)    { $statecol = 'state_ncbiorig'; }
+        if ($key =~ /src.cram/)   { $statecol = 'state_ncbiorig'; }
         if (! $statecol) { die "Unable to figure out database column '$key' NWDID=$nwdid Errormsg=$nwdid2errormsg{$key}\n"; }
         #   Now see if we already knew about this error
         delete($loadednwdids{$nwdid});          # Make sure we do not treat this as loaded
         $errors++;
         if ($statecol eq 'xmlerror') { next; }  # Fake error, count it but no DB update
+
+        #   Watch for internally generated error msg. Make sure we do not mess things up
+        if ($nwdid2errormsg{$key} =~ /NCBI checksum/) {
+            print "$nowdate  Checksum error detected - failure for '$nwdid' $statecol\n";
+            $checksumerrors++;
+            if (exists($loadednwdids{$nwdid})) {
+                print "===> Wait a minute, $nwdid DID get loaded, but we saw error\n$nwdid2errormsg{$key}";
+                next;
+            }
+            #next;                           # Do not change status in database
+        }
+        
         my $sql = "SELECT $statecol FROM $opts{bamfiles_table} " .
                 "WHERE expt_sampleid='$nwdid' AND $statecol!=$FAILED";
         my $sth = DoSQL($sql);
@@ -313,7 +348,7 @@ sub CheckBAMS {
         DoSQL("UPDATE $opts{bamfiles_table} SET $statecol=$FAILED WHERE expt_sampleid='$nwdid'");
         print "$nowdate  New error detected - failure for '$nwdid' $statecol\n";
     }
-    if ($errors) { print "$nowdate  $errors new BAMs marked as FAILED\n"; }
+    if ($errors) { print "$nowdate  $errors new BAMs marked as FAILED ($checksumerrors checksum errors)\n"; }
 
     #   Found list of loaded NWDIDs
     foreach my $nwdid (keys %loadednwdids) {
@@ -325,9 +360,7 @@ sub CheckBAMS {
         $completed{$v}++;
     }
     foreach my $k (keys %completed) {
-        #if ($completed{$k}) {
-            print "$nowdate  $completed{$k} $k BAMs marked as COMPLETED\n";
-        #}
+        print "$nowdate  $completed{$k} $k BAMs marked as COMPLETED\n";
     }
     return;
 }
