@@ -83,6 +83,7 @@ sz=`ls -L -l $bamfile | awk '{print $5}'`
 $topmedcmd set $bamid bamsize $sz
 
 #   Rename the BAM file and change the MD5 entry
+chmod 0444 $bamfile
 $topmedrename $bamid $bamfile
 if [ "$?" != "0" ]; then
   $topmedcmd mark $bamid $markverb failed
