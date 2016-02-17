@@ -40,7 +40,7 @@ my %opts = (
     port => 48109,
     fromips => '127.0.0.1 192.168.1.56 192.168.2.200 192.168.1.8',
     squeue => '/usr/cluster/bin/squeue --format "%.9i %.10P %.12j %.8u %.2t %.10M %R"',
-    df => '/bin/df -h /net/topmed/incoming /net/topmed/working /net/topmed2/incoming /net/topmed2/working  /net/topmed3/incoming /net/topmed3/working',
+    df => '/bin/df -h /net/topmed/incoming /net/topmed/working /net/topmed2/incoming /net/topmed2/working  /net/topmed3/incoming /net/topmed3/working /net/topmed4/working /net/topmed4/incoming',
     errorcheck => '/usr/cluster/monitor/bin/topmed_monitor.pl check',
     shownode => '/usr/cluster/bin/scontrol show node',
 );
