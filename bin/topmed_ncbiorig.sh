@@ -98,12 +98,14 @@ here=`pwd`
 if [ "$center" = "broad" ]; then
   l=(`$topmedcmd where $bamid backup`)      # Get backupdir and backupfile and host
   sendfile="${l[1]}"
-  ln -sf $sendfile `basename $sendfile`
+  sf=$nwdid.src.cram
+  ln -sf $sendfile $sf
   checksum=`$topmedcmd show $bamid cramchecksum`
+  sendfile=$sf
 else
   l=(`$topmedcmd where $bamid bam`)         # Get pathofbam and host for bam
-  sendfile=$origbam
-  ln -sf ${l[0]}/$origbam $origbam
+  sendfile=$nwdid.src.bam
+  ln -sf ${l[0]}/$origbam $sendfile
   checksum=`$topmedcmd show $bamid checksum`
 fi
 if [ "$checksum" = "" ]; then
