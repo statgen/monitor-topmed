@@ -243,21 +243,38 @@ sub CheckBAMS {
         my ($nwd, $suffix) = ($1, $2);
 
         #   Watch for a couple of statuses of interest
-        if ($cols[9] eq 'received') {               # If NCBI checksum != our checksum, mark in error
-            my $dbcol = 'checksum';                 # Figure out which db column to compare
-            if ($suffix ne 'src.bam') {
-                if ($suffix eq 'src.cram')      { $dbcol = 'cramchecksum'; }
-                if ($suffix eq 'recal.bam')     { $dbcol = 'checksum'; }  # My bug
-                if ($suffix eq 'recal.37.cram') { $dbcol = 'b37bamchecksum'; }
-                if ($suffix eq 'recal.38.cram') { $dbcol = 'b38bamchecksum'; }
+        #   If NCBI checksum != our checksum, mark in error
+        if ($cols[9] eq 'received' || substr($cols[9], 0, 8) eq 'replace') {
+            my $statecol = GetStateCol($suffix);   #   Figure out state column name
+            #   Now figure out the checksum column
+            my $dbcol = 'unknown';              # Figure out which db column to compare 
+            if ($suffix eq 'src.bam')       { $dbcol = 'checksum'; }
+            if ($suffix eq 'src.cram')      { $dbcol = 'cramchecksum'; }
+            if ($suffix eq 'recal.bam')     { $dbcol = 'checksum'; }  # My bug
+            if ($suffix eq 'recal.37.cram') { $dbcol = 'b37bamchecksum'; }
+            if ($suffix eq 'recal.38.cram') { $dbcol = 'b38bamchecksum'; }
+            if ($dbcol eq 'unknown') {          # I've messed up here
+                #   Only show errors for the recent past
+                if (substr($cols[2],0,10) eq $today || substr($cols[2],0,10) eq $yesterday) {
+                    $nwdid2errormsg{$cols[3]} = $cols[3] . ": Incorrectly named file sent: $cols[3]\n";
+                }
+                next;
             }
-            my $sql = "SELECT bamid,$dbcol FROM $opts{bamfiles_table} WHERE expt_sampleid='$nwd'";
+            #   We know what this is, now get it's checksum value and maybe the state 
+            my $sql = "SELECT bamid,$dbcol";
+            if ($statecol) { $sql .= ',' . $statecol; }
+            $sql .= " FROM $opts{bamfiles_table} WHERE expt_sampleid='$nwd'";
             my $sth = DoSQL($sql);
             my $rowsofdata = $sth->rows();
-            if (! $rowsofdata) { next; }            # How can this happen?  Ignore it
+            if (! $rowsofdata) { next; }        # How can this happen?  Ignore it
             my $href = $sth->fetchrow_hashref;
-            if ($cols[5] eq $href->{$dbcol}) { next; }
-            #   Somehow NCBI checksum is wrong, mark as failed
+            #   Checksum matches, so we can ignore any previous error messages
+            if ($cols[5] eq $href->{$dbcol}) {
+                delete($nwdid2errormsg{$cols[3]});
+                next;
+            }
+            #   NCBI checksum is wrong. If we think it was delivered, mark as failed
+            if ($statecol && $href->{$statecol} != $DELIVERED) { next; }
             $nwdid2errormsg{$cols[3]} = $cols[3] . ": NCBI checksum is incorrect\n";
             next;
         }
@@ -310,20 +327,15 @@ sub CheckBAMS {
         if ($opts{verbose}) { print "  FAILED: $key - $nwdid2errormsg{$key}"; }
         #   Get actual NWDID
         my $nwdid = $key;
-        my $statecol = '';
         if ($key =~ /(NWD\d+)/) { $nwdid = $1; }
         else { die "Unable to isolate NWDID:  NWDID=$nwdid Errormsg=$nwdid2errormsg{$key}\n"; }
-        #   Figure out state column name
-        if ($key =~ /xml/)        { $statecol = 'xmlerror'; }
-        if ($key =~ /recal.37/)   { $statecol = 'state_ncbib37'; }    # My bug
-        if ($key =~ /recal.bam/)  { $statecol = 'state_ncbib37'; }    # My bug
-        if ($key =~ /recal.cram/) { $statecol = 'state_ncbib37'; }    # My bug
-        if ($key =~ /remap.37/)   { $statecol = 'state_ncbib37'; }
-        if ($key =~ /remap.38/)   { $statecol = 'state_ncbib38'; }
-        if ($key =~ /secondary/)  { $statecol = 'state_ncbiorig'; }
-        if ($key =~ /src.bam/)    { $statecol = 'state_ncbiorig'; }
-        if ($key =~ /src.cram/)   { $statecol = 'state_ncbiorig'; }
-        if (! $statecol) { die "Unable to figure out database column '$key' NWDID=$nwdid Errormsg=$nwdid2errormsg{$key}\n"; }
+        my $statecol = GetStateCol($key);    #   Figure out state column name
+        if (! $statecol) {
+            if ($opts{verbose}) {
+                print "Unable to figure out database column '$key' NWDID=$nwdid Errormsg=$nwdid2errormsg{$key}\n";
+            }
+            next;
+        }
         #   Now see if we already knew about this error
         delete($loadednwdids{$nwdid});          # Make sure we do not treat this as loaded
         $errors++;
@@ -401,6 +413,31 @@ sub GetNWDlist {
         }
     }
     return \%nwd2bamid;
+}
+
+#==================================================================
+# Subroutine:
+#   GetStateCol - Given a string, return the database column associated with it
+#
+# Arguments:
+#   str - string
+#
+# Returns:
+#   name of state database column or ''
+#==================================================================
+sub GetStateCol {
+    my ($str) = @_;
+    my $statecol = '';
+    if ($str =~ /xml/)        { $statecol = 'xmlerror'; }
+    if ($str =~ /recal.37/)   { $statecol = 'state_ncbib37'; }    # My bug
+    if ($str =~ /recal.bam/)  { $statecol = 'state_ncbib37'; }    # My bug
+    if ($str =~ /recal.cram/) { $statecol = 'state_ncbib37'; }    # My bug
+    if ($str =~ /remap.37/)   { $statecol = 'state_ncbib37'; }
+    if ($str =~ /remap.38/)   { $statecol = 'state_ncbib38'; }
+    if ($str =~ /secondary/)  { $statecol = 'state_ncbiorig'; }
+    if ($str =~ /src.bam/)    { $statecol = 'state_ncbiorig'; }
+    if ($str =~ /src.cram/)   { $statecol = 'state_ncbiorig'; }
+    return $statecol;
 }
 
 #==================================================================
