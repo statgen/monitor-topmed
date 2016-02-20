@@ -263,6 +263,8 @@ if ($fcn == 'showqlocal') {
             $cmd = "/usr/cluster/monitor/bin/slurm_query.sh -squeue ${n}-incoming";
             print `$cmd`;
         }
+        $cmd = "/usr/cluster/monitor/bin/slurm_query.sh -squeue topmed-working";
+        print `$cmd`;
         exit;
     }
     foreach ($NODELIST as $n) { print ShowSLURMIcoming($n); }
