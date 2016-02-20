@@ -311,19 +311,17 @@ if ($fcn eq 'sexpt') {
                 if ($href->{state_cram} != $COMPLETED) { next; }
 
                 #   Check important fields for this BAM are possibly correct
-                my $skip = 0;
+                my $skip = '';
                 foreach my $col (qw(expt_sampleid phs library_name nominal_length nominal_sdev base_coord)) {
                     if (exists($href->{$col}) && $href->{$col}) { next; }
-                    if ($opts{verbose}) { print "  No value for '$col'\n"; }
-                    $skip++;
+                    $skip .= ' ' . $col;
                 }
                 #   Do better checking than just is the field non-blank
                 if ($href->{expt_sampleid} !~ /^NWD/) {
-                    print "  Invalid NWDID '$href->{expt_sampleid}'?\n";
-                    $skip++;
+                    $skip .= ' Invalid_NWDID_' . $href->{expt_sampleid};
                 }
                 if ($skip) {
-                    print "  BAM '$href->{bamname}' [$href->{bamid}] is ignored because of incomplete data\n";
+                    print "  BAM '$href->{bamname}' [$href->{bamid}] is ignored because of incomplete data: $skip\n";
                     next;
                 }
 
