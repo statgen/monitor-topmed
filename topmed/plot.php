@@ -28,6 +28,9 @@ $COMPLETED = 20;            // Task completed successfully
 $CANCELLED = 89;            // Task cancelled
 $FAILED    = 99;            // Task failed
 
+$YMAX = 240;                // Globals for screen size
+$XMAX = 600;
+
 //-------------------------------------------------------------------
 //  Get parameters passed in via normal invocation
 //-------------------------------------------------------------------
@@ -77,11 +80,14 @@ if ($fcn == 'plot') {
     //-------------------------------------------------------------------
     //  Details about steps for processing each BAM (non-NCBI)
     //-------------------------------------------------------------------
-    print "<form action='" . $_SERVER['PHP_SELF'] . "' method='post'>\n" .
+    print "<table width='80%' align='center' border='0'> <tr><td align='left'>" .
+        "<form action='" . $_SERVER['PHP_SELF'] . "' method='post'>\n" .
         "<b><input type='submit' value=' Generate Plots '>\n" .
         "<input type='text' name='lastdays' value='$lastdays' size='2'>\n" .
         "days </form>" .
-        "</b></br>\n";   
+        "</td><td align='right'>" .
+        "<a href='" . $_SERVER['SCRIPT_NAME'] . "'>Reshow Plots</a>" .
+        "</td></tr></table></b></br>\n";   
         
     // Plot totals of all states for each step
     print "<p><b>Legend: <font size='-1'>" .
@@ -122,7 +128,10 @@ if ($fcn == 'plot') {
         array_push($plotdata, $d);
     }
     $legend = array();
+    $xtmp = $XMAX;
+    $XMAX = 900;                // Extra wide so we can read numbers
     MakePlot($plotdata, $title, $legend, '', '', 'stackedbars', 'text-data-yx');
+    $XMAX = $xtmp;
 
     $legend = array('cram', 'qplot', 'bai', 'md5ver');
     $title = "Daily Count of Steps Completed";
@@ -227,6 +236,8 @@ if ($fcn == 'plot') {
     }
     MakePlot($plotdata, $title, $legend, '', 'y');
 
+
+    print "<p align='right'><a href='" . $_SERVER['SCRIPT_NAME'] . "'>Reshow Plots</a>\n";
     print dofooter($HDR['footer']);
     exit;
 }
@@ -246,11 +257,9 @@ exit;
 #   $datatype should be text-data or text-data-yx
 ---------------------------------------------------------------*/
 function MakePlot($plotdata, $title, $legend, $ytitle='', $ypoints='', $type='lines', $datatype='text-data') {
-    global $JS;
-    $ymax = 240;
-    $xmax = 600;
+    global $JS, $YMAX, $XMAX;
 
-    $plot = new PHPlot($xmax, $ymax);
+    $plot = new PHPlot($XMAX, $YMAX);
     $plot->SetFailureImage(False);  // No error images
     $plot->SetPrintImage(False);    // No automatic output
     $plot->SetImageBorderType('plain');
@@ -266,6 +275,7 @@ function MakePlot($plotdata, $title, $legend, $ytitle='', $ypoints='', $type='li
         //$plot->SetLegendPixels($xmax-85, 5);
         $plot->SetDataColors(array('DarkGreen', 'red', 'SlateBlue', 'gray'));
         if ($ypoints) { $plot->SetXDataLabelPos('plotin'); }
+        else { $plot->SetXDataLabelPos('plotstack'); }
     }
     else {
         $plot->SetLegend($legend);
