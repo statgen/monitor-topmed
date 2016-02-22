@@ -38,6 +38,16 @@ my $COMPLETED = 20;           # Task completed successfully
 my $CANCELLED = 89;           # Task cancelled
 my $FAILED    = 99;           # Task failed
 
+#   Ignore files with these suffixes as they were sent incorrectly
+my %IGNORESUFFIXES = (
+    'recal.bam' => 1,
+    'recal.cram' => 1,
+    'recal.37.bam' => 1,
+    'final.sqz.bam' => 1,
+    'squeezed.bam' => 1,
+    'hg19.bam' => 1,
+);
+
 my $topmedbin = '/usr/cluster/monitor/bin';
 my $ascphost = 'asp-um-sph@gap-submit.ncbi.nlm.nih.gov';
 our %opts = (
@@ -245,6 +255,8 @@ sub CheckBAMS {
         if ($cols[3] !~ /(NWD\d+)\.(.+)/) { next; }     # Break into NWDnnnnnn and suffix
         my ($nwd, $suffix) = ($1, $2);
         if ($suffix eq 'expt.xml') { next; }
+        my $date = substr($cols[2],0,10);               # Date of this action
+
 
         if ($cols[9] eq 'loaded') {
 
@@ -255,7 +267,7 @@ sub CheckBAMS {
 
             if (($suffix eq 'src.bam' && $cols[10] eq 'BAM') ||
                 ($suffix eq 'src.cram' && ($cols[10] eq 'CRAM' || $cols[10] eq 'UNKNOWN'))) {
-                if ($opts{verbose}) { print "  $nwd orig marked as COMPLETED [$suffix]\n"; }
+                if ($opts{verbose}) { print "  $nwd orig marked as COMPLETED [$suffix] [$date]\n"; }
                 $sql  .= 'orig' . $sql2;
                 DoSQL($sql);
                 $completed{orig}++;               
@@ -266,7 +278,7 @@ sub CheckBAMS {
                 ($suffix eq 'recal.cram' && ($cols[10] eq 'CRAM' || $cols[10] eq 'UNKNOWN')) || # My bug
                 ($suffix eq 'recal.37.bam' && ($cols[10] eq 'BAM' || $cols[10] eq 'UNKNOWN')) || # My bug
                 ($suffix eq 'recal.37.cram' && ($cols[10] eq 'CRAM' || $cols[10] eq 'UNKNOWN'))) {
-                if ($opts{verbose}) { print "  $nwd b37 marked as COMPLETED [$suffix]\n"; }
+                if ($opts{verbose}) { print "  $nwd b37 marked as COMPLETED [$suffix] [$date]\n"; }
                 $sql  .= 'b37' . $sql2;
                 DoSQL($sql);
                 $completed{b37}++;               
@@ -274,7 +286,7 @@ sub CheckBAMS {
             }
 
             if (($suffix eq 'recal.38.cram' && ($cols[10] eq 'CRAM' || $cols[10] eq 'UNKNOWN'))) {
-                if ($opts{verbose}) { print "  $nwd b38 marked as COMPLETED [$suffix]\n"; }
+                if ($opts{verbose}) { print "  $nwd b38 marked as COMPLETED [$suffix] [$date]\n"; }
                 $sql  .= 'b38' . $sql2;
                 DoSQL($sql);
                 $completed{b38}++;               
@@ -315,13 +327,8 @@ sub CheckBAMS {
             if ($suffix eq 'src.cram')      { $dbcol = 'cramchecksum'; }
             if ($suffix eq 'recal.37.cram') { $dbcol = 'b37bamchecksum'; }
             if ($suffix eq 'recal.38.cram') { $dbcol = 'b38bamchecksum'; }
-            #   These are bugs when we sent the wrong file
-            if ($suffix eq 'recal.bam')     { $dbcol = 'checksum'; }
-            if ($suffix eq 'recal.cram')    { $dbcol = 'b37bamchecksum'; }
-            if ($suffix eq 'recal.37.bam')  { $dbcol = 'b37bamchecksum'; }
             if ($dbcol eq 'unknown') {          # I've messed up here
-                #   These are bugs when we sent the wrong file
-                if ($suffix eq 'final.sqz.bam' || $suffix eq 'squeezed.bam' || $suffix eq 'hg19.bam')  { next; }
+                if (exists($IGNORESUFFIXES{$suffix})) { next; }
                 print $cols[3] . ": Incorrectly named file was sent\n";
                 next;
             }
@@ -336,7 +343,7 @@ sub CheckBAMS {
             #   Checksum matches, so nothing more needs to be considered
             if ($cols[5] eq $href->{$dbcol}) {
                 $received++;
-                if ($opts{verbose}) { print "  $cols[3] marked as received [" . substr($cols[2],0,10) . "]\n"; }
+                if ($opts{verbose}) { print "  $cols[3] marked as received, but not loaded yet [$date]\n"; }
                 next;
             }
             #   NCBI checksum is wrong. If we think it was delivered, mark as failed
