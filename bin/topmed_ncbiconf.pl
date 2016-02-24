@@ -67,10 +67,11 @@ our %opts = (
     ascpinfiles => 'outgoing/Files',
     studystatus => 'latest_samples.xml',
     bamsstatus => 'latest_loaded_files.txt.gz',
+    days => 0,
     verbose => 0,
 );
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose center=s runs=s fetchfiles xmlfilesdir=s
+    help realm=s verbose center=s runs=s fetchfiles xmlfilesdir=s days=i
     )) || die "Failed to parse options\n";
 
 #   Simple help if requested
@@ -238,12 +239,13 @@ sub CheckBAMS {
     my %receivedfile = ();                      # Keep track of all received files
     my %completed = ();                         # Keep track of number of loaded files by type
     $completed{orig} = $completed{b37} = $completed{b38} = 0;
+    my $lastdate = '';
 
     my $rc;
     #   Read the summary file in reverse order. This allows us to get the LAST state for a file
     #   Doing it forward, we detect errors and all sorts of cruft and THEN need to recognize loaded
     my $cmd = "tac $file";
-    if ($file =~ /\.gz$/) { $cmd = "gunzip -c $file | tac - |"; }
+    if ($file =~ /\.gz$/) { $cmd = "gunzip -c $file | tac - 2> /dev/null |"; }
     $rc = open(IN, $cmd);
     if (! $rc) { die "$Script - Unable to read data from command: $cmd\n"; }
     while (<IN>) {
@@ -252,11 +254,16 @@ sub CheckBAMS {
         #   [9]=error|loaded|received [10]=BAM|CRAM|UKNOWN [12]=message
         my @cols = split(' ',$_);
         if ($cols[0] ne 'protected') { next; }
-        if ($cols[3] !~ /(NWD\d+)\.(.+)/) { next; }     # Break into NWDnnnnnn and suffix
+        if ($cols[3] !~ /(NWD\d+)\.(.+)/) { next; } # Break into NWDnnnnnn and suffix
         my ($nwd, $suffix) = ($1, $2);
         if ($suffix eq 'expt.xml') { next; }
-        my $date = substr($cols[2],0,10);               # Date of this action
-
+        my $date = substr($cols[2],0,10);           # Date of this action
+        if ($opts{days} && $lastdate && $date ne $lastdate) {
+            $opts{days}--;
+            if ($opts{days} == 0) { last; }     # We've processed all we we supposed to
+        }
+        if ($opts{verbose} && $date ne $lastdate) { print "Processing data for date=$date\n"; }
+        $lastdate = $date;
 
         if ($cols[9] eq 'loaded') {
 
@@ -470,6 +477,13 @@ The default for B<-batchsize> is B<120>.
 Specifies a specific center name on which to run the action, e.g. B<uw>.
 This is useful for testing.
 The default is to run against all centers.
+
+=item B<-days N>
+
+Specifies the number of days of data from the summary log to parse.
+The summary log is read backwards, so B<-days 3> would process only
+entries for the last three days.
+This only applies when checking the status BAMs/CRAMs that have been sent.
 
 =item B<-dryrun>
 
