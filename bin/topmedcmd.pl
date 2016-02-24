@@ -404,7 +404,7 @@ sub Where {
     if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
     my $href = $sth->fetchrow_hashref;
     my $bamname = $href->{bamname};
-    my $cramname = $href->{cramname};
+    my $cramname = $href->{cramname} || 'CRAMNAME_not_SET';
     my $piname = $href->{piname};
     my $nwdid = $href->{expt_sampleid};
     my $runid = $href->{runid};
