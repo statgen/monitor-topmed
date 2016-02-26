@@ -442,7 +442,9 @@ sub Where {
         foreach ('', '2', '3', '4') {
             $bakbamfdir = "$opts{netdir}$_/$opts{backupsdir}/$centername";
             $bakfile = "$bakbamfdir/$rundir/$cramname";
-            if (! -l $bakbamfdir) { last; }     # Found non-symlink to backup file
+            if (-f $bakfile) {
+                if (! -l $bakbamfdir) { last; }        # Found non-symlink to remapped file
+            }
         }
         if (! -d $bakbamfdir) { $bakbamfdir = $backuphost = 'none'; }
         else {
@@ -460,7 +462,9 @@ sub Where {
         foreach ('', '2', '3', '4') {
             $b37fdir = "$opts{netdir}$_/$opts{resultsdir}/$centername/$piname/$nwdid/bams";
             $b37file = "$b37fdir/$nwdid.recal.cram";
-            if (! -l $b37fdir) { last; }        # Found non-symlink to remapped file
+            if (-f $b37file) {
+                if (! -l $b37fdir) { last; }        # Found non-symlink to remapped file
+            }
         }
         if (! -d $b37fdir) { $b37fdir = 'none'; }
         print "$b37fdir $b37file\n";            # Note that file might not really exist
@@ -474,7 +478,9 @@ sub Where {
         foreach ('', '2', '3', '4') {
             $b38fdir = "$opts{netdir}$_/$opts{resultsdir}/$centername/$piname/$nwdid/bams";
             $b38file = "$b38fdir/$nwdid.recal.cram";
-            if (! -l $b38fdir) { last; }        # Found non-symlink to remapped file
+            if (-f $b38file) {
+                if (! -l $b38fdir) { last; }        # Found non-symlink to remapped file
+            }
         }
         if (! -d $b38fdir) { $b38fdir = 'none'; }
         print "$b38fdir $b38file\n";            # Note that file might not really exist
