@@ -329,16 +329,23 @@ sub WhatNWDID {
             $nwdid = $href->{expt_sampleid};
         }
     }
-  
+    else {                              # Extrace NWD from whatever was provided
+        if ($nwdid =~ /(nwd\d+)/i) { $nwdid = uc($1); }
+    }
+
     #   Reconstruct partial path to BAM
     my $sth = DoSQL("SELECT runid,bamid from $opts{bamfiles_table} WHERE expt_sampleid='$nwdid'", 0);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - NWDID '$nwdid' is unknown\n"; }
     my $href = $sth->fetchrow_hashref;
     my $bamid = $href->{bamid};
-    $sth = DoSQL("SELECT dirname from $opts{runs_table} WHERE runid=$href->{runid}");
+    $sth = DoSQL("SELECT centerid,dirname from $opts{runs_table} WHERE runid=$href->{runid}");
     $href = $sth->fetchrow_hashref;
-    print "$nwdid/$bamid can be found in run '$href->{dirname}'\n";
+    my $run = $href->{dirname};
+    $sth = DoSQL("SELECT centername from $opts{centers_table} WHERE centerid=$href->{centerid}");
+    $href = $sth->fetchrow_hashref;
+    my $center = uc($href->{centername});
+    print "$nwdid/$bamid can be found in run '$run' for center $center\n";
 }
 
 #==================================================================
