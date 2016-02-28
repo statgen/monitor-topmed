@@ -696,15 +696,14 @@ function ShowSLURMIcoming($host) {
     //  Get state for this machine
     $cmd = "/usr/cluster/bin/scontrol show node $host | grep State=";
     $results = `$cmd`;
-    $nodestate = 'State=Node not known';
-    $nodestate = 'State=Fix scontrol, Sean';
+    $nodestate = 'State=Cannot be Determined';
 
     #   This should work too, returning something like 'State=MIXED'
     #   except gcsdev does not work. Somehow the 48109 port is blocked maybe?
     #$results = `/usr/bin/wget -o /dev/null -O $tmpfile.0 $url/shownode/$h`;
 
     if (preg_match('/(State=\S+)/', $results, $m)) { $nodestate = $m[1]; }
-    if (preg_match('/DRAIN/', $nodestate)) { $nodestate = "<font color=red>$nodestate</font>"; }
+    if (preg_match('/DRAIN/', $nodestate)) { $nodestate = "<font color=red>$nodestate  </font>"; }
 
     //  Get number jobs queued
     $tmpfile = '/tmp/tempfile.topmed';
