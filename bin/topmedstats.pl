@@ -81,8 +81,6 @@ my $dbh = DBConnect($opts{realm});
 #--------------------------------------------------------------
 if ($fcn eq 'jobid')    { Jobids(@ARGV); exit; }
 if ($fcn eq 'summary')  {
-    #my $s = GetSummaryFromBamFiles(@ARGV);
-    #if ($s) { DoSQL($s); }
     Summary(@ARGV, "$opts{outdir}/$opts{summaryfile}");
     exit;
 }
@@ -92,7 +90,7 @@ exit;
 
 #==================================================================
 # Subroutine:
-#   Summary($file)
+#   Summary($yyyymmdd, $file)
 #
 #   Read the NCBI summary file, identifying all BAMs loaded on a date
 #   The loadedbamcount column is the total loaded counts each day
@@ -104,34 +102,45 @@ exit;
 sub Summary {
     my ($yyyymmdd, $file) = @_;
 
-    #   Find all NWDIDnnnnn.src.bam in
-    #   protected 3563129 2014-09-06T09:24:12 NWDnnnnn.src.bam 10844214270 93ed94e9918b868d0ecd7009c3e427e8 = = = loaded BAM etc
-    #     or
-    #   protected NWD792235-remap.37.run.xml ... error RUN_XML - some_error_message
     my $origsum = 0;
     my $b37sum = 0;
     my $b38sum = 0;
-    my ($loaddate, $rc);
-    if ($file =~ /\.gz$/) { $rc = open(IN, "gunzip -c $file |"); }
-    else { $rc = open(IN, $file); }
-    if (! $rc) { die "$Script - Unable to read file '$file': $!\n"; }
+
+    #   Read the summary file in reverse order. This allows us to get the LAST state for a file
+    my $cmd = "tac $file";
+    if ($file =~ /\.gz$/) { $cmd = "gunzip -c $file | tac - 2> /dev/null |"; }
+    my $rc = open(IN, $cmd);
+    if (! $rc) { die "$Script - Unable to read data from command: $cmd\n"; }
     while (<IN>) {
-        if (! /protected\s+\d+\s+(20\S+)T.+\s+NWD/) { next; }
-        $loaddate = $1;
-        $loaddate =~ s/-/\//g;
-        #if ($loaddate le $prevyyyymmdd) { next; }
-        if ($loaddate ne $yyyymmdd) { next; }
-        #   This entry is after $prevyyyymmdd
-        if (/protected\s+\d+\s+20.+\s+NWD\S+.src.bam\s+.+\s+loaded\sBAM/) {
-            $origsum++;
+        chomp();
+        #   [0]=protected [2]=date [3]=NWDnnnnnn [5]=checksum
+        #   [9]=error|loaded|received [10]=BAM|CRAM|UKNOWN [12]=message
+        my @cols = split(' ',$_);
+        if ($cols[0] ne 'protected') { next; }
+        if ($cols[3] !~ /(NWD\d+)\.(.+)/) { next; } # Break into NWDnnnnnn and suffix
+        my ($nwd, $suffix) = ($1, $2);
+        if ($suffix eq 'expt.xml') { next; }
+        my $date = substr($cols[2],0,10);           # Date of this action
+        $date =~ s/-/\//g;
+        if ($date ne $yyyymmdd) { next; }
+        if ($opts{verbose}) { print "Processing data for date=$date\n"; }
+
+        if (($suffix eq 'src.bam' && $cols[10] eq 'BAM') ||
+            ($suffix eq 'src.cram' && ($cols[10] eq 'CRAM' || $cols[10] eq 'UNKNOWN'))) {
+            $origsum++;             
             next;
         }
-        if (/protected\s+\d+\s+20.+\s+NWD\S+.recal.37.bam\s+.+\s+loaded\sBAM/) {
-            $b37sum++;
+
+        if (($suffix eq 'recal.bam' && $cols[10] eq 'BAM') ||   # From a bug of mine
+            ($suffix eq 'recal.cram' && ($cols[10] eq 'CRAM' || $cols[10] eq 'UNKNOWN')) || # My bug
+            ($suffix eq 'recal.37.bam' && ($cols[10] eq 'BAM' || $cols[10] eq 'UNKNOWN')) || # My bug
+            ($suffix eq 'recal.37.cram' && ($cols[10] eq 'CRAM' || $cols[10] eq 'UNKNOWN'))) {
+            $b37sum++;             
             next;
         }
-        if (/protected\s+\d+\s+20.+\s+NWD\S+.recal.38.bam\s+.+\s+loaded\sBAM/) {
-            $b38sum++;
+
+        if (($suffix eq 'recal.38.cram' && ($cols[10] eq 'CRAM' || $cols[10] eq 'UNKNOWN'))) {
+            $b38sum++;           
             next;
         }
     }
@@ -224,58 +233,6 @@ sub SummaryHistory {
         }
         push @sqlupdates,"UPDATE $opts{stats_table} SET loadedbamcount=$sum WHERE yyyymmdd='$yyyymmdd';";
     }
-    foreach (@sqlupdates) {
-        print "$_\n";
-    }
-}
-
-#==================================================================
-# Subroutine:
-#   GetSummaryFromBamFiles($ymd)
-#
-#   Figure out the count of BAMs that are verified each day
-#   This can be used to set bamcount in the stepstats database
-#   If $ymd is set, return the SQL to update that date only
-#   otherwise print out the SQL for all days so we can create
-#   a history to initialize stepstats
-#==================================================================
-sub GetSummaryFromBamFiles {
-    my ($ymd) = @_;
-
-    my $sql = "SELECT dateinit FROM $opts{bamfiles_table}";
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "No rows?\n"; }
-    my $href;
-    my %verifiydates = ();              # Count of bams verified by date
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        $href = $sth->fetchrow_hashref;
-        my @c = localtime($href->{dateinit});
-        my $yyyymmdd = sprintf('%04d/%02d/%02d', $c[5]+1900, $c[4]+1, $c[3]); 
-        if (! exists($verifiydates{$yyyymmdd})) { $verifiydates{$yyyymmdd} = 0; }
-        $verifiydates{$yyyymmdd}++;
-    }
-    my @vdates = sort keys %verifiydates;   # List of dates when bams were verified
-
-    $sql = "SELECT yyyymmdd FROM $opts{stats_table}";
-    $sth = DoSQL($sql);
-    $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "No rows?\n"; }
-    my @sqlupdates = ();
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        $href = $sth->fetchrow_hashref;
-        my $yyyymmdd = $href->{yyyymmdd};
-        #   Get count of all verified bams until this date
-        my $sum = 0;
-        foreach my $d (@vdates) {
-            if ($d gt $yyyymmdd) { last; }
-            $sum += $verifiydates{$d};
-        }
-        my $s = "UPDATE $opts{stats_table} SET bamcount=$sum WHERE yyyymmdd='$yyyymmdd'";
-        if ($ymd eq $yyyymmdd) { return $s; }       # Surprising exit here
-        push @sqlupdates,"$s;";
-    }
-
     foreach (@sqlupdates) {
         print "$_\n";
     }
