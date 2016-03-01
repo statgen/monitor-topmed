@@ -1,4 +1,4 @@
-#!/usr/bin/perl -I/usr/cluster/lib/perl5/site_perl
+#!/usr/bin/perl -I/usr/cluster/lib/perl5/site_perl -I/usr/cluster/monitor/lib/perl5 -I /usr/cluster/monitor/bin
 ###################################################################
 #
 # Name: topmed_phs.pl
@@ -28,19 +28,30 @@ use POSIX qw(strftime);
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
+my $NOTSET    = 0;            # Not set
+my $REQUESTED = 1;            # Task requested
+my $SUBMITTED = 2;            # Task submitted to be run
+my $STARTED   = 3;            # Task started
+my $DELIVERED = 19;           # Data delivered, but not confirmed
+my $COMPLETED = 20;           # Task completed successfully
+my $CANCELLED = 89;           # Task cancelled
+my $FAILED    = 99;           # Task failed
+
+#--------------------------------------------------------------
+#   Initialization - Sort out the options and parameters
+#--------------------------------------------------------------
 our %opts = (
     realm => '/usr/cluster/monitor/etc/.db_connections/topmed',
     bamfiles_table => 'bamfiles',
     phsconfig => '/net/topmed/incoming/study.reference/study.reference/study.phs.numbers.tab',
     phsdir => '/net/topmed/incoming/study.reference/phs',
-    phstable => 'phs',
     phsurl => 'http://www.ncbi.nlm.nih.gov/projects/gap/cgi-bin/GetSampleStatus.cgi?study_id=%PHS%&rettype=xml',
     verbose => 0,
     filelist => '',
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help verbose=i filelist=s dryrun
+    help verbose filelist=s dryrun phsdir=s
     )) || die "Failed to parse options\n";
 
 #   Simple help if requested
@@ -73,6 +84,10 @@ foreach my $fcn (@ARGV) {
     }
     if ($fcn eq 'update') {
         Update($filelist_ref);
+        next;
+    }
+    if ($fcn eq 'verify') {
+        Verify($filelist_ref);
         next;
     }
     die "$Script - Unknown directive '$fcn'\n";
@@ -166,7 +181,7 @@ sub Update {
             my $sra_details = $r->{sra_data_details} || '';
 
             #   Update this NWDID in database, else ignore 
-            my $sth = DoSQL("SELECT bamid from $opts{bamfiles_table} WHERE expt_sampleid='$nwdid'", 0);
+            my $sth = DoSQL("SELECT bamid from $opts{bamfiles_table} WHERE expt_sampleid='$nwdid'");
             my $rowsofdata = $sth->rows();
             if (! $rowsofdata) { 
                 if ($opts{verbose}) { print "  No BAMID found for NWDID='$nwdid'\n"; }
@@ -189,7 +204,83 @@ sub Update {
         }
         if ($f ne $file) { unlink($f); }
         print "$nowdate Updated $changes entries from $file, $unknowns unknown bamids\n";  
-    }      
+    }
+} 
+
+#==================================================================
+# Subroutine:
+#   Verify - Compare the state for an NWDID in the PHS files
+#       to that in the bamfiles database
+#       These might not match because the NCBI summary File
+#       is not always correct :-( 
+#
+# Arguments:
+#   filesref - Reference to array of paths to xml files
+#==================================================================
+sub Verify {
+    my ($filesref) = @_;
+    my %status = ();                # Save list of loaded files
+
+    foreach my $file (@$filesref) {
+        my $f = $file;
+        if ($f =~ /\.gz$/) {
+            $f = "/tmp/$$.tmp";
+            my $cmd = "gunzip -c $file > $f";
+            system($cmd) &&
+                die "Unable to run command: $cmd\n";
+        }
+        #   Read in each XML             
+        my $xml = new XML::Simple();
+        my $myxml = eval { $xml->XMLin($f) };
+        if ($@) {
+            if ($f ne $file) { unlink($f); }
+            die "XML parse error in '$file': $@\n";
+        }
+        #   Walk through array of all NWDID entries
+        my $k = $#{$myxml->{Study}->{SampleList}->{Sample}};
+        if ($opts{verbose}) { print "  Processing $k NWDID entries [$file]\n"; }
+        my $loaded = 0;
+        my $waiting = 0;
+        my $unknown = 0;
+        my $errors = 0;
+        my $processing = 0;
+        for (my $i=0; $i<=$k; $i++) {
+            my $phs = $myxml->{Study}->{accession};
+            if ($phs =~ /^(phs\d+)/) { $phs = $1; }
+            my $r = $myxml->{Study}->{SampleList}->{Sample}[$i];    # For convenience
+            my $nwdid = $r->{submitted_sample_id};
+
+            if (ref($r->{SRAData}->{Stats}) ne 'HASH') { $unknown++; next; }
+            my $status = $r->{SRAData}->{Stats}->{status} || '';
+            if ($status eq 'ready') { $status{$nwdid} = $file; $loaded++; }
+            else {
+                if (! $status) { $unknown++; next; }
+                if ($status =~ /waiting/) { $waiting++; next; }
+                if ($status eq 'error') { $processing++; next; }
+                if ($status eq 'processing') { $errors++; next; }
+                print "NWDID=$nwdid status=$status\n";
+            }
+        }
+        print "    Status counts: loaded=$loaded waiting=$waiting unknown=$unknown error=$errors processing=$processing\n"; 
+    }
+
+    #   Now check the status of all delivered bams to see if these were loaded
+    #   Apparently we cannot tell anything useful about the primary bam
+    #   so we can only look for bams that are delivered and are loaded in the PHS file
+    my $sth = DoSQL("SELECT bamid,state_ncbib37,expt_sampleid FROM $opts{bamfiles_table} " .
+        "WHERE state_ncbiorig=$DELIVERED");
+    my $rowsofdata = $sth->rows();
+    my $mixed = 0;
+    print "Found $rowsofdata entries marked as delivered\n";
+    for (my $i=1; $i<=$rowsofdata; $i++) { 
+        my $href = $sth->fetchrow_hashref;
+        if ($href->{state_ncbib37} == $COMPLETED || $href->{state_ncbib37} == $DELIVERED) { $mixed++; next; }
+        my $nwdid = $href->{expt_sampleid};
+        if (! exists($status{$nwdid})) { next; }
+        #   This NWDID was loaded, but we don't think software
+        print "Delivered '$nwdid' marked as LOADED in '$status{$nwdid}'\n";
+    }
+    print "Found $mixed entries where secondary is complete, but primary was not\n";
 } 
 
 #==================================================================
@@ -233,6 +324,11 @@ Generates this output.
 
 If specified this is the file of PHS information from fetch.
 This option allows one to separate the normal sequence of fetch and update.
+
+=item B<-phsdir directory>
+
+Specifies the directory where the PHS data is downloaded.
+This defaults to B<'/net/topmed/incoming/study.reference/phs>.
 
 =item B<-verbose>
 
