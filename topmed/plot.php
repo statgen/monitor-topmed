@@ -31,6 +31,8 @@ $FAILED    = 99;            // Task failed
 $YMAX = 240;                // Globals for screen size
 $XMAX = 600;
 
+$COLORS = array('DarkGreen', 'red', 'orange', 'SlateBlue', 'gray');
+
 //-------------------------------------------------------------------
 //  Get parameters passed in via normal invocation
 //-------------------------------------------------------------------
@@ -91,14 +93,15 @@ if ($fcn == 'plot') {
         
     // Plot totals of all states for each step
     print "<p><b>Legend: <font size='-1'>" .
-        "<font color='DarkGreen'>Completed</font>, " .
-        "<font color='red'>Failed/Canceled</font>, " .
-        "<font color='SlateBlue'>In Process</font> (submitted, running, delivered), or " .
-        "<font color='gray'>Not Started</font> " .
+        "<font color='$COLORS[0]'>Completed</font>, " .
+        "<font color='$COLORS[1]'>Failed/Canceled</font>, " .
+        "<font color='$COLORS[2]'>Not Loaded</font>, " .
+        "<font color='$COLORS[3]'>In Process</font> (submitted, running), or " .
+        "<font color='$COLORS[4]'>Not Started</font> " .
         "</font></b></p>\n";
     $legend = array('ncbib38', 'ncbib37', 'ncbiorig', 'ncbiexpt',
         'b38', 'b37', 'cram', 'qplot', 'bai');    // Reversed
-    $title = "State for Each Step [$totalbamcount Verified BAMs]";
+    $title = "Current Counts for Each Step [$totalbamcount Verified BAMs]";
     $plotdata = array();
     $s = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . ' ';
     foreach ($legend as &$c) {  
@@ -114,12 +117,17 @@ if ($fcn == 'plot') {
         $row = SQL_Fetch($result);
         array_push($d, $row['count(*)']);
 
-        $sql = $s . " WHERE state_$c=$SUBMITTED OR state_$c=$STARTED OR state_$c=$DELIVERED";
+        $sql = $s . " WHERE state_$c=$DELIVERED";
         $result = SQL_Query($sql);
         $row = SQL_Fetch($result);
         array_push($d, $row['count(*)']);
 
-        $sql = $s . " WHERE state_$c=$NOTSET OR state_$c=$REQUESTED";
+        $sql = $s . " WHERE state_$c=$SUBMITTED OR state_$c=$STARTED OR state_$c=$REQUESTED";
+        $result = SQL_Query($sql);
+        $row = SQL_Fetch($result);
+        array_push($d, $row['count(*)']);
+
+        $sql = $s . " WHERE state_$c=$NOTSET";
         $result = SQL_Query($sql);
         $row = SQL_Fetch($result);
         array_push($d, $row['count(*)']);
@@ -171,7 +179,7 @@ if ($fcn == 'plot') {
         "<p><font size='-1'>" .
         "The following describe the number of various BAMs and average send times " .
         "for the three types of BAMs:  <b>orig</b> are the original BAMs (BROAD " .
-        "original BAMs are recreated from CRAM. <b>b37</b> are BAMs remapped using " .
+        "original BAMs are sent as a CRAM). <b>b37</b> are BAMs remapped using " .
         "build 37 and are created from CRAMs and <b>b38</b> is similar except using " .
         "build 38." .
         "</font></p>\n";
@@ -257,7 +265,7 @@ exit;
 #   $datatype should be text-data or text-data-yx
 ---------------------------------------------------------------*/
 function MakePlot($plotdata, $title, $legend, $ytitle='', $ypoints='', $type='lines', $datatype='text-data') {
-    global $JS, $YMAX, $XMAX;
+    global $JS, $YMAX, $XMAX, $COLORS;
 
     $plot = new PHPlot($XMAX, $YMAX);
     $plot->SetFailureImage(False);  // No error images
@@ -273,7 +281,7 @@ function MakePlot($plotdata, $title, $legend, $ytitle='', $ypoints='', $type='li
         //$plot->SetXTickLabelPos('none');
         //$plot->SetXDataLabelPos('plotin');
         //$plot->SetLegendPixels($xmax-85, 5);
-        $plot->SetDataColors(array('DarkGreen', 'red', 'SlateBlue', 'gray'));
+        $plot->SetDataColors($COLORS);
         if ($ypoints) { $plot->SetXDataLabelPos('plotin'); }
         else { $plot->SetXDataLabelPos('plotstack'); }
     }
