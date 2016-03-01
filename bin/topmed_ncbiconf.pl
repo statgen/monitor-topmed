@@ -485,38 +485,13 @@ The summary log is read backwards, so B<-days 3> would process only
 entries for the last three days.
 This only applies when checking the status BAMs/CRAMs that have been sent.
 
-=item B<-dryrun>
+=item B<-fetchfiles>
 
-Do not submit any jobs, just show the command to be executed.
+Causes the summary log file to be fetched from NCBI.
 
 =item B<-help>
 
 Generates this output.
-
-=item B<-maxjobs N>
-
-Do not submit more than N jobs for this invocation.
-The default for B<-maxjobs> is B<100>.
-
-=item B<-maxsubmits N>
-
-Do not send more than N XML submits to NCBI.
-The default for B<-maxjobs> is B<10>.
-
-=item B<-memory nG>
-
-Force the sbatch --mem setting when submitting a job.
-This requires the SHELL scripts to handle the environment variable.
-
-=item B<-partition name>
-
-Force the sbatch --partition setting when submitting a job.
-This requires the SHELL scripts to handle the environment variable.
-
-=item B<-qos name>
-
-Force the sbatch --qos setting when submitting a job.
-This requires the SHELL scripts to handle the environment variable.
 
 =item B<-realm NAME>
 
@@ -529,14 +504,10 @@ e.g. B<2015jun05.weiss.02,2015jun05.weiss.03>.
 This is useful for testing.
 The default is to run against all runs for the center.
 
-=item B<-suberr>
+=item B<-xmlfilesdir directory>
 
-Submit the job if the state is B<error>. Normally tasks in this state
-are not submitted to be run.
-
-=item B<-topdir PATH>
-
-Specifies the path to where the tree of BAMs exists. This defaults to  B</incoming/topmed>;
+Specifies a directory where the summary log files will be downloaded.
+This defaults to B</net/topmed/working/topmed-output/XMLfiles>.
 
 =item B<-verbose>
 
@@ -548,10 +519,11 @@ Provided for developers to see additional information.
 
 =over 4
 
-=item B<arrive | verify | backup | bai | qplot | cram | expt | ncbiorig>
+=item B<updatedb | ignore>
 
-Directs this program to look for runs that have not been through the process name
-you provided and to queue a request they be verified.
+Controls what steps will be run. The usual command is B<updatedb>, but at times
+you might want to just fetch the log files, in which case B<ignore> can be
+specified to avoid a misleading error message.
 
 =back
 
@@ -563,7 +535,7 @@ return code of 0. Any error will set a non-zero return code.
 
 =head1 AUTHOR
 
-Written by Terry Gliedt I<E<lt>tpg@umich.eduE<gt>> in 2015 and is
+Written by Terry Gliedt I<E<lt>tpg@umich.eduE<gt>> in 2015- and is
 is free software; you can redistribute it and/or modify it under the
 terms of the GNU General Public License as published by the Free Software
 Foundation; See http://www.gnu.org/copyleft/gpl.html
