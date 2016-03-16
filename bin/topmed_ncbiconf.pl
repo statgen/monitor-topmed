@@ -71,7 +71,7 @@ our %opts = (
     verbose => 0,
 );
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose center=s runs=s fetchfiles xmlfilesdir=s days=i
+    help realm=s verbose center=s runs=s fetchfiles xmlfilesdir=s days=i all ncbistatusfile=s
     )) || die "Failed to parse options\n";
 
 #   Simple help if requested
@@ -129,7 +129,7 @@ if ($opts{fetchfiles}) {
             }
         }
     }
-    if ($rc) {                              # Pretty lost, get all files and use last loaded file
+    if ($opts{all} || $rc) {                              # Pretty lost, get all files and use last loaded file
         # Here is command:  /usr/cluster/bin/ascp -i /net/topmed/incoming/study.reference/send2ncbi/topmed-2-ncbi.pri \
         #   -Q -l 200m -k 1 -q asp-um-sph@gap-submit.ncbi.nlm.nih.gov:outgoing/Files .
         $cmd = "$opts{ascpcmd} $ascphost:$opts{ascpinfiles} .";   # Creates directory Files
@@ -147,7 +147,8 @@ if ($opts{fetchfiles}) {
         rename("Files/$f", $opts{bamsstatus}) ||
             die "$Script Unable to find any listing of loaded files. Totally lost: $!\n";
         print "Fetched file 'Files/$f', saved as '$opts{xmlfilesdir}/$opts{bamsstatus}'\n";
-        system('rm -rf Files');         # Clean up cruft
+        if ($opts{all}) { print "All files were downloaded to output/XMLfiles/Files\n"; }
+        else { system('rm -rf Files'); }    # Clean up cruft
     }
     if ($rc) { die "$Script Unable to fetch files of loaded files at NCBI\n"; }
 }
@@ -161,7 +162,8 @@ if ($fcn eq 'updatedb') {
     my $centersref = GetCenters();
     CheckEXPT($centersref, "$opts{xmlfilesdir}/$opts{studystatus}");
     CheckEXPT($centersref, "$opts{xmlfilesdir}/$opts{bamsstatus}");
-    CheckBAMS($centersref, "$opts{xmlfilesdir}/$opts{bamsstatus}");
+    if ($opts{ncbistatusfile}) { CheckBAMS($centersref, $opts{ncbistatusfile}); }
+    else { CheckBAMS($centersref, "$opts{xmlfilesdir}/$opts{bamsstatus}"); }
     exit;
 }
 
@@ -466,6 +468,11 @@ might expect all the data has arrived.
 
 =over 4
 
+=item B<-all>
+
+If B<-fetchfiles> was specified, this option will force all files to
+be fetched, not just the single file we think we want.
+
 =item B<-batchsize N>
 
 When sending sets of files to NCBI, batch them into sets of this size.
@@ -492,6 +499,10 @@ Causes the summary log file to be fetched from NCBI.
 =item B<-help>
 
 Generates this output.
+
+=item B<-ncbistatusfile FILE>
+
+Use this to force processing on an older summary file from NCBI.
 
 =item B<-realm NAME>
 
