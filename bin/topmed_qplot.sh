@@ -5,6 +5,7 @@
 #	Run QPLOT on a BAM file
 #
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
+topmedqplot=/usr/cluster/monitor/bin/topmedqplot.pl
 console=/net/topmed/working/topmed-output
 gcbin=/net/mario/gotcloud/bin
 gcref=/net/mario/nodeDataMaster/local/ref/gotcloud.ref
@@ -122,6 +123,20 @@ etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "Command completed in $etime seconds. Created files:"
 ls -la $basebam.*
+
+#   Now attempt to put the QPLOT data into the database
+nwdid=`$topmedcmd.pl show $bamid expt_sampleid`
+if [ "$nwdid" = "" ]; then
+  echo "Unable to find the NWDID for '$bamid'"
+  exit 6
+fi
+$topmedqplot $outdir $nwdid
+if [ "$?" != "0" ]; then
+  echo "Unable to update the database with the QCPLOT results for '$bamid' [$outdir $nwdid]"
+  $topmedcmd mark $bamid $markverb failed
+  exit 7
+fi
+
 $topmedcmd mark $bamid $markverb completed
   echo `date` qplot $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
 exit 0
