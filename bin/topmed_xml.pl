@@ -40,7 +40,6 @@ my $xmlns_url = "xmlns:xsi = \"http://www.w3.org/2001/XMLSchema-instance\"\n" .
             "trunk/sra/doc/SRA_1-5/SRA";
 my $incomingdir = '/net/topmed/incoming';
 my $topmed = '/net/topmed';
-my $topmed2 = '/net/topmed2';
 our %opts = (
     realm => '/usr/cluster/monitor/etc/.db_connections/topmed',
     centers_table => 'centers',
@@ -164,7 +163,11 @@ sub CreateRun {
         $processingfile = "$opts{processingsectiondir}/$center.run_processing.txt";
         $title = "Secondary mapping Build $opts{build} for $href->{expt_sampleid} [$href->{bamid}]";
         if ($filename =~ /(^NWD\d+)/) {         # BAM we send should be called NWDxxxxx.src.bam
-            $filename = $1 . '.src.bam';
+            my $n = $1;
+            if ($filename =~ /cram/) {          # Unless it is a CRAM from a bam
+                $filename = $n . '.src.cram';
+            }
+            else { $filename = $n . '.src.bam'; }
         }
     }
     else {
