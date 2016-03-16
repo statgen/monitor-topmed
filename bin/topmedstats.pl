@@ -345,37 +345,24 @@ __END__
 
 =head1 NAME
 
-topmedcmd.pl - Update the database for NHLBI TopMed
+topmedstats.pl - Collect statistics from the jobids files
 
 =head1 SYNOPSIS
 
-  topmedcmd.pl mark 33 arrived completed   # BAM has arrived
-  topmedcmd.pl mark NWD00234  arrived completed   # Same BAM has arrived
-  topmedcmd.pl unmark 33 arrived           # Reset BAM has arrived
+  topmedstats.pl jobid 2015/03/02       # Collect stats for a particular day
 
-  topmedcmd.pl set 33 jobidqplot 123445    # Set jobidqplot in bamfiles
- 
-  topmedcmd.pl where 2199                  # Returns path to bam, path to backup, bamname
-
-  topmedcmd.pl permit add bai braod 2015oct18   # Stop bai job submissions for a run
-  topmedcmd.pl permit remove 12             # Remove a permit control
-  topmedcmd.pl permit test bai 4567         # Test if we should submit a bai job for one bam
+  topmedstats.pl summary  2015/03/02    # Make a summary for a day
 
 =head1 DESCRIPTION
 
-This program supports simple commands to set key elements of the NHLBI database.
-The queue of tasks is kept in a MySQL database.
+This program is used to collect statistics from the jobids files
+and update the statistics database used to generate plots.
+
 See B<perldoc DBIx::Connector> for details defining the database.
 
 =head1 OPTIONS
 
 =over 4
-
-=item B<-center NAME>
-
-Specifies a specific center name on which to run the action, e.g. B<uw>.
-This is useful for testing.
-The default is to run against all centers.
 
 =item B<-help>
 
@@ -387,13 +374,6 @@ Specifies the realm name to be used.
 This defaults to B<$opts{realm}> in the same directory as
 where this program is to be found.
 
-=item B<-runs NAME[,NAME,...]>
-
-Specifies a specific set of runs on which to run the action,
-e.g. B<2015jun05.weiss.02,2015jun05.weiss.03>.
-This is useful for testing.
-The default is to run against all runs for the center.
-
 =item B<-verbose>
 
 Provided for developers to see additional information.
@@ -402,57 +382,17 @@ Provided for developers to see additional information.
 
 =head1 PARAMETERS
 
-Parameters to this program are grouped into several groups which are used
-to deal with specific sets of information in the monitor databases.
+=over 4
 
-B<mark bamid dirname  [verb] [state]>
-Use this to set the state for a particular BAM file.
-You may specify the bamid or the NWDID.
-Mark will set a date for the process (e.g. arrived sets state_arrive)
-and unmark will set that entry to NULL.
-The list of verbs and states can be seen by B<perldoc topmedcmd.pl>.
+=item B<jobid yyyy/mm/dd>
 
-B<permit enable/disable operation center run>
-Use this to control the database which allows one enable or disable topmed operations
-(e.g. backup, verify etc) for a center or run.
-Use B<all> for all centers or all runs or all operations.
+Collect statistics from the jobids files for a particular date.
 
-B<permit test operation bamid>
-Use this to test if an operation (e.g. backup, verify etc) may be submitted 
-for a particular bam.
+=item B<summary yyyy/mm/dd>
 
-B<set bamid columnname value>
-Use this to set the value for a column for a particular BAM file.
+Collect details from the summary log file for a particular date.
 
-B<send2ncbi filelist>
-Use this to copy data to NCBI with ascp.
-
-B<show arrived>
-Use this to show the bamids for all BAMs that are marked arrived.
-
-B<step yyyy/mm/dd stepname slurmid seconds>
-Update the step database with time for various steps so they can be easily plotted.
-This only applies to successful steps.
-You can extract the data from steptime with a command like:
-
-B<mysql --user=sqlnhlbiro --host=f-db --password=PASSWORD --batch \>
-  B<-e 'select step,stepdate,seconds from steptime' nhlbi | \>
-  B<grep -v stepdate | sed "s/\t/,/g"> /tmp/step.csv>
-
-B<unmark bamid [verb]>
-Use this to reset the state for a particular BAM file to the default
-database value.
-
-B<whatnwdid bamid|NWDnnnnnn>
-Use this to get some details for a particular bam.
-
-<where bamid>
-Use this to display the directory of the bam file, 
-the path to the backup direcotry,
-the name of the bam without any path,
-the real host where the file leaves (e.g. B<topmed3>),
-and the index of the hostname (e.g. B<2> for topmed2).
-
+=back
 
 =head1 EXIT
 
