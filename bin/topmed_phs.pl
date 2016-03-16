@@ -57,7 +57,7 @@ Getopt::Long::GetOptions( \%opts,qw(
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
     my $m = "$Script [options]";
-    warn "$m fetch|nofetch\n" .
+    warn "$m fetch\n$m update\n$m verify\n" .
         "Manage the PHS files and database\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
@@ -348,6 +348,12 @@ Fetch the PHS files from NCBI. This is normally followed by B<update>
 
 Read the PHS files and update the database.
 
+=item B<verify>
+
+Read the PHS files and try to verify the state of files in the database.
+This is generally not used, but was added in an attempt to find lost
+entries in the NCBI data.
+
 =back
 
 =head1 EXIT
@@ -357,7 +363,7 @@ return code of 0. Any error will set a non-zero return code.
 
 =head1 AUTHOR
 
-Written by Terry Gliedt I<E<lt>tpg@umich.eduE<gt>> in 2015 and is
+Written by Terry Gliedt I<E<lt>tpg@umich.eduE<gt>> in 2015-2016 and is
 is free software; you can redistribute it and/or modify it under the
 terms of the GNU General Public License as published by the Free Software
 Foundation; See http://www.gnu.org/copyleft/gpl.html
