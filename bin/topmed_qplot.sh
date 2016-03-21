@@ -91,6 +91,8 @@ if [ "$?" != "0" ]; then
   $topmedcmd mark $bamid $markverb failed
   exit 3
 fi
+echo "Files will be created in "
+pwd
 
 #   Run qplot, output written to current working directory
 basebam=`basename $bamfile .bam`
@@ -125,7 +127,7 @@ echo "Command completed in $etime seconds. Created files:"
 ls -la $basebam.*
 
 #   Now attempt to put the QPLOT data into the database
-nwdid=`$topmedcmd.pl show $bamid expt_sampleid`
+nwdid=`$topmedcmd show $bamid expt_sampleid`
 if [ "$nwdid" = "" ]; then
   echo "Unable to find the NWDID for '$bamid'"
   exit 6
