@@ -302,7 +302,6 @@ if ($fcn eq 'sexpt') {
                 if ($opts{runs}) { print "No BAMs from '$dirname' have nwdid_known='Y'\n"; }
                 next;
             }
-            my %pistudy2bamlist = ();
             for (my $i=1; $i<=$rowsofdata; $i++) {
                 my $href = $sth->fetchrow_hashref;
                 
@@ -357,7 +356,6 @@ if ($fcn eq 'sorig') {
                 if ($opts{runs}) { print "No BAMs from '$dirname' have nwdid_known='Y'\n"; }
                 next;
             }
-            my %pistudy2bamlist = ();
             for (my $i=1; $i<=$rowsofdata; $i++) {
                 my $href = $sth->fetchrow_hashref;
 
@@ -404,7 +402,6 @@ if ($fcn eq 'sb37') {
             my $sth = DoSQL($sql);
             my $rowsofdata = $sth->rows();
             if (! $rowsofdata) { next; }
-            my %pistudy2bamlist = ();
             for (my $i=1; $i<=$rowsofdata; $i++) {
                 my $href = $sth->fetchrow_hashref;
 
