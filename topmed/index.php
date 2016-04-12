@@ -202,7 +202,7 @@ $parmcols = array('fcn', 'maxdir', 'desc', 'center',
 extract (isolate_parms($parmcols));
 if (! $center) { $center = 'all'; }
 if (! $fcn)    { $fcn = 'runs'; }
-if (! $maxdir) { $maxdir = '150'; }
+if (! $maxdir) { $maxdir = 0; }     // Show all data
 
 DB_Connect($LDB['realm']);
 GetCenters();                   // Get maps to identify centers
@@ -218,7 +218,7 @@ if ($fcn == 'queue') {              // This cannot work until statgen can run sq
     exit;
 }
 if ($fcn == 'runs') {
-    print ViewRuns($center, $maxdir, $iammgr);
+    print ViewRuns($center, $maxdir, $iammgr);        
     print dofooter($HDR['footer']);
     exit;
 }
@@ -479,22 +479,23 @@ function ViewPullQueue($cid, $onlyactive=1) {
 
 /*---------------------------------------------------------------
 #   html = ViewRuns($center, $maxdirs, $iammgr)
-#   Show summary of directories of runs
+#   Show summary of directories of runs for all datayears
 ---------------------------------------------------------------*/
 function ViewRuns($center, $maxdirs, $iammgr) {
-    global $LDB, $CENTERS, $CENTERID2NAME, $CENTERNAME2ID, $RUNNOTE, $SHOWQUEUES;
-    $hdrcols  = array('dirname', 'status', 'bamcount', 'dateinit', 'datecomplete');
+    global $CENTERS, $CENTERNAME2ID, $RUNNOTE, $SHOWQUEUES;
+    $hdrcols  = array('dirname', 'status', 'bamcount');
 
     //  Generate HTML header for page
     //  Get list of centers doing:  select distinct(project) from status;
-    $html = "<h3 align='center'>Summary of Last $maxdirs Directories</h3>\n" .
+    $html = "<h3 align='center'>Summary of Runs</h3>\n" .
         "<center>" .
-        "<a href='" . $_SERVER['SCRIPT_NAME'] . "?maxdirs=25'>Show Last 25</a>" .
-        "&nbsp;&nbsp;&nbsp; or &nbsp;&nbsp;&nbsp;" .
-        "<a href='" . $_SERVER['SCRIPT_NAME'] . "?maxdir=75'>Show Last 75</a>" .
-        "&nbsp;&nbsp;&nbsp; or &nbsp;&nbsp;&nbsp;" .
-          "<a href='" . $_SERVER['SCRIPT_NAME'] . "?" . $_SERVER['QUERY_STRING'] .
-        "'>Refresh</a><br>\n Or Choose a Center: " .
+        //"<a href='" . $_SERVER['SCRIPT_NAME'] . "?maxdirs=25'>Show Last 25</a>" .
+        //"&nbsp;&nbsp;&nbsp; or &nbsp;&nbsp;&nbsp;" .
+        //"<a href='" . $_SERVER['SCRIPT_NAME'] . "?maxdir=75'>Show Last 75</a>" .
+        //"&nbsp;&nbsp;&nbsp; or &nbsp;&nbsp;&nbsp;" .
+        //"<a href='" . $_SERVER['SCRIPT_NAME'] . "?" . $_SERVER['QUERY_STRING'] .
+        //"'>Refresh</a><br>" .
+        "\nChoose a Center: " .
         "&nbsp;&nbsp;<a href='" . $_SERVER['SCRIPT_NAME'] .
         "?center=all&amp;maxdir=$maxdirs'>All</a>&nbsp;&nbsp;\n";
     foreach ($CENTERS as $c) {
@@ -507,74 +508,81 @@ function ViewRuns($center, $maxdirs, $iammgr) {
     if ($center == 'all') { $centers2show = $CENTERS; }
     else { array_push($centers2show, $center); }
 
-    //  For each center, show details from database ($rows)
-    foreach ($centers2show as $centr) {
-        $cid = $CENTERNAME2ID[$centr];
-        $html .= "<br><div class='indent'><b>" . strtoupper($centr);
-        if ($iammgr) {
-            $u = $_SERVER['SCRIPT_NAME'] ."?fcn=reqfetch&amp;centerid=$cid";
-            $html .= "&nbsp;&nbsp;&nbsp;<a href='$u' onclick='javascript:popup2(\"$u\",680,720); return false;'>" .
-                "<font color='blue' size='-1'>Queue Pull</font></a>";
-            $u = $_SERVER['SCRIPT_NAME'] ."?fcn=reqshow&amp;centerid=$cid";
-            $html .= "&nbsp;&nbsp;&nbsp;<a href='$u' onclick='javascript:popup2(\"$u\",680,720); return false;'>" .
-                "<font color='blue' size='-1'>Show Queue</font></a>";
+    //  Show data for center by datayear
+    for ($datayear=2; $datayear>0; $datayear--) {
+        //  For each center show details from database ($rows)
+        foreach ($centers2show as $centr) {
+            $cid = $CENTERNAME2ID[$centr];
+            $h = ShowRunYear($cid, $maxdirs, $datayear, $iammgr);
+            if (! $h) { continue; }
+            $html .= "<br><div class='indent'><b>" . strtoupper($centr) .
+                ", Year $datayear</b></div>$h\n";
         }
-        $html .= "</b></div>\n";
-        //  Build start of table for each center
-        $html .= "<table align='center' width='100%' border='1'><tr>\n";
-        foreach ($hdrcols as $c) {
-            $html .= "<th class='heading'>" . ucfirst($c) . "</th>\n";
-        }
-        if ($iammgr) { $html .= "<th>&nbsp;</th>"; }
-        $html .= "</tr>\n";
-
-        //  Walk through database getting data for this center
-        $sql = 'SELECT * FROM ' . $LDB['runs'] . " WHERE centerid=$cid";
-        if ($maxdirs) { $sql .= " LIMIT $maxdirs"; }
-        $result = SQL_Query($sql);
-        $numrows = SQL_NumRows($result);
-        $rows = array();            // Save DB info for later display
-        $centers2show = array();    // Get list of centers for this query
-        for ($i=0; $i<$numrows; $i++) {
-            $row = SQL_Fetch($result);
-            $rows[$row['runid']] = $row;
-        }
-
-        reset($rows);
-        foreach ($rows as $id => $row) {
-            if ($row['centerid'] != $cid) { continue; }
-            //print "<!-- CID=$cid ROW=\n"; print_r($row); print " -->\n";
-            //  Show data for this center
-            $html .= "<tr>\n";
-            reset($hdrcols);
-            foreach ($hdrcols as $c) {
-                $d = $row[$c];
-                if ((! isset($d)) || ($d == '')) { $d = '&nbsp;'; }
-                if ($c == 'dirname') {
-                    $u = $_SERVER['SCRIPT_NAME'] . "?fcn=bams&amp;runid=" . $row['runid'];
-                    $d = "<a href='$u'>$d</a>";
-                }
-                if ($c == 'status') { $d = CalcRunStatus($d); }
-                //if ($c == 'dateinit' && (! preg_match('/\D/', $d))) { $d = date('Y/m/d H:i', $d); }
-                if ($c == 'dateinit') { $d = date('Y/m/d H:i', $d); }
-                if ($c == 'datecomplete' && $d != '&nbsp;') { $d = date('Y/m/d H:i', $d); }
-                $html .= "<td align='center'>$d</td>\n";
-            }
-            
-            $html .= "<td align='center'>";
-            $u = $_SERVER['SCRIPT_NAME'] ."?fcn=rundetail&amp;runid=" . $row['runid'];
-            $html .= "<a href='$u' onclick='javascript:popup2(\"$u\",680,720); return false;'>" .
-                    "<font color='green' size='-1'>Details</font></a>&nbsp;&nbsp;&nbsp;";
-            if ($iammgr) {
-                $u = $_SERVER['SCRIPT_NAME'] ."?fcn=editrun&amp;runid=" . $row['runid'];
-                $html .= "<a href='$u' onclick='javascript:popup2(\"$u\",680,720); return false;'>" .
-                    "<font color='red' size='-1'>Edit</font></a>";
-            }
-            $html .= "</td></tr>\n";
-        }
-        $html .= "</table>\n";
-    }
+        $html .= "<br>";
+        if ($datayear > 1) { $html .= "<hr width='80%' class='separator'>\n"; }
+    }    
+    
     $html .= "<div class='indent'>\n$RUNNOTE</div>\n";
+    return $html;
+}
+
+/*---------------------------------------------------------------
+#   html = ShowRunYear($cid, $maxdirs, $datayear, $iammgr) {
+#   Show summary of directories of runs
+---------------------------------------------------------------*/
+function ShowRunYear($cid, $maxdirs, $datayear, $iammgr) {
+    global $LDB;
+    $hdrcols  = array('dirname', 'status', 'bamcount');
+
+    //  Walk through database getting data for this center
+    $sql = 'SELECT * FROM ' . $LDB['runs'] . " WHERE centerid=$cid AND datayear=$datayear";
+    if ($maxdirs) { $sql .= " LIMIT $maxdirs"; }
+    $result = SQL_Query($sql);
+    $numrows = SQL_NumRows($result);
+    $rows = array();            // Save DB info for later display
+    $centers2show = array();    // Get list of runs for this query
+    for ($i=0; $i<$numrows; $i++) {
+        $row = SQL_Fetch($result);
+        $rows[$row['runid']] = $row;
+    }
+    if (! count($rows)) { return ''; }        // Nothing here
+
+    //  Build start of table for each center
+    $html = "<table align='center' width='100%' border='1'><tr>\n";
+    foreach ($hdrcols as $c) {
+        $html .= "<th class='heading'>" . ucfirst($c) . "</th>\n";
+    }
+    if ($iammgr) { $html .= "<th>&nbsp;</th>"; }
+    $html .= "</tr>\n";
+
+    reset($rows);
+    foreach ($rows as $id => $row) {
+        //  Show data for this run
+        $html .= "<tr>\n";
+        reset($hdrcols);
+        foreach ($hdrcols as $c) {
+            $d = $row[$c];
+            if ((! isset($d)) || ($d == '')) { $d = '&nbsp;'; }
+            if ($c == 'dirname') {
+                $u = $_SERVER['SCRIPT_NAME'] . "?fcn=bams&amp;runid=" . $row['runid'];
+                $d = "<a href='$u'>$d</a>";
+            }
+            if ($c == 'status') { $d = CalcRunStatus($d); }
+            $html .= "<td align='center'>$d</td>\n";
+        }
+            
+        $html .= "<td align='center'>";
+        $u = $_SERVER['SCRIPT_NAME'] ."?fcn=rundetail&amp;runid=" . $row['runid'];
+        $html .= "<a href='$u' onclick='javascript:popup2(\"$u\",680,720); return false;'>" .
+            "<font color='green' size='-2'>Details</font></a>&nbsp;";
+        if ($iammgr) {
+            $u = $_SERVER['SCRIPT_NAME'] ."?fcn=editrun&amp;runid=" . $row['runid'];
+            $html .= "<a href='$u' onclick='javascript:popup2(\"$u\",680,720); return false;'>" .
+                "<font color='red' size='-2'>Edit</font></a>";
+        }
+        $html .= "</td></tr>\n";
+    }
+    $html .= "</table>\n";
     return $html;
 }
 
