@@ -58,6 +58,7 @@ our %opts = (
     runs_table => 'runs',
     studies_table => 'studies',
     bamfiles_table => 'bamfiles',
+    summary_table => 'ncbi_summary',
     summarydir => 'ncbisummaries',
     topdir  => '/net/topmed/incoming/topmed',
     studystatusurl => 'http://www.ncbi.nlm.nih.gov/projects/gap/cgi-bin/GetSampleStatus.cgi?study_id=phs000954.v1.p1&rettype=xml',
@@ -67,16 +68,17 @@ our %opts = (
     ascpinfiles => 'outgoing/Files',
     studystatus => 'latest_samples.xml',
     bamsstatus => 'latest_loaded_files.txt.gz',
+    summarymysqlcmd => '/home/topmed/.mysql/topmed_ncbiconf.cmd',      # Used to load summary file into database
     days => 0,
     verbose => 0,
 );
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose center=s runs=s fetchfiles xmlfilesdir=s days=i all ncbistatusfile=s
+    help realm=s verbose center=s runs=s fetchfiles loadsummary xmlfilesdir=s days=i all ncbistatusfile=s
     )) || die "Failed to parse options\n";
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$Script [options] [-fetchfiles] updatedb\n" .
+    warn "$Script [options] [-fetchfiles -loadsummary] updatedb\n" .
         "$Script [options] [-fetchfiles] ignore     # Fetch files only\n" .
         "Confirm files sent to NCBI were error free.\n";
     exit 1;
@@ -154,11 +156,30 @@ if ($opts{fetchfiles}) {
 }
 
 #--------------------------------------------------------------
+#   Load summary file into database
+#--------------------------------------------------------------
+if ($opts{loadsummary}) {
+    chdir $opts{xmlfilesdir} ||
+        die "$Script Unable to CD to '$opts{xmlfilesdir}'\n";
+    #   Get XML of all known experiments
+    my $cmd = "gunzip -c $opts{bamsstatus} > $opts{summary_table}";
+    system($cmd) &&
+        die "$Script Failed to unzip '$opts{bamsstatus}': CMD=$cmd\n";
+    $cmd = "$opts{summarymysqlcmd}";
+    my $rc = system($cmd);
+    unlink($opts{summary_table});
+    if ($rc) { die "$Script Failed to load summary file: CMD=$cmd\n"; }
+    print "$Script Loaded summary file into database table '$opts{summary_table}'\n";
+}
+
+#--------------------------------------------------------------
 #   Update state_expt fields in database when NCBI is happy with what we sent
 #--------------------------------------------------------------
 if ($fcn eq 'ignore') { exit; }     # Convenient way to just load files
 
-if ($fcn eq 'updatedb') {
+if ($fcn eq 'updatedb') { CheckSummary(); exit; }
+
+if ($fcn eq 'updatedb_unused') {
     my $centersref = GetCenters();
     CheckEXPT($centersref, "$opts{xmlfilesdir}/$opts{studystatus}");
     CheckEXPT($centersref, "$opts{xmlfilesdir}/$opts{bamsstatus}");
@@ -168,6 +189,160 @@ if ($fcn eq 'updatedb') {
 }
 
 die "Invalid request '$fcn'. Try '$Script --help'\n";
+
+#==================================================================
+# Subroutine:
+#   CheckSummary - Check the summary database for changes in status
+#==================================================================
+sub CheckSummary {
+    #my ($cref, $table) = @_;
+    my %stats = ();                     # Collect stats on attempts
+
+    #   Check status for each expt we sent
+    print "$nowdate Checking for loaded experiments:   "; 
+    %stats = ();
+    my $sql = "SELECT bamid,bamname,expt_sampleid from $opts{bamfiles_table} " .
+        "WHERE state_ncbiexpt=$DELIVERED";
+    LookFor($sql, 'expt', 'expt.xml', \%stats);
+    print SummarizeStats(\%stats) . "\n";
+
+    #   Check status for each original BAM/CRAM that we sent
+    print "$nowdate Checking for loaded original files:   "; 
+    %stats = ();
+    $sql = "SELECT bamid,bamname,expt_sampleid from $opts{bamfiles_table} " .
+        "WHERE state_ncbiorig=$DELIVERED";
+    LookFor($sql, 'orig', 'src.bam src.cram', \%stats);
+    print SummarizeStats(\%stats) . "\n";
+
+
+
+    #   Check status for each b37 BAM/CRAM that we sent
+    print "$nowdate Checking for remapped build 37 files:   "; 
+    %stats = ();
+    $sql = "SELECT bamid,bamname,expt_sampleid from $opts{bamfiles_table} " .
+        "WHERE state_ncbib37=$DELIVERED";
+    #   Last three of extensions are from my bugs
+    LookFor($sql, 'b37', 'recal.37.cram recal.37.bam recal.cram recal.bam', \%stats);
+    print SummarizeStats(\%stats) . "\n";
+
+    #   Check status for each b38 BAM/CRAM that we sent
+    print "$nowdate Checking for remapped build 38 files:   "; 
+    %stats = ();
+    $sql = "SELECT bamid,bamname,expt_sampleid from $opts{bamfiles_table} " .
+        "WHERE state_ncbib38=$DELIVERED";
+    #   Last three of extensions are from my bugs
+    LookFor($sql, 'b38', 'recal.38.cram', \%stats);
+    print SummarizeStats(\%stats) . "\n";
+
+    return;
+}
+
+#==================================================================
+# Subroutine:
+#   LookFor - Search database for files of a certain name
+#
+# Arguments:
+#   initialsql - SQL select in bamfiles for entries of interest
+#   type - expt orig b37 b38
+#   extensions - string of file extensions to the nwdid
+#   statsref - hash reference to array to collect stats in
+#
+#  Returns:
+#   Boolean if successful or not
+#==================================================================
+sub LookFor {
+    my ($initialsql, $type, $extensions, $statsref) = @_;
+
+    #   Get list of all nwdids we are interested in
+    my $sth = DoSQL($initialsql);
+    my $rowsofdata = $sth->rows();
+    if ($rowsofdata <= 0) { return undef(); }
+    print $type . "delivered=$rowsofdata  ";
+    my @exts = split(' ', $extensions);
+
+    for (my $i=1; $i<=$rowsofdata; $i++) {
+        my $href = $sth->fetchrow_hashref;
+        my $bamid = $href->{bamid};
+        my $nwdid = $href->{expt_sampleid};
+        my @searchfiles = ();
+        foreach (@exts) { push @searchfiles,$nwdid . '.' . $_; }
+        $href = GetSummaryStatus(@searchfiles);
+        if (! $href) {
+            #if ($opts{verbose}) { print "$nwdid not found in summary database\n"; }
+            next;
+        }
+        #   BAM/CRAM is now loaded
+        if ($href->{file_status} eq 'loaded') {
+            $statsref->{$type . 'loaded'}++;
+            if ($opts{verbose}) { print "$nwdid $type loaded $href->{upload_date}\n"; }
+            my $sql = "UPDATE $opts{bamfiles_table} SET state_ncbi$type=$COMPLETED " .
+                "WHERE bamid=$bamid";
+print $sql . "\n";
+            my $sth = DoSQL($sql);
+            next;
+        }
+        #   BAM/CRAM is received (no state change)
+        if ($href->{file_status} eq 'received') {
+            $statsref->{$type . 'received'}++;
+            if ($opts{verbose}) { print "$nwdid $type received $href->{upload_date}\n"; }
+            next;
+        }
+        #   BAM/CRAM had an error
+        if ($href->{file_status} eq 'error') {
+            $statsref->{$type . 'error'}++;
+            print "$nwdid $type in error $href->{file_error}\n";
+            my $sql = "UPDATE $opts{bamfiles_table} SET state_ncbi$type=$FAILED " .
+                "WHERE bamid=$bamid";
+            my $sth = DoSQL($sql);
+            next;
+        }
+        $statsref->{$type . 'unknown'}++;
+        print "$nwdid $type unknown status '$href->{file_status}'\n";
+    }
+    return 1;
+}
+
+#==================================================================
+# Subroutine:
+#   SummarizeStats
+#
+# Arguments:
+#   statsref - hash reference to array to collect stats in
+#
+#   Returns:
+#     Summary string
+#==================================================================
+sub SummarizeStats {
+    my ($statsref) = @_;
+    my $s = '';
+    foreach my $k (sort keys %$statsref) {
+        $s .= "$k=$statsref->{$k} ";
+    }
+    if (! $s) { return ''; }
+    return $s;
+}
+
+#==================================================================
+# Subroutine:
+#   GetSummaryStatus - Get status for NWDID
+#
+# Arguments:
+#   filearray - array of files to search for
+#
+#   Returns:
+#     hash reference to database query results
+#==================================================================
+sub GetSummaryStatus {
+    my $sql = "SELECT file_name,file_status,file_error,upload_date from $opts{summary_table} WHERE";
+    foreach my $f (@_) {
+        my $s = $sql .= " file_name='$f'";
+        my $sth = DoSQL($sql);
+        if (! $sth) { next; }
+        my $href = $sth->fetchrow_hashref;
+        return $href;
+    }
+    return undef();
+}
 
 #==================================================================
 # Subroutine:
@@ -258,6 +433,10 @@ sub CheckBAMS {
         if ($cols[0] ne 'protected') { next; }
         if ($cols[3] !~ /(NWD\d+)\.(.+)/) { next; } # Break into NWDnnnnnn and suffix
         my ($nwd, $suffix) = ($1, $2);
+if ($nwd eq 'NWD378142') {
+print "$nwd found\n";
+}
+
         if ($suffix eq 'expt.xml') { next; }
         my $date = substr($cols[2],0,10);           # Date of this action
         if ($opts{days} && $lastdate && $date ne $lastdate) {
