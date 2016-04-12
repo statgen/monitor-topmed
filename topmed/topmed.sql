@@ -42,6 +42,9 @@ INSERT INTO centers (centername,centerdesc,designdesc) VALUES('nygc', 'New York 
 INSERT INTO centers (centername,centerdesc,designdesc) VALUES('uw', 'University of Washington Genome Sciences','equivalent to Illumina TruSeq PCR-free DNA sample prep');
 INSERT INTO centers (centername,centerdesc,designdesc) VALUES('baylor', 'UNKNOWN center','UNKNOWN Design Desc');
 
+/*  The second of these is used to overwhelm a bug on the part of NCBI */
+UPDATE centers set centerdesc='New York Genome Center' where centerid=3;
+UPDATE centers set centerdesc='NYGC' where centerid=3;
 
 /* Lists all runs (directories of data). Must be tied to a center */
 DROP TABLE IF EXISTS runs;
@@ -51,6 +54,7 @@ CREATE TABLE runs (
   dirname      VARCHAR(64) NOT NULL,
   status       VARCHAR(256),
   bamcount     INT,
+  datayear     INT DEFAULT 2,          /* Year of project: 1, 2 ... */
   xmlfound     INT DEFAULT 0,          /* Remove this */
 
   dateinit     VARCHAR(12),
@@ -159,10 +163,151 @@ CREATE INDEX index_refname ON bamfiles(refname);
 /* ALTER TABLE bamfiles ADD COLUMN datebai VARCHAR(12) AFTER datebackup; */
 
 
+/*  This table is regularly loaded from a tab delimited summary file from NCBI
+    The NCBI data is loaded into this table to make it easier for us to garner
+    the state of data sent there.
+
+    mysql -h f-db.sph.umich.edu -u sqlnhlbi --password=g9X+6iaO --local-infile=1 nhlbi    
+    load data local infile 'ncbi_summary' into table ncbi_summary;
+
+*/
+DROP TABLE IF EXISTS ncbi_summary;
+CREATE TABLE ncbi_summary (
+  realm         VARCHAR(12),
+  upload_id     INT,
+  upload_date   VARCHAR(20),
+  file_name     VARCHAR(64),
+  file_size     INT,
+  file_md5sum   VARCHAR(32),
+  upload_name   VARCHAR(64),
+  upload_size   VARCHAR(24),
+  upload_md5sum VARCHAR(32),
+  file_status   VARCHAR(20),
+  file_type	    VARCHAR(20),
+  load_date     VARCHAR(24),
+  file_error    VARCHAR(255),
+  submissions   VARCHAR(64),
+  loaded_runs   VARCHAR(64),
+  unloaded_runs VARCHAR(64),
+  suppressed_runs   VARCHAR(64),
+  loaded_analyses   VARCHAR(64),
+  unloaded_analyses VARCHAR(64),
+  suppressed_analyses   VARCHAR(64),
+  id        INT         NOT NULL AUTO_INCREMENT,
+  PRIMARY KEY  (id)
+);
+CREATE INDEX index_file_name ON ncbi_summary(file_name);
+
+
+
 /* ####################################################
    Daily statisitics for steps
    #################################################### */
 
+
+/* ####################################################
+   View of QC _Metric data    nhlbi_qc_metrics
++-------------------+-------------+------+-----+---------------------+-------+
+| Field             | Type        | Null | Key | Default             | Extra |
++-------------------+-------------+------+-----+---------------------+-------+
+| id                | int(11)     | YES  |     | 0                   |       |
+| bam_id            | int(11)     | YES  |     | NULL                |       |
+| pct_freemix       | float       | YES  |     | NULL                |       |
+| n_reads_m         | float       | YES  |     | NULL                |       |
+| pct_mapped        | float       | YES  |     | NULL                |       |
+| pct_mq0           | float       | YES  |     | NULL                |       |
+| pct_paired        | float       | YES  |     | NULL                |       |
+| pct_prop_paired   | float       | YES  |     | NULL                |       |
+| mapped_gb         | float       | YES  |     | NULL                |       |
+| q20_gb            | float       | YES  |     | NULL                |       |
+| pct_q20_base      | float       | YES  |     | NULL                |       |
+| mean_depth        | float       | YES  |     | NULL                |       |
+| pct_genome_cov    | float       | YES  |     | NULL                |       |
+| isize_mode        | float       | YES  |     | NULL                |       |
+| isize_median      | float       | YES  |     | NULL                |       |
+| pct_dups          | float       | YES  |     | NULL                |       |
+| pct_genome_dp5    | float       | YES  |     | NULL                |       |
+| pct_genome_dp10   | float       | YES  |     | NULL                |       |
+| pct_genome_dp20   | float       | YES  |     | NULL                |       |
+| pct_genome_dp30   | float       | YES  |     | NULL                |       |
+| vmr_depth         | float       | YES  |     | NULL                |       |
+| depth_q10         | float       | YES  |     | NULL                |       |
+| depth_q20         | float       | YES  |     | NULL                |       |
+| depth_q30         | float       | YES  |     | NULL                |       |
+| raw_base_gb       | float       | YES  |     | NULL                |       |
+| pct_overlap_reads | float       | YES  |     | NULL                |       |
+| pct_overlap_bases | float       | YES  |     | NULL                |       |
+| isize_iqr         | float       | YES  |     | NULL                |       |
+| isize_stdev       | float       | YES  |     | NULL                |       |
+| gc_depth_0_1      | float       | YES  |     | NULL                |       |
+| gc_depth_1_5      | float       | YES  |     | NULL                |       |
+| gc_depth_5_25     | float       | YES  |     | NULL                |       |
+| gc_depth_25_75    | float       | YES  |     | NULL                |       |
+| gc_depth_75_95    | float       | YES  |     | NULL                |       |
+| gc_depth_95_99    | float       | YES  |     | NULL                |       |
+| gc_depth_99_100   | float       | YES  |     | NULL                |       |
+| library_size_m    | float       | YES  |     | NULL                |       |
+| created_at        | datetime    | YES  |     | NULL                |       |
+| modified_at       | timestamp   | YES  |     | 0000-00-00 00:00:00 |       |
+| sample_id         | varchar(96) | YES  |     | UNKNOWN             |       |
+| study             | varchar(96) | NO   |     | NULL                |       |
+| center            | varchar(16) | NO   |     | NULL                |       |
+| recieved          | datetime    | YES  |     | NULL                |       |
+| size              | varchar(16) | YES  |     | 0                   |       |
+| status_qplot      | varchar(45) | NO   |     | NULL                |       |
+| status_remap_hg37 | varchar(45) | NO   |     | NULL                |       |
+| status_remap_hg38 | varchar(45) | NO   |     | NULL                |       |
+| status_backup     | varchar(45) | NO   |     | NULL                |       |
+| status_ncbi_hg37  | varchar(45) | NO   |     | NULL                |       |
+| status_ncbi_hg38  | varchar(45) | NO   |     | NULL                |       |
++-------------------+-------------+------+-----+---------------------+-------+
+   #################################################### */
+
+/* ####################################################
+   QC _Metric data    qc_results
++-------------------+-----------+------+-----+-------------------+----------------+
+| Field             | Type      | Null | Key | Default           | Extra          |
++-------------------+-----------+------+-----+-------------------+----------------+
+| id                | int(11)   | NO   | PRI | NULL              | auto_increment |
+| bam_id            | int(11)   | NO   | MUL | NULL              |                |
+| pct_freemix       | float     | YES  |     | NULL              |                |
+| n_reads_m         | float     | YES  |     | NULL              |                |
+| pct_mapped        | float     | YES  |     | NULL              |                |
+| pct_mq0           | float     | YES  |     | NULL              |                |
+| pct_paired        | float     | YES  |     | NULL              |                |
+| pct_prop_paired   | float     | YES  |     | NULL              |                |
+| mapped_gb         | float     | YES  |     | NULL              |                |
+| q20_gb            | float     | YES  |     | NULL              |                |
+| pct_q20_base      | float     | YES  |     | NULL              |                |
+| mean_depth        | float     | YES  |     | NULL              |                |
+| pct_genome_cov    | float     | YES  |     | NULL              |                |
+| isize_mode        | float     | YES  |     | NULL              |                |
+| isize_median      | float     | YES  |     | NULL              |                |
+| pct_dups          | float     | YES  |     | NULL              |                |
+| pct_genome_dp5    | float     | YES  |     | NULL              |                |
+| pct_genome_dp10   | float     | YES  |     | NULL              |                |
+| pct_genome_dp20   | float     | YES  |     | NULL              |                |
+| pct_genome_dp30   | float     | YES  |     | NULL              |                |
+| vmr_depth         | float     | YES  |     | NULL              |                |
+| depth_q10         | float     | YES  |     | NULL              |                |
+| depth_q20         | float     | YES  |     | NULL              |                |
+| depth_q30         | float     | YES  |     | NULL              |                |
+| raw_base_gb       | float     | YES  |     | NULL              |                |
+| pct_overlap_reads | float     | YES  |     | NULL              |                |
+| pct_overlap_bases | float     | YES  |     | NULL              |                |
+| isize_iqr         | float     | YES  |     | NULL              |                |
+| isize_stdev       | float     | YES  |     | NULL              |                |
+| gc_depth_0_1      | float     | YES  |     | NULL              |                |
+| gc_depth_1_5      | float     | YES  |     | NULL              |                |
+| gc_depth_5_25     | float     | YES  |     | NULL              |                |
+| gc_depth_25_75    | float     | YES  |     | NULL              |                |
+| gc_depth_75_95    | float     | YES  |     | NULL              |                |
+| gc_depth_95_99    | float     | YES  |     | NULL              |                |
+| gc_depth_99_100   | float     | YES  |     | NULL              |                |
+| library_size_m    | float     | YES  |     | NULL              |                |
+| created_at        | datetime  | NO   |     | NULL              |                |
+| modified_at       | timestamp | NO   |     | CURRENT_TIMESTAMP |                |
++-------------------+-----------+------+-----+-------------------+----------------+
 
 
 /* ####################################################
