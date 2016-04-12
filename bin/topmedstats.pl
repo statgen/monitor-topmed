@@ -316,7 +316,7 @@ sub Jobids {
         if (! exists($STEPS{$c[6]})) { die "$Script - unknown step '$c[6]' from line:\n  $l"; }
         if (! exists($data{$c[6]})) { $data{$c[6]}{count} = 0; $data{$c[6]}{totaltime} = 0; }
         $data{$c[6]}{count}++;
-        $data{$c[6]}{totaltime} += $c[9];
+        if (defined($c[9])) { $data{$c[6]}{totaltime} += $c[9]; }
     }
     close(IN);
     if (! %data) { die "No data found for '$yyyymmdd'\n"; }
