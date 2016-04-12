@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-#   topmed_ncbib37.sh -submit bamid
+#   topmed_ncbib37.sh -xmlonly -submit bamid
 #
 #	Send the proper set of files to NCBI for the remapped bam build 37
 #
@@ -21,8 +21,10 @@ version=remap
 markverb=sentb$build
 jobname=b$build
 qos=ncbi
+xmlonly=N
 if [ "$TOPMED_QOS" != "" ]; then qos=$TOPMED_QOS; fi
 
+if [ "$1" = "-xmlonly" ]; then shift; xmlonly=Y; fi    # Force just XML to be sent to NCBI
 if [ "$1" = "-submit" ]; then
   shift
   #   May I submit this job?
@@ -49,7 +51,7 @@ fi
 
 if [ "$1" = "" ]; then
   me=`basename $0`
-  echo "Usage: $me [-submit] bamid"
+  echo "Usage: $me [-xmlonly] [-submit] bamid"
   echo ""
   echo "Send Remapped Build $build CRAM file to NCBI"
   exit 1
@@ -152,21 +154,25 @@ if [ "$?" != "0" ]; then
 fi
 files=$nwdid-$version.$build.tar
 
-echo "Sending data file to NCBI - $sendfile"
-ls -l $sendfile
+if [ "$xmlonly" != "Y" ]; then
+  echo "Sending data file to NCBI - $sendfile"
+  ls -l $sendfile
 
-stime=`date +%s`
-$ascpcmd $sendfile
-rc=$?
-rm -f $sendfile
-if [ "$rc" != "0" ]; then
-  echo "FAILED to send data file '$sendfile'"
-  $topmedcmd mark $bamid $markverb failed
-  exit 2
+  stime=`date +%s`
+  $ascpcmd $sendfile
+  rc=$?
+  rm -f $sendfile
+  if [ "$rc" != "0" ]; then
+    echo "FAILED to send data file '$sendfile'"
+    $topmedcmd mark $bamid $markverb failed
+    exit 2
+  fi
+  etime=`date +%s`
+  etime=`expr $etime - $stime`
+  echo "File sent in $etime seconds"
+else
+  echo "XMLONLY specified, did not send CRAM file"
 fi
-etime=`date +%s`
-etime=`expr $etime - $stime`
-echo "File sent in $etime seconds"
 
 echo "Sending XML files to NCBI - $files"
 $ascpcmd $files
