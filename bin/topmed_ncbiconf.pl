@@ -131,7 +131,7 @@ if ($opts{fetchfiles}) {
             }
         }
     }
-    if ($opts{all} || $rc) {                              # Pretty lost, get all files and use last loaded file
+    if ($opts{all} || $rc) {                    # Pretty lost, get all files and use last loaded file
         # Here is command:  /usr/cluster/bin/ascp -i /net/topmed/incoming/study.reference/send2ncbi/topmed-2-ncbi.pri \
         #   -Q -l 200m -k 1 -q asp-um-sph@gap-submit.ncbi.nlm.nih.gov:outgoing/Files .
         $cmd = "$opts{ascpcmd} $ascphost:$opts{ascpinfiles} .";   # Creates directory Files
@@ -179,15 +179,6 @@ if ($fcn eq 'ignore') { exit; }     # Convenient way to just load files
 
 if ($fcn eq 'updatedb') { CheckSummary(); exit; }
 
-if ($fcn eq 'updatedb_unused') {
-    my $centersref = GetCenters();
-    CheckEXPT($centersref, "$opts{xmlfilesdir}/$opts{studystatus}");
-    CheckEXPT($centersref, "$opts{xmlfilesdir}/$opts{bamsstatus}");
-    if ($opts{ncbistatusfile}) { CheckBAMS($centersref, $opts{ncbistatusfile}); }
-    else { CheckBAMS($centersref, "$opts{xmlfilesdir}/$opts{bamsstatus}"); }
-    exit;
-}
-
 die "Invalid request '$fcn'. Try '$Script --help'\n";
 
 #==================================================================
@@ -209,17 +200,15 @@ sub CheckSummary {
     #   Check status for each original BAM/CRAM that we sent
     print "$nowdate Checking for loaded original files:   "; 
     %stats = ();
-    $sql = "SELECT bamid,bamname,expt_sampleid from $opts{bamfiles_table} " .
+    $sql = "SELECT bamid,bamname,expt_sampleid,cramchecksum,checksum from $opts{bamfiles_table} " .
         "WHERE state_ncbiorig=$DELIVERED";
-    LookFor($sql, 'orig', 'src.bam src.cram', \%stats);
+    LookFor($sql, 'orig', 'src.bam src.cram final.sqz.bam', \%stats);
     print SummarizeStats(\%stats) . "\n";
-
-
 
     #   Check status for each b37 BAM/CRAM that we sent
     print "$nowdate Checking for remapped build 37 files:   "; 
     %stats = ();
-    $sql = "SELECT bamid,bamname,expt_sampleid from $opts{bamfiles_table} " .
+    $sql = "SELECT bamid,bamname,expt_sampleid,cramchecksum,checksum from $opts{bamfiles_table} " .
         "WHERE state_ncbib37=$DELIVERED";
     #   Last three of extensions are from my bugs
     LookFor($sql, 'b37', 'recal.37.cram recal.37.bam recal.cram recal.bam', \%stats);
@@ -228,7 +217,7 @@ sub CheckSummary {
     #   Check status for each b38 BAM/CRAM that we sent
     print "$nowdate Checking for remapped build 38 files:   "; 
     %stats = ();
-    $sql = "SELECT bamid,bamname,expt_sampleid from $opts{bamfiles_table} " .
+    $sql = "SELECT bamid,bamname,expt_sampleid,cramchecksum,checksum from $opts{bamfiles_table} " .
         "WHERE state_ncbib38=$DELIVERED";
     #   Last three of extensions are from my bugs
     LookFor($sql, 'b38', 'recal.38.cram', \%stats);
@@ -264,6 +253,8 @@ sub LookFor {
         my $href = $sth->fetchrow_hashref;
         my $bamid = $href->{bamid};
         my $nwdid = $href->{expt_sampleid};
+        my $cramchecksum = $href->{cramchecksum};
+        my $checksum = $href->{checksum};
         my @searchfiles = ();
         foreach (@exts) { push @searchfiles,$nwdid . '.' . $_; }
         $href = GetSummaryStatus(@searchfiles);
@@ -277,7 +268,6 @@ sub LookFor {
             if ($opts{verbose}) { print "$nwdid $type loaded $href->{upload_date}\n"; }
             my $sql = "UPDATE $opts{bamfiles_table} SET state_ncbi$type=$COMPLETED " .
                 "WHERE bamid=$bamid";
-print $sql . "\n";
             my $sth = DoSQL($sql);
             next;
         }
@@ -285,6 +275,15 @@ print $sql . "\n";
         if ($href->{file_status} eq 'received') {
             $statsref->{$type . 'received'}++;
             if ($opts{verbose}) { print "$nwdid $type received $href->{upload_date}\n"; }
+            #   Received could have an incorrect checksum
+            if ($href->{file_name} =~ /cram/) { $checksum = $cramchecksum; }
+            if ($href->{file_md5sum} ne $checksum) {
+                $statsref->{$type . 'checksumerror'}++;
+                my $statecol = 'state_ncbi' . $type;         # Mark this column in error
+                my $sql = "UPDATE $opts{bamfiles_table} SET $statecol=$FAILED WHERE bamid=$bamid";
+                if ($opts{verbose}) { print "$nwdid: NCBI checksum incorrect, $bamid $statecol forced to FAILED\n"; }
+                DoSQL($sql);
+            }
             next;
         }
         #   BAM/CRAM had an error
@@ -294,6 +293,10 @@ print $sql . "\n";
             my $sql = "UPDATE $opts{bamfiles_table} SET state_ncbi$type=$FAILED " .
                 "WHERE bamid=$bamid";
             my $sth = DoSQL($sql);
+            next;
+        }
+        #   BAM/CRAM was replaced, not a real error
+        if ($href->{file_status} =~ /replaced_by/) {
             next;
         }
         $statsref->{$type . 'unknown'}++;
@@ -333,11 +336,13 @@ sub SummarizeStats {
 #     hash reference to database query results
 #==================================================================
 sub GetSummaryStatus {
-    my $sql = "SELECT file_name,file_status,file_error,upload_date from $opts{summary_table} WHERE";
+    my $sql = "SELECT file_name,file_status,file_error,upload_date,file_md5sum from $opts{summary_table} WHERE";
     foreach my $f (@_) {
-        my $s = $sql .= " file_name='$f'";
-        my $sth = DoSQL($sql);
+        my $s = $sql . " file_name='$f'";
+        my $sth = DoSQL($s);
         if (! $sth) { next; }
+        my $rows = $sth->rows();
+        if ($rows <= 0) { next; }
         my $href = $sth->fetchrow_hashref;
         return $href;
     }
@@ -390,168 +395,6 @@ sub CheckEXPT {
         $completed++;
     }
     print "$nowdate  Marked $completed experiments as completed\n";
-    return;
-}
-
-#==================================================================
-# Subroutine:
-#   CheckBAMS - Check for BAMs that have completed
-#
-# Arguments:
-#   cref - reference to hash of center data
-#   file - log summary file from NCBI
-#==================================================================
-sub CheckBAMS {
-    my ($cref, $file) = @_;
-
-    #   Find all NWDIDnnnnn.*.* in our summary file, read backwards (most recent first)
-    #   protected 3563129 2014-09-06T09:24:12 NWDnnnnn.src.bam 10844214270 93ed94e9918b868d0ecd7009c3e427e8 ... loaded BAM etc
-    #   protected 5370520 2016-01-31T13:17:51 NWDnnnnnn ... error RUN_XML - some_error_message
-    #   protected 292535 2016-01-07T09:48:08 NWDnnnnn.src.bam 1610612736 cf4bbff70440c6dc648b886f7b57ebbe ... replaced_by_5302750 BAM
-
-    my $received = 0;                           # Count number of fiels received
-    my $errors = 0;                             # Count number of errors
-    my $checksumerrors = 0;                     # Count number of mismatched checksums
-    my %processedfile = ();                     # Keep track of all files we look seriously at
-    my %receivedfile = ();                      # Keep track of all received files
-    my %completed = ();                         # Keep track of number of loaded files by type
-    $completed{orig} = $completed{b37} = $completed{b38} = 0;
-    my $lastdate = '';
-
-    my $rc;
-    #   Read the summary file in reverse order. This allows us to get the LAST state for a file
-    #   Doing it forward, we detect errors and all sorts of cruft and THEN need to recognize loaded
-    my $cmd = "tac $file";
-    if ($file =~ /\.gz$/) { $cmd = "gunzip -c $file | tac - 2> /dev/null |"; }
-    $rc = open(IN, $cmd);
-    if (! $rc) { die "$Script - Unable to read data from command: $cmd\n"; }
-    while (<IN>) {
-        chomp();
-        #   [0]=protected [2]=date [3]=NWDnnnnnn [5]=checksum
-        #   [9]=error|loaded|received [10]=BAM|CRAM|UKNOWN [12]=message
-        my @cols = split(' ',$_);
-        if ($cols[0] ne 'protected') { next; }
-        if ($cols[3] !~ /(NWD\d+)\.(.+)/) { next; } # Break into NWDnnnnnn and suffix
-        my ($nwd, $suffix) = ($1, $2);
-if ($nwd eq 'NWD378142') {
-print "$nwd found\n";
-}
-
-        if ($suffix eq 'expt.xml') { next; }
-        my $date = substr($cols[2],0,10);           # Date of this action
-        if ($opts{days} && $lastdate && $date ne $lastdate) {
-            $opts{days}--;
-            if ($opts{days} == 0) { last; }     # We've processed all we we supposed to
-        }
-        if ($opts{verbose} && $date ne $lastdate) { print "Processing data for date=$date\n"; }
-        $lastdate = $date;
-
-        if ($cols[9] eq 'loaded') {
-
-            my $sql = "UPDATE $opts{bamfiles_table} SET state_ncbi";
-            my $sql2 = "=$COMPLETED WHERE expt_sampleid='$nwd'";
-            $processedfile{$cols[3]} = 1;               # Note we have something for this file
-            #   Note that cols[10] can be UNKNOWN because of a bug at NCBI 
-
-            if (($suffix eq 'src.bam' && $cols[10] eq 'BAM') ||
-                ($suffix eq 'src.cram' && ($cols[10] eq 'CRAM' || $cols[10] eq 'UNKNOWN'))) {
-                if ($opts{verbose}) { print "  $nwd orig marked as COMPLETED [$suffix] [$date]\n"; }
-                $sql  .= 'orig' . $sql2;
-                DoSQL($sql);
-                $completed{orig}++;               
-                next;
-            }
-
-            if (($suffix eq 'recal.bam' && $cols[10] eq 'BAM') ||   # From a bug of mine
-                ($suffix eq 'recal.cram' && ($cols[10] eq 'CRAM' || $cols[10] eq 'UNKNOWN')) || # My bug
-                ($suffix eq 'recal.37.bam' && ($cols[10] eq 'BAM' || $cols[10] eq 'UNKNOWN')) || # My bug
-                ($suffix eq 'recal.37.cram' && ($cols[10] eq 'CRAM' || $cols[10] eq 'UNKNOWN'))) {
-                if ($opts{verbose}) { print "  $nwd b37 marked as COMPLETED [$suffix] [$date]\n"; }
-                $sql  .= 'b37' . $sql2;
-                DoSQL($sql);
-                $completed{b37}++;               
-                next;
-            }
-
-            if (($suffix eq 'recal.38.cram' && ($cols[10] eq 'CRAM' || $cols[10] eq 'UNKNOWN'))) {
-                if ($opts{verbose}) { print "  $nwd b38 marked as COMPLETED [$suffix] [$date]\n"; }
-                $sql  .= 'b38' . $sql2;
-                DoSQL($sql);
-                $completed{b38}++;               
-                next;
-            }
-
-            #   We did not know what was loaded
-            print $cols[3] . ": Unrecognized type of file was loaded\n";
-            next;
-        }
-
-        if ($cols[9] eq 'error') {
-            if (exists($processedfile{$cols[3]})) {      # If this has been loaded, ignore it
-                if ($opts{verbose}) {
-                    print "Error ignored because '$cols[3]' was already seen.  MSG=$cols[12]\n";
-                    next;
-                }
-            }
-            $errors++;
-            $processedfile{$cols[3]} = 1;               # Note we have something for this file
-            $cols[12] =~ s/_/ /g;
-            print $cols[3] . ': ' . $cols[12] . "\n";
-            next;
-        }
-
-        #   A file might be received or replaced, but because ASCP can deliver a file
-        #   which does not match its input, we must make sure the checksum matches
-        #   This happens far more often than you'd expect
-        if ($cols[9] eq 'received' || substr($cols[9], 0, 8) eq 'replace') {
-            if (exists($processedfile{$cols[3]})) { next; }
-            if ($suffix eq 'expt.xml') { next; }        # Already processed these
-            $processedfile{$cols[3]} = 1;           # Note we noticed this file
-
-            my $statecol = GetStateCol($suffix);        # Figure out state column name
-            #   Now figure out the checksum column
-            my $dbcol = 'unknown';              # Figure out which db column to compare 
-            if ($suffix eq 'src.bam')       { $dbcol = 'checksum'; }
-            if ($suffix eq 'src.cram')      { $dbcol = 'cramchecksum'; }
-            if ($suffix eq 'recal.37.cram') { $dbcol = 'b37bamchecksum'; }
-            if ($suffix eq 'recal.38.cram') { $dbcol = 'b38bamchecksum'; }
-            if ($dbcol eq 'unknown') {          # I've messed up here
-                if (exists($IGNORESUFFIXES{$suffix})) { next; }
-                print $cols[3] . ": Incorrectly named file was sent\n";
-                next;
-            }
-            #   We know what this is, now get it's checksum value and state 
-            my $sql = "SELECT bamid,$dbcol";
-            if ($statecol) { $sql .= ',' . $statecol; }
-            $sql .= " FROM $opts{bamfiles_table} WHERE expt_sampleid='$nwd'";
-            my $sth = DoSQL($sql);
-            my $rowsofdata = $sth->rows();
-            if (! $rowsofdata) { next; }        # How can this happen?  Ignore it
-            my $href = $sth->fetchrow_hashref;
-            #   Checksum matches, so nothing more needs to be considered
-            if ($cols[5] eq $href->{$dbcol}) {
-                $received++;
-                if ($opts{verbose}) { print "  $cols[3] marked as received, but not loaded yet [$date]\n"; }
-                next;
-            }
-            #   NCBI checksum is wrong. If we think it was delivered, mark as failed
-            if ($statecol || $href->{$statecol} != $DELIVERED) { next; }
-            $checksumerrors++;
-            $errors++;
-            print $cols[3] . ": NCBI checksum is incorrect, $href->{bamid} $statecol forced to FAILED\n";
-            DoSQL("UPDATE $opts{bamfiles_table} SET $statecol=$FAILED WHERE bamid=$href->{bamid}");
-            next;
-        }
-    }
-    close(IN);
-#
-    if ($received) {
-        print "$nowdate  $received BAMs/CRAMs received with correct checksum, waiting to be loaded\n";
-    }
-    if ($errors) {
-        print "$nowdate  $errors new BAMs marked as FAILED ($checksumerrors checksum errors)\n";
-    }
-    print "$nowdate  Completed $completed{orig}/$completed{b37}/$completed{b38}  [orig/b37/b38]\n";
     return;
 }
 
