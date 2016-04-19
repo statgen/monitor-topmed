@@ -10,7 +10,7 @@ ascpcmd="$topmedcmd send2ncbi"
 topmedxml="/usr/cluster/monitor/bin/topmed_xml.pl"
 mem=8G
 if [ "$TOPMED_MEMORY" != "" ]; then mem=$TOPMED_MEMORY; fi
-realhost=topmed
+realhost=topmed3
 if [ "$TOPMED_HOST" != "" ]; then realhost=$TOPMED_HOST; fi
 console=/net/topmed/working/topmed-output
 tmpconsole=/working/topmed-output
