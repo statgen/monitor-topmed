@@ -7,6 +7,7 @@
 bindir=/usr/cluster/bin
 samtools=/net/mario/gotcloud/bin/samtools
 ref=/net/mario/gotcloud/gotcloud.ref/hs37d5.fa
+illuminaref=/net/topmed/incoming/study.reference/study.reference/illumina.hg19.fa
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 backupdir=/net/topmed/working/backups
 mem=8G
@@ -123,6 +124,15 @@ fi
 s=`date +%s`; s=`expr $s - $now`; echo "samtools flagstat completed in $s seconds"
 
 now=`date +%s`
+
+#   This was added so we could remake the cram files for strange illumina data
+center=`$topmedcmd show $bamid center`
+if [ "$center" = "illumina" ]; then
+  ref=$illuminaref
+  echo "BAM to CRAM for '$center' requires a different fasta file '$ref'"
+fi
+
+#   Create the CRAM file
 if [ "$squeezed" = "n" ]; then
   $bindir/bam squeeze  --in $bamfile  --out - --rmTags "BI:Z;BD:Z;PG:Z"  --keepDups --binMid  --binQualS  2,3,10,20,25,30,35,40,50 | $samtools view  -C -T  $ref  -  >  $newname 
 else 
