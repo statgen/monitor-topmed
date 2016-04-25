@@ -102,6 +102,7 @@ my $STARTED   = 3;            # Task started
 my $DELIVERED = 19;           # Data delivered, but not confirmed
 my $COMPLETED = 20;           # Task completed successfully
 my $CANCELLED = 89;           # Task cancelled
+my $FAILEDCHECKSUM = 98;      # Task failed, because checksum at NCBI bad
 my $FAILED    = 99;           # Task failed
 */
   state_arrive   INT DEFAULT 0,
@@ -119,6 +120,13 @@ my $FAILED    = 99;           # Task failed
 
   PRIMARY KEY  (bamid)
 
+/*   Handy queries
+
+select bamid,bamname,runid,(select dirname from runs where runid=bamfiles.runid) from bamfiles where state_ncbib37=19;
+
+
+
+*/
 
 /* ####################################################
    Remove these some day 
