@@ -102,6 +102,18 @@ if [ "$center" = "broad" ]; then
   ln -sf $sendfile $sf
   checksum=`$topmedcmd show $bamid cramchecksum`
   sendfile=$sf
+  # It's not supposed to happen, but sometimes the CRAM checksum is missing
+  if [ "$checksum" = "" ]; then
+    echo "Calculating MD5 for CRAM"
+    stime=`date +%s`
+    checksum=`md5sum $sendfile | awk '{print $1}'`
+    if [ "$checksum" != "" ]; then
+      $topmedcmd set $bamid cramb37checksum $checksum
+      etime=`date +%s`
+      etime=`expr $etime - $stime`
+      echo "MD5 calculated for CRAM in $etime seconds"
+    fi
+  fi
 else
   l=(`$topmedcmd where $bamid bam`)         # Get pathofbam and host for bam
   sendfile=$nwdid.src.bam
@@ -109,7 +121,7 @@ else
   checksum=`$topmedcmd show $bamid checksum`
 fi
 if [ "$checksum" = "" ]; then
-  echo "Invalid bamid '$bamid'. CHECKSUM not known"
+  echo "Invalid bamid '$bamid' ($sendfile). CHECKSUM not known"
   $topmedcmd mark $bamid $markverb failed
   exit 2
 fi
