@@ -67,6 +67,7 @@ $BAMNOTE = "<p><b>Note:</b><br>" .
     "<span class='cancelled'> cancelled </span>&nbsp;" .
     "<span class='completed'> completed </span>&nbsp;" .
     "<span class='delivered'> delivered </span>&nbsp;" .
+    "<span class='failedchecksum'> failed_checksum </span>&nbsp;" .
     "<span class='failed'> failed </span>&nbsp;" .
     "<span class='requested'> requested </span>&nbsp;" .
     "<span class='started'> started </span>&nbsp;" . 
@@ -119,6 +120,7 @@ $STARTED   = 3;             // Task started
 $DELIVERED = 19;            // Data delivered, but not confirmed
 $COMPLETED = 20;            // Task completed successfully
 $CANCELLED = 89;            // Task cancelled
+$FAILEDCHECKSUM = 98;       // Task failed, because checksum at NCBI bad
 $FAILED    = 99;            // Task failed
 $state2str = array(         // Values here are class for SPAN tag
     $NOTSET => 'notset',
@@ -128,6 +130,7 @@ $state2str = array(         // Values here are class for SPAN tag
     $DELIVERED => 'delivered',
     $COMPLETED => 'completed',
     $CANCELLED => 'cancelled',
+    $FAILEDCHECKSUM => 'failedchecksum',
     $FAILED => 'failed'
 );
 

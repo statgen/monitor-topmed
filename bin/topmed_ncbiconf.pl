@@ -36,6 +36,7 @@ my $STARTED   = 3;            # Task started
 my $DELIVERED = 19;           # Data delivered, but not confirmed
 my $COMPLETED = 20;           # Task completed successfully
 my $CANCELLED = 89;           # Task cancelled
+my $FAILEDCHECKSUM = 98;      # Task failed, because checksum at NCBI bad
 my $FAILED    = 99;           # Task failed
 
 #   Ignore files with these suffixes as they were sent incorrectly
@@ -280,7 +281,7 @@ sub LookFor {
             if ($href->{file_md5sum} ne $checksum) {
                 $statsref->{$type . 'checksumerror'}++;
                 my $statecol = 'state_ncbi' . $type;         # Mark this column in error
-                my $sql = "UPDATE $opts{bamfiles_table} SET $statecol=$FAILED WHERE bamid=$bamid";
+                my $sql = "UPDATE $opts{bamfiles_table} SET $statecol=$FAILEDCHECKSUM WHERE bamid=$bamid";
                 if ($opts{verbose}) { print "$nwdid: NCBI checksum incorrect, $bamid $statecol forced to FAILED\n"; }
                 DoSQL($sql);
             }
