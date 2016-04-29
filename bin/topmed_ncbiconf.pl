@@ -282,7 +282,8 @@ sub LookFor {
                 $statsref->{$type . 'checksumerror'}++;
                 my $statecol = 'state_ncbi' . $type;         # Mark this column in error
                 my $sql = "UPDATE $opts{bamfiles_table} SET $statecol=$FAILEDCHECKSUM WHERE bamid=$bamid";
-                if ($opts{verbose}) { print "$nwdid: NCBI checksum incorrect, $bamid $statecol forced to FAILED\n"; }
+                if ($opts{verbose}) { print "$nwdid: NCBI checksum incorrect, $bamid $statecol forced to FAILEDCHECKSUM\n"; }
+print "$nwdid: NCBI checksum incorrect, $bamid $statecol forced to FAILEDCHECKSUM\n";
                 DoSQL($sql);
             }
             next;
