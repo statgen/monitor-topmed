@@ -37,6 +37,7 @@ my $STARTED   = 3;            # Task started
 my $DELIVERED = 19;           # Data delivered, but not confirmed
 my $COMPLETED = 20;           # Task completed successfully
 my $CANCELLED = 89;           # Task cancelled
+my $FAILEDCHECKSUM = 98;      # Task failed, because checksum at NCBI bad
 my $FAILED    = 99;           # Task failed
 
 my $topmedbin = '/usr/cluster/monitor/bin';
@@ -167,7 +168,7 @@ if ($fcn eq 'verify') {
                 }
                 #   Only do verify if file has arrived and ready to be run
                 if ($href->{state_arrive} != $COMPLETED) { next; }
-                if ($opts{suberr} && $href->{state_md5ver} == $FAILED) { $href->{state_md5ver} = $REQUESTED; }
+                if ($opts{suberr} && $href->{state_md5ver} >= $FAILEDCHECKSUM) { $href->{state_md5ver} = $REQUESTED; }
                 if ($href->{state_md5ver} != $NOTSET && $href->{state_md5ver} != $REQUESTED) { next; }
 
                 #   Run the command
@@ -202,7 +203,7 @@ if ($fcn eq 'bai') {
                 my $f = $opts{topdir} . "/$centername/$dirname/" . $href->{bamname};
                 #   Only do bai if file has been verified
                 if ($href->{state_md5ver} != $COMPLETED) { next; }
-                if ($opts{suberr} && $href->{state_bai} == $FAILED) { $href->{state_bai} = $REQUESTED; }
+                if ($opts{suberr} && $href->{state_bai} >= $FAILEDCHECKSUM) { $href->{state_bai} = $REQUESTED; }
                 if ($href->{state_bai} != $NOTSET && $href->{state_bai} != $REQUESTED) { next; }
                 #   Run the command
                 BatchSubmit("$opts{topmedbai} -submit $href->{bamid} $f");
@@ -236,7 +237,7 @@ if ($fcn eq 'cram') {
                 my $f = $opts{topdir} . "/$centername/$dirname/" . $href->{bamname};
                 #   Only create cram if file has been verified
                 if ($href->{state_md5ver} != $COMPLETED) { next; }
-                if ($opts{suberr} && $href->{state_cram} == $FAILED) { $href->{state_cram} = $REQUESTED; }
+                if ($opts{suberr} && $href->{state_cram} >= $FAILEDCHECKSUM) { $href->{state_cram} = $REQUESTED; }
                 if ($href->{state_cram} != $NOTSET && $href->{state_cram} != $REQUESTED) { next; }
                 #   Run the command
                 BatchSubmit("$opts{topmedcram} -submit $href->{bamid} $f");
@@ -271,7 +272,7 @@ if ($fcn eq 'qplot') {
                 if (! -f $f) { next; }      # If BAM not there, do not submit
                 #   Only do qplot if BAI finished
                 if ($href->{state_bai} != $COMPLETED) { next; }
-                if ($opts{suberr} && $href->{state_qplot} == $FAILED) { $href->{state_qplot} = $REQUESTED; }
+                if ($opts{suberr} && $href->{state_qplot} >= $FAILEDCHECKSUM) { $href->{state_qplot} = $REQUESTED; }
                 if ($href->{state_qplot} != $NOTSET && $href->{state_qplot} != $REQUESTED) { next; }
                 #   Run the command
                 BatchSubmit("$opts{topmedqplot} -submit $href->{bamid} $f");
@@ -313,18 +314,18 @@ if ($fcn eq 'sexpt') {
                 my $skip = '';
                 foreach my $col (qw(expt_sampleid phs library_name nominal_length nominal_sdev base_coord)) {
                     if (exists($href->{$col}) && $href->{$col}) { next; }
-                    $skip .= ' ' . $col;
+                    $skip .= "$col ";
                 }
                 #   Do better checking than just is the field non-blank
                 if ($href->{expt_sampleid} !~ /^NWD/) {
                     $skip .= ' Invalid_NWDID_' . $href->{expt_sampleid};
                 }
                 if ($skip) {
-                    print "  BAM '$href->{bamname}' [$href->{bamid}] is ignored because of incomplete data: $skip\n";
+                    print "  BAM '$href->{bamname}' [$href->{bamid}] is ignored because of incomplete data for: $skip\n";
                     next;
                 }
 
-                if ($opts{suberr} && $href->{state_ncbiexpt} == $FAILED) { $href->{state_ncbiexpt} = $REQUESTED; }
+                if ($opts{suberr} && $href->{state_ncbiexpt} >= $FAILEDCHECKSUM) { $href->{state_ncbiexpt} = $REQUESTED; }
                 if ($href->{state_ncbiexpt} != $NOTSET && $href->{state_ncbiexpt} != $REQUESTED) { next; }
                 #   Tell NCBI about this NWDID experiment
                 BatchSubmit("$opts{topmedexpt} -submit $href->{bamid}");
@@ -363,17 +364,17 @@ if ($fcn eq 'sorig') {
                 if ($href->{state_ncbiexpt} != $COMPLETED) { next; }
 
                 #   Check important fields for this BAM are possibly correct
-                my $skip = 0;
+                my $skip = '';
                 foreach my $col (qw(checksum expt_sampleid)) {
                     if (exists($href->{$col}) && $href->{$col}) { next; }
                     if ($opts{verbose}) { print "  No value for '$col'\n"; }
-                    $skip++;
+                    $skip .= "$col ";
                 }
                 if ($skip) {
-                    print "  BAM '$href->{bamname}' [$href->{bamid}] is ignored because of incomplete data\n";
+                    print "  BAM '$href->{bamname}' [$href->{bamid}] is ignored because of incomplete data for: $skip\n";
                     next;
                 }
-                if ($opts{suberr} && $href->{state_ncbiorig} == $FAILED) { $href->{state_ncbiorig} = $REQUESTED; }
+                if ($opts{suberr} && $href->{state_ncbiorig} >= $FAILEDCHECKSUM) { $href->{state_ncbiorig} = $REQUESTED; }
                 if ($href->{state_ncbiorig} != $NOTSET && $href->{state_ncbiorig} != $REQUESTED) { next; }
                 #   Send the secondary BAM to NCBI
                 BatchSubmit("$opts{topmedncbiorig} -submit $href->{bamid}");
@@ -409,17 +410,17 @@ if ($fcn eq 'sb37') {
                 if ($href->{state_ncbiexpt} != $COMPLETED) { next; }
 
                 #   Check important fields for this BAM are possibly correct
-                my $skip = 0;
+                my $skip = '';
                 foreach my $col (qw(cramname cramchecksum expt_sampleid)) {
                     if (exists($href->{$col}) && $href->{$col}) { next; }
                     if ($opts{verbose}) { print "  No value for '$col'\n"; }
-                    $skip++;
+                    $skip .= "$col ";
                 }
                 if ($skip) {
-                    print "  BAM '$href->{bamname}' [$href->{bamid}] is ignored because of incomplete data\n";
+                    print "  BAM '$href->{bamname}' [$href->{bamid}] is ignored because of incomplete data for: $skip\n";
                     next;
                 }
-                if ($opts{suberr} && $href->{state_ncbib37} == $FAILED) { $href->{state_ncbib37} = $REQUESTED; }
+                if ($opts{suberr} && $href->{state_ncbib37} >= $FAILEDCHECKSUM) { $href->{state_ncbib37} = $REQUESTED; }
                 if ($href->{state_ncbib37} != $NOTSET && $href->{state_ncbib37} != $REQUESTED) { next; }
                 #   Send the primary CRAM (as BAM) to NCBI
                 BatchSubmit("$opts{topmedncbib37} -submit $href->{bamid}");
