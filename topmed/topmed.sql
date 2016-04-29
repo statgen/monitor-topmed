@@ -104,7 +104,7 @@ my $COMPLETED = 20;           # Task completed successfully
 my $CANCELLED = 89;           # Task cancelled
 my $FAILEDCHECKSUM = 98;      # Task failed, because checksum at NCBI bad
 my $FAILED    = 99;           # Task failed
-*/
+*/ 
   state_arrive   INT DEFAULT 0,
   state_md5ver   INT DEFAULT 0,
   state_backup   INT DEFAULT 0,
@@ -211,6 +211,43 @@ CREATE INDEX index_file_name ON ncbi_summary(file_name);
 /* ####################################################
    Daily statisitics for steps
    #################################################### */
+DROP TABLE IF EXISTS stepstats;
+CREATE TABLE stepstats (
+  yyyymmdd CHAR(10) NOT NULL,
+  count_verify      INT DEFAULT 0,
+  avetime_verify    INT DEFAULT 0,
+  count_bai         INT DEFAULT 0,
+  avetime_bai       INT DEFAULT 0,
+  count_qplot       INT DEFAULT 0,
+  avetime_qplot     INT DEFAULT 0,
+  count_cram        INT DEFAULT 0,
+  avetime_cram      INT DEFAULT 0,
+  count_expt        INT DEFAULT 0,
+  avetime_expt      INT DEFAULT 0,
+  ncbicount_expt    INT DEFAULT 0,
+  count_orig        INT DEFAULT 0,
+  avetime_orig      INT DEFAULT 0,
+  ncbicount_orig    INT DEFAULT 0,
+  count_b37         INT DEFAULT 0,
+  avetime_b37       INT DEFAULT 0,
+  ncbicount_b37     INT DEFAULT 0,
+  count_b38         INT DEFAULT 0,
+  avetime_b38       INT DEFAULT 0,
+  ncbicount_b38     INT DEFAULT 0,
+
+  bamcount           INT DEFAULT 0,      /* Count of all arrived bams */
+  errcount           INT DEFAULT 0,      /* Count of all errors for bams */
+  errorigcount       INT DEFAULT 0,      /* Count of original bams sent to NCBI in error */
+  loadedorigbamcount INT DEFAULT 0,      /* Count of loaded original BAMs at NCBI */
+  errckorigcount     INT DEFAULT 0,      /* Count of original bams at NCBI with checsum error */
+  errb37count        INT DEFAULT 0,      /* Count of primary bams sent to NCBI in error */
+  loadedb37bamcount  INT DEFAULT 0,      /* Count of loaded primary BAMs at NCBI */
+  errckb37count      INT DEFAULT 0,      /* Count of primary bams at NCBI with checsum error */
+  errb38count        INT DEFAULT 0,      /* Count of tertiary bams sent to NCBI in error */
+  loadedb38bamcount  INT DEFAULT 0,      /* Count of loaded tertiary BAMs at NCBI */
+  errckb38count      INT DEFAULT 0,      /* Count of tertiary bams at NCBI with checsum error */
+  PRIMARY KEY  (yyyymmdd)
+);
 
 
 /* ####################################################
