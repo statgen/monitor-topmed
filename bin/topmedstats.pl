@@ -44,6 +44,7 @@ my $STARTED   = 3;            # Task started
 my $DELIVERED = 19;           # Data delivered, but not confirmed
 my $COMPLETED = 20;           # Task completed successfully
 my $CANCELLED = 89;           # Task cancelled
+my $FAILEDCHECKSUM = 98;      # Task failed, because checksum at NCBI bad
 my $FAILED    = 99;           # Task failed
 
 #--------------------------------------------------------------
@@ -147,30 +148,12 @@ sub Summary {
     close(IN);
     print "Loaded $origsum,$b37sum,$b38sum BAMs on $yyyymmdd\n";
 
-    my $errorigcount = 0;
-    my $errb37count = 0;
-    my $errb38count = 0;
-    my $sql = "SELECT count(*) FROM $opts{bamfiles_table} WHERE state_ncbiorig=$FAILED";
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if ($rowsofdata > 0) {
-        my $href = $sth->fetchrow_hashref;
-        $errorigcount  = $href->{'count(*)'};
-    }
-    $sql = "SELECT count(*) FROM $opts{bamfiles_table} WHERE state_ncbib37=$FAILED";
-    $sth = DoSQL($sql);
-    $rowsofdata = $sth->rows();
-    if ($rowsofdata > 0) {
-        my $href = $sth->fetchrow_hashref;
-        $errb37count  = $href->{'count(*)'};
-    }
-    $sql = "SELECT count(*) FROM $opts{bamfiles_table} WHERE state_ncbib38=$FAILED";
-    $sth = DoSQL($sql);
-    $rowsofdata = $sth->rows();
-    if ($rowsofdata > 0) {
-        my $href = $sth->fetchrow_hashref;
-        $errb38count  = $href->{'count(*)'};
-    }
+    my $errorigcount = CountError('state_ncbiorig', $FAILED);
+    my $errckorigcount = CountError('state_ncbiorig', $FAILEDCHECKSUM);
+    my $errb37count = CountError('state_ncbib37', $FAILED);
+    my $errckb37count = CountError('state_ncbib37', $FAILEDCHECKSUM);
+    my $errb38count = CountError('state_ncbib38', $FAILED);
+    my $errckb38count = CountError('state_ncbib38', $FAILEDCHECKSUM);
 
     DoSQL("UPDATE $opts{stats_table} SET " .
         "loadedorigbamcount=$origsum," .
@@ -179,7 +162,26 @@ sub Summary {
         "errorigcount=$errorigcount," .
         "errb37count=$errb37count," .
         "errb38count=$errb38count" .
+        "errckorigcount=$errckorigcount," .
+        "errckb37count=$errckb37count," .
+        "errckb38count=$errckb38count" .
         " WHERE yyyymmdd='$yyyymmdd'");
+}
+
+#==================================================================
+# Subroutine:
+#   $count = CountError($col, $err)
+#
+#   Return the count of bams in a particular error
+#==================================================================
+sub CountError {
+    my ($col, $err) = @_;
+    my $sql = "SELECT count(*) FROM $opts{bamfiles_table} WHERE $col=$err";
+    $sth = DoSQL($sql);
+    $rowsofdata = $sth->rows();
+    if ($rowsofdata <= 0 0) { retunr 0; }
+    my $href = $sth->fetchrow_hashref;
+    return $href->{'count(*)'};
 }
 
 #==================================================================
