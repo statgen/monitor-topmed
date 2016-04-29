@@ -39,38 +39,42 @@ $COLORS = array('DarkGreen', 'red', 'orange', 'SlateBlue', 'gray');
 print doheader($HDR['title'], 1);
 
 //  Real parameters for each form, default is ''
-$parmcols = array('fcn', 'lastdays');
+$parmcols = array('fcn', 'lastdays', 'datayear');
 extract (isolate_parms($parmcols));
+
 
 DB_Connect($LDB['realm']);
 if (! $fcn)    { $fcn = 'plot'; }
 if (! $lastdays)   { $lastdays = 20; }
+if (! $datayear)   { $datayear = 1; }
 
 $totalcompletedbams = '';
-$sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE state_ncbiorig=$COMPLETED";
+$sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE datayear=$datayear AND state_ncbiorig=$COMPLETED";
 $result = SQL_Query($sql);
 $row = SQL_Fetch($result);
 $totalcompletedbams .= $row['count(*)'] . '/';
-$sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE state_ncbib37=$COMPLETED";
+$sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE datayear=$datayear AND state_ncbib37=$COMPLETED";
 $result = SQL_Query($sql);
 $row = SQL_Fetch($result);
 $totalcompletedbams .= $row['count(*)'] . '/';
-$sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE state_ncbib38=$COMPLETED";
+$sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE datayear=$datayear AND state_ncbib38=$COMPLETED";
 $result = SQL_Query($sql);
 $row = SQL_Fetch($result);
 $totalcompletedbams .= $row['count(*)'];
 
-$totalbamcount = 0;
 $sql = 'SELECT * FROM ' . $LDB['stepstats'];
 $result = SQL_Query($sql);
 $numrows = SQL_NumRows($result);
 $sqldata = array();                         // Save all SQL data
 for ($i=0; $i<$numrows; $i++) {
     $row = SQL_Fetch($result);
-    $totalbamcount = $row['bamcount'];
     array_push($sqldata, $row);
 }
-//  We have saved all SQL data in $sqldata
+
+$sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE datayear=$datayear AND state_md5ver=$COMPLETED";
+$result = SQL_Query($sql);
+$row = SQL_Fetch($result);
+$totalbamcount = $row['count(*)'];
 
 
 //-------------------------------------------------------------------
@@ -82,14 +86,20 @@ if ($fcn == 'plot') {
     //-------------------------------------------------------------------
     //  Details about steps for processing each BAM (non-NCBI)
     //-------------------------------------------------------------------
-    print "<table width='80%' align='center' border='0'> <tr><td align='left'>" .
-        "<form action='" . $_SERVER['PHP_SELF'] . "' method='post'>\n" .
-        "<b><input type='submit' value=' Generate Plots '>\n" .
-        "<input type='text' name='lastdays' value='$lastdays' size='2'>\n" .
-        "days </form>" .
-        "</td><td align='right'>" .
-        "<a href='" . $_SERVER['SCRIPT_NAME'] . "'>Reshow Plots</a>" .
-        "</td></tr></table></b></br>\n";   
+    $reshowurl =  $_SERVER['SCRIPT_NAME'] . "?datayear=$datayear&amp;lastdays=$lastdays";
+    print "<table width='80%' align='center' border='0'> <tr>\n" .
+        "<td align='left'>" .
+          "<form action='" . $_SERVER['PHP_SELF'] . "' method='post'>\n" .
+          "<b><input type='submit' value=' Generate Plots: '>\n" .
+          "Last <input type='text' name='lastdays' value='$lastdays' size='2'>\n" .
+          "days</td>" .
+        "<td><b>Project:</b>" .
+          "<select name='datayear'>" .
+          "<option value='1'>Year 1</option><option value='2'>Year 2</option></select>\n" . 
+          "</td>" .
+        "<td align='right'>" .
+        "<a href='$reshowurl'>Reshow Plots</a>" .
+        "</td></tr></form></table></b></br>\n";   
         
     // Plot totals of all states for each step
     print "<p><b>Legend: <font size='-1'>" .
@@ -103,31 +113,31 @@ if ($fcn == 'plot') {
         'b38', 'b37', 'cram', 'qplot', 'bai');    // Reversed
     $title = "Current Counts for Each Step [$totalbamcount Verified BAMs]";
     $plotdata = array();
-    $s = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . ' ';
+    $s = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE datayear=$datayear AND";
     foreach ($legend as &$c) {  
         $d = array();
         array_push($d, $c);
-        $sql = $s . " WHERE state_$c=$COMPLETED";
+        $sql = $s . "  state_$c=$COMPLETED";
         $result = SQL_Query($sql);
         $row = SQL_Fetch($result);
         array_push($d, $row['count(*)']);
 
-        $sql = $s . " WHERE state_$c=$FAILED OR state_$c=$CANCELLED";
+        $sql = $s . " state_$c=$FAILED OR state_$c=$CANCELLED";
         $result = SQL_Query($sql);
         $row = SQL_Fetch($result);
         array_push($d, $row['count(*)']);
 
-        $sql = $s . " WHERE state_$c=$DELIVERED";
+        $sql = $s . " state_$c=$DELIVERED";
         $result = SQL_Query($sql);
         $row = SQL_Fetch($result);
         array_push($d, $row['count(*)']);
 
-        $sql = $s . " WHERE state_$c=$SUBMITTED OR state_$c=$STARTED OR state_$c=$REQUESTED";
+        $sql = $s . " state_$c=$SUBMITTED OR state_$c=$STARTED OR state_$c=$REQUESTED";
         $result = SQL_Query($sql);
         $row = SQL_Fetch($result);
         array_push($d, $row['count(*)']);
 
-        $sql = $s . " WHERE state_$c=$NOTSET";
+        $sql = $s . " state_$c=$NOTSET";
         $result = SQL_Query($sql);
         $row = SQL_Fetch($result);
         array_push($d, $row['count(*)']);
@@ -226,26 +236,34 @@ if ($fcn == 'plot') {
     }
     MakePlot($plotdata, $title, $legend, '', 'y');
 
+    //-------------------------------------------------------------------
+    //  Show plots of errors
+    //-------------------------------------------------------------------
     print "<p><font size='-1'>" .
         "Failure rates at NCBI for BAMs that are sent are surprisingly high. " .
         "Here are the daily counts of errors. Once we figure out how to avoid " .
         "these errors, this count should plunge to zero, we hope." .
         "</font></p>\n";
     $title = "Daily Count of Errors When Sending BAMs to NCBI";
-    $legend = array();
+    $legend = array('orig', 'origchecksum', 'b37', 'b37checksum', 'b38', 'b38checksum');
     $plotdata = array(); 
     for ($i=0; $i<$numrows; $i++) {
         $row = $sqldata[$i];
         if ($row['yyyymmdd'] < $NCBIBAMDATE) { continue; }
         $d = array();
         array_push($d, substr($row['yyyymmdd'],5,5));
-        array_push($d, $row['errcount']);
+        array_push($d, $row['errorigcount']);
+        array_push($d, $row['errckorigcount']);
+        array_push($d, $row['errb37count']);
+        array_push($d, $row['errckb37count']);
+        array_push($d, $row['errb38count']);
+        array_push($d, $row['errckb38count']);
         array_push($plotdata, $d);
     }
     MakePlot($plotdata, $title, $legend, '', 'y');
 
 
-    print "<p align='right'><a href='" . $_SERVER['SCRIPT_NAME'] . "'>Reshow Plots</a>\n";
+    print "<p align='right'><a href='$reshowurl'>Reshow Plots</a>\n";
     print dofooter($HDR['footer']);
     exit;
 }
