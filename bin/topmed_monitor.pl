@@ -62,6 +62,8 @@ our %opts = (
     topdir2 => '/net/topmed2/incoming/topmed',
     topdir3 => '/net/topmed3/incoming/topmed',
     topdir4 => '/net/topmed4/incoming/topmed',
+    topdir5 => '/net/topmed5/incoming/topmed',
+    topdir6 => '/net/topmed6/incoming/topmed',
     backupdir => '/working/backups/incoming/topmed',
     resultsdir => '/incoming/qc.results',    
     dryrun => 0,
@@ -640,7 +642,7 @@ sub ShowSummary {
 #==================================================================
 sub FindPrefix {
     my ($f) = @_;
-    foreach my $pfx ('topdir','topdir2','topdir3', 'topdir4') {                    
+    foreach my $pfx ('topdir','topdir2','topdir3', 'topdir4', 'topmed5', 'topmed6') {                    
         if (-f "$opts{$pfx}/$f") { return $opts{$pfx}; }
     }
     return '';

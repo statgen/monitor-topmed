@@ -15,7 +15,7 @@ if [ "$TOPMED_HOST" != "" ]; then realhost=$TOPMED_HOST; fi
 console=/net/topmed/working/topmed-output
 tmpconsole=/working/topmed-output
 topmeddir=/net/topmed/incoming/topmed
-remapdir="/net/topmed/working/schelcj/results /net/topmed2/working/schelcj/results /net/topmed3/working/schelcj/results /net/topmed4/working/schelcj/results"
+remapdir="/net/topmed/working/schelcj/results /net/topmed2/working/schelcj/results /net/topmed3/working/schelcj/results /net/topmed4/working/schelcj/results /net/topmed5/working/schelcj/results  /net/topmed6/working/schelcj/results"
 build=37
 version=remap
 markverb=sentb$build

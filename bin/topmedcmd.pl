@@ -431,7 +431,7 @@ sub Where {
     if ($set eq 'bam') {
         my $bamfdir = '';
         my $bamhost = '';
-        foreach ('', '2', '3', '4') {
+        foreach ('', '2', '3', '4', '5', '6') {
             $bamfdir = "$opts{netdir}$_/$opts{incomingdir}/$centername";
             if (! -l $bamfdir) { last; }        # Found non-symlink to center directory
         }
@@ -446,7 +446,7 @@ sub Where {
         my $bakbamfdir = '';
         my $bakfile = '';
         my $backuphost = '';
-        foreach ('', '2', '3', '4') {
+        foreach ('', '2', '3', '4', '5', '6') {
             $bakbamfdir = "$opts{netdir}$_/$opts{backupsdir}/$centername";
             $bakfile = "$bakbamfdir/$rundir/$cramname";
             if (-f $bakfile) {
@@ -466,7 +466,7 @@ sub Where {
     if ($set eq 'b37') {
         my $b37fdir = '';
         my $b37file = '';
-        foreach ('', '2', '3', '4') {
+        foreach ('', '2', '3', '4', '5', '6') {
             $b37fdir = "$opts{netdir}$_/$opts{resultsdir}/$centername/$piname/$nwdid/bams";
             $b37file = "$b37fdir/$nwdid.recal.cram";
             if (-f $b37file) {
@@ -482,7 +482,7 @@ sub Where {
     if ($set eq 'b38') {
         my $b38fdir = '';
         my $b38file = '';
-        foreach ('', '2', '3', '4') {
+        foreach ('', '2', '3', '4', '5', '6') {
             $b38fdir = "$opts{netdir}$_/$opts{resultsdir}/$centername/$piname/$nwdid/bams";
             $b38file = "$b38fdir/$nwdid.recal.cram";
             if (-f $b38file) {
@@ -500,7 +500,7 @@ sub Where {
     if ($set eq 'unset') {
         #   The BAM is in one of those $opts{netdir} trees where center is not a symlink
         my $bamfdir = '';
-        foreach ('', '2', '3', '4') {
+        foreach ('', '2', '3', '4', '5', '6') {
             $bamfdir = "$opts{netdir}$_/$opts{incomingdir}/$centername";
             if (! -l $bamfdir) { last; }        # Found non-symlink to center directory
         }
@@ -517,11 +517,14 @@ sub Where {
         if ($realhost =~ /(\d)/)  { $realhostindex = $1; }     # e.g. 2
 
         #   The backup for the BAM is in another tree, also not a symlink
+        #   This is rather a mess and is probably really fixed by Tom using symlinks
         my $bakbamfdir = $opts{netdir};
         if ($realhostindex eq '') { $bakbamfdir = $opts{netdir} . '2'; }
         if ($realhostindex eq '2') { $bakbamfdir = $opts{netdir} . ''; }
-        if ($realhostindex eq '3') { $bakbamfdir = $opts{netdir} . '3'; }   # No idea what to do here
-        if ($realhostindex eq '4') { $bakbamfdir = $opts{netdir} . 'x4'; }  # No idea what to do here
+        if ($realhostindex eq '3') { $bakbamfdir = $opts{netdir} . '3'; }
+        if ($realhostindex eq '4') { $bakbamfdir = $opts{netdir} . '4'; }
+        if ($realhostindex eq '5') { $bakbamfdir = $opts{netdir} . '5'; }
+        if ($realhostindex eq '6') { $bakbamfdir = $opts{netdir} . '6'; }
         $bakbamfdir = "$bakbamfdir/$opts{backupsdir}/$centername";
         if (-l $bakbamfdir) { die "BAMID=$bamid bamdir=$bamfdir Backup directory may not be a symlink for '$bakbamfdir'\n"; }
         $bakbamfdir .= '/' . $rundir;
