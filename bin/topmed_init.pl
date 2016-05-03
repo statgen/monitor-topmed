@@ -300,7 +300,8 @@ sub NormalizeMD5Line {
     }
     if ($fn =~ /\//) { $fn = basename($fn); }   # Path should not be qualified, but ...
     if ($fn !~ /bam$/) {                    # File better be a bam
-        print "$Script - Invalid BAM name '$fn' in '$f'. Line: $l";
+        #   Only generate error message for true errors, not dumb ones :-(
+        if ($fn !~ /bai$/) { print "$Script - Invalid BAM name '$fn' in '$f'. Line: $l"; }
         return @retvals;
     }
     @retvals = ($fn, $checksum);
