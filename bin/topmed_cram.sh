@@ -10,6 +10,8 @@ ref=/net/mario/gotcloud/gotcloud.ref/hs37d5.fa
 illuminaref=/net/topmed/incoming/study.reference/study.reference/illumina.hg19.fa
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 backupdir=/net/topmed/working/backups
+medir=`dirname $0`
+calcmd5=$medir/topmed_calcmd5.sh
 mem=8G
 if [ "$TOPMED_MEMORY" != "" ]; then mem=$TOPMED_MEMORY; fi
 realhost=topmed
@@ -176,7 +178,7 @@ rm -f ${chkname}.init.stat  ${chkname}.cram.stat ${chkname}.bam ${chkname}.bam.m
 echo "Calculating new MD5"
 now=`date +%s`
 #   Calculate the MD5 for the cram
-md5=`md5sum $newname | awk '{print $1}'`
+md5=`$calcmd5.sh $newname | awk '{print $1}'`
 if [ "$md5" = "" ]; then
   echo "Command failed: md5sum $newname"
   $topmedcmd mark $bamid $markverb failed

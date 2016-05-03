@@ -8,6 +8,8 @@ samtools=/net/mario/gotcloud/bin/samtools
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 ascpcmd="$topmedcmd send2ncbi"
 topmedxml="/usr/cluster/monitor/bin/topmed_xml.pl"
+medir=`dirname $0`
+calcmd5=$medir/topmed_calcmd5.sh
 mem=8G
 if [ "$TOPMED_MEMORY" != "" ]; then mem=$TOPMED_MEMORY; fi
 realhost=topmed3
@@ -106,7 +108,7 @@ if [ "$center" = "broad" ]; then
   if [ "$checksum" = "" ]; then
     echo "Calculating MD5 for CRAM"
     stime=`date +%s`
-    checksum=`md5sum $sendfile | awk '{print $1}'`
+    checksum=`calcmd5.sh $sendfile | awk '{print $1}'`
     if [ "$checksum" != "" ]; then
       $topmedcmd set $bamid cramb37checksum $checksum
       etime=`date +%s`
