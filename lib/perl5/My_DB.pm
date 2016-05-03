@@ -41,6 +41,7 @@ sub DBConnect {
             -dbi_options => {RaiseError => 1, PrintError => 1});
     }
     $DBH = $DBC->connect();
+    $DBH->{mysql_auto_reconnect} = 1;   # On timeout, reconnect please
     return $DBH;
 }
 
