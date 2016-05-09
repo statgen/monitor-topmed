@@ -134,7 +134,7 @@ $state2str = array(         // Values here are class for SPAN tag
     $FAILED => 'failed'
 );
 
-$NODELIST = array('topmed', 'topmed2', 'topmed3', 'topmed4');
+$NODELIST = array('topmed', 'topmed2', 'topmed3', 'topmed4', 'topmed5', 'topmed6');
 $TOPMEDJOBNAMES = array('verify', 'bai', 'qplot', 'cram', 'expt', 'orig', 'b37', 'b38');
 $LOGFILES = array('topmed_init.log',
     'topmed_monitor_arrive.log',
