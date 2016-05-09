@@ -97,7 +97,7 @@ Getopt::Long::GetOptions( \%opts,qw(
 if ($#ARGV < 0 || $opts{help}) {
     my $m = "$Script [options]";
     my $verbs = join(',', sort keys %VALIDVERBS);
-    my $requests = join(',', sort values %VALIDSTATUS);
+    my $requests = join(',', sort keys %VALIDSTATUS);
     warn "$m mark bamid|NWDnnnnn $verbs $requests\n" .
         "  or\n" .
         "$m unmark bamid [same list as mark]\n" .
@@ -473,7 +473,7 @@ sub Where {
                 if (! -l $b37fdir) { last; }        # Found non-symlink to remapped file
             }
         }
-        if (! -d $b37fdir) { $b37fdir = 'none'; }
+        #if (! -d $b37fdir) { $b37fdir = 'none'; }
         print "$b37fdir $b37file\n";            # Note that file might not really exist
         exit;
     }
@@ -489,7 +489,7 @@ sub Where {
                 if (! -l $b38fdir) { last; }        # Found non-symlink to remapped file
             }
         }
-        if (! -d $b38fdir) { $b38fdir = 'none'; }
+        #if (! -d $b38fdir) { $b38fdir = 'none'; }
         print "$b38fdir $b38file\n";            # Note that file might not really exist
         exit;
     }
@@ -867,8 +867,8 @@ Use this to get some details for a particular bam.
 B<where bamid bam|backup|b37|b38>
 If B<bam> was specified, display the path to the real bam file, not one that is symlinked
 and the host where the bam exists (or null string).
-If B<backup> was specified, display the path to the backup directory (or 'none')
-and the path to the backup file (which may not exist)
+If B<backup> was specified, display the path to the backup directory 
+and the path to the backup file (neither of which may not exist)
 and the host where the backup BAM file should exist (or null string).
 If B<b37> was specified, display the path to the directory of remapped data for build 37 (or 'none')
 and the path to the remapped file (which may not exist).
