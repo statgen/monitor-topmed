@@ -41,6 +41,7 @@ INSERT INTO centers (centername,centerdesc,designdesc) VALUES('illumina', 'Illum
 INSERT INTO centers (centername,centerdesc,designdesc) VALUES('nygc', 'New York Genome Center','Whole genome sequencing using Illumina TruSeq PCR-free DNA library preparation with 500ng input DNA, sequenced to >30x mean coverage with 2x150bp reads on HiSeq X.');
 INSERT INTO centers (centername,centerdesc,designdesc) VALUES('uw', 'University of Washington Genome Sciences','equivalent to Illumina TruSeq PCR-free DNA sample prep');
 INSERT INTO centers (centername,centerdesc,designdesc) VALUES('baylor', 'UNKNOWN center','UNKNOWN Design Desc');
+INSERT INTO centers (centername,centerdesc,designdesc) VALUES('Macrogen', 'UNKNOWN center','UNKNOWN Design Desc');
 
 /*  The second of these is used to overwhelm a bug on the part of NCBI */
 UPDATE centers set centerdesc='New York Genome Center' where centerid=3;
@@ -125,7 +126,8 @@ my $FAILED    = 99;           # Task failed
 select bamid,bamname,runid,(select dirname from runs where runid=bamfiles.runid) from bamfiles where state_ncbib37=19;
 
 
-
+  How can we have dozens of files with this checksum ?
+select bamid,bamname from bamfiles where cramb37checksum='d41d8cd98f00b204e9800998ecf8427e'
 */
 
 /* ####################################################
@@ -182,10 +184,10 @@ CREATE INDEX index_refname ON bamfiles(refname);
 DROP TABLE IF EXISTS ncbi_summary;
 CREATE TABLE ncbi_summary (
   realm         VARCHAR(12),
-  upload_id     INT,
+  upload_id     VARCHAR(12),
   upload_date   VARCHAR(20),
   file_name     VARCHAR(64),
-  file_size     INT,
+  file_size     VARCHAR(12),
   file_md5sum   VARCHAR(32),
   upload_name   VARCHAR(64),
   upload_size   VARCHAR(24),
@@ -201,11 +203,8 @@ CREATE TABLE ncbi_summary (
   loaded_analyses   VARCHAR(64),
   unloaded_analyses VARCHAR(64),
   suppressed_analyses   VARCHAR(64),
-  id        INT         NOT NULL AUTO_INCREMENT,
-  PRIMARY KEY  (id)
+  PRIMARY KEY  (file_name)
 );
-CREATE INDEX index_file_name ON ncbi_summary(file_name);
-
 
 
 /* ####################################################
