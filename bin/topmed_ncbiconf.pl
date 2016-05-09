@@ -103,36 +103,40 @@ if ($opts{fetchfiles}) {
     #   Get today's list of files sent to NCBI and their status
     #   Unfortunately, if there is no activity yesterday, there is none for today
     #   so we must do some guessing as to the last report generated
-    my $ym = strftime('%Y%m', localtime);
-    my $today = strftime('%d', localtime);
-    my $d = sprintf('%02d', $today);
-    my $report = 'NCBI_SRA_Files_Full_UM-SPH_';
     my $rc = 1;
-    #   Just for consistency's sake, the first of the month is different
-    if ($d eq '01') {
-        my $f = $report . $ym . $d . '.gz';
-        $cmd = "$opts{ascpcmd} $ascphost:$opts{ascpinfiles}/$f .";
-        $rc = system($cmd);
-        if ($rc == 0) {                     # This day's file exists
-            rename($f, $opts{bamsstatus});  # Save as lastest file
-            print "Fetched file $f, saved as '$opts{xmlfilesdir}/$opts{bamsstatus}'\n";
-        }
-    }
-    if ($rc) {                              # Not the first, search for the last file
-        $report = 'NCBI_SRA_Files_UM-SPH_';
-        foreach (0 .. 4) {                  # Try to get one of the last few days
-            my $d = sprintf('%02d', $today - $_);
+    if (! $opts{all}) {
+        my $ym = strftime('%Y%m', localtime);
+        my $today = strftime('%d', localtime);
+        my $d = sprintf('%02d', $today);
+        my $report = 'NCBI_SRA_Files_Full_UM-SPH_';
+        #   Just for consistency's sake, the first of the month is different
+        if ($d eq '01') {
             my $f = $report . $ym . $d . '.gz';
             $cmd = "$opts{ascpcmd} $ascphost:$opts{ascpinfiles}/$f .";
-            $rc = system($cmd);                 # Failure is OK, up to a point
+            $rc = system($cmd);
             if ($rc == 0) {                     # This day's file exists
+                SummaryTableMerge($f);
                 rename($f, $opts{bamsstatus});  # Save as lastest file
                 print "Fetched file $f, saved as '$opts{xmlfilesdir}/$opts{bamsstatus}'\n";
-                last;
+            }
+        }
+        if ($rc) {                              # Not the first, search for the last file
+            $report = 'NCBI_SRA_Files_UM-SPH_';
+            foreach (0 .. 4) {                  # Try to get one of the last few days
+                my $d = sprintf('%02d', $today - $_);
+                my $f = $report . $ym . $d . '.gz';
+                $cmd = "$opts{ascpcmd} $ascphost:$opts{ascpinfiles}/$f .";
+                $rc = system($cmd);                 # Failure is OK, up to a point
+                if ($rc == 0) {                     # This day's file exists
+                    SummaryTableMerge($f);
+                    rename($f, $opts{bamsstatus});  # Save as lastest file
+                    print "Fetched file $f, saved as '$opts{xmlfilesdir}/$opts{bamsstatus}'\n";
+                    last;
+                }
             }
         }
     }
-    if ($opts{all} || $rc) {                    # Pretty lost, get all files and use last loaded file
+    if ($opts{all} || $rc) {                    # Pretty lost, get all files 
         # Here is command:  /usr/cluster/bin/ascp -i /net/topmed/incoming/study.reference/send2ncbi/topmed-2-ncbi.pri \
         #   -Q -l 200m -k 1 -q asp-um-sph@gap-submit.ncbi.nlm.nih.gov:outgoing/Files .
         $cmd = "$opts{ascpcmd} $ascphost:$opts{ascpinfiles} .";   # Creates directory Files
@@ -145,13 +149,26 @@ if ($opts{fetchfiles}) {
             die "$Script Unable to read directory 'Files': $!\n";
         my @files = grep { /\.gz/ } readdir($dh);
         close($dh);
-        @files = sort @files;
-        my $f = pop(@files);               # Get last entry
-        rename("Files/$f", $opts{bamsstatus}) ||
-            die "$Script Unable to find any listing of loaded files. Totally lost: $!\n";
-        print "Fetched file 'Files/$f', saved as '$opts{xmlfilesdir}/$opts{bamsstatus}'\n";
+
+        #   The monthly summaries are named special, rename them to look like the others
+        my @files2 = ();
+        foreach my $f (@files) {
+            $f = 'Files/' . $f;
+            if ($f =~ /_Full/) {
+                my $f2 = $f;
+                $f2 =~ s/_Full//;
+                rename($f, $f2) ||
+                    die "$Script - cmd failed: 'rename $f $f2': $!\n";
+                push @files2,$f2;
+            }
+            else { push @files2,$f; }
+        }
+
+        #   Walk through each file and update the database
+        foreach my $f (sort @files2) {
+            SummaryTableMerge($f);
+        }
         if ($opts{all}) { print "All files were downloaded to output/XMLfiles/Files\n"; }
-        else { system('rm -rf Files'); }    # Clean up cruft
     }
     if ($rc) { die "$Script Unable to fetch files of loaded files at NCBI\n"; }
 }
@@ -181,6 +198,68 @@ if ($fcn eq 'ignore') { exit; }     # Convenient way to just load files
 if ($fcn eq 'updatedb') { CheckSummary(); exit; }
 
 die "Invalid request '$fcn'. Try '$Script --help'\n";
+
+#==================================================================
+# Subroutine:
+#   SummaryTableMerge - Read a file and merge it into ncbi_summary
+#==================================================================
+sub SummaryTableMerge {
+    my ($f) = @_;
+    #   Walk through each file and update the database
+    my @xdbcols = qw(
+        realm
+        upload_id
+        upload_date
+        file_name
+        file_size
+        file_md5sum
+        upload_name
+        upload_size
+        upload_md5sum
+        file_status
+        file_type
+        load_date
+        file_error
+        submissions
+        loaded_runs
+        unloaded_runs
+        suppressed_runs
+        loaded_analyses
+        unloaded_analyses
+        suppressed_analyses
+    );
+    open (INSQL, "gunzip -c $f |") ||
+        die "$Script - Unable to open file '$f': $!\n";
+    my @dbcols = split("\t", <INSQL>);
+    print "Merging data from '$f' ";
+    my $upd = 0;
+    my $ins = 0;
+    while (<INSQL>) {
+        chomp();
+        my @cols = split("\t",$_);
+        if ($cols[3] !~ /^NWD/) { next; }   # Ignore cruft from other projects
+        if ($#cols != $#dbcols) {
+            die "$Script - Number columns in $. of '$f' was incorrect " .
+                "($#cols != $#dbcols)\n";
+        }
+
+        my $setsql = 'SET ';
+        for (my $i=0; $i<=$#dbcols; $i++) {
+            $setsql .= $dbcols[$i] . "='" . $cols[$i] . "',";
+        }
+        chop($setsql);
+        my $sql = "UPDATE $opts{summary_table} $setsql WHERE file_name='$cols[3]'";
+        my $sth = DoSQL($sql,0);        # This can fail
+        if (! $sth->rows()) {           # If failed, then do insert
+            $sql = "INSERT INTO $opts{summary_table} $setsql";
+            DoSQL($sql);                # This may not fail
+            $ins++;
+        }
+        else { $upd++; }
+    }
+    close(INSQL);
+    print "  ($upd updates, $ins inserts)\n";
+}
 
 #==================================================================
 # Subroutine:
