@@ -108,7 +108,7 @@ if [ "$center" = "broad" ]; then
   if [ "$checksum" = "" ]; then
     echo "Calculating MD5 for CRAM"
     stime=`date +%s`
-    checksum=`calcmd5.sh $sendfile | awk '{print $1}'`
+    checksum=`calcmd5 $sendfile | awk '{print $1}'`
     if [ "$checksum" != "" ]; then
       $topmedcmd set $bamid cramb37checksum $checksum
       etime=`date +%s`

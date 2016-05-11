@@ -178,7 +178,7 @@ rm -f ${chkname}.init.stat  ${chkname}.cram.stat ${chkname}.bam ${chkname}.bam.m
 echo "Calculating new MD5"
 now=`date +%s`
 #   Calculate the MD5 for the cram
-md5=`$calcmd5.sh $newname | awk '{print $1}'`
+md5=`$calcmd5 $newname | awk '{print $1}'`
 if [ "$md5" = "" ]; then
   echo "Command failed: md5sum $newname"
   $topmedcmd mark $bamid $markverb failed

@@ -111,7 +111,7 @@ checksum=`$topmedcmd show $bamid cramb37checksum`
 if [ "$checksum" = "" ]; then
   echo "Calculating MD5 for CRAM"
   stime=`date +%s`
-  checksum=`$calcmd5.sh $sendfile | awk '{print $1}'`
+  checksum=`$calcmd5 $sendfile | awk '{print $1}'`
   if [ "$checksum" = "" ]; then
     echo "Unable to calculate the MD5 for CRAM: md5sum $sendfile"
     $topmedcmd mark $bamid $markverb failed
