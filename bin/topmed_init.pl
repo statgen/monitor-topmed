@@ -93,7 +93,7 @@ foreach my $centerid (keys %{$centersref}) {
     foreach my $d (@{$dirsref}) {
         $runid = $knownruns{$d}{runid} || CreateRun($centerid, $d);
         if (! defined($runid)) {
-            warn "$Script How can runid not be defined?  dir=$d\n";
+            if ($opts{verbose}) { warn "$Script RUNID not defined for dir=$d\n"; }
             next;
         }
         if ($opts{run} && $opts{run} ne $d) { next; }
@@ -121,6 +121,9 @@ exit;
 #==================================================================
 sub CreateRun {
     my ($cid, $d) = @_;
+    #   Runs with a magic name are ignored
+    if ($d eq 'upload') { return undef(); }
+
     #   Try to write in this directory. Can't trust the users
     my $touchfile = '.test';
     if ( ! open(TOUCH, '>' . $touchfile)) {
