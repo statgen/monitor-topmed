@@ -89,16 +89,31 @@ if (! $rowsofdata) { die "$Script - NWDID '$nwdid' is unknown\n"; }
 my $href = $sth->fetchrow_hashref;
 my $bamid = $href->{bamid};
 
-#   First value returned is a string, rest are floats
 my $date = shift(@metrics);
 $_ = shift(@colnames);              # Ignore name of this first column
-my $sql = "INSERT INTO $opts{qcdata_table} (bam_id,created_at," . lc(join(',',@colnames)) .
-    ") VALUES($bamid,'$date',";
-for (my $i=0; $i<=$#metrics; $i++) {
-    $sql .= $metrics[$i] . ',';
+my $sql;
+
+#   See if there already is a qc result for this NWDID
+$sth = DoSQL("SELECT bam_id FROM $opts{qcdata_table} WHERE bam_id=$bamid", 0);
+$rowsofdata = $sth->rows();
+if ($rowsofdata) {                  # This already exists, do UPDATE
+    $sql = "UPDATE $opts{qcdata_table} SET created_at='$date',";
+    for (my $i=0; $i<=$#metrics; $i++) {        # No need to specify bam_id
+        $sql .= "$colnames[$i]=$metrics[$i],";
+    }
+    chop($sql);
+    $sql .= " WHERE bam_id=$bamid";
 }
-chop($sql);
-$sql .= ')';
+else {                              # First time, do INSERT
+    #   First value is a string, rest are floats
+    $sql = "INSERT INTO $opts{qcdata_table} (bam_id,created_at," . lc(join(',',@colnames)) .
+        ") VALUES($bamid,'$date',";
+    for (my $i=0; $i<=$#metrics; $i++) {
+        $sql .= $metrics[$i] . ',';
+    }
+    chop($sql);
+    $sql .= ')';
+}
 if ($opts{verbose}) { print "SQL=$sql\n"; }
 $sth = DoSQL($sql, 0);
 if (! $sth) { die "$Script Failed to update database. SQL=$sql\n"; }
