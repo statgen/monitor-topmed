@@ -30,11 +30,13 @@ our %opts = (
     realm => '/usr/cluster/monitor/etc/.db_connections/topmed',
     qcdata_table => 'qc_results',
     bamfiles_table => 'bamfiles',
+    password => 'please',               # Password to be entered for --remove  (yes, not secure)
     verbose => 0,
 );
+my $dbh;
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose
+    help finddups realm=s remove=s verbose
     )) || die "$Script - Failed to parse options\n";
 
 #   Simple help if requested
@@ -47,6 +49,47 @@ if ($#ARGV < 1 || $opts{help}) {
 }
 my $dirname = shift @ARGV;
 my $nwdid   = shift @ARGV;
+
+#--------------------------------------------------------------
+#   Special admin hook - show all duplicates in the database
+#--------------------------------------------------------------
+#   Show all the duplicates. There should be none, but ...
+if ($opts{finddups}) {
+    my $aref = Dups();
+    if ($#$aref < 0) { print "$Script - No duplicates found!\n"; exit; }
+    print "Found " . ($#$aref+1) . " duplicates\n";
+    if ($opts{verbose}) { print join(' ', @$aref) . "\n"; }
+    exit;
+}
+
+#   Generate the SQL to remove duplicate records
+if ($opts{remove}) {
+    if ($opts{remove} ne $opts{password}) {
+        die "$Script - password '$opts{remove}' invalid\n";
+    }
+
+    my $aref = Dups();
+    if ($#$aref < 0) { print "$Script - No duplicates found!\n"; exit; }
+    foreach my $bamid (@$aref) {
+        my $sql = "SELECT id from $opts{qcdata_table} WHERE bam_id=$bamid ORDER by id";
+        my $sth = DoSQL($sql);
+        my $rowsofdata = $sth->rows();
+        if (! $rowsofdata) { print "$Script - Oops, now there is no duplicate '$bamid'?\n"; next; }
+        my @dupbamids = ();
+        for (my $i=0; $i<$rowsofdata; $i++) {
+            my $href = $sth->fetchrow_hashref();
+            push @dupbamids,$href->{id};            
+        }
+        my $keepbamid = pop(@dupbamids);
+        if ($opts{verbose}) { print "Keep $keepbamid, remove " . join(',',@dupbamids) . "\n"; }
+        else {
+            foreach my $id (@dupbamids) {
+                print "DELETE FROM $opts{qcdata_table} WHERE id=$id;\n";
+            }
+        }
+    }
+    exit;
+}
 
 #--------------------------------------------------------------
 #   Extract qplot valies or die trying
@@ -69,7 +112,6 @@ if ($#colnames != $#metrics) {
 #--------------------------------------------------------------
 #   Our network can get flakey and the DBConnect can fail
 #   Catch when this happens and wait a bit and try again
-my $dbh;
 my $sleeptime = 10;
 for (1 .. 10) {
     eval { $dbh = DBConnect($opts{realm}); };
@@ -122,6 +164,30 @@ print "Updated QC database data for '$nwdid'\n";
 exit;
 
 #==================================================================
+# Subroutine:
+#   $aref = Dups()
+#
+#   Return a reference to an array of duplicate qc_result entries
+#==================================================================
+sub Dups {
+    #my ($href, $ncbihref) = @_;
+    my @dups = ();
+    
+    $dbh = DBConnect($opts{realm}) ||
+        die "$Script - Unable to connect to database, realm=$opts{realm}\n";
+    my $sth = DoSQL("SELECT count(bam_id) as count,bam_id FROM $opts{qcdata_table} group by bam_id having count > 1");
+    my $rowsofdata = $sth->rows();
+    if ($rowsofdata) {
+        my $href;
+        for (my $i=0; $i<$rowsofdata; $i++) {
+            $href = $sth->fetchrow_hashref();
+            push @dups, $href->{bam_id};
+        }
+    }
+    return \@dups;
+}
+
+#==================================================================
 #   Perldoc Documentation
 #==================================================================
 __END__
@@ -134,6 +200,10 @@ topmedqplot.pl - Update the database with qplot values for a NWDID sampleid
 
   topmedqplot.pl /net/topmed/incoming/qc.results/broad/2015may01.single.fram NWD321439
 
+  topmedqplot.pl -finddups  ignore ignore       # Debugging, show number qc_results duplicates
+  topmedqplot.pl -finddups -verbose ignore ignore 
+  topmedqplot.pl -remove=please ignore ignore   # Remove show qc_results duplicates
+
 =head1 DESCRIPTION
 
 This program extracts values of interest from qplot output and saves them
@@ -145,6 +215,12 @@ See B<perldoc DBIx::Connector> for details defining the database.
 
 =over 4
 
+=item B<-finddups>
+
+Scan the database of qc results and show instances of multiple bam_id 
+This is only for admins to fing bugs.
+No processing of normal parameters is done (e.g. add/modify database).
+
 =item B<-help>
 
 Generates this output.
@@ -154,6 +230,13 @@ Generates this output.
 Specifies the realm name to be used.
 This defaults to B<$opts{realm}> in the same directory as
 where this program is to be found.
+
+=item B<-remove=password>
+
+Remove instances of multiple bam_id records from the database.
+This generates the SQL to remove all duplicates (all but the last record).
+This is only for admins to fing bugs.
+No processing of normal parameters is done.
 
 =item B<-verbose>
 
