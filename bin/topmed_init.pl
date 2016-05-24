@@ -39,6 +39,7 @@ our %opts = (
     runcount => 0,
     bamcount => 0,
     bamcountruns => '',
+    arrivedsecs => 86400*7,         # If no new bam in a week, stop looking at run
     verbose => 0,
 );
 
@@ -73,8 +74,8 @@ foreach my $centerid (keys %{$centersref}) {
         warn "$Script Unable to CD to '$d': $!\n";
         next;
     }
-    #   Get all the known batch runs for this center
-    my $sql = "SELECT runid,dirname,xmlfound FROM $opts{runs_table} WHERE centerid=$centerid";
+    #   Get all the known batch runs for this center that are not fully arrived
+    my $sql = "SELECT runid,dirname,arrived FROM $opts{runs_table} WHERE centerid=$centerid";
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     my %knownruns = ();
@@ -83,7 +84,7 @@ foreach my $centerid (keys %{$centersref}) {
         foreach my $href ($sth->fetchrow_hashref) {
             $dir = $href->{dirname};            
             $knownruns{$dir}{runid} = $href->{runid};
-            $knownruns{$dir}{xmlfound} = $href->{xmlfound};
+            $knownruns{$dir}{arrived} = $href->{arrived};
         }
     }
     #   Get list of all runs for this center
@@ -97,6 +98,9 @@ foreach my $centerid (keys %{$centersref}) {
             next;
         }
         if ($opts{run} && $opts{run} ne $d) { next; }
+        #   Check if this run has arrived, no need to look at it further
+        if ($knownruns{$d}{arrived} eq 'Y') { next; }
+        if ($opts{verbose}) { print "Try to add BAMs in '$d' [$runid]\n"; }
         AddBams($runid, $d);
     }
 }
@@ -122,7 +126,7 @@ exit;
 sub CreateRun {
     my ($cid, $d) = @_;
     #   Runs with a magic name are ignored
-    if ($d eq 'upload') { return undef(); }
+    if ($d eq 'upload' || $d eq 'slots') { return undef(); }
 
     #   Try to write in this directory. Can't trust the users
     my $touchfile = '.test';
@@ -151,6 +155,9 @@ sub CreateRun {
 #==================================================================
 # Subroutine:
 #   AddBams - Add details for bams in this directory to the database
+#       In order to know if we've found all the bam files, we look
+#       for any BAMs older than the MD5 files. If so, we parse the
+#       md5 files again.
 #
 # Arguments:
 #   runid - run id
@@ -163,11 +170,6 @@ sub AddBams {
     my ($runid, $d) = @_;
     if (! -d $d) {
         print "$Script - Unable to read directory '$d': $!\n";
-        return 0;
-    }
-    #   If we're using one MD5 file and the .old version exists, we have nothing to add
-    if (-f "$d/Manifest.txt.old") {
-        if ($opts{verbose}) { print "$Script - $d/Manifest.txt.old found, no more BAMs to add\n"; }
         return 0;
     }
 
@@ -187,7 +189,8 @@ sub AddBams {
         }
     }
 
-    #   Get list of all new MD5 files
+    #   Get list of all MD5 files and reprocess them. Don't get excited when
+    #   the BAM has already been added to bamfiles. This will not go on forever.
     my @md5files = ();
     if ( -r "$d/Manifest.txt") { push @md5files,'Manifest.txt'; }
     else {
@@ -195,9 +198,6 @@ sub AddBams {
             die "$Script - Unable to read directory '$d'\n";
         while (readdir $dh) {
             if (! /\.md5$/) { next; }
-            #   If a .old version of this file exists, we've done it before
-            if (-f "$d/$_.old") { next; }
-            if (-z "$d/$_") { next; }
             push @md5files,$_;
         }
         closedir $dh;
@@ -208,7 +208,7 @@ sub AddBams {
     }
 
     #   There is no consistency what people do here.
-    #   Foreach md5 file, get the new of the BAM and create the bamfiles record
+    #   Foreach md5 file, get the BAM name and create the bamfiles record
     #   and rename the md5 file so we do not process it again
     my $newbams = 0;
     my ($fn, $checksum);
@@ -223,9 +223,7 @@ sub AddBams {
         while (my $l = <IN>) {          # Read md5 checksum file
             ($fn, $checksum) = NormalizeMD5Line($l, $f);
             if (! $checksum) { $badmd5++; next; }
-            #   Ideally we only read MD5 files for NEW records, but sometimes we might
-            #   reprocess an MD5 intentionally (?) or but accident/bug.
-            #   In any case don't make duplicate records
+            #   Don't make duplicate records
             if (exists($knownbams{$fn})) { next; }       # Skip known bams
             if (exists($knownorigbam{$fn})) { next; }    # Skip known original bams
 
@@ -239,25 +237,14 @@ sub AddBams {
         }
         close(IN);
         if ($badmd5) { next; }              # This MD5 was in error
-
-        #   Have added new bam. Rename MD5 file and append $md5lines to our own MD5 file
-        #   Aspera can really screw us up by re-transmitting a renamed file.
-        #   To avoid this we create a symlink to the MD5 file
-        my $oldchecksum = "$f.old";
-        if (! -f $oldchecksum) {            # Only do this once
-            if ($opts{verbose}) { print "SYMLINK:   ln -s $f $oldchecksum\n"; }
-            else {
-                system("ln -s $origf $oldchecksum") &&
-                    die "$Script - Unable to create symlink to $f for $oldchecksum ($d)\n";
-            }
-        }
     }
 
     #   If we added bams, change the bamcount
-    if (! $newbams) { return 0; }
-    print "$Script - $newbams new bams found in '$d'\n";
-    $opts{bamcount} += $newbams;            # Stats for ending msg
-    $opts{bamcountruns} .= $d . ' ';
+    if ($newbams) {
+        print "$Script - $newbams new bams found in '$d'\n";
+        $opts{bamcount} += $newbams;            # Stats for ending msg
+        $opts{bamcountruns} .= $d . ' ';
+    }
 
     #   Get number of database records
     $sql = "SELECT bamid FROM $opts{bamfiles_table} WHERE runid=$runid";
@@ -268,14 +255,51 @@ sub AddBams {
 
     #   Last sanity check, see if number of BAM files matches records
     #   This might not always be accurate, but ...
-    my $n = `ls $d/N*.bam 2>/dev/null | wc -l`;
-    chomp($n);
-    if ($n eq $numbamrecords) { print "$Script - Congratulations, # bams = # database records\n"; }
-    else {
-        print "$Script - Warning, # bams [$n] != # database records [$numbamrecords].  " .
+    if ($newbams) {
+        my $n = `ls $d/N*.bam 2>/dev/null | wc -l`;
+        chomp($n);
+        if ($n eq $numbamrecords) { print "$Script - Congratulations, # bams = # database records\n"; }
+        else {
+            print "$Script - Warning, # bams [$n] != # database records [$numbamrecords].  " .
             "If data is incoming, this might be OK\n";
+        }
+    }
+    
+    #   Last thing, see if there has been little changed in this directory
+    #   If nothing has changed in a long time, make this run as 'arrived'
+    #   and we'll never come back here again.
+    my $oldestbamdate = OldestBAM($d);
+    if ((time() - $oldestbamdate) > $opts{arrivedsecs}) {
+        $sql = "UPDATE $opts{runs_table}  SET arrived='Y' WHERE runid=$runid";
+        $sth = DoSQL($sql);
+        print "$Script - Run '$d' has finally arrived. Look at it no more\n";
     }
     return 1;
+}
+
+#==================================================================
+# Subroutine:
+#   Get date of oldest BAM in this directory
+#   filedate = OldestBAM($d)
+#
+# Arguments:
+#   d - directory to search
+#
+# Returns:
+#   Date of oldest BAM or zero
+#==================================================================
+sub OldestBAM {
+    my ($d) = @_;
+    my $oldestbamdate = 0;
+    opendir(my $dh, $d) ||
+        die "$Script - Unable to read directory '$d'\n";
+    while (readdir $dh) {
+        if (! /\.bam$/) { next; }
+        my @stats = stat("$d/$_");
+        if ($oldestbamdate < $stats[9]) { $oldestbamdate = $stats[9]; }
+    }
+    closedir $dh;
+    return $oldestbamdate;
 }
 
 #==================================================================
