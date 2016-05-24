@@ -9,7 +9,7 @@ topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 ascpcmd="$topmedcmd send2ncbi"
 topmedxml="/usr/cluster/monitor/bin/topmed_xml.pl"
 medir=`dirname $0`
-calcmd5=$medir/topmed_calcmd5.sh
+calcmd5=/usr/cluster/monitor/bin/topmed_calcmd5.sh
 mem=8G
 if [ "$TOPMED_MEMORY" != "" ]; then mem=$TOPMED_MEMORY; fi
 realhost=topmed3
