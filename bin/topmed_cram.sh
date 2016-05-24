@@ -11,7 +11,7 @@ illuminaref=/net/topmed/incoming/study.reference/study.reference/illumina.hg19.f
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 backupdir=/net/topmed/working/backups
 medir=`dirname $0`
-calcmd5=$medir/topmed_calcmd5.sh
+calcmd5=/usr/cluster/monitor/bin/topmed_calcmd5.sh
 mem=8G
 if [ "$TOPMED_MEMORY" != "" ]; then mem=$TOPMED_MEMORY; fi
 realhost=topmed
