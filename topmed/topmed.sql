@@ -57,6 +57,7 @@ CREATE TABLE runs (
   bamcount     INT,
   datayear     INT DEFAULT 2,          /* Year of project: 1, 2 ... */
   xmlfound     INT DEFAULT 0,          /* Remove this */
+  arrived      CHAR(1) DEFAULT('N'),   /* Y or N that all files arrived for this run */
 
   dateinit     VARCHAR(12),
   datecomplete VARCHAR(12),
@@ -129,7 +130,7 @@ select bamid,bamname,runid,(select dirname from runs where runid=bamfiles.runid)
   How can we have dozens of files with this checksum ?
 select bamid,bamname from bamfiles where cramb37checksum='d41d8cd98f00b204e9800998ecf8427e'
 */
-
+ 
 /* ####################################################
    Remove these some day 
    #################################################### */
