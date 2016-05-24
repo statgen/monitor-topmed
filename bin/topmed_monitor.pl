@@ -413,7 +413,8 @@ if ($fcn eq 'sb37') {
 
                 #   Check important fields for this BAM are possibly correct
                 my $skip = '';
-                foreach my $col (qw(cramname cramchecksum expt_sampleid)) {
+                #foreach my $col (qw(cramname cramchecksum expt_sampleid)) {
+                foreach my $col (qw(cramname expt_sampleid)) {
                     if (exists($href->{$col}) && $href->{$col}) { next; }
                     if ($opts{verbose}) { print "  No value for '$col'\n"; }
                     $skip .= "$col ";
