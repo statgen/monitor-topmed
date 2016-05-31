@@ -4,6 +4,11 @@
 #
 #	Backup the original BAM as a simple copy
 #
+
+echo "This script is no longer used"
+exit 5
+
+
 bindir=/usr/cluster/bin
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 backupdir=/net/topmed/working/backups

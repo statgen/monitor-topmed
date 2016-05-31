@@ -8,13 +8,11 @@
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 topmedrename=/usr/cluster/monitor/bin/topmedrename.pl
 console=/net/topmed/working/topmed-output
-mem=1G
-if [ "$TOPMED_MEMORY" != "" ]; then mem=$TOPMED_MEMORY; fi
-realhost=topmed
-#if [ "$TOPMED_HOST" != "" ]; then realhost=$TOPMED_HOST; fi
+mem=2G
 markverb=md5verified
-qos=verify
-if [ "$TOPMED_QOS" != "" ]; then qos=$TOPMED_QOS; fi
+slurmp=topmed
+qos=topmed-verify
+realhost=''
 
 if [ "$1" = "-submit" ]; then
   shift
@@ -24,18 +22,10 @@ if [ "$1" = "-submit" ]; then
     exit 4
   fi 
 
-  #   Figure where to submit this to run - should be local
-  l=(`$topmedcmd where $1 bam`)         # Get pathofbam and host for bam
-  h="${l[1]}"
-  if [ "$h" != "" ]; then realhost=$h; fi
-  if [ "$TOPMED_HOST" != "" ]; then realhost=$TOPMED_HOST; fi
-  slurmp="$realhost-incoming"
-  slurmqos="$realhost-$qos"
-
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos -J $1-verify --output=$console/$1-verify.out $0 $*`)
+  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos -J $1-verify --output=$console/$1-verify.out $0 $*`)
   if [ "$?" != "0" ]; then
     echo "Failed to submit command to SLURM"
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos -J $1-verify --output=$console/$1-verify.out $0 $*"
+    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos -J $1-verify --output=$console/$1-verify.out $0 $*"
     exit 1
   fi
   $topmedcmd mark $1 $markverb submitted

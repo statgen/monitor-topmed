@@ -6,13 +6,11 @@
 #
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 gcbin=/net/mario/gotcloud/bin
-mem=1G
-if [ "$TOPMED_MEMORY" != "" ]; then mem=$TOPMED_MEMORY; fi
-realhost=topmed
-#if [ "$TOPMED_HOST" != "" ]; then realhost=$TOPMED_HOST; fi
+mem=2G
 console=/net/topmed/working/topmed-output
-qos=bai
-if [ "$TOPMED_QOS" != "" ]; then qos=$TOPMED_QOS; fi
+slurmp=topmed
+qos=topmed-bai
+realhost=''
 
 if [ "$1" = "-submit" ]; then
   shift
@@ -22,18 +20,10 @@ if [ "$1" = "-submit" ]; then
     exit 4
   fi 
 
-  #   Figure where to submit this to run - should be local
-  l=(`$topmedcmd where $1 bam`)         # Get pathofbam and host for bam
-  h="${l[1]}"
-  if [ "$h" != "" ]; then realhost=$h; fi
-  if [ "$TOPMED_HOST" != "" ]; then realhost=$TOPMED_HOST; fi
-  slurmp="$realhost-incoming"
-  slurmqos="$realhost-$qos"
-
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-bai --output=$console/$1-bai.out $0 $*`)
+  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos --workdir=$console -J $1-bai --output=$console/$1-bai.out $0 $*`)
   if [ "$?" != "0" ]; then
     echo "Failed to submit command to SLURM"
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-bai --output=$console/$1-bai.out $0 $*"
+    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos --workdir=$console -J $1-bai --output=$console/$1-bai.out $0 $*"
     exit 1
   fi
   $topmedcmd mark $1 baid submitted

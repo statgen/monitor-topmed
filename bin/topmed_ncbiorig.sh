@@ -10,10 +10,7 @@ ascpcmd="$topmedcmd send2ncbi"
 topmedxml="/usr/cluster/monitor/bin/topmed_xml.pl"
 medir=`dirname $0`
 calcmd5=/usr/cluster/monitor/bin/topmed_calcmd5.sh
-mem=8G
-if [ "$TOPMED_MEMORY" != "" ]; then mem=$TOPMED_MEMORY; fi
-realhost=topmed3
-#if [ "$TOPMED_HOST" != "" ]; then realhost=$TOPMED_HOST; fi
+mem=2G
 console=/net/topmed/working/topmed-output
 tmpconsole=/working/topmed-output
 topmeddir=/net/topmed/incoming/topmed
@@ -21,8 +18,9 @@ build=37
 version=secondary
 markverb=sentorig
 jobname=orig
-qos=ncbi
-if [ "$TOPMED_QOS" != "" ]; then qos=$TOPMED_QOS; fi
+slurmp=topmed
+qos=topmed-ncbi
+realhost=''
 
 if [ "$1" = "-submit" ]; then
   shift
@@ -32,19 +30,11 @@ if [ "$1" = "-submit" ]; then
     exit 4
   fi 
 
-  #   Figure where to submit this to run - does not need to be local
-  l=(`$topmedcmd where $1 bam`)         # Get pathofbam and host for bam
-  h="${l[1]}"
-  if [ "$h" != "" ]; then realhost=$h; fi
-  if [ "$TOPMED_HOST" != "" ]; then realhost=$TOPMED_HOST; fi
-  slurmp="$realhost-incoming"
-  slurmqos="$realhost-$qos"
-
   #  Submit this script to be run
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-$jobname --output=$console/$1-$jobname.out $0 $*`)
+  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos --workdir=$console -J $1-$jobname --output=$console/$1-$jobname.out $0 $*`)
   if [ "$?" != "0" ]; then
     echo "Failed to submit command to SLURM"
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-$jobname --output=$console/$1-$jobname.out $0 $*"
+    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos --workdir=$console -J $1-$jobname --output=$console/$1-$jobname.out $0 $*"
     exit 1
   fi
   $topmedcmd mark $1 $markverb submitted

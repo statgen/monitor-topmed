@@ -8,13 +8,11 @@ topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 ascpcmd="$topmedcmd send2ncbi"
 topmedxml="/usr/cluster/monitor/bin/topmed_xml.pl"
 mem=2G
-if [ "$TOPMED_MEMORY" != "" ]; then mem=$TOPMED_MEMORY; fi
-realhost=topmed
-if [ "$TOPMED_HOST" != "" ]; then realhost=$TOPMED_HOST; fi
 console=/net/topmed/working/topmed-output
 markverb=sentexpt
-qos=bai                      # This queue is free most of the time
-if [ "$TOPMED_QOS" != "" ]; then qos=$TOPMED_QOS; fi
+slurmp=topmed
+qos=topmed-ncbi
+realhost=''
 
 if [ "$1" = "-submit" ]; then
   shift
@@ -23,14 +21,12 @@ if [ "$1" = "-submit" ]; then
   if [ "$?" = "0" ]; then
     exit 4
   fi 
-  slurmp="$realhost-incoming"
-  slurmqos="$realhost-$qos"
 
   #  Submit this script to be run
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-expt --output=$console/$1-sexpt.out $0 $*`)
+  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos --workdir=$console -J $1-expt --output=$console/$1-sexpt.out $0 $*`)
   if [ "$?" != "0" ]; then
     echo "Failed to submit command to SLURM"
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-expt --output=$console/$1-sexpt.out $0 $*"
+    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos --workdir=$console -J $1-expt --output=$console/$1-sexpt.out $0 $*"
     exit 1
   fi
   $topmedcmd mark $1 $markverb submitted

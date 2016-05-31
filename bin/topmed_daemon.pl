@@ -39,8 +39,9 @@ my %opts = (
     stop => 0,
     port => 48109,
     fromips => '127.0.0.1 192.168.1.56 192.168.2.200 192.168.1.8',
-    squeue => '/usr/cluster/bin/squeue --format "%.9i %.10P %.12j %.8u %.2t %.10M %R"',
+    squeue_unused => '/usr/cluster/bin/squeue --format "%.9i %.10P %.12j %.8u %.2t %.10M %R"',
     df => '/bin/df -h /net/topmed/incoming /net/topmed/working /net/topmed2/incoming /net/topmed2/working  /net/topmed3/incoming /net/topmed3/working /net/topmed4/working /net/topmed4/incoming /net/topmed5/incoming /net/topmed5/working   /net/topmed6/incoming /net/topmed6/working',
+    squeue => '/usr/cluster/monitor/bin/topmedcmd.pl squeue', 
     errorcheck => '/usr/cluster/monitor/bin/topmed_monitor.pl check',
     shownode => '/usr/cluster/bin/scontrol show node',
 );
@@ -129,7 +130,7 @@ sub ProcessGet {
     #   Handle squeue/queue
     if ($path =~ /squeue.(\S+)/) {
         my $part = Clean($1);
-        my $cmd = "$opts{squeue} -p $part";
+        my $cmd = $opts{squeue};
         if ($opts{verbose}) { print "  CMD=$cmd\n"; }
         my $s = `$cmd  2>&1`;
         SendText($conn, $s);

@@ -13,14 +13,12 @@ backupdir=/net/topmed/working/backups
 medir=`dirname $0`
 calcmd5=/usr/cluster/monitor/bin/topmed_calcmd5.sh
 mem=8G
-if [ "$TOPMED_MEMORY" != "" ]; then mem=$TOPMED_MEMORY; fi
-realhost=topmed
-#if [ "$TOPMED_HOST" != "" ]; then realhost=$TOPMED_HOST; fi
 console=/net/topmed/working/topmed-output
 markverb=cramed
 squeezed=n
-qos=cram
-if [ "$TOPMED_QOS" != "" ]; then qos=$TOPMED_QOS; fi
+qos=''
+slurmp=topmed
+realhost=''
 
 if [ "$1" = "-submit" ]; then
   shift
@@ -30,13 +28,13 @@ if [ "$1" = "-submit" ]; then
     exit 4
   fi 
 
-  #   Figure where to submit this to run - should be local
-  l=(`$topmedcmd where $1 backup`)     # Get backupdir and backupfile and host
-  h="${l[2]}"
-  if [ "$h" != "" ]; then realhost=$h; fi
-  if [ "$TOPMED_HOST" != "" ]; then realhost=$TOPMED_HOST; fi
-  slurmp="$realhost-incoming"
-  slurmqos="$realhost-$qos"
+  #   Figure where to submit this to run - should be where bam lives
+  l=(`$topmedcmd where $1 bam`)         # Get pathofbam and host for bam
+  h="${l[1]}"
+  if [ "$h" != "" ]; then
+    realhost="-w $h";
+    qos="$h-cram"
+  fi
 
   #  Is this squeezed or not?  For now this is only files from the Broad usually,
   #  however, not quite always.  $qual is the number of distinct base call quality 
@@ -48,10 +46,10 @@ if [ "$1" = "-submit" ]; then
   fi
 
   #  Submit this script to be run
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-cram --output=$console/$1-cram.out $0 $sq $*`)
+  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost --qos=$qos --workdir=$console -J $1-cram --output=$console/$1-cram.out $0 $sq $*`)
   if [ "$?" != "0" ]; then
     echo "Failed to submit command to SLURM"
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-cram --output=$console/$1-cram.out $0 $sq $*"
+    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost --qos=$qos --workdir=$console -J $1-cram --output=$console/$1-cram.out $0 $sq $*"
     exit 1
   fi
   $topmedcmd mark $1 $markverb submitted
