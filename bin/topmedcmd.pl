@@ -86,11 +86,13 @@ our %opts = (
     ascpcmd => "/usr/cluster/bin/ascp -i ".
         "/net/topmed/incoming/study.reference/send2ncbi/topmed-2-ncbi.pri -l 800M -k 1",
     ascpdest => 'asp-um-sph@gap-submit.ncbi.nlm.nih.gov:protected',
+    squeuecmd => "/usr/cluster/bin/squeue -o '%.10i %.18P %.18j %.8u %.2t %.10M %.6D %R'",
+    maxlongjobs => 10,
     verbose => 0,
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose center=s runs=s
+    help realm=s verbose center=s runs=s maxlongjobs=i
     )) || die "$Script - Failed to parse options\n";
 
 #   Simple help if requested
@@ -111,6 +113,8 @@ if ($#ARGV < 0 || $opts{help}) {
         "$m export\n" .
         "  or\n" .
         "$m send2ncbi files\n" .
+        "  or\n" .
+        "$m squeue\n" .
         "  or\n" .
         "$m where bamid bam|backup|b37|b38\n" .
         "  or\n" .
@@ -151,6 +155,7 @@ if ($fcn eq 'set')      { Set(@ARGV); exit; }
 if ($fcn eq 'show')     { Show(@ARGV); exit; }
 if ($fcn eq 'export')   { Export(@ARGV); exit; }
 if ($fcn eq 'send2ncbi')    { Send2NCBI(@ARGV); exit; }
+if ($fcn eq 'squeue')   { SQueue(@ARGV); exit; }
 if ($fcn eq 'where')    { Where(@ARGV); exit; }
 if ($fcn eq 'whatnwdid')  { WhatNWDID(@ARGV); exit; }
 if ($fcn eq 'permit')   { Permit(@ARGV); exit; }
@@ -389,6 +394,92 @@ sub Send2NCBI {
     print "$Script - FATAL: Excessive ASCP fatal errors\n";
     unlink($errs);
     exit(3);
+}
+
+#==================================================================
+# Subroutine:
+#   SQueue()
+#
+#   Print summary of topmed-related jobs
+#==================================================================
+sub SQueue {
+    #my ($bamid, $set) = @_;
+    my $cmd = $opts{squeuecmd} . ' -t r | grep topmed';
+    my %partitions = ();            # Unique partition names
+    my %running = ();
+    my %queued = ();
+    foreach my $l (split('\n', `$cmd`)) {
+        my @c = split(' ', $l);
+        if ($c[3] ne 'topmed') { next; }    # Not my stuff
+        $partitions{$c[1]} = 1;
+        push @{$running{$c[1]}{data}},$l;
+        $running{$c[1]}{count}++;
+    }
+    
+    $cmd = $opts{squeuecmd} . ' -t pd | grep topmed';
+    foreach my $l (split('\n', `$cmd`)) {
+        my @c = split(' ', $l);
+        if ($c[3] ne 'topmed') { next; }    # Not my stuff
+        $partitions{$c[1]} = 1;
+        push @{$queued{$c[1]}{data}},$l;
+        $queued{$c[1]}{count}++;
+    }
+    
+    #   Show summary
+    print "Partition Summary\n";
+    foreach my $p (sort keys %partitions) {
+        if (! defined($queued{$p}{count}))  { $queued{$p}{count} = 0; }
+        if (! defined($running{$p}{count})) { $running{$p}{count} = 0; }
+        printf("%-18s %3d running / %3d queued\n", $p, $running{$p}{count}, $queued{$p}{count}); 
+    }
+    print "\n";
+
+    #   Show summary of running
+    print "Running jobs per partition\n";
+    my $format = '%-16s  %-11s  %s';
+    printf ($format . "\n", 'Partition', 'Host', 'Job types and count');
+    foreach my $p (sort keys %partitions) {
+        my %hosts = ();
+        foreach my $l (@{$running{$p}{data}}) {
+            my @c = split(' ', $l);
+            $c[2] =~ s/\d+\-//;             # Remove bamid from jobname
+            $hosts{$c[7]}{$c[2]}++;         # Increment $hosts{topmed2}{cram}
+        }
+        foreach my $h (sort keys %hosts) {
+            my $s = '';
+            foreach my $jobname (sort keys %{$hosts{$h}}) {
+                $s .= sprintf('%-12s', $jobname . "  [" . $hosts{$h}{$jobname} . '] ');
+            }
+            printf ($format . "\n", $p, $h, $s);
+        }
+    }
+    print "\n";
+
+    #   Show longest running jobs
+    print "Longest running jobs per partition\n";
+    foreach my $p (sort keys %partitions) {
+        if (! defined($running{$p}{data})) { next; }
+        print "  $p:\n";
+        my %longjobs = ();
+        foreach my $l (@{$running{$p}{data}}) {
+            my @c = split(' ', $l);
+            my $t = $c[5];                  # Normalize all times to dd-hh:mm:ss
+            my $days = '00-';
+            if ($t =~ /^(\d+\-)(.+)/) { $days = $1; $t = $2; }
+            if ($t =~ /^(\d+):(\d+):(\d+)$/) { $t = sprintf('%02d:%02d:%02d', $1, $2, $3); }
+            elsif ($t =~ /^(\d+):(\d+)$/) { $t = sprintf('00:%02d:%02d', $1, $2); }
+            elsif ($t =~ /^:(\d+)$/) { $t = sprintf('00:00:%02d', $1); }
+            $longjobs{$t} .= '  ' . $l . "\n";      # Descriptions of longest running job
+        }
+        my $i = $opts{maxlongjobs};
+        foreach my $t (reverse sort keys %longjobs) {
+            print $longjobs{$t};
+            $i--;
+            if ($i <= 0) { last; }
+        }
+    }
+    print "\n";
+    return;
 }
 
 #==================================================================
@@ -788,6 +879,7 @@ topmedcmd.pl - Update the database for NHLBI TopMed
   topmedcmd.pl permit remove 12             # Remove a permit control
   topmedcmd.pl permit test bai 4567         # Test if we should submit a bai job for one bam
 
+  topmedcmd.pl -maxlongjobs 35 squeue       # Show what is running
 =head1 DESCRIPTION
 
 This program supports simple commands to set key elements of the NHLBI database.
@@ -807,6 +899,11 @@ The default is to run against all centers.
 =item B<-help>
 
 Generates this output.
+
+=item B<-maxlongjobs N>
+
+Specifies how many of the longest running jobs to show.
+This defaults to B<10>.
 
 =item B<-realm NAME>
 
