@@ -14,6 +14,7 @@ if [ "$2" = "" ]; then
   echo "Usage: $0 -squeue partition"
   echo "Usage: $0 -df     path-is-ignored"
   echo "Usage: $0 -logs   path-is-ignored"
+  echo "Usage: $0 -squeue ignored ignored"
   echo "Usage: $0 -errorcheck  path-is-ignored"
   echo "Usage: $0 -restart password"
   echo "Usage: $0 -stop    password"
@@ -86,6 +87,19 @@ if [ "$1" = "-stop" ]; then
 fi
 
 if [ "$1" = "-squeue" ]; then
+  echo "<pre>"
+  /usr/bin/wget -o /dev/null -O $tmpfile $url/squeue/topmed
+  if [ "$?" != "0" ]; then
+    echo "<b>Query for partition '$2' failed. Perhaps daemon at '$url' is not running</b><br>"
+    exit 2
+  fi
+  cat $tmpfile
+  rm -f $tmpfile
+  echo "</pre>"
+  exit
+fi
+
+if [ "$1" = "-squeue_unused" ]; then
   /usr/bin/wget -o /dev/null -O $tmpfile $url/squeue/$2
   if [ "$?" != "0" ]; then
     echo "<b>Query for partition '$2' failed. Perhaps daemon at '$url' is not running</b><br>"
