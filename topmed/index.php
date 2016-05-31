@@ -261,16 +261,8 @@ if ($fcn == 'control') {
 
 if ($fcn == 'showqlocal') {
     print "<center>$SHOWQUEUES &nbsp;&nbsp;&nbsp;</center>\n";
-    if ($oldsite) {
-        foreach ($NODELIST as $n) {
-            $cmd = "/usr/cluster/monitor/bin/slurm_query.sh -squeue ${n}-incoming";
-            print `$cmd`;
-        }
-        $cmd = "/usr/cluster/monitor/bin/slurm_query.sh -squeue topmed-working";
-        print `$cmd`;
-        exit;
-    }
-    foreach ($NODELIST as $n) { print ShowSLURMIcoming($n); }
+    $cmd = "/usr/cluster/monitor/bin/slurm_query.sh -squeue ignored ignored";
+    print `$cmd`;
     exit;
 }
 
