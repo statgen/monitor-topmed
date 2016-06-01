@@ -86,7 +86,7 @@ our %opts = (
     ascpcmd => "/usr/cluster/bin/ascp -i ".
         "/net/topmed/incoming/study.reference/send2ncbi/topmed-2-ncbi.pri -l 800M -k 1",
     ascpdest => 'asp-um-sph@gap-submit.ncbi.nlm.nih.gov:protected',
-    squeuecmd => "/usr/cluster/bin/squeue -o '%.10i %.18P %.18j %.8u %.2t %.10M %.6D %R'",
+    squeuecmd => "/usr/cluster/bin/squeue -o '%.10i %.18P %.15q %.18j %.8u %.2t %.10M %.6D %R'",
     maxlongjobs => 10,
     verbose => 0,
 );
@@ -172,7 +172,7 @@ exit;
 sub Mark {
     my ($bamid, $op, $state) = @_;
     if ($bamid =~ /NWD/) {              # Special Hack for Chris cause he does not same BAMID
-        my $sth = DoSQL("SELECT bamid from $opts{bamfiles_table} WHERE expt_sampleid='$bamid'", 0);
+        my $sth = DoSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE expt_sampleid='$bamid'", 0);
         if ($sth) {
             my $href = $sth->fetchrow_hashref;
             $bamid = $href->{bamid};
@@ -183,7 +183,7 @@ sub Mark {
     }
 
     #   Make sure this is a bam we know
-    my $sth = DoSQL("SELECT bamid from $opts{bamfiles_table} WHERE bamid=$bamid", 0);
+    my $sth = DoSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE bamid=$bamid", 0);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
 
@@ -259,7 +259,7 @@ sub UnMark {
     }
 
     #   Make sure this is a bam we know
-    my $sth = DoSQL("SELECT bamid from $opts{bamfiles_table} WHERE bamid=$bamid", 0);
+    my $sth = DoSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE bamid=$bamid", 0);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
 
@@ -328,7 +328,7 @@ sub WhatNWDID {
     my ($nwdid) = @_;
 
     if ($nwdid =~ /^\d+/) {             # If bamid, get NWDID
-        my $sth = DoSQL("SELECT expt_sampleid from $opts{bamfiles_table} WHERE bamid=$nwdid", 0);
+        my $sth = DoSQL("SELECT expt_sampleid FROM $opts{bamfiles_table} WHERE bamid=$nwdid", 0);
         if ($sth) {
             my $href = $sth->fetchrow_hashref;
             $nwdid = $href->{expt_sampleid};
@@ -339,15 +339,15 @@ sub WhatNWDID {
     }
 
     #   Reconstruct partial path to BAM
-    my $sth = DoSQL("SELECT runid,bamid from $opts{bamfiles_table} WHERE expt_sampleid='$nwdid'", 0);
+    my $sth = DoSQL("SELECT runid,bamid FROM $opts{bamfiles_table} WHERE expt_sampleid='$nwdid'", 0);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - NWDID '$nwdid' is unknown\n"; }
     my $href = $sth->fetchrow_hashref;
     my $bamid = $href->{bamid};
-    $sth = DoSQL("SELECT centerid,dirname from $opts{runs_table} WHERE runid=$href->{runid}");
+    $sth = DoSQL("SELECT centerid,dirname FROM $opts{runs_table} WHERE runid=$href->{runid}");
     $href = $sth->fetchrow_hashref;
     my $run = $href->{dirname};
-    $sth = DoSQL("SELECT centername from $opts{centers_table} WHERE centerid=$href->{centerid}");
+    $sth = DoSQL("SELECT centername FROM $opts{centers_table} WHERE centerid=$href->{centerid}");
     $href = $sth->fetchrow_hashref;
     my $center = uc($href->{centername});
     print "$nwdid/$bamid can be found in run '$run' for center $center\n";
@@ -404,53 +404,67 @@ sub Send2NCBI {
 #==================================================================
 sub SQueue {
     #my ($bamid, $set) = @_;
-    my $cmd = $opts{squeuecmd} . ' -t r | grep topmed';
+    my $cmd = $opts{squeuecmd} . '| grep topmed';
     my %partitions = ();            # Unique partition names
+    my %qos = ();                   # Unique QOS names
     my %running = ();
     my %queued = ();
+    my $nottopmed = 0;              # Count of jobs not from my user
     foreach my $l (split('\n', `$cmd`)) {
         my @c = split(' ', $l);
-        if ($c[3] ne 'topmed') { next; }    # Not my stuff
+        if ($c[4] ne 'topmed') { next; }    # Not topmed user
         $partitions{$c[1]} = 1;
-        push @{$running{$c[1]}{data}},$l;
-        $running{$c[1]}{count}++;
+        if ($c[5] eq 'PD') {        # Queued
+            push @{$queued{$c[1]}{data}},$l;
+            $queued{$c[1]}{count}++;
+            $qos{$c[2]}{queued}++;
+            next;
+        }
+        if ($c[5] eq 'R') {         # Running
+            push @{$running{$c[1]}{data}},$l;
+            $running{$c[1]}{count}++;
+            $qos{$c[2]}{running}++;
+            next;
+        }
+        $nottopmed++;
     }
     
-    $cmd = $opts{squeuecmd} . ' -t pd | grep topmed';
-    foreach my $l (split('\n', `$cmd`)) {
-        my @c = split(' ', $l);
-        if ($c[3] ne 'topmed') { next; }    # Not my stuff
-        $partitions{$c[1]} = 1;
-        push @{$queued{$c[1]}{data}},$l;
-        $queued{$c[1]}{count}++;
-    }
-    
-    #   Show summary
+    #   Show summary of partitions
     print "Partition Summary\n";
     foreach my $p (sort keys %partitions) {
         if (! defined($queued{$p}{count}))  { $queued{$p}{count} = 0; }
         if (! defined($running{$p}{count})) { $running{$p}{count} = 0; }
-        printf("%-18s %3d running / %3d queued\n", $p, $running{$p}{count}, $queued{$p}{count}); 
+        printf("  %-18s %3d running / %3d queued / %3d not user topmed \n", $p, $running{$p}{count}, $queued{$p}{count}, $nottopmed); 
+    }
+    print "\n";
+
+    #   Show summary of QOS
+    print "QOS Summary\n";
+    foreach my $q (sort keys %qos) {
+        if (! defined($qos{$q}{running}))  { $qos{$q}{running} = 0; }
+        if (! defined($qos{$q}{queued}))   { $qos{$q}{queued} = 0; }
+        printf("  %-18s %3d running / %3d queued\n", $q, $qos{$q}{running}, $qos{$q}{queued}); 
     }
     print "\n";
 
     #   Show summary of running
     print "Running jobs per partition\n";
-    my $format = '%-16s  %-11s  %s';
-    printf ($format . "\n", 'Partition', 'Host', 'Job types and count');
     foreach my $p (sort keys %partitions) {
         my %hosts = ();
         foreach my $l (@{$running{$p}{data}}) {
             my @c = split(' ', $l);
-            $c[2] =~ s/\d+\-//;             # Remove bamid from jobname
-            $hosts{$c[7]}{$c[2]}++;         # Increment $hosts{topmed2}{cram}
+            $c[3] =~ s/\d+\-//;             # Remove bamid from jobname
+            $hosts{$c[8]}{$c[3]}++;         # Increment $hosts{topmed2}{cram}
         }
+        print '  ' . $p . ":\n";
+        my $format = '    %-11s  %s';
+        printf ($format . "\n", 'Partition', 'Host', 'Job types and count');
         foreach my $h (sort keys %hosts) {
             my $s = '';
             foreach my $jobname (sort keys %{$hosts{$h}}) {
-                $s .= sprintf('%-12s', $jobname . "  [" . $hosts{$h}{$jobname} . '] ');
+                $s .= sprintf('  %-12s', $jobname . "  [" . $hosts{$h}{$jobname} . '] ');
             }
-            printf ($format . "\n", $p, $h, $s);
+            printf ($format . "\n", $h, $s);
         }
     }
     print "\n";
@@ -463,7 +477,7 @@ sub SQueue {
         my %longjobs = ();
         foreach my $l (@{$running{$p}{data}}) {
             my @c = split(' ', $l);
-            my $t = $c[5];                  # Normalize all times to dd-hh:mm:ss
+            my $t = $c[6];                  # Normalize all times to dd-hh:mm:ss
             my $days = '00-';
             if ($t =~ /^(\d+\-)(.+)/) { $days = $1; $t = $2; }
             if ($t =~ /^(\d+):(\d+):(\d+)$/) { $t = sprintf('%02d:%02d:%02d', $1, $2, $3); }
@@ -473,13 +487,44 @@ sub SQueue {
         }
         my $i = $opts{maxlongjobs};
         foreach my $t (reverse sort keys %longjobs) {
-            print $longjobs{$t};
-            $i--;
+            foreach (split("\n", $longjobs{$t})) {
+                print ReFormatPartitionData($_);
+                $i--;
+                if ($i <= 0) { last; }
+            }
             if ($i <= 0) { last; }
         }
     }
     print "\n";
     return;
+}
+
+#==================================================================
+# Subroutine:
+#   ReFormatPartitionData($str)
+#
+#   Return reformatted partition data
+#==================================================================
+sub ReFormatPartitionData {
+    my ($str) = @_;
+    my $fmt = '    %-10s %-9s %-15s %-12s %s  %s';
+    my @c = split(' ', $str);
+    my $nwdid = '?';
+    my $dir = '?';
+    if ($c[3] =~ /^(\d+)/) {
+        my $bamid=$1;
+        my $sth = DoSQL("SELECT runid,expt_sampleid FROM $opts{bamfiles_table} WHERE bamid=$bamid", 0);
+        if ($sth) {
+            my $href = $sth->fetchrow_hashref;
+            $nwdid = $href->{expt_sampleid};
+            $sth = DoSQL("SELECT dirname FROM $opts{runs_table} WHERE runid=$href->{runid}", 0);
+            if ($sth) {
+                $href = $sth->fetchrow_hashref;
+                $dir = $href->{dirname};
+            }
+        }
+    }
+    return sprintf($fmt, $c[0], $nwdid, $c[2], $c[3], $c[6], $dir)  . "\n";
 }
 
 #==================================================================
@@ -497,7 +542,7 @@ sub Where {
     if ((! defined($set) || ! $set)) { $set = 'unset'; }    # Default
 
     #   Get values of interest from the database
-    my $sth = DoSQL("SELECT runid,bamname,cramname,piname,expt_sampleid from $opts{bamfiles_table} WHERE bamid=$bamid", 0);
+    my $sth = DoSQL("SELECT runid,bamname,cramname,piname,expt_sampleid FROM $opts{bamfiles_table} WHERE bamid=$bamid", 0);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
     my $href = $sth->fetchrow_hashref;
@@ -506,13 +551,13 @@ sub Where {
     my $piname = $href->{piname};
     my $nwdid = $href->{expt_sampleid};
     my $runid = $href->{runid};
-    $sth = DoSQL("SELECT centerid,dirname from $opts{runs_table} WHERE runid=$runid", 0);
+    $sth = DoSQL("SELECT centerid,dirname FROM $opts{runs_table} WHERE runid=$runid", 0);
     $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' run '$runid' is unknown\n"; }
     $href = $sth->fetchrow_hashref;
     my $rundir = $href->{dirname};
     my $centerid = $href->{centerid};
-    $sth = DoSQL("SELECT centername from $opts{centers_table} WHERE centerid=$centerid", 0);
+    $sth = DoSQL("SELECT centername FROM $opts{centers_table} WHERE centerid=$centerid", 0);
     $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' center '$centerid' is unknown\n"; }
     $href = $sth->fetchrow_hashref;
@@ -757,7 +802,7 @@ sub Set {
     }
 
     #   Make sure this is a bam we know
-    my $sth = DoSQL("SELECT bamid from $opts{bamfiles_table} WHERE bamid=$bamid", 0);
+    my $sth = DoSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE bamid=$bamid", 0);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
 
@@ -780,14 +825,14 @@ sub Show {
         die "$Script - Invalid 'show' syntax. Try '$Script -help'\n";
     }
 
-    my $sth = DoSQL("SELECT bamid,runid from $opts{bamfiles_table} WHERE bamid=$bamid", 0);
+    my $sth = DoSQL("SELECT bamid,runid FROM $opts{bamfiles_table} WHERE bamid=$bamid", 0);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
     my $href = $sth->fetchrow_hashref;
 
     #   Get run if asked for it
     if ($col eq 'run') {
-        $sth = DoSQL("SELECT centerid,dirname from $opts{runs_table} WHERE runid=$href->{runid}", 0);
+        $sth = DoSQL("SELECT centerid,dirname FROM $opts{runs_table} WHERE runid=$href->{runid}", 0);
         $rowsofdata = $sth->rows();
         if (! $rowsofdata) { die "$Script - RUNID '$href->runid' is unknown\n"; }
         $href = $sth->fetchrow_hashref;
@@ -797,12 +842,12 @@ sub Show {
 
     #   Get center if asked for it
     if ($col eq 'center') {
-        $sth = DoSQL("SELECT centerid from $opts{runs_table} WHERE runid=$href->{runid}", 0);
+        $sth = DoSQL("SELECT centerid FROM $opts{runs_table} WHERE runid=$href->{runid}", 0);
         $rowsofdata = $sth->rows();
         if (! $rowsofdata) { die "$Script - RUNID '$href->runid' is unknown\n"; }
         $href = $sth->fetchrow_hashref;
 
-        $sth = DoSQL("SELECT centername from $opts{centers_table} WHERE centerid=$href->{centerid}", 0);
+        $sth = DoSQL("SELECT centername FROM $opts{centers_table} WHERE centerid=$href->{centerid}", 0);
         $rowsofdata = $sth->rows();
         if (! $rowsofdata) { die "$Script - CENTERID '$href->centerid' is unknown\n"; }
         $href = $sth->fetchrow_hashref;
@@ -811,7 +856,7 @@ sub Show {
     }
 
     #   Get value of column we asked for
-    $sth = DoSQL("SELECT $col from $opts{bamfiles_table} WHERE bamid=$bamid", 0);
+    $sth = DoSQL("SELECT $col FROM $opts{bamfiles_table} WHERE bamid=$bamid", 0);
     $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' or column '$col' is unknown\n"; }
     $href = $sth->fetchrow_hashref;
