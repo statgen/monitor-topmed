@@ -88,7 +88,8 @@ if [ "$?" != "0" ]; then
   exit 2
 fi
 s=`hostname`
-echo "#========= '$d' host=$s $SLURM_JOB_ID squeezed=$squeezed $0 bamid=$bamid bamfile=$bamfile backupdir=$backupdir ========="
+p=`pwd`
+echo "#========= '$d' host=$s $SLURM_JOB_ID squeezed=$squeezed $0 bamid=$bamid bamfile=$bamfile backupdir=$backupdir pwd=$p========="
 
 #   Mark this as started
 $topmedcmd mark $bamid $markverb started
