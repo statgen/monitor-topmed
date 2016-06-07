@@ -6,10 +6,11 @@
 #
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 gcbin=/net/mario/gotcloud/bin
-mem=2G
+mem=8G                  # Artificially high so not too many on small nodes
 console=/net/topmed/working/topmed-output
 slurmp=topmed
 qos=topmed-bai
+constraint="--constraint eth-10g"
 realhost=''
 
 if [ "$1" = "-submit" ]; then
@@ -20,10 +21,10 @@ if [ "$1" = "-submit" ]; then
     exit 4
   fi 
 
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos --workdir=$console -J $1-bai --output=$console/$1-bai.out $0 $*`)
+  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos $constraint --workdir=$console -J $1-bai --output=$console/$1-bai.out $0 $*`)
   if [ "$?" != "0" ]; then
     echo "Failed to submit command to SLURM"
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos --workdir=$console -J $1-bai --output=$console/$1-bai.out $0 $*"
+    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos $constraint --workdir=$console -J $1-bai --output=$console/$1-bai.out $0 $*"
     exit 1
   fi
   $topmedcmd mark $1 baid submitted
