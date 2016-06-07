@@ -12,6 +12,7 @@ gcref=/net/mario/nodeDataMaster/local/ref/gotcloud.ref
 topoutdir=/net/topmed/incoming/qc.results
 mem=8G
 markverb=qploted
+constraint=''                   # "--constraint eth-10g"
 qos=''
 slurmp=topmed
 realhost=''
@@ -24,23 +25,16 @@ if [ "$1" = "-submit" ]; then
     exit 4
   fi 
 
-  #   Figure where to submit this to run - should be where bam lives
-  l=(`$topmedcmd where $1 bam`)         # Get pathofbam and host for bam
-  h="${l[1]}"
-  if [ "$h" != "" ]; then
-    realhost="-w $h";
-    qos="$h-qplot"
-  fi
-
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost --qos=$qos --workdir=$console -J $1-qplot --output=$console/$1-qplot.out $0 $*`)
+  #   Can run anywhere. Low rate of access to cram, small output
+  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $qos --workdir=$console -J $1-qplot --output=$console/$1-qplot.out $0 $*`)
   if [ "$?" != "0" ]; then
     echo "Failed to submit command to SLURM"
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$slurmqos --workdir=$console -J $1-qplot --output=$console/$1-qplot.out $0 $*"
+    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $qos --workdir=$console -J $1-qplot --output=$console/$1-qplot.out $0 $*"
     exit 1
   fi
   $topmedcmd mark $1 $markverb submitted
   if [ "${l[0]}" = "Submitted" ]; then      # Job was submitted, save job details
-    echo `date` qplot ${l[3]} $slurmp $slurmqos $mem >> $console/$1.jobids
+    echo `date` qplot ${l[3]} $slurmp $qos $realhost $mem >> $console/$1.jobids
   fi
   exit
 fi
