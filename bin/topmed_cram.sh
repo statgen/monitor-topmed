@@ -16,6 +16,7 @@ mem=8G
 console=/net/topmed/working/topmed-output
 markverb=cramed
 squeezed=n
+constraint="--constraint eth-10g"
 qos=''
 slurmp=topmed
 realhost=''
@@ -28,12 +29,11 @@ if [ "$1" = "-submit" ]; then
     exit 4
   fi 
 
-  #   Figure where to submit this to run - should be where bam lives
-  l=(`$topmedcmd where $1 bam`)         # Get pathofbam and host for bam
-  h="${l[1]}"
-  if [ "$h" != "" ]; then
-    realhost="-w $h";
-    qos="$h-cram"
+  # Run this on node where bam lives
+  l=(`$topmedcmd where $1 bam`)
+  if [ "${l[1]}" != "" ]; then
+    realhost="--nodelist=${l[1]}"
+    qos="--qos=${l[1]}-cram"
   fi
 
   #  Is this squeezed or not?  For now this is only files from the Broad usually,
@@ -46,10 +46,10 @@ if [ "$1" = "-submit" ]; then
   fi
 
   #  Submit this script to be run
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost --qos=$qos --workdir=$console -J $1-cram --output=$console/$1-cram.out $0 $sq $*`)
+  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos --workdir=$console -J $1-cram --output=$console/$1-cram.out $0 $sq $*`)
   if [ "$?" != "0" ]; then
     echo "Failed to submit command to SLURM"
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost --qos=$qos --workdir=$console -J $1-cram --output=$console/$1-cram.out $0 $sq $*"
+    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos --workdir=$console -J $1-cram --output=$console/$1-cram.out $0 $sq $*"
     exit 1
   fi
   $topmedcmd mark $1 $markverb submitted
@@ -69,7 +69,7 @@ if [ "$2" = "" ]; then
   me=`basename $0`
   echo "Usage: $me [-submit|-squeezed] bamid bamfile"
   echo ""
-  echo "Backup the original BAM as a CRAM file and update database"
+  echo "Convert original BAM to a CRAM file and update database"
   exit 1
 fi
 bamid=$1
@@ -164,6 +164,16 @@ if [ "$?" != "0" ]; then
 fi
 s=`date +%s`; s=`expr $s - $now`; echo "samtools view completed in $s seconds"
 
+#   Capture flagstat for this cram
+a=(`grep 'paired in sequencing' ${chkname}.cram.stat`)
+if [ "${a[0]}" == "" ]; then
+    echo "Unable to get reads of paired in sequencing from '${chkname}.cram.stat'"
+  $topmedcmd mark $bamid $markverb failed
+  exit 3
+fi
+$topmedcmd  set $bamid cramflagstat ${a[0]}
+
+#   Did init.stat for cram look similar to that for a bam?
 diff=`diff  ${chkname}.init.stat  ${chkname}.cram.stat | wc -l`
 if [ "$diff" != "0" ]; then
   echo "Stat for backup CRAM file differs from that for original BAM"
