@@ -8,7 +8,7 @@
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 topmedrename=/usr/cluster/monitor/bin/topmedrename.pl
 console=/net/topmed/working/topmed-output
-mem=2G
+mem=8G                  # Artificially high so not too many on small nodes
 markverb=md5verified
 slurmp=topmed
 qos=topmed-verify
@@ -22,10 +22,17 @@ if [ "$1" = "-submit" ]; then
     exit 4
   fi 
 
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos -J $1-verify --output=$console/$1-verify.out $0 $*`)
+  # Run this on node where bam lives
+  l=(`$topmedcmd where $1 bam`)
+  if [ "${l[1]}" != "" ]; then
+    realhost="--nodelist=${l[1]}"
+    qos="${l[1]}-verify"
+  fi
+
+  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos $realhost -J $1-verify --output=$console/$1-verify.out $0 $*`)
   if [ "$?" != "0" ]; then
     echo "Failed to submit command to SLURM"
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos -J $1-verify --output=$console/$1-verify.out $0 $*"
+    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos $realhost -J $1-verify --output=$console/$1-verify.out $0 $*"
     exit 1
   fi
   $topmedcmd mark $1 $markverb submitted
