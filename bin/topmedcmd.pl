@@ -408,11 +408,17 @@ sub SQueue {
     my %partitions = ();            # Unique partition names
     my %qos = ();                   # Unique QOS names
     my %running = ();
+    my %mosixrunning = ();          # Counts of jobs by nomosix users
     my %queued = ();
     my $nottopmed = 0;              # Count of jobs not from my user
     foreach my $l (split('\n', `$cmd`)) {
         my @c = split(' ', $l);
-        if ($c[4] ne 'topmed') { next; }    # Not topmed user
+        if ($c[1] eq 'nomosix' && $c[8] =~ /topmed/) {    # nomosix on topmed node
+            $mosixrunning{$c[4]}++;    # Count of running jobs for this user
+            next;
+        }
+        if ($c[1] ne 'topmed') { next; }    # Not interested in anything but topmed
+        if ($c[4] ne 'topmed') { $nottopmed++; next; }    # Not topmed user
         $partitions{$c[1]} = 1;
         if ($c[5] eq 'PD') {        # Queued
             push @{$queued{$c[1]}{data}},$l;
@@ -426,7 +432,6 @@ sub SQueue {
             $qos{$c[2]}{running}++;
             next;
         }
-        $nottopmed++;
     }
     
     #   Show summary of partitions
@@ -443,12 +448,15 @@ sub SQueue {
     foreach my $q (sort keys %qos) {
         if (! defined($qos{$q}{running}))  { $qos{$q}{running} = 0; }
         if (! defined($qos{$q}{queued}))   { $qos{$q}{queued} = 0; }
-        printf("  %-18s %3d running / %3d queued\n", $q, $qos{$q}{running}, $qos{$q}{queued}); 
+        my $qq = $q;                    # Patch normal to be something meaningful?
+        if ($q eq 'normal') { $qq = 'default_qos'; }
+        printf("  %-18s %3d running / %3d queued\n", $qq, $qos{$q}{running}, $qos{$q}{queued}); 
     }
     print "\n";
 
-    #   Show summary of running
-    print "Running jobs per partition\n";
+    #   Show summary of running on partitions
+    print "Running jobs per host\n";
+    my $format = '    %-11s  %s';
     foreach my $p (sort keys %partitions) {
         my %hosts = ();
         foreach my $l (@{$running{$p}{data}}) {
@@ -456,9 +464,9 @@ sub SQueue {
             $c[3] =~ s/\d+\-//;             # Remove bamid from jobname
             $hosts{$c[8]}{$c[3]}++;         # Increment $hosts{topmed2}{cram}
         }
-        print '  ' . $p . ":\n";
+        print "   Partition $p:\n";
         my $format = '    %-11s  %s';
-        printf ($format . "\n", 'Partition', 'Host', 'Job types and count');
+        printf ($format . "\n", 'Host', 'Job types and count');
         foreach my $h (sort keys %hosts) {
             my $s = '';
             foreach my $jobname (sort keys %{$hosts{$h}}) {
@@ -466,6 +474,12 @@ sub SQueue {
             }
             printf ($format . "\n", $h, $s);
         }
+    }
+    $format = "    %-8s  %s\n";
+    print "  Partition nomosix jobs on topmed hosts:\n";
+    printf ($format, 'User', 'Job count');
+    foreach my $u (sort keys %mosixrunning) {
+        printf($format, $u, "  [" . $mosixrunning{$u} . '] ');
     }
     print "\n";
 
