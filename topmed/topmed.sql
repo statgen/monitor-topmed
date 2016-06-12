@@ -72,6 +72,7 @@ CREATE INDEX index_dirname ON runs(dirname);
 DROP TABLE IF EXISTS bamfiles;
 CREATE TABLE bamfiles (
   dateinit     VARCHAR(12),
+  datayear     INT DEFAULT 2,          /* Year of project: 1, 2 ... */
   bamid        INT         NOT NULL AUTO_INCREMENT,
   runid        INT         NOT NULL,
   bamname_orig VARCHAR(96) NOT NULL,
