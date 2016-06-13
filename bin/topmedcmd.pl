@@ -23,7 +23,7 @@ use lib "$FindBin::Bin/../lib/perl5";
 use TopMed_Get;
 use My_DB;
 use Getopt::Long;
-use Cwd qw(realpath);
+use Cwd qw(realpath abs_path);
 
 my $NOTSET = 0;                     # Not set
 my $REQUESTED = 1;                  # Task requested
@@ -586,8 +586,10 @@ sub Where {
             if (! -l $bamfdir) { last; }        # Found non-symlink to center directory
         }
         if (! $bamfdir) { die "$Script - BAMID=$bamid Unable to find real directory for '$centername'\n"; }
-        if ($bamfdir =~ /^\/net\/(\w+)/) { $bamhost = $1; }
-        print "$bamfdir/$rundir $bamhost\n";
+
+        my $d = abs_path("$bamfdir/$rundir");
+        if ($d =~ /^\/net\/(\w+)/) { $bamhost = $1; }
+        print "$d $bamhost\n";
         exit;
     }
  
@@ -605,7 +607,7 @@ sub Where {
         }
         if (! -d $bakbamfdir) { $bakbamfdir = $backuphost = 'none'; }
         else {
-            $bakbamfdir .= '/' . $rundir;
+            $bakbamfdir = abs_path("$bakbamfdir/$rundir");
             if ($bakbamfdir =~ /^\/net\/(\w+)/) { $backuphost = $1; }
         }
         print "$bakbamfdir $bakfile $backuphost\n";     # Note that file might not really exist
@@ -641,45 +643,6 @@ sub Where {
         }
         #if (! -d $b38fdir) { $b38fdir = 'none'; }
         print "$b38fdir $b38file\n";            # Note that file might not really exist
-        exit;
-    }
-
-    #
-    #   This is the original obsolete code - it should be removed after April 2016
-    #
-    if ($set eq 'unset') {
-        #   The BAM is in one of those $opts{netdir} trees where center is not a symlink
-        my $bamfdir = '';
-        foreach ('', '2', '3', '4', '5', '6') {
-            $bamfdir = "$opts{netdir}$_/$opts{incomingdir}/$centername";
-            if (! -l $bamfdir) { last; }        # Found non-symlink to center directory
-        }
-        if (! $bamfdir) { die "BAMID=$bamid Unable to find real directory for '$centername'\n"; }
-        $bamfdir .= '/' . $rundir;
-
-        #   Because we can't really plan very well, some files in a directory might actually
-        #   live on some other host. All center directories and files should 'look' the
-        #   same on all hosts, but some directories can have files scattered all over the place.
-        my $realbamname = realpath("$bamfdir/$bamname");    # e.g. /net/topmed2/incoming/topmed/broad/2015jun22/xxxx
-        my $realhost = 'unknown';
-        if ($realbamname =~ /^($opts{netdir}\d*)\//)  { $realhost = substr($1,5); } # e.g. topmedN
-        my $realhostindex = '';
-        if ($realhost =~ /(\d)/)  { $realhostindex = $1; }     # e.g. 2
-
-        #   The backup for the BAM is in another tree, also not a symlink
-        #   This is rather a mess and is probably really fixed by Tom using symlinks
-        my $bakbamfdir = $opts{netdir};
-        if ($realhostindex eq '') { $bakbamfdir = $opts{netdir} . '2'; }
-        if ($realhostindex eq '2') { $bakbamfdir = $opts{netdir} . ''; }
-        if ($realhostindex eq '3') { $bakbamfdir = $opts{netdir} . '3'; }
-        if ($realhostindex eq '4') { $bakbamfdir = $opts{netdir} . '4'; }
-        if ($realhostindex eq '5') { $bakbamfdir = $opts{netdir} . '5'; }
-        if ($realhostindex eq '6') { $bakbamfdir = $opts{netdir} . '6'; }
-        $bakbamfdir = "$bakbamfdir/$opts{backupsdir}/$centername";
-        if (-l $bakbamfdir) { die "BAMID=$bamid bamdir=$bamfdir Backup directory may not be a symlink for '$bakbamfdir'\n"; }
-        $bakbamfdir .= '/' . $rundir;
-
-        print "$bamfdir $bakbamfdir $bamname $realhost $realhostindex\n";
         exit;
     }
 
