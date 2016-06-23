@@ -24,6 +24,7 @@ use TopMed_Get;
 use My_DB;
 use Getopt::Long;
 use Cwd qw(realpath abs_path);
+use YAML;
 
 my $NOTSET = 0;                     # Not set
 my $REQUESTED = 1;                  # Task requested
@@ -100,15 +101,15 @@ if ($#ARGV < 0 || $opts{help}) {
     my $m = "$Script [options]";
     my $verbs = join(',', sort keys %VALIDVERBS);
     my $requests = join(',', sort keys %VALIDSTATUS);
-    warn "$m mark bamid|NWDnnnnn $verbs $requests\n" .
+    warn "$m mark bamid|nwdid $verbs $requests\n" .
         "  or\n" .
-        "$m unmark bamid [same list as mark]\n" .
+        "$m unmark bamid|nwdid [same list as mark]\n" .
         "  or\n" .
-        "$m set bamid colname value\n" .
+        "$m set bamid|nwdid colname value\n" .
         "  or\n" .
         "$m show arrived\n" .
         "  or\n" .
-        "$m show bamid colname|run|center\n" .
+        "$m show bamid|nwdid colname|run|center|yaml\n" .
         "  or\n" .
         "$m export\n" .
         "  or\n" .
@@ -116,7 +117,7 @@ if ($#ARGV < 0 || $opts{help}) {
         "  or\n" .
         "$m squeue\n" .
         "  or\n" .
-        "$m where bamid bam|backup|b37|b38\n" .
+        "$m where bamid|nwdid bam|backup|b37|b38\n" .
         "  or\n" .
         "$m whatnwdid NWDnnnnn\n" .
         "  or\n" .
@@ -171,14 +172,8 @@ exit;
 #==================================================================
 sub Mark {
     my ($bamid, $op, $state) = @_;
-    if ($bamid =~ /NWD/) {              # Special Hack for Chris cause he does not same BAMID
-        my $sth = DoSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE expt_sampleid='$bamid'", 0);
-        if ($sth) {
-            my $href = $sth->fetchrow_hashref;
-            $bamid = $href->{bamid};
-        }
-    }
-    if (($bamid !~ /^\d+$/) || (! exists($VALIDVERBS{$op})) || (! exists($VALIDSTATUS{$state}))) {
+    $bamid = GetBamid($bamid);
+    if ((! exists($VALIDVERBS{$op})) || (! exists($VALIDSTATUS{$state}))) {
         die "$Script - Invalid 'mark' syntax. Try '$Script -help'\n";
     }
 
@@ -254,7 +249,8 @@ sub Mark {
 #==================================================================
 sub UnMark {
     my ($bamid, $op) = @_;
-    if (($bamid !~ /^\d+$/) || (! exists($VALIDVERBS{$op}))) {
+    $bamid = GetBamid($bamid);
+    if (! exists($VALIDVERBS{$op})) {
         die "$Script - Invalid 'unmark' syntax. Try '$Script -help'\n";
     }
 
@@ -555,6 +551,8 @@ sub Where {
     my ($bamid, $set) = @_;
     if ((! defined($set) || ! $set)) { $set = 'unset'; }    # Default
 
+    $bamid = GetBamid($bamid);
+
     #   Get values of interest from the database
     my $sth = DoSQL("SELECT runid,bamname,cramname,piname,expt_sampleid FROM $opts{bamfiles_table} WHERE bamid=$bamid", 0);
     my $rowsofdata = $sth->rows();
@@ -774,13 +772,12 @@ sub GetBamidInfo {
 #==================================================================
 sub Set {
     my ($bamid, $col, $val) = @_;
-    if ($bamid !~ /^\d+$/){
-        die "$Script - Invalid 'set' syntax. Try '$Script -help'\n";
-    }
+    my ($sth, $rowsofdata, $href);
+    $bamid = GetBamid($bamid);
 
     #   Make sure this is a bam we know
-    my $sth = DoSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE bamid=$bamid", 0);
-    my $rowsofdata = $sth->rows();
+    $sth = DoSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE bamid=$bamid", 0);
+    $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
 
     if ($col eq 'nwdid') { $col = 'expt_sampleid'; }
@@ -798,14 +795,14 @@ sub Show {
     my ($bamid, $col) = @_;
     if ($bamid eq 'arrived') { return ShowArrived($bamid); }
 
-    if ($bamid !~ /^\d+$/){
-        die "$Script - Invalid 'show' syntax. Try '$Script -help'\n";
-    }
-
-    my $sth = DoSQL("SELECT bamid,runid FROM $opts{bamfiles_table} WHERE bamid=$bamid", 0);
-    my $rowsofdata = $sth->rows();
+    my ($sth, $rowsofdata, $href);
+    $bamid = GetBamid($bamid);
+    
+    $sth = DoSQL("SELECT bamid,runid FROM $opts{bamfiles_table} WHERE bamid=$bamid", 0);
+    $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
-    my $href = $sth->fetchrow_hashref;
+    $href = $sth->fetchrow_hashref;
+    my $runid = $href->{runid};
 
     #   Get run if asked for it
     if ($col eq 'run') {
@@ -829,6 +826,30 @@ sub Show {
         if (! $rowsofdata) { die "$Script - CENTERID '$href->centerid' is unknown\n"; }
         $href = $sth->fetchrow_hashref;
         print $href->{centername} . "\n";
+        return;
+    }
+
+    #   Show everything in YAML format
+    if ($col eq 'yaml') {
+        $sth = DoSQL("SELECT centerid,dirname FROM $opts{runs_table} WHERE runid=$runid", 0);
+        $rowsofdata = $sth->rows();
+        if (! $rowsofdata) { die "$Script - RUNID '$runid' is unknown\n"; }
+        $href = $sth->fetchrow_hashref;
+        my $run = $href->{dirname};
+
+        $sth = DoSQL("SELECT centername FROM $opts{centers_table} WHERE centerid=$href->{centerid}", 0);
+        $rowsofdata = $sth->rows();
+        if (! $rowsofdata) { die "$Script - CENTERID '$href->centerid' is unknown\n"; }
+        $href = $sth->fetchrow_hashref;
+        my $center = $href->{centername};
+
+        $sth = DoSQL("SELECT * FROM $opts{bamfiles_table} WHERE bamid=$bamid", 0);
+        $rowsofdata = $sth->rows();
+        if (! $rowsofdata) { die "$Script - BAM '$bamid' or column '$col' is unknown\n"; }
+        $href = $sth->fetchrow_hashref;
+        $href->{run} = $run;
+        $href->{center} = $center;
+        print YAML::Dump($href);
         return;
     }
 
@@ -876,6 +897,30 @@ sub ShowArrived {
 }
 
 #==================================================================
+# Subroutine:
+#   GetBamid($bamid)
+#
+#   Return bamid for bamid or expt_sampleid
+#==================================================================
+sub GetBamid {
+    my ($bamid) = @_;
+    my ($sth, $rowsofdata, $href);
+    if ($bamid =~ /^\d+$/) { return $bamid; }
+
+    if ($bamid =~ /^NWD/){
+        $sth = DoSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE expt_sampleid='$bamid'", 0);
+        $rowsofdata = $sth->rows();
+        if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
+        $href = $sth->fetchrow_hashref;
+        $bamid = $href->{bamid};
+    }
+    if ($bamid !~ /^\d+$/){
+        die "$Script - Invalid bamid or NWDID ($bamid). Try '$Script -help'\n";
+    }
+    return $bamid;
+}
+
+#==================================================================
 #   Perldoc Documentation
 #==================================================================
 __END__
@@ -891,10 +936,15 @@ topmedcmd.pl - Update the database for NHLBI TopMed
   topmedcmd.pl unmark 33 arrived           # Reset BAM has arrived
 
   topmedcmd.pl set 33 jobidqplot 123445    # Set jobidqplot in bamfiles
+
+  topmedcmd.pl show 2199 state_cram        # Show a column
+  topmedcmd.pl show 2199 center            # Show center 
+  topmedcmd.pl show NWD00234 run           # Show run
+  topmedcmd.pl show NWD00234 yaml          # Show everything known about a bamid
  
   topmedcmd.pl where 2199 bam              # Returns real path to bam and host of bam
   topmedcmd.pl where 2199 backup           # Returns path to backups directory and to backup file and host
-  topmedcmd.pl where 2199 b37              # Returns path to remapped b37 directory and to file
+  topmedcmd.pl where NWD00234 b37          # Returns path to remapped b37 directory and to file
   topmedcmd.pl where 2199 b38              # Returns path to remapped b38 directory and to file
 
   topmedcmd.pl permit add bai braod 2015oct18   # Stop bai job submissions for a run
@@ -951,7 +1001,7 @@ Provided for developers to see additional information.
 Parameters to this program are grouped into several groups which are used
 to deal with specific sets of information in the monitor databases.
 
-B<mark bamid dirname  [verb] [state]>
+B<mark bamid|nwdid dirname  [verb] [state]>
 Use this to set the state for a particular BAM file.
 You may specify the bamid or the NWDID.
 Mark will set a date for the process (e.g. arrived sets state_arrive)
@@ -967,7 +1017,7 @@ B<permit test operation bamid>
 Use this to test if an operation (e.g. backup, verify etc) may be submitted 
 for a particular bam.
 
-B<set bamid columnname value>
+B<set bamid|nwdid columnname value>
 Use this to set the value for a column for a particular BAM file.
 
 B<send2ncbi filelist>
@@ -976,14 +1026,18 @@ Use this to copy data to NCBI with ascp.
 B<show arrived>
 Use this to show the bamids for all BAMs that are marked arrived.
 
-B<unmark bamid [verb]>
+B<show bamid|nwdid colname|center|run|yaml>
+Use this to show information about a particular bamid (or expt_sampleid).
+Use 'yaml' to display everything known about the bam of interest.
+
+B<unmark bamid|nwdid [verb]>
 Use this to reset the state for a particular BAM file to the default
 database value.
 
-B<whatnwdid bamid|NWDnnnnnn>
+B<whatnwdid bamid|nwdid>
 Use this to get some details for a particular bam.
 
-B<where bamid bam|backup|b37|b38>
+B<where bamid|nwdid bam|backup|b37|b38>
 If B<bam> was specified, display the path to the real bam file, not one that is symlinked
 and the host where the bam exists (or null string).
 If B<backup> was specified, display the path to the backup directory 
