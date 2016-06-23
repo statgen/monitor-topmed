@@ -97,24 +97,70 @@ stime=`date +%s`
 #   Try to force everything as readonly
 chmod 555 $bamfile 2> /dev/null
 
+chkname=`basename $bamfile .bam`
+nwdid=`$samtools view -H $bamfile | grep '^@RG' | grep -o 'SM:\S*' | sort -u | cut -d \: -f 2`
+if [ "$nwdid" = "" ]; then
+   echo "Unable to extract NWDID from header of '$bamfile'"
+   $topmedcmd mark $bamid $markverb failed
+   exit 2
+fi
+newname="$nwdid.src.cram"
+
+#======================================================================
+#   Original input file was a cram
+#
+#   Some centers deliver us a cram. In this case we do not need to
+#   create a cram, but just copy it elsewhere.
+#======================================================================
+a=`echo $bamfile | grep .cram`
+if [ "$a" != "" ]; then
+  now=`date +%s`
+  cp -p $bamfile $backupdir/$newname
+  if [ "$?" != "0" ]; then
+    echo "Copy command failed: cp -p $bamfile $backupdir/$newname"
+    $topmedcmd mark $bamid $markverb failed
+    exit 3
+  fi
+  s=`date +%s`; s=`expr $s - $now`; echo "Copy completed in $s seconds"
+
+  now=`date +%s`
+  $samtools index $newname
+  if [ "$?" != "0" ]; then
+    echo "Command failed: $samtools index $newname"
+    $topmedcmd mark $bamid $markverb failed
+    exit 3
+  fi
+  s=`date +%s`; s=`expr $s - $now`; echo "samtools index completed in $s seconds"
+
+  # The md5 for the backup is the same as that for the input
+  md5=`$topmedcmd show $bamid checksum`
+  $topmedcmd set $bamid cramchecksum $md5
+
+  #   Be sure that NWDID is set in database
+  $topmedcmd set $bamid expt_sampleid $nwdid
+  if [ "$?" != "0" ]; then
+    echo "Command failed: $topmedcmd set $bamid expt_sampleid $nwdid"
+    $topmedcmd mark $bamid $markverb failed
+    exit 3
+  fi
+
+  #   All was good
+  $topmedcmd mark $bamid $markverb completed
+  etime=`date +%s`
+  etime=`expr $etime - $stime`
+  echo `date` cram $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
+  exit
+fi
+
+#======================================================================
+#   Original input file was a bam
+#
 #   Run 'bam squeeze' on .bam file with result written as .cram
 #   Checking with 'samtools flagstat' is quick, zero means success.
 #   Running 'samtools index' on a .cram file does NOT require 
 #   an explicit genome reference sequence, but 'samtools view' 
 #   does.  (And, 'samtools flagstat' does accept .sam input.)
-#
-#   All this code used to be just a simple
-#       cp -p $bamfile $backupdir
-#
-chkname=`basename $bamfile .bam`
-nwdid=`$samtools view -H $bamfile | grep '^@RG' | grep -o 'SM:\S*' | sort -u | cut -d \: -f 2`
-if [ "$nwdid" = "" ]; then
-  echo "Unable to extract NWDID from header of '$bamfile'"
-  $topmedcmd mark $bamid $markverb failed
-  exit 2
-fi
-newname="$nwdid.src.cram"
-
+#======================================================================
 now=`date +%s`
 $samtools flagstat  $bamfile >  ${chkname}.init.stat
 if [ "$?" != "0" ]; then
@@ -123,7 +169,6 @@ if [ "$?" != "0" ]; then
   exit 3
 fi
 s=`date +%s`; s=`expr $s - $now`; echo "samtools flagstat completed in $s seconds"
-
 now=`date +%s`
 
 #   This was added so we could remake the cram files for strange illumina data
@@ -196,11 +241,10 @@ fi
 $topmedcmd set $bamid cramchecksum $md5
 s=`date +%s`; s=`expr $s - $now`; echo "md5 calculated in $s seconds"
 
-etime=`date +%s`
-etime=`expr $etime - $stime`
-
 #   Be sure that NWDID is set in database
 here=`pwd`
+etime=`date +%s`
+etime=`expr $etime - $stime`
 echo "BAM to CRAM backup completed in $etime seconds, created $here/$newname"
 $topmedcmd set $bamid expt_sampleid $nwdid
 if [ "$?" != "0" ]; then
