@@ -144,6 +144,10 @@ if [ "$a" != "" ]; then
     exit 3
   fi
 
+  #   Paired reads count for this file is unchanged
+  reads=`$topmedcmd show $bamid bamflagstat`
+  $topmedcmd set $bamid cramflagstat $reads
+
   #   All was good
   $topmedcmd mark $bamid $markverb completed
   etime=`date +%s`
@@ -251,6 +255,12 @@ if [ "$?" != "0" ]; then
   echo "Command failed: $topmedcmd set $bamid expt_sampleid $nwdid"
   $topmedcmd mark $bamid $markverb failed
   exit 3
+fi
+
+#   Get the paired reads count for this new cram file
+$topmedflagstat $newname $bamid $markverb cramflagstat
+if [ "$?" != "0" ]; then
+  exit 4
 fi
 
 #   All was good
