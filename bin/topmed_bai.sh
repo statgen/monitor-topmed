@@ -38,7 +38,7 @@ if [ "$2" = "" ]; then
   me=`basename $0`
   echo "Usage: $me [-submit] bamid bamfile"
   echo ""
-  echo "Create BAI for a bam file and update database"
+  echo "Create index for a cram/bam file and update database"
   exit 1
 fi
 bamid=$1
@@ -57,16 +57,16 @@ if [ -f $bai ]; then
   exit 0
 fi
 
-echo "Creating BAI file '$bai'"
+echo "Creating index file '$bai'"
 $gcbin/samtools index $bamfile 2>&1
 if [ "$?" != "0" ]; then
-  echo "Unable to create BAI file"
+  echo "Unable to create index file"
   $topmedcmd mark $bamid baid failed
   exit 2
 fi
 etime=`date +%s`
 etime=`expr $etime - $stime`
-echo "Created BAI '$bai' (at second $etime)"
+echo "Created index '$bai' (at second $etime)"
 $topmedcmd mark $bamid baid completed
 echo `date` bai $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
 
