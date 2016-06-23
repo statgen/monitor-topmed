@@ -27,11 +27,13 @@ CREATE TABLE permissions (
   PRIMARY KEY  (id)
 );
 
-/* Lists all the centers we get BAMs from */
+/* Lists all the centers we get BAMs from.
+    Datamethod is push or pull depending on how data gets to us. */
 DROP TABLE IF EXISTS centers;
 CREATE TABLE centers (
   centerid     INT         NOT NULL AUTO_INCREMENT,
   centername   VARCHAR(16) NOT NULL,
+  datamethod   VARCHAR(8) NOT NULL DEFAULT 'pull',
   centerdesc   VARCHAR(96) NOT NULL,
   designdesc   TEXT NOT NULL,
   PRIMARY KEY  (centerid)
