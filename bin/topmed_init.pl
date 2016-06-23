@@ -99,7 +99,7 @@ foreach my $centerid (keys %{$centersref}) {
         }
         if ($opts{run} && $opts{run} ne $d) { next; }
         #   Check if this run has arrived, no need to look at it further
-        if ($knownruns{$d}{arrived} eq 'Y') { next; }
+        if (defined($knownruns{$d}{arrived}) && $knownruns{$d}{arrived} eq 'Y') { next; }
         if ($opts{verbose}) { print "Try to add BAMs in '$d' [$runid]\n"; }
         AddBams($runid, $d);
     }
@@ -232,7 +232,7 @@ sub AddBams {
                 "(runid,bamname,checksum,dateinit) " .
                 "VALUES($runid,'$fn','$checksum', $nowdate)";
             if ($opts{verbose}) { print "SQL=$sql\n"; }
-            else { $sth = DoSQL($sql); }
+            $sth = DoSQL($sql);
             $newbams++;
         }
         close(IN);
@@ -256,7 +256,7 @@ sub AddBams {
     #   Last sanity check, see if number of BAM files matches records
     #   This might not always be accurate, but ...
     if ($newbams) {
-        my $n = `ls $d/N*.bam 2>/dev/null | wc -l`;
+        my $n = `ls $d/N*.bam $d/N*.cram 2>/dev/null | wc -l`;
         chomp($n);
         if ($n eq $numbamrecords) { print "$Script - Congratulations, # bams = # database records\n"; }
         else {
@@ -294,7 +294,7 @@ sub OldestBAM {
     opendir(my $dh, $d) ||
         die "$Script - Unable to read directory '$d'\n";
     while (readdir $dh) {
-        if (! /\.bam$/) { next; }
+        if ((! /\.bam$/) && (! /\.cram$/) { next; }
         my @stats = stat("$d/$_");
         if ($oldestbamdate < $stats[9]) { $oldestbamdate = $stats[9]; }
     }
@@ -326,7 +326,7 @@ sub NormalizeMD5Line {
         return @retvals;
     }
     if ($fn =~ /\//) { $fn = basename($fn); }   # Path should not be qualified, but ...
-    if ($fn !~ /bam$/) {                    # File better be a bam
+    if ($fn !~ /bam$/ && $fn !~ /cram$/) {      # File better be a bam or cram
         #   Only generate error message for true errors, not dumb ones :-(
         if ($fn !~ /bai$/) { print "$Script - Invalid BAM name '$fn' in '$f'. Line: $l"; }
         return @retvals;
