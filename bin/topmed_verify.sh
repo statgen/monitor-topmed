@@ -7,6 +7,7 @@
 #
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 topmedrename=/usr/cluster/monitor/bin/topmedrename.pl
+topmedflagstat=/usr/cluster/monitor/bin/topmed_flagstat.sh
 console=/net/topmed/working/topmed-output
 mem=8G                  # Artificially high so not too many on small nodes
 markverb=md5verified
@@ -79,6 +80,12 @@ echo `date` verify $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
 sz=`ls -L -l $bamfile | awk '{print $5}'`
 $topmedcmd set $bamid bamsize $sz
 
+#   Get the paired reads count for this file
+$topmedflagstat $bamfile $bamid $markverb bamflagstat
+if [ "$?" != "0" ]; then
+  exit 1
+fi
+
 #   Rename the BAM file and change the MD5 entry
 chmod 0444 $bamfile
 $topmedrename $bamid $bamfile
@@ -86,4 +93,5 @@ if [ "$?" != "0" ]; then
   $topmedcmd mark $bamid $markverb failed
   exit 1
 fi
+
 exit
