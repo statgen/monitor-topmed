@@ -10,8 +10,17 @@
 #   This is a modified version by Tom and is a version of the script
 #   used by Tom to download broad files manually.  June 2016
 #
+#   This was modified to provide hooks so we can fetch the Manifest.txt
+#   file which tells us what files can be downloaded.
+#   This version will write key information to /tmp so we can extract
+#   the raw command that needs to be used for all the other files to fetch.
+#   It is used in conjunction with topmed_aspera.pl
+#
 
 DBG=false
+#DBG=true
+HOOK=false
+LOGDIR=''
 
 #
 # Internals
@@ -20,7 +29,7 @@ DBG=false
 _usage() {
   echo " To decrypt files, please set the  ASPERA_SCP_FILEPASS environemnt variable."
   echo
-  echo "  Usage: $0  SHARES_URL  USER:PASSWORD  /SHARES/PATH/TO/SOURCE/FILE  LOCAL_TARGET"
+  echo "  Usage: $0 [-hook] [-L dir] SHARES_URL  USER:PASSWORD  /SHARES/PATH/TO/SOURCE/FILE  LOCAL_TARGET"
   echo
   echo "  Example: ascp-shares-down.sh https://shares.broadinstitute.org SN0000000:ABCD1234efgh /SN00000000/foo.bar /home/user/me/my_aspera_downloads"
   echo
@@ -108,19 +117,40 @@ _download() {
   
 _temp_key_make
 
-if [ -z ${ASPERA_SCP_FILEPASS}"" ]; then
-  echo "No ASPERA_SCP_FILEPASS environment variable found. Downloading without decryption"
-  CMD="ascp --ignore-host-key -k 1 -Q -l 1500M -d -i $KEY -W $TOKEN --src-base=$SOURCE -L $LOGDIR  $USER@$HOST:$SOURCE $TARGET >> $RECORD  2>&1"
-else
-  echo "ASPERA_SCP_FILEPASS environment variable found. Decrypting and downloading"
-  CMD="ascp --ignore-host-key -k 1 -Q -l 1500M -d --file-crypt=decrypt -i $KEY -W $TOKEN --src-base=$SOURCE -L $LOGDIR  $USER@$HOST:$SOURCE $TARGET >> $RECORD  2>&1"
-fi
-
-if($DBG)
-  then
-    echo $CMD
+  #    Add exclusion of single character directories if we are hooked
+  EXCLUDE=''
+  if ($HOOK); then
+    EXCLUDE="-E '?'"
   fi
 
+  if [ -z ${ASPERA_SCP_FILEPASS}"" ]; then
+    echo "No ASPERA_SCP_FILEPASS environment variable found. Downloading without decryption"
+    DECRYPT=''
+  else
+    DECRYPT='--file-crypt=decrypt'
+  fi
+
+  #   Original commands were
+  #   CMD="ascp --ignore-host-key -k 1 -Q -l 1500M -d -i $KEY -W $TOKEN --src-base=$SOURCE -L $LOGDIR  $USER@$HOST:$SOURCE $TARGET >> $RECORD  2>&1"
+  #      or
+  #   CMD="ascp --ignore-host-key -k 1 -Q -l 1500M -d --file-crypt=decrypt -i $KEY -W $TOKEN --src-base=$SOURCE -L $LOGDIR  $USER@$HOST:$SOURCE $TARGET >> $RECORD  2>&1"
+  BASECMD="ascp --ignore-host-key -k 1 --policy=high -l 2000M -d -i $KEY -W $TOKEN $DECRYPT"
+  #   Capture important information so we can fetch individual files
+  if ($HOOK); then
+    b=`basename $0`
+    hook=/tmp/$b.hooks
+    cp -p $KEY $hook.key
+    echo "keyfile=$hook.key" > $hook
+    echo "token=$TOKEN" >> $hook
+    echo "decryptpasswd=$ASPERA_SCP_FILEPASS" >> $hook
+    echo "basecmd=$BASECMD" >> $hook
+    echo "Wrote hooks to '$hook'"  
+  fi
+  CMD="$BASECMD $EXCLUDE $LOGDIR --src-base=$SOURCE $USER@$HOST:$SOURCE $TARGET 2>&1"
+
+  if ($DBG); then
+    echo $CMD
+  fi
   eval $CMD
   rm $KEY
 }
@@ -128,6 +158,16 @@ if($DBG)
 #
 # Main program
 #
+
+if [ "$1" = "-hook" ]; then
+  HOOK=true
+  shift
+fi
+if [ "$1" = "-L" ]; then
+  LOGDIR="-L $2"
+  shift
+  shift
+fi
 
 if test $# -lt 3; then
   _usage
@@ -141,16 +181,6 @@ if test $# -lt 4; then
    TARGET=`pwd`
 else
    TARGET=$4
-fi
-
-# Better construction of logging directory
-
-LOGBASE=/home/tblackw/broad.aspera.logs
-LOGDIR=$LOGBASE/`basename $TARGET`
-RECORD=$LOGDIR/output.keep
-
-if [ ! -d $LOGDIR ]; then
-   mkdir  $LOGDIR
 fi
 
 _prep
