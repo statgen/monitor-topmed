@@ -119,6 +119,8 @@ if ($#ARGV < 0 || $opts{help}) {
         "  or\n" .
         "$m where bamid|nwdid bam|backup|b37|b38\n" .
         "  or\n" .
+        "$m whatbamid bamname\n" .
+        "  or\n" .
         "$m whatnwdid NWDnnnnn\n" .
         "  or\n" .
         "$m permit add operation center run\n" .
@@ -150,16 +152,17 @@ if ($@) { die $@ . "\n"; }
 #--------------------------------------------------------------
 #   Execute the command provided
 #--------------------------------------------------------------
-if ($fcn eq 'mark')     { Mark(@ARGV); exit; }
-if ($fcn eq 'unmark')   { UnMark(@ARGV); exit; }
-if ($fcn eq 'set')      { Set(@ARGV); exit; }
-if ($fcn eq 'show')     { Show(@ARGV); exit; }
-if ($fcn eq 'export')   { Export(@ARGV); exit; }
-if ($fcn eq 'send2ncbi')    { Send2NCBI(@ARGV); exit; }
-if ($fcn eq 'squeue')   { SQueue(@ARGV); exit; }
-if ($fcn eq 'where')    { Where(@ARGV); exit; }
-if ($fcn eq 'whatnwdid')  { WhatNWDID(@ARGV); exit; }
-if ($fcn eq 'permit')   { Permit(@ARGV); exit; }
+if ($fcn eq 'mark')      { Mark(@ARGV); exit; }
+if ($fcn eq 'unmark')    { UnMark(@ARGV); exit; }
+if ($fcn eq 'set')       { Set(@ARGV); exit; }
+if ($fcn eq 'show')      { Show(@ARGV); exit; }
+if ($fcn eq 'export')    { Export(@ARGV); exit; }
+if ($fcn eq 'send2ncbi') { Send2NCBI(@ARGV); exit; }
+if ($fcn eq 'squeue')    { SQueue(@ARGV); exit; }
+if ($fcn eq 'where')     { Where(@ARGV); exit; }
+if ($fcn eq 'whatbamid') { WhatBAMID(@ARGV); exit; }
+if ($fcn eq 'whatnwdid') { WhatNWDID(@ARGV); exit; }
+if ($fcn eq 'permit')    { Permit(@ARGV); exit; }
 
 die "$Script  - Invalid function '$fcn'\n";
 exit;
@@ -312,6 +315,22 @@ sub Export {
             }
         }
     }
+}
+
+#==================================================================
+# Subroutine:
+#   WhatBAMID($bamname)
+#
+#   Print bamid for a bamfiles entry with this bamname
+#==================================================================
+sub WhatBAMID {
+    my ($bamname) = @_;
+
+    if ($bamname =~ /\/(\S+)$/) { $bamname = $1; }
+    my $sth = DoSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE bamname='$bamname'", 0);
+    if (! $sth) { exit 1; }
+    my $href = $sth->fetchrow_hashref;
+    if (defined($href->{bamid})) { print $href->{bamid} . "\n"; }
 }
 
 #==================================================================
@@ -526,7 +545,7 @@ sub ReFormatPartitionData {
         my $sth = DoSQL("SELECT runid,expt_sampleid FROM $opts{bamfiles_table} WHERE bamid=$bamid", 0);
         if ($sth) {
             my $href = $sth->fetchrow_hashref;
-            $nwdid = $href->{expt_sampleid};
+            if (defined($href->{expt_sampleid})) { $nwdid = $href->{expt_sampleid}; }
             $sth = DoSQL("SELECT dirname FROM $opts{runs_table} WHERE runid=$href->{runid}", 0);
             if ($sth) {
                 $href = $sth->fetchrow_hashref;
@@ -748,10 +767,12 @@ sub Permit {
 # Subroutine:
 #   ($centerid, $runid) = GetBamidInfo($bamid)
 #
+#   Return id for the center and run for a bamid
 #==================================================================
 sub GetBamidInfo {
     my ($bamid) = @_;
 
+    if ($bamid !~ /^d+$/) { return (0,0); }     # No bamid, no ids
     my $sth = DoSQL("SELECT runid FROM $opts{bamfiles_table} WHERE bamid=$bamid", 0);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
@@ -1033,6 +1054,9 @@ Use 'yaml' to display everything known about the bam of interest.
 B<unmark bamid|nwdid [verb]>
 Use this to reset the state for a particular BAM file to the default
 database value.
+
+B<whatbamid bamname>
+Use this to get the bamid for a particular bamname.
 
 B<whatnwdid bamid|nwdid>
 Use this to get some details for a particular bam.
