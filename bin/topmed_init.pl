@@ -294,7 +294,7 @@ sub OldestBAM {
     opendir(my $dh, $d) ||
         die "$Script - Unable to read directory '$d'\n";
     while (readdir $dh) {
-        if ((! /\.bam$/) && (! /\.cram$/) { next; }
+        if ((! /\.bam$/) && (! /\.cram$/)) { next; }
         my @stats = stat("$d/$_");
         if ($oldestbamdate < $stats[9]) { $oldestbamdate = $stats[9]; }
     }
