@@ -275,7 +275,7 @@ if ($fcn eq 'qplot') {
                 #   Only do qplot if BAI finished
                 if ($href->{state_bai} != $COMPLETED) { next; }
                 #   Only do qplot if cram has been created
-                if ($href->{state_cram} != $COMPLETED) { next; }
+                ####if ($href->{state_cram} != $COMPLETED) { next; }
                 $f = $opts{topdir} . "/$centername/$dirname/" . $href->{bamname};
                 if (! -f $f) { next; }      # If BAM not there, do not submit
 
