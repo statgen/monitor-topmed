@@ -1,11 +1,13 @@
 #!/bin/bash
 #
+#   topmed_flagstat.sh amfile [[bamid colname] outfile]
+#
 #	Calculate the flagstat paired in sequencing number for a file
 #   and save it in a database column
 #   This can handle bam or cram input files
 #   If bamid is set, this can handle illumina files
-#   If verb is set, this will mark a step for bamid as failed
-#   If colname is set, the flagstat value will be saved in this column of the database
+#   If colname is provided, the flagstat value will be saved in this column of the database
+#   If outfile is provided the flagstat results will be copied to this file
 samtools=/net/mario/gotcloud/bin/samtools
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 ref=/net/mario/gotcloud/gotcloud.ref/hs37d5.fa
@@ -13,18 +15,18 @@ illuminaref=/net/topmed/incoming/study.reference/study.reference/illumina.hg19.f
 
 if [ "$1" = "" ]; then
   me=`basename $0`
-  echo "Usage: $me amfile [[[bamid] verb] colname]"
+  echo "Usage: $me amfile [[bamid colname] outfile]"
   echo ""
   echo "Calculate the flagstat paired in sequencing number for a file"
   exit 1
 fi
 amfile=$1
 bamid=$2
-verb=$3
-colname=$4
+colname=$3
+myoutfile=$4
 
-outfile=`basename $amfile`
-outfile="$outfile.tmp"
+outfile=`basename $amfile`              # Calculate temp file for flagstat results
+outfile="/tmp/$outfile.tmp"
 
 if [ "$bamid" != "" ]; then
   center=`$topmedcmd show $bamid center`
@@ -43,27 +45,25 @@ else
   rc=$?
 fi
 if [ "$rc" != "0" ]; then
-  echo "Command failed: $samtools flagstat $amfile"
-  if [ "$verb" != "" ]; then
-    $topmedcmd mark $bamid $verb failed
-  fi
+  echo "$me - Command failed: $samtools flagstat $amfile. Results in $outfile"
   exit 2
 fi
 
-#   outfile has results of flagstat call, get paired reads
+#   Outfile has results of flagstat call, get paired reads
 a=(`grep 'paired in sequencing' $outfile`)
 if [ "${a[0]}" = "" ]; then
-  echo "Unable to get reads of paired in sequencing from '$output' for '$amfile'"
-  if [ "$verb" != "" ]; then
-    $topmedcmd mark $bamid $verb failed
-  fi
+  echo "$me - Unable to get reads of paired in sequencing from '$output' for '$amfile'"
   exit 3
 fi
 
 #   Maybe put this in the database
 if [ "$colname" != "" ]; then
   $topmedcmd  set $bamid $colname ${a[0]}
-else
-  echo "Flagstat value for '$colname' = ${a[0]}"
+fi
+echo "$me - Flagstat value for '$colname' = ${a[0]}"
+
+if [ "$myoutfile" != "" ]; then
+  cp $outfile $myoutfile
 fi
 rm -f $outfile
+
