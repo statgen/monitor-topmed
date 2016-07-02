@@ -199,7 +199,6 @@ sub ProcessGet {
         else {
             foreach my $f (qw(
                 topmed_init.log
-                topmed_failures.log
                 topmed_monitor_arrive.log
                 topmed_monitor_b37.log
                 topmed_monitor_bai.log
