@@ -81,8 +81,9 @@ sz=`ls -L -l $bamfile | awk '{print $5}'`
 $topmedcmd set $bamid bamsize $sz
 
 #   Get the paired reads count for this file
-$topmedflagstat $bamfile $bamid $markverb bamflagstat
+$topmedflagstat $bamfile $bamid bamflagstat
 if [ "$?" != "0" ]; then
+  $topmedcmd mark $bamid $markverb failed
   exit 1
 fi
 
