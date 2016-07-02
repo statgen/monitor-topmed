@@ -95,7 +95,7 @@ if ($fcn == 'plot') {
           "days</td>" .
         "<td><b>Project:</b>" .
           "<select name='datayear'>" .
-          "<option value='1'>Year 1</option><option value='2'>Year 2</option></select>\n" . 
+          "<option value='2'>Year 2</option><option value='1'>Year 1</option></select>\n" . 
           "</td>" .
         "<td align='right'>" .
         "<a href='$reshowurl'>Reshow Plots</a>" .
