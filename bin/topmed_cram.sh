@@ -9,6 +9,7 @@ samtools=/net/mario/gotcloud/bin/samtools
 ref=/net/mario/gotcloud/gotcloud.ref/hs37d5.fa
 illuminaref=/net/topmed/incoming/study.reference/study.reference/illumina.hg19.fa
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
+topmedflagstat=/usr/cluster/monitor/bin/topmed_flagstat.sh
 backupdir=/net/topmed/working/backups
 medir=`dirname $0`
 calcmd5=/usr/cluster/monitor/bin/topmed_calcmd5.sh
@@ -104,6 +105,14 @@ if [ "$nwdid" = "" ]; then
    $topmedcmd mark $bamid $markverb failed
    exit 2
 fi
+#   Be sure that NWDID is set in database
+$topmedcmd set $bamid expt_sampleid $nwdid
+if [ "$?" != "0" ]; then
+  echo "Command failed: $topmedcmd set $bamid expt_sampleid $nwdid"
+  $topmedcmd mark $bamid $markverb failed
+  exit 3
+fi
+
 newname="$nwdid.src.cram"
 
 #======================================================================
@@ -136,14 +145,6 @@ if [ "$a" != "" ]; then
   md5=`$topmedcmd show $bamid checksum`
   $topmedcmd set $bamid cramchecksum $md5
 
-  #   Be sure that NWDID is set in database
-  $topmedcmd set $bamid expt_sampleid $nwdid
-  if [ "$?" != "0" ]; then
-    echo "Command failed: $topmedcmd set $bamid expt_sampleid $nwdid"
-    $topmedcmd mark $bamid $markverb failed
-    exit 3
-  fi
-
   #   Paired reads count for this file is unchanged
   reads=`$topmedcmd show $bamid bamflagstat`
   $topmedcmd set $bamid cramflagstat $reads
@@ -158,31 +159,31 @@ fi
 
 #======================================================================
 #   Original input file was a bam
-#
-#   Run 'bam squeeze' on .bam file with result written as .cram
-#   Checking with 'samtools flagstat' is quick, zero means success.
-#   Running 'samtools index' on a .cram file does NOT require 
-#   an explicit genome reference sequence, but 'samtools view' 
-#   does.  (And, 'samtools flagstat' does accept .sam input.)
 #======================================================================
+#   Get flagstat for original input file
 now=`date +%s`
-$samtools flagstat  $bamfile >  ${chkname}.init.stat
+$topmedflagstat $bamfile $bamid bamflagstat /tmp/${chkname}.init.stat
 if [ "$?" != "0" ]; then
-  echo "Command failed: $samtools flagstat  $bamfile"
+  echo "Command failed: $flagstat $bamfile"
   $topmedcmd mark $bamid $markverb failed
   exit 3
 fi
-s=`date +%s`; s=`expr $s - $now`; echo "samtools flagstat completed in $s seconds"
-now=`date +%s`
+s=`date +%s`; s=`expr $s - $now`; echo "$flagstat completed in $s seconds"
 
-#   This was added so we could remake the cram files for strange illumina data
+#   Illumina cram flles require a different fasta
 center=`$topmedcmd show $bamid center`
 if [ "$center" = "illumina" ]; then
   ref=$illuminaref
   echo "BAM to CRAM for '$center' requires a different fasta file '$ref'"
 fi
 
+now=`date +%s`
 #   Create the CRAM file
+#   Run 'bam squeeze' on .bam file with result written as .cram
+#   Checking with 'samtools flagstat' is quick, zero means success.
+#   Running 'samtools index' on a .cram file does NOT require 
+#   an explicit genome reference sequence, but 'samtools view' 
+#   does.  (And, 'samtools flagstat' does accept .sam input.)
 if [ "$squeezed" = "n" ]; then
   $bindir/bam squeeze  --in $bamfile  --out - --rmTags "BI:Z;BD:Z;PG:Z"  --keepDups --binMid  --binQualS  2,3,10,20,25,30,35,40,50 | $samtools view  -C -T  $ref  -  >  $newname 
 else 
@@ -193,8 +194,9 @@ if [ "$?" != "0" ]; then
   $topmedcmd mark $bamid $markverb failed
   exit 1
 fi
-s=`date +%s`; s=`expr $s - $now`; echo "squeeze completed in $s seconds"
+s=`date +%s`; s=`expr $s - $now`; echo "Cram created in $s seconds"
 
+#   Build index for the new file
 now=`date +%s`
 $samtools index $newname
 if [ "$?" != "0" ]; then
@@ -202,38 +204,30 @@ if [ "$?" != "0" ]; then
   $topmedcmd mark $bamid $markverb failed
   exit 3
 fi
-s=`date +%s`; s=`expr $s - $now`; echo "samtools index completed in $s seconds"
+s=`date +%s`; s=`expr $s - $now`; echo "Cram index created in $s seconds"
 
+#   Get flagstat for this cram
 now=`date +%s`
-$samtools view  -u -T  $ref $newname | $samtools flagstat  - >  ${chkname}.cram.stat
+$topmedflagstat $newname $bamid cramflagstat /tmp/${chkname}.cram.stat
 if [ "$?" != "0" ]; then
-  echo "Command failed: $samtools view  -h -T  $ref $newname ..."
+  echo "Command failed: $flagstat $bamfile"
   $topmedcmd mark $bamid $markverb failed
   exit 3
 fi
-s=`date +%s`; s=`expr $s - $now`; echo "samtools view completed in $s seconds"
+s=`date +%s`; s=`expr $s - $now`; echo "$flagstat for cram completed in $s seconds"
 
-#   Capture flagstat for this cram
-a=(`grep 'paired in sequencing' ${chkname}.cram.stat`)
-if [ "${a[0]}" == "" ]; then
-    echo "Unable to get reads of paired in sequencing from '${chkname}.cram.stat'"
-  $topmedcmd mark $bamid $markverb failed
-  exit 3
-fi
-$topmedcmd  set $bamid cramflagstat ${a[0]}
-
-#   Did init.stat for cram look similar to that for a bam?
-diff=`diff  ${chkname}.init.stat  ${chkname}.cram.stat | wc -l`
+#   Did flagstat output for cram match that for the input bam?
+diff=`diff  /tmp/${chkname}.init.stat  /tmp/${chkname}.cram.stat | wc -l`
 if [ "$diff" != "0" ]; then
   echo "Stat for backup CRAM file differs from that for original BAM"
-  diff  ${chkname}.init.stat  ${chkname}.cram.stat
+  diff  /tmp/${chkname}.init.stat  /tmp/${chkname}.cram.stat
   $topmedcmd mark $bamid $markverb failed
   exit 2
 fi
 echo "Stat for CRAM file matches that of original"
-rm -f ${chkname}.init.stat  ${chkname}.cram.stat ${chkname}.bam ${chkname}.bam.md5  ${chkname}.bai ${chkname}.bai.md5
+rm -f /tmp/${chkname}.init.stat  /tmp/${chkname}.cram.stat
 
-echo "Calculating new MD5"
+echo "Calculate MD5 for cram"
 now=`date +%s`
 #   Calculate the MD5 for the cram
 md5=`$calcmd5 $newname | awk '{print $1}'`
@@ -243,26 +237,11 @@ if [ "$md5" = "" ]; then
   exit 3
 fi
 $topmedcmd set $bamid cramchecksum $md5
-s=`date +%s`; s=`expr $s - $now`; echo "md5 calculated in $s seconds"
+s=`date +%s`; s=`expr $s - $now`; echo "MD5 calculated in $s seconds"
 
-#   Be sure that NWDID is set in database
 here=`pwd`
 etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "BAM to CRAM backup completed in $etime seconds, created $here/$newname"
-$topmedcmd set $bamid expt_sampleid $nwdid
-if [ "$?" != "0" ]; then
-  echo "Command failed: $topmedcmd set $bamid expt_sampleid $nwdid"
-  $topmedcmd mark $bamid $markverb failed
-  exit 3
-fi
-
-#   Get the paired reads count for this new cram file
-$topmedflagstat $newname $bamid $markverb cramflagstat
-if [ "$?" != "0" ]; then
-  exit 4
-fi
-
-#   All was good
 $topmedcmd mark $bamid $markverb completed
 echo `date` cram $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
