@@ -596,6 +596,33 @@ sub Where {
 
     #   BAM is in one of those $opts{netdir} trees where without a symlink
     if ($set eq 'bam') {
+        my $bamhost = 'none';
+        my $bamfdir = abs_path("$opts{netdir}/$opts{incomingdir}/$centername/$rundir");
+        if ($bamfdir =~ /\/net\/([^\/]+)\//) { $bamhost = $1; }
+        print "$bamfdir $bamhost\n";         # File might not really exist
+        exit;
+    }
+ 
+    #   Try to guess where the backup CRAM lives
+    if ($set eq 'backup') {
+        my $backuphost = 'none';
+        my $bakbamfdir = abs_path("$opts{netdir}/$opts{backupsdir}/$centername/$rundir");
+        my $bakfile = abs_path("$bakbamfdir/$cramname");
+        if ($bakbamfdir =~ /\/net\/([^\/]+)\//) { $backuphost = $1; }
+        print "$bakbamfdir $bakfile $backuphost\n";     # File might not really exist
+        exit;
+    }
+
+    #   Try to guess where the b37 remapped CRAM lives
+    if ($set eq 'b37-cannotwork') {
+        my $b37fdir = abs_path("$opts{netdir}/$opts{resultsdir}/$centername/$piname/$nwdid/bams");
+        if (! $b37fdir) { die "$Script - symlink to b37 path $opts{netdir}/$opts{resultsdir}/$centername/$piname are not defined\n"; }
+        my $b37file = abs_path("$b37fdir/$nwdid.recal.cram");
+        print "$b37fdir $b37file\n";            # Note that file might not really exist
+        exit;
+    }
+
+    if ($set eq 'bamx') {
         my $bamfdir = '';
         my $bamhost = '';
         foreach ('', '2', '3', '4', '5', '6') {
@@ -609,9 +636,8 @@ sub Where {
         print "$d $bamhost\n";
         exit;
     }
- 
-    #   Try to guess where the backup CRAM lives
-    if ($set eq 'backup') {
+
+    if ($set eq 'backupx') {
         my $bakbamfdir = '';
         my $bakfile = '';
         my $backuphost = '';
@@ -649,18 +675,7 @@ sub Where {
 
     #   Try to guess where the b38 remapped CRAM lives -- this likely needs to be corrected
     if ($set eq 'b38') {
-        my $b38fdir = '';
-        my $b38file = '';
-        foreach ('', '2', '3', '4', '5', '6') {
-            $b38fdir = "$opts{netdir}$_/$opts{resultsdir}/$centername/$piname/$nwdid/bams";
-            $b38file = "$b38fdir/$nwdid.recal.cram";
-            if (-f $b38file) {
-                if (! -l $b38fdir) { last; }        # Found non-symlink to remapped file
-            }
-        }
-        #if (! -d $b38fdir) { $b38fdir = 'none'; }
-        print "$b38fdir $b38file\n";            # Note that file might not really exist
-        exit;
+        die "$Script - b38 paths are not set yet\n";
     }
 
     die "$Script - Unknown Where option '$set'\n";
@@ -772,7 +787,7 @@ sub Permit {
 sub GetBamidInfo {
     my ($bamid) = @_;
 
-    if ($bamid !~ /^d+$/) { return (0,0); }     # No bamid, no ids
+    if ($bamid !~ /^\d+$/) { return (0,0); }     # No bamid, no ids
     my $sth = DoSQL("SELECT runid FROM $opts{bamfiles_table} WHERE bamid=$bamid", 0);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
@@ -879,7 +894,7 @@ sub Show {
     $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' or column '$col' is unknown\n"; }
     $href = $sth->fetchrow_hashref;
-    print $href->{$col} . "\n";
+    if (defined($href->{$col})) { print $href->{$col} . "\n"; }
 }
 
 #==================================================================
