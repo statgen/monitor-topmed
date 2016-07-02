@@ -134,7 +134,7 @@ _temp_key_make
   #   CMD="ascp --ignore-host-key -k 1 -Q -l 1500M -d -i $KEY -W $TOKEN --src-base=$SOURCE -L $LOGDIR  $USER@$HOST:$SOURCE $TARGET >> $RECORD  2>&1"
   #      or
   #   CMD="ascp --ignore-host-key -k 1 -Q -l 1500M -d --file-crypt=decrypt -i $KEY -W $TOKEN --src-base=$SOURCE -L $LOGDIR  $USER@$HOST:$SOURCE $TARGET >> $RECORD  2>&1"
-  BASECMD="ascp --ignore-host-key -k 1 --policy=high -l 2000M -d -i $KEY -W $TOKEN $DECRYPT"
+  BASECMD="ascp --ignore-host-key -k 1 -Q -l 1500M -d -i $KEY -W $TOKEN $DECRYPT"
   #   Capture important information so we can fetch individual files
   if ($HOOK); then
     b=`basename $0`
