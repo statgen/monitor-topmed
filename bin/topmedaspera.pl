@@ -26,33 +26,47 @@ use lib "$FindBin::Bin/../lib";
 use lib "$FindBin::Bin/../lib/perl5";
 use Getopt::Long;
 use Cwd 'abs_path';
+use File::Basename;
 
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
+#   UW pw = gobuN4je (aspera) and Cah4Meu6 (aspera2)
 #--------------------------------------------------------------
 our %opts = (
-    url => 'https://shares.broadinstitute.org/',
-    center => 'broad',
-    database => 'dbfile',                       # As found in $basedir 
+    broadurl => 'https://shares.broadinstitute.org/',
+    uwhost => 'aspera.gs.washington.edu',
+    center => '',
+    database => 'dbfile',                       # As found in $asperadir
+    ascp => '/net/mario/cluster/bin/ascp -d -Q -l 1500M -k 1',
     logdir => "/net/topmed/working/topmed-output/aspera",
-    keyfile => 'keyfile',                       # Name of keyfile in $basedir
+    keyfile => 'keyfile',                       # Name of keyfile in $asperadir
     hooksfile => '/tmp/ascp-shares.sh.hooks',   # File created by our ascpshares
     ascpshares => '/usr/cluster/monitor/bin/ascp-shares.sh',
     asperabroad => '/usr/cluster/monitor/bin/aspera.broad.sh',
+    uwrmthost => 'aspera.gs.washington.edu',
     verbose => 0,
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose url=s logdir=s
+    help verbose center=s
     user=s password=s decryptpassword=s
     target=s rmtdir=s dest=s
     )) || die "$Script - Failed to parse options\n";
 
 #   Simple help if requested
 if ($#ARGV < 1 || $opts{help}) {
-    warn "$Script [options] -user SN0096478 -password FA3XCLEI7JZAMX8 -decryptpassword yk2iCI7zefH3nmu -rmtdir SN0096478 manifest targetdir\n" .
+    warn "$Script [options] -center broad \\\n" .
+        "  -user SN0096478 -password FA3XCLEI7JZAMX8 -decryptpassword yk2iCI7zefH3nmu \\\n" .
+        "  -rmtdir SN0096478 \\\n" .
+        "  manifest targetdir\n" .
         "  or\n" .
-       "$Script [options] -dest 2016jun23 fetch file\n" .
+        "$Script [options] -center uw \\\n" .
+        #  or --user nhlbi-aspera2 --password Cah4Meu6
+        "  -user nhlbi-aspera -password gobuN4je \\\n" .
+        "  -rmtdir /nhlbi_macrogen_2/arnett_nhlbi_wgs_hypergen_utah/batch_9 \\\n" .
+        "  manifest targetdir\n" .
+        "  or\n" .
+       "$Script [options] -center broad -dest 2016jun23 fetch file\n" .
        "\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
@@ -60,32 +74,30 @@ if ($#ARGV < 1 || $opts{help}) {
 }
 my $fcn = shift @ARGV;
 
-#--------------------------------------------------------------
-#   Fetch data for a run
-#--------------------------------------------------------------
-#   First time, you must get the Manifest, then do fetch
-if ($fcn eq 'manifest') {      # Start getting the manifest. Must be like SN0096478/Manifest
-    if ((! exists($opts{user})) ||
-        (! exists($opts{password})) ||
-        (! exists($opts{rmtdir})) ||
-        (! exists($opts{decryptpassword})) ) {
-        die "$Script important options were not specified.  Try $Script --help\n";
-    }
-
-    if ($ARGV[0] !~ /^\//) {
-        die "$Script - file to fetch ($ARGV[0]) may not begin with a '/'\n";
-    }
-    GetManifest($ARGV[0]);
-    exit;
+#   Set the URL for this center, unless the user provided it
+if (! $opts{center}) {
+    die "$Script - Option -center was not provided\n";
 }
 
-#   Fetch a file.  If Manifest was done, the dbfile was created with all the important details
+#--------------------------------------------------------------
+#   Fetch the list of files, the manifest
+#--------------------------------------------------------------
+if ($fcn eq 'manifest') {      # Start getting the manifest. e.g. SN0096478/Manifest
+    if ($opts{center} eq 'broad') { GetManifestBroad($ARGV[0]); exit; }
+    if ($opts{center} eq 'uw')    { GetManifestUW($ARGV[0]); exit; } 
+    die "$Script - Unable to handle Manifest for center '$opts{center}'\n";
+}
+
+#--------------------------------------------------------------
+#   Fetch a file.
+#   If Manifest was done, the dbfile was created with all the important details
+#--------------------------------------------------------------
 if ($fcn eq 'fetch') {      # Start getting the manifest. Must be like SN0096478/Manifest
     if (! exists($opts{dest})) {
-        die "$Script important options were not specified.  Try $Script --help\n";
+        die "$Script - option -dest was not specified.  Try $Script --help\n";
     }
-    FetchFile($ARGV[0]);
-    exit;
+    if ($opts{center} eq 'broad') { FetchFile($ARGV[0]); exit; }
+    if ($opts{center} eq 'uw')    { FetchFile($ARGV[0]); exit; } 
 }
 
 die "$Script - Incorrect directive '$fcn', try $Script --help\n";
@@ -93,7 +105,7 @@ exit;
 
 #==================================================================
 # Subroutine:
-#   GetManifest($tdir)
+#   GetManifestUW($targetdir)
 #
 #   Fetch the Manifest file. This has the side effect of
 #   saving key information for subsequent data being copied to the target.
@@ -101,50 +113,97 @@ exit;
 #   and this gets one or more files, possibly called Manifest.txt.
 #   If that works, we can get a list of all files to be fetched.
 #==================================================================
-sub GetManifest {
+sub GetManifestUW {
     my ($tdir) = @_;
+
+    #   The broad requires a number of options
+    if ((! exists($opts{user})) ||
+        (! exists($opts{password})) ||
+        (! exists($opts{rmtdir})) ) {
+        die "$Script important $opts{center} options were not specified.  Try $Script --help\n";
+    }
 
     # Figure out where these files should go
     if (! -d $tdir) {
         die "$Script - Directory '$tdir' does not exist\n";
     }
-    my $fqtdir = abs_path($tdir);           # All our data goes here
-    system("mkdir -p $fqtdir") && die "$Script - unable to create directory '$fqtdir'\n";
-    system("mkdir -p $opts{logdir}") && die "$Script - unable to create directory '$opts{logdir}'\n";
+    my $runname = basename($tdir);
+    my ($fqtdir, $asperadir) = MakeAsperaDir($tdir);
 
-    #   Squash the target directory so we have a unique identifier
-    my $base = `basename $fqtdir`;
-    chomp($base);
-    $base =~ s/\//_/g;
-    $base =~ s/ /_/g;
-    my $basedir = $opts{logdir} . '/' . $base;        # Save fetch details here
-    system("mkdir -p $basedir") && die "$Script - unable to create directory '$basedir\n";
-    print "Details for '$tdir' will be saved in '$basedir'\n";
+    #   Now see if we can get a mess of md5 files and create a Manifest
+    $ENV{ASPERA_SCP_PASS} = $opts{password};
+    my $basecmd = "$opts{ascp} --src-base=$opts{rmtdir} -L $asperadir";
+    my $cmd = "$basecmd -E '*.bam' $opts{user}\@$opts{uwhost}:$opts{rmtdir} $fqtdir";
+    if ($opts{verbose}) { print "Executing: $cmd\n"; }
+    system($cmd) &&
+        die "$Script - Unable to fetch manifest md5 files for '$tdir'\n  CMD=$cmd\n";
+    $cmd = "cat $fqtdir/*.md5 > $fqtdir/Manifest.txt";
+    system($cmd) &&
+        die "$Script - Unable to create Manifest.txt from md5 files\n  CMD=$cmd\n";
+    system("ls -l $fqtdir/Manifest.txt");          # Show file we ceated 
+    print "Saved Manifest in $fqtdir\n";
+
+    #   Save data for fetch
+    my %datatosave = (
+        dirname => $runname,
+        center => 'uw',
+        password => $opts{password},
+        basecmd => $basecmd, 
+        destdir => $fqtdir,
+        user => $opts{user},
+    );
+    MakeAsperaData("$fqtdir/Manifest.txt", $asperadir, $runname, \%datatosave);
+
+}
+
+#==================================================================
+# Subroutine:
+#   GetManifestBroad($targetdir)
+#
+#   This assumes the $opts{rmtdir} minimally looks like:
+#       Manifest.txt
+#       x     (set of subdirectories where the data resides)
+#       
+#   We invoke ascp with an exclude of a single character file/directory
+#   and this gets one or more files, possibly called Manifest.txt.
+#   If that works, we can get a list of all files to be fetched.
+#==================================================================
+sub GetManifestBroad {
+    my ($tdir) = @_;
+
+    #   The broad requires a number of options
+    if ((! exists($opts{user})) ||
+        (! exists($opts{password})) ||
+        (! exists($opts{rmtdir})) ||
+        (! exists($opts{decryptpassword})) ) {
+        die "$Script important $opts{center} options were not specified.  Try $Script --help\n";
+    }
+
+    # Figure out where these files should go
+    if (! -d $tdir) {
+        die "$Script - Directory '$tdir' does not exist\n";
+    }
+    my $runname = basename($tdir);
+    my ($fqtdir, $asperadir) = MakeAsperaDir($tdir);
 
     #   Now see if we can get something like a Manifest
     $ENV{ASPERA_SCP_FILEPASS} = $opts{decryptpassword};
-    my $cmd = "$opts{ascpshares} -hook -L $basedir $opts{url} $opts{user}:$opts{password} /$opts{rmtdir} $basedir/Manifest";
+    my $cmd = "$opts{ascpshares} -hook -L $asperadir $opts{broadurl} $opts{user}:$opts{password} /$opts{rmtdir} $asperadir/Manifest";
     if ($opts{verbose}) { print "Executing: $cmd\n"; }
     system($cmd) &&
         die "$Script - Unable to fetch manifest file\n";
-    system("ls -l $basedir/Manifest");          # Show file we fetched 
+    system("ls -l $asperadir/Manifest");          # Show file we fetched 
 
     #   Here is data to be saved.  Assumes destination looks like .../center/dirname
-    my $dirname = `basename $fqtdir`;
-    chomp($dirname);
-    my $center = `dirname $fqtdir`;
-    chomp($center);
-    $center = `basename $center`;
-    chomp($center);
     my %dbdata = (                      # Save key information
         sharedir => $opts{rmtdir},
         destdir => $fqtdir,
-        dirname => $dirname,
-        center => $center,
+        dirname => $runname,
+        center => $opts{center},
         user => $opts{user},
         password => $opts{password},
         decryptpassword => $opts{decryptpassword},
-        url => $opts{url},
+        url => $opts{broadurl},
     );
 
     #   Get hooks provided by ascpshares
@@ -155,54 +214,34 @@ sub GetManifest {
         if (/(\S+)=(.+)/) { $dbdata{$1} = $2; }
     }
     close(IN);
+
     #   Now save those hooks from ascpshares
     if (! exists($dbdata{keyfile})) { die "$Script - missing 'keyfile' in $opts{hooksfile}\n"; }
     if (! exists($dbdata{basecmd})) { die "$Script - missing 'basecmd' in $opts{hooksfile}\n"; }
-    system("mv $dbdata{keyfile} $basedir/$opts{keyfile}") &&
+    system("mv $dbdata{keyfile} $asperadir/$opts{keyfile}") &&
         die "$Script - Unable to save keyfile from '$opts{ascpshares} -hook': $!\n";
-    $dbdata{keyfile} = "$basedir/$opts{keyfile}";   # Change where keyfile is now
+    $dbdata{keyfile} = "$asperadir/$opts{keyfile}";   # Change where keyfile is now
     if ($dbdata{basecmd} !~ /^(.+) -i \S+/) {
         die "$Script - unable to parse ascpshares basecmd: $dbdata{basecmd}\n";
     }
-    $dbdata{basecmd} = "$1 -i $basedir/$opts{keyfile} --file-crypt=decrypt";     # Correct command to fetch later
+    $dbdata{basecmd} = "$1 -i $asperadir/$opts{keyfile} --file-crypt=decrypt";     # Correct command to fetch later
     unlink($opts{hooksfile});
     
-    #   Create our master key file so we can fetch more files
-    open(OUT, '>' . "$basedir/$opts{database}") ||
-        die "$Script - Unable to create file '$basedir/$opts{database}': $!\n";
-    foreach my $k (keys %dbdata) { print OUT "$k=$dbdata{$k}\n"; }
-    close(OUT);
-    print "Saved information for '$base' in $basedir\n";
-
     #   Now move the Manifest file to the proper place
-    $_ = `ls $basedir/Manifest/Manifest*`;
+    $_ = `ls $asperadir/Manifest/Manifest*`;
     chomp();
-    if ("$_" eq "") { die "$Script - Unable to retrieve '$basedir/Manifest/Manifest*'\n"; }
+    if ("$_" eq "") { die "$Script - Unable to retrieve '$asperadir/Manifest/Manifest*'\n"; }
 
     my $manfile = "$fqtdir/Manifest.txt";
     system("mv -f $_ $manfile") &&
         die "$Script - Unable to move Manifest.txt to $fqtdir: $!\n";
     system("chmod 0444 $manfile") &&
         die "$Script - Unable to force Manifest.txt as readonly\n";
-    rmdir("$basedir/Manifest");
+    rmdir("$asperadir/Manifest");
     print "Saved Manifest in $fqtdir\n";
 
-    #   Read the manifest and generate the commands to fetch the file
-    my $fetchcmds = "$basedir/fetch-commands.txt";
-    open(OUT, '>' . $fetchcmds) ||
-        die "$Script - Unable to create file '$fetchcmds': $!\n";
-    open(IN, $manfile) ||
-        die "$Script - Unable to read file '$manfile': $!\n";
-    my $n = 0;
-    while (<IN>) {
-        if (! /^(\S+)/) { next; }
-        my $f = $1;
-        $n++;
-        print OUT "$0 -dest $dirname fetch $f\n";
-    }
-    close(IN);
-    close(OUT);
-    print "Created list of fetch commands in $fetchcmds\n";
+    MakeAsperaData($manfile, $asperadir, $runname, \%dbdata);
+
 }
 
 #==================================================================
@@ -215,13 +254,110 @@ sub GetManifest {
 sub FetchFile {
     my ($sendfile) = @_;               
 
-    #   Squash the target directory so we have a unique identifier
-    my $base = $opts{dest};
-    $base =~ s/\//_/g;
-    $base =~ s/ /_/g;
-    my $basedir = $opts{logdir} . '/' . $base;        # Saved fetch details here
+    #   Saved details for this destinaltion are here
+    my $asperadir = $opts{logdir} . '/' . GeteAsperaDest($opts{dest});
+
     #   Read database data for this dest
-    my $f = "$basedir/$opts{database}";
+    my $f = "$asperadir/$opts{database}";
+    open(IN,$f) ||
+        die "$Script - Unable to read saved information for '$opts{dest}' from '$f': $!\n";
+    my %dbdata = ();
+    while (<IN>) {
+        if (! /(\S+)=(.+)/) { die "$Script - Unable to parse line in '$f'\n  LINE=$_\n"; }
+        $dbdata{$1} = $2;
+    }
+    close(IN);
+
+    #   Prepare to build the ascp command
+    my $realfile = basename($sendfile);
+    mkdir("$dbdata{destdir}/.$realfile");
+    mkdir("$asperadir/logs");                 # Aspera logs go here
+    my $logdir = "$asperadir/logs/$realfile";
+    mkdir($logdir);
+
+    my ($rmtfile, $cmd);
+    #   BROAD - Build the aspera command to fetch this file
+    if ($opts{center} eq 'broad') {
+        #   Get variables specific to this particular file
+        $rmtfile = "$dbdata{sharedir}/$sendfile.aspera-env";
+        $cmd = "$opts{asperabroad} $dbdata{user}:$dbdata{password} $rmtfile";
+        open(IN, "$cmd |") ||
+            die "$Script - Unable to get data for $opts{center} file: CMD=$cmd\n";
+        my ($user, $host, $token, $srcfile) = split(' ', <IN>);
+        close(IN);
+
+        #   Build command to fetch file
+        $ENV{ASPERA_SCP_FILEPASS} = $dbdata{decryptpassword};
+        $cmd = "$dbdata{basecmd} -W $token -L $logdir $user\@$host:$rmtfile $dbdata{destdir}/.$realfile";
+    }
+
+    #   UW - Build the aspera command to fetch this file
+    if ($opts{center} eq 'uw') {
+        $rmtfile = "$dbdata{sharedir}/$sendfile";
+        $ENV{ASPERA_SCP_PASS} = $dbdata{password};
+        $cmd = "$opts{ascp} --src-base=$dbdata{rmtdir} -L $logdir " .
+            "$dbdata{user}\@$opts{uwhost}:$rmtfile $dbdata{destdir}/.$realfile";        
+    }
+
+    if (! $cmd) { die "$Script - Unable to build cmd for center '$opts{center}'\n"; }
+
+    #   Run ascp tp get the file. If there was an error, capture some
+    #   important information and try again
+    if ($opts{verbose}) { print "Executing: $cmd\n"; }
+    my $rc = 0;
+    foreach my $try (1..10) {
+        $rc = system($cmd);
+        if (! $rc) { last; }
+        my $tmp = "/tmp/$$.topmedaspera";
+        system("ls -la $logdir");
+        #   Read log and extract key error message
+        system("grep ERR $logdir/* > $tmp");
+        my $errs = '';
+        if (open(IN, $tmp)) {
+            while(<IN>) {
+                if (! /ERR Sess/) { next; }
+                $errs = $_;
+                print $errs;
+            }
+            close(IN);
+        }
+        unlink($tmp);
+        system("echo \"Failed to fetch '$sendfile' try=$try\n$errs\nSee logs at $logdir\"|mail -s err tpg\@hps.com");
+        print "Retrying try=$try\n";
+        sleep(45*$try);
+    }
+    if ($rc) { die "$Script - Unable to fetch file '$sendfile\n"; }
+
+    #   File has arrived, make it visible to the outside world
+    system("ls -l $dbdata{destdir}/.$realfile");     # Show tmp file we fetched
+    $cmd = "echo this should never be\n"; 
+    if ($opts{center} eq 'broad') {
+        $cmd = "mv $dbdata{destdir}/.$realfile/$realfile $dbdata{destdir}";
+    }
+    if ($opts{center} eq 'uw') {
+        $cmd = "mv $dbdata{destdir}/.$realfile $dbdata{destdir}/$realfile";
+    }
+    system($cmd) &&
+        die "$Script - Unable to rename newly arrived file:  CMD=$cmd\n";
+    chmod(0444, "$dbdata{destdir}/$realfile");
+    if ($opts{center} eq 'broad') { rmdir("$dbdata{destdir}/.$realfile"); }
+    system("ls -l $dbdata{destdir}/$realfile");     # Show file we fetched 
+}
+
+#==================================================================
+# Subroutine:
+#   OLDFetchFile($sendfile)
+#
+#   Fetch a file (maybe as dir/file) as a temporary.
+#   When successful, rename it to what it should be.
+#==================================================================
+sub OLDFetchFile {
+    my ($sendfile) = @_;               
+
+    #   Squash the target directory so we have a unique identifier
+    my $asperadir = $opts{logdir} . '/' . GeteAsperaDest($opts{dest});    # Saved fetch details here
+    #   Read database data for this dest
+    my $f = "$asperadir/$opts{database}";
     open(IN,$f) ||
         die "$Script - Unable to read saved information for '$opts{dest}' from '$f': $!\n";
     my %dbdata = ();
@@ -233,71 +369,185 @@ sub FetchFile {
 
     #   Get variables specific to this particular file
     my $rmtfile = "/$dbdata{sharedir}/$sendfile.aspera-env";
-    my $cmd = "$opts{asperabroad} $dbdata{user}:$dbdata{password} $rmtfile";
+    my $cmd = "$opts{asperabroad} $dbdata{user}:$opts{password} $rmtfile";
     open(IN, "$cmd |") ||
-        die "$Script - Unable to get crucial data for broad file: CMD=$cmd\n";
+        die "$Script - Unable to get data for $opts{center} file: CMD=$cmd\n";
     my ($user, $host, $token, $srcfile) = split(' ', <IN>);
     close(IN);
 
     #   Build command to fetch file
-    my $realfile = `basename $sendfile`;
+    my $realfile = basename($sendfile);
     chomp($realfile);
     $ENV{ASPERA_SCP_FILEPASS} = $dbdata{decryptpassword};
     mkdir "$dbdata{destdir}/.$realfile";
-    mkdir("$basedir/logs");                 # Aspera logs go here
-    my $logdir = "$basedir/logs/$realfile";
+    mkdir("$asperadir/logs");                 # Aspera logs go here
+    my $logdir = "$asperadir/logs/$realfile";
     mkdir($logdir);
     $cmd = "$dbdata{basecmd} -W $token -L $logdir $user\@$host:$rmtfile $dbdata{destdir}/.$realfile";
+    #   Run ascp tp get the file. If there was an error, capture some
+    #   important information and try again
     if ($opts{verbose}) { print "Executing: $cmd\n"; }
-    system($cmd) &&
-        die "$Script - Unable to fetch file '$sendfile\n";
+    my $rc = 0;
+    foreach my $try (1..10) {
+        $rc = system($cmd);
+        if (! $rc) { last; }
+        my $tmp = "/tmp/$$.topmedaspera";
+        system("ls -la $logdir");
+        #   Read log and extract key error message
+        system("grep ERR $logdir/* > $tmp");
+        my $errs = '';
+        if (open(IN, $tmp)) {
+            while(<IN>) {
+                if (! /ERR Sess/) { next; }
+                $errs = $_;
+                print $errs;
+            }
+            close(IN);
+        }
+        unlink($tmp);
+        system("echo \"Failed to fetch '$sendfile' try=$try\n$errs\nSee logs at $logdir\"|mail -s err tpg\@hps.com");
+        print "Retrying try=$try\n";
+        sleep(45*$try);
+    }
+    if ($rc) { die "$Script - Unable to fetch file '$sendfile\n"; }
+
     system("ls -l $dbdata{destdir}/.$realfile");     # Show tmp file we fetched 
     $cmd = "mv $dbdata{destdir}/.$realfile/$realfile $dbdata{destdir}";
     system($cmd) &&
         die "$Script - Unable to rename newly arrived file:  CMD=$cmd\n";
-    system("chmod 0444 $dbdata{destdir}/$realfile");
+    chmod(0444, "$dbdata{destdir}/$realfile");
 
     rmdir("$dbdata{destdir}/.$realfile");
     system("ls -l $dbdata{destdir}/$realfile");     # Show file we fetched 
+}
+
+
+#==================================================================
+# Subroutine:
+#   (fqtdir, asperadir) = MakeAsperaDir($targetdir)
+#
+#   This has the side effect of saving key information for subsequent
+#   data being copied to the target.
+#
+#   Returns:
+#       fully qualified path to tdir, no symlinks
+#       asperadir - directory where we save all the aspera information
+#==================================================================
+sub MakeAsperaDir {
+    my ($tdir) = @_;
+
+    my $fqtdir = abs_path($tdir);           # All our data goes here
+    system("mkdir -p $fqtdir") && die "$Script - unable to create directory '$fqtdir'\n";
+    system("mkdir -p $opts{logdir}") && die "$Script - unable to create directory '$opts{logdir}'\n";
+
+    #   Squash the target directory so we have a unique identifier
+    my $asperadir = $opts{logdir} . '/' . GeteAsperaDest($fqtdir);  # Save fetch details here
+    system("mkdir -p $asperadir") && die "$Script - unable to create directory '$asperadir\n";
+    print "Details for '$tdir' will be saved in '$asperadir'\n";
+    return ($fqtdir, $asperadir);
+}
+
+
+#==================================================================
+# Subroutine:
+#   ($destkey) = GeteAsperaDest($dir)
+#
+#   Calculate the destination key for the aspera data we save
+#
+#   Returns:
+#       string
+#==================================================================
+sub GeteAsperaDest {
+    my ($dir) = @_;
+   return basename($dir);
+}
+
+#==================================================================
+# Subroutine:
+#   MakeAsperaData($manfile, $asperadir, $runname, $dbdataref)
+#
+#   Create the 'database' of information used by fetch
+#
+#==================================================================
+sub MakeAsperaData {
+    my ($manfile, $asperadir, $runname, $dbdataref) = @_;
+
+    #   Create our master key file so we can fetch more files
+    open(OUT, '>' . "$asperadir/$opts{database}") ||
+        die "$Script - Unable to create file '$asperadir/$opts{database}': $!\n";
+    foreach my $k (keys %$dbdataref) { print OUT "$k=$dbdataref->{$k}\n"; }
+    close(OUT);
+    print "Saved information for '$runname' in $asperadir\n";
+
+    #   Read the manifest and generate the commands to fetch the file
+    my $fetchcmds = "$asperadir/fetch-commands.txt";
+    open(OUT, '>' . $fetchcmds) ||
+        die "$Script - Unable to create file '$fetchcmds': $!\n";
+    open(IN, $manfile) ||
+        die "$Script - Unable to read file '$manfile': $!\n";
+    my $n = 0;
+    while (<IN>) {
+        if (! /^(\S+)/) { next; }
+        my $f = $1;
+        $n++;
+        print OUT "$0 -dest $runname fetch $f\n";
+    }
+    close(IN);
+    close(OUT);
+    print "Created list of fetch commands in $fetchcmds\n";
 }
 
 #==================================================================
 #   Perldoc Documentation
 #==================================================================
 __END__
+topmedaspera.pl [options] -center broad \
+  -user SN0096478 -password FA3XCLEI7JZAMX8 -decryptpassword yk2iCI7zefH3nmu \
+  -rmtdir SN0096478 \
+  manifest targetdir
+  or
+topmedaspera.pl [options] -center uw \
+  -user nhlbi-aspera -password gobuN4je \
+  -rmtdir /nhlbi_macrogen_2/arnett_nhlbi_wgs_hypergen_utah/batch_9 \
+  manifest targetdir
+  or
+topmedaspera.pl [options] -dest 2016jun23 fetch file
+
 
 =head1 NAME
 
-topmedcmd.pl - Update the database for NHLBI TopMed
+topmedaspera.pl - Automate download of data using ASPERA
 
 =head1 SYNOPSIS
 
-  topmedcmd.pl mark 33 arrived completed   # BAM has arrived
-  topmedcmd.pl mark NWD00234  arrived completed   # Same BAM has arrived
-  topmedcmd.pl unmark 33 arrived           # Reset BAM has arrived
+  topmedaspera.pl -center uw -user RMTUSER -pass RMTPW \
+    --rmtdir /DIRECTORY/AT/REMOTE/SITE manifest  /incoming/topmed/uw/2016mar33
 
-  topmedcmd.pl set 33 jobidqplot 123445    # Set jobidqplot in bamfiles
+  topmedaspera.pl --dest 2016mar33 fetch 145474.final.sqz.bam
+  
+  
+  topmedaspera.pl -center broad -user SN0096478 -pass RMTPW \
+    decryptpassword yk2iCI7zefH3nmu /
+    --rmtdir /SN0096478 manifest  /incoming/topmed/broad/2016jun34
 
-  topmedcmd.pl show 2199 state_cram        # Show a column
-  topmedcmd.pl show 2199 center            # Show center 
-  topmedcmd.pl show NWD00234 run           # Show run
-  topmedcmd.pl show NWD00234 yaml          # Show everything known about a bamid
- 
-  topmedcmd.pl where 2199 bam              # Returns real path to bam and host of bam
-  topmedcmd.pl where 2199 backup           # Returns path to backups directory and to backup file and host
-  topmedcmd.pl where NWD00234 b37          # Returns path to remapped b37 directory and to file
-  topmedcmd.pl where 2199 b38              # Returns path to remapped b38 directory and to file
+  topmedaspera.pl --dest 2016jun34 fetch a/NWD123456
 
-  topmedcmd.pl permit add bai braod 2015oct18   # Stop bai job submissions for a run
-  topmedcmd.pl permit remove 12             # Remove a permit control
-  topmedcmd.pl permit test bai 4567         # Test if we should submit a bai job for one bam
-
-  topmedcmd.pl -maxlongjobs 35 squeue       # Show what is running
 =head1 DESCRIPTION
 
-This program supports simple commands to set key elements of the NHLBI database.
-The queue of tasks is kept in a MySQL database.
-See B<perldoc DBIx::Connector> for details defining the database.
+This program can automate the downloading of data from another center.
+You must specify the center, since each has it's own peculiarities of
+how the data looks.
+
+The process consists of two steps. The first is to fetch the manifest
+of files to be downloaded. This ultimately results in a Manifest.txt
+being created in the target directory. The monitor will notice this and 
+then create database entries for all data.
+
+The second step consists of multiple invocations of this script which will
+download a single file. Downloading one file at a time (probably run concurrently)
+allows the monitor to notice when the file arrives and to begin processing 
+the files as they come in.
+
 
 =head1 OPTIONS
 
@@ -305,31 +555,37 @@ See B<perldoc DBIx::Connector> for details defining the database.
 
 =item B<-center NAME>
 
-Specifies a specific center name on which to run the action, e.g. B<uw>.
-This is useful for testing.
-The default is to run against all centers.
+Specifies a specific center name from which we will download the data, e.g. B<uw>.
+
+=item B<-decryptpassword string>
+This must be provided for a BROAD manifest call.
+
+Specifies a descryption string used by the BROAD.
+
+=item B<-dest target>
+
+Specifies a target set of information created when a manifest is downloaded.
+This is the target directory where the data is downloaded (e.g. basename targetdirectory).
+This is only used by B<fetch>
 
 =item B<-help>
 
 Generates this output.
 
-=item B<-maxlongjobs N>
+=item B<-password string>
 
-Specifies how many of the longest running jobs to show.
-This defaults to B<10>.
+Specifies the password to be used when accessing the remote site.
+This must be provided for a manifest call.
 
-=item B<-realm NAME>
+=item B<-rmtdir NAME>
 
-Specifies the realm name to be used.
-This defaults to B<$opts{realm}> in the same directory as
-where this program is to be found.
+Specifies the local directory where the data will be downloaded.
+This must be provided for a manifest call.
 
-=item B<-runs NAME[,NAME,...]>
+=item B<-user string>
 
-Specifies a specific set of runs on which to run the action,
-e.g. B<2015jun05.weiss.02,2015jun05.weiss.03>.
-This is useful for testing.
-The default is to run against all runs for the center.
+Specifies the login account to use when downloading the data.
+This must be provided for a manifest call.
 
 =item B<-verbose>
 
@@ -339,55 +595,28 @@ Provided for developers to see additional information.
 
 =head1 PARAMETERS
 
-Parameters to this program are grouped into several groups which are used
-to deal with specific sets of information in the monitor databases.
+There are two parameters to this program. 
 
-B<mark bamid|nwdid dirname  [verb] [state]>
-Use this to set the state for a particular BAM file.
-You may specify the bamid or the NWDID.
-Mark will set a date for the process (e.g. arrived sets state_arrive)
-and unmark will set that entry to NULL.
-The list of verbs and states can be seen by B<perldoc topmedcmd.pl>.
+=over 4
 
-B<permit enable/disable operation center run>
-Use this to control the database which allows one enable or disable topmed operations
-(e.g. backup, verify etc) for a center or run.
-Use B<all> for all centers or all runs or all operations.
+=item B<manifest targetdirectory>
 
-B<permit test operation bamid>
-Use this to test if an operation (e.g. backup, verify etc) may be submitted 
-for a particular bam.
+Specifies we are starting a download and need to fetch a list of all the files
+to be downloaded - e.g. a Manifest.
 
-B<set bamid|nwdid columnname value>
-Use this to set the value for a column for a particular BAM file.
+This requires you specify the local destination directory where the files 
+will be downloaded to. This directory must already exist.
 
-B<send2ncbi filelist>
-Use this to copy data to NCBI with ascp.
+=item B<fetch  file>
 
-B<show arrived>
-Use this to show the bamids for all BAMs that are marked arrived.
+Specifies a specific file that will be downloaded. This is in the form of the 
+remote site (e.g. B<a/NWD123456>.
+The file will be downloaded as 'dot' file, so it will not normally be visible.
+Once the file is successfully downloaded, it will be renamed to the basename
+of the original file that was fetched (e.g. B<NWD123456>).
 
-B<show bamid|nwdid colname|center|run|yaml>
-Use this to show information about a particular bamid (or expt_sampleid).
-Use 'yaml' to display everything known about the bam of interest.
+=back
 
-B<unmark bamid|nwdid [verb]>
-Use this to reset the state for a particular BAM file to the default
-database value.
-
-B<whatnwdid bamid|nwdid>
-Use this to get some details for a particular bam.
-
-B<where bamid|nwdid bam|backup|b37|b38>
-If B<bam> was specified, display the path to the real bam file, not one that is symlinked
-and the host where the bam exists (or null string).
-If B<backup> was specified, display the path to the backup directory 
-and the path to the backup file (neither of which may not exist)
-and the host where the backup BAM file should exist (or null string).
-If B<b37> was specified, display the path to the directory of remapped data for build 37 (or 'none')
-and the path to the remapped file (which may not exist).
-If B<b38> was specified, display the path to the directory of remapped data for build 38 (or 'none')
-and the path to the remapped file (which may not exist).
 
 =head1 EXIT
 
@@ -396,7 +625,7 @@ return code of 0. Any error will set a non-zero return code.
 
 =head1 AUTHOR
 
-Written by Terry Gliedt I<E<lt>tpg@umich.eduE<gt>> in 2015-2016 and is
+Written by Terry Gliedt I<E<lt>tpg@umich.eduE<gt>> in 2016 and is
 is free software; you can redistribute it and/or modify it under the
 terms of the GNU General Public License as published by the Free Software
 Foundation; See http://www.gnu.org/copyleft/gpl.html
