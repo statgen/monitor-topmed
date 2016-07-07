@@ -4,7 +4,6 @@
 #
 #	Run QPLOT on a BAM file
 #
-samtools=/net/mario/gotcloud/bin/samtools
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 topmedqplot=/usr/cluster/monitor/bin/topmedqplot.pl
 console=/net/topmed/working/topmed-output
@@ -25,6 +24,12 @@ if [ "$1" = "-submit" ]; then
   if [ "$?" = "0" ]; then
     exit 4
   fi 
+
+  # Run this on node where bam lives
+  l=(`$topmedcmd where $1 bam`)
+  if [ "${l[1]}" != "" ]; then
+    qos="--qos=${l[1]}-qplot"
+  fi
 
   #   Can run anywhere. Low rate of access to cram, small output
   l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $qos --workdir=$console -J $1-qplot --output=$console/$1-qplot.out $0 $*`)
@@ -87,19 +92,10 @@ fi
 echo "Files will be created in "
 pwd
 
-#   Use the cram file for input, if it exists
-#   Get destination directory for backup files
-l=(`$topmedcmd where $bamid backup`)        # Get backupdir and backupfile and host
-bfile="${l[1]}"
-basebam=`basename $bamfile .bam`
 #   Run qplot, output written to current working directory
-if [ -r $bfile ]; then
-  $samtools view $bfile | $gcbin/qplot --reference  $gcref/hs37d5.fa --dbsnp \
-  $gcref/dbsnp_142.b37.vcf.gz --label $basebam --stats $basebam.qp.stats --Rcode $basebam.qp.R 2>&1
-else
-  $gcbin/qplot --reference  $gcref/hs37d5.fa --dbsnp $gcref/dbsnp_142.b37.vcf.gz \
-    --label $basebam --stats $basebam.qp.stats --Rcode $basebam.qp.R $bamfile 2>&1
-fi
+basebam=`basename $bamfile .bam`
+$gcbin/qplot --reference  $gcref/hs37d5.fa --dbsnp $gcref/dbsnp_142.b37.vcf.gz \
+  --label $basebam --stats $basebam.qp.stats --Rcode $basebam.qp.R $bamfile 2>&1
 if [ "$?" != "0" ]; then
   echo "QPLOT failed for '$bamfile'"
   $topmedcmd mark $bamid $markverb failed
