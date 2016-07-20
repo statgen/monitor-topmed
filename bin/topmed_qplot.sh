@@ -10,6 +10,7 @@ console=/net/topmed/working/topmed-output
 gcbin=/net/mario/gotcloud/bin
 gcref=/net/mario/nodeDataMaster/local/ref/gotcloud.ref
 topoutdir=/net/topmed/incoming/qc.results
+fixverifybamid=/usr/cluster/monitor/bin/nhlbi.1648.vbid.rewrite.awk
 mem=16G                         # Really should be 8G, increase to avoid too many at once
 markverb=qploted
 constraint=''                   # "--constraint eth-10g"
@@ -55,6 +56,9 @@ fi
 bamid=$1
 bamfile=$2
 
+#   Is this a cram or bam
+extension="${bamfile##*.}"
+
 #   Mark this as started
 $topmedcmd mark $bamid $markverb started
 d=`date +%Y/%m/%d`
@@ -62,26 +66,17 @@ stime=`date +%s`
 s=`hostname`
 echo "#========= $d host=$s $SLURM_JOB_ID $0 bamid=$bamid bamfile=$bamfile ========="
 bai=$bamfile.bai
+if [ "$extension" = "cram" ]; then
+  bai=$bamfile.crai
+fi
 if [ ! -f $bai ]; then
-  echo "BAI '$bai' does not exist"
+  echo "Index '$bai' does not exist"
   $topmedcmd mark $bamid $markverb failed
   exit 3
-  echo "Creating BAI file '$bai'"
-  $gcbin/samtools index $bamfile 2>&1
-  if [ "$?" != "0" ]; then
-    echo "Unable to create BAI file"
-    $topmedcmd mark $bamid $markverb failed
-    exit 2
-  fi
-  etime=`date +%s`
-  etime=`expr $etime - $stime`
-  echo "Created BAI '$bai' (at second $etime)"
 fi
 
 #   Create output directory and CD there
-o=`dirname $bamfile`
-o=`echo $o | sed -e s:/net/topmed/incoming/topmed/::`
-outdir=$topoutdir/$o
+outdir=`$topmedcmd where $bamid qcresults`
 mkdir -p $outdir
 cd $outdir
 if [ "$?" != "0" ]; then
@@ -89,14 +84,29 @@ if [ "$?" != "0" ]; then
   $topmedcmd mark $bamid $markverb failed
   exit 3
 fi
-echo "Files will be created in "
-pwd
+echo "Files will be created in $outdir"
 
 #   Run qplot, output written to current working directory
-basebam=`basename $bamfile .bam`
-$gcbin/qplot --reference  $gcref/hs37d5.fa --dbsnp $gcref/dbsnp_142.b37.vcf.gz \
+basebam=`basename $bamfile .$extension`
+build=`$topmedcmd show $bamid build`
+rc=none
+echo "Running qplot for build '$build'"
+if [ "$build" = "37" ]; then
+  $gcbin/qplot --reference  $gcref/hs37d5.fa --dbsnp $gcref/dbsnp_142.b37.vcf.gz \
   --label $basebam --stats $basebam.qp.stats --Rcode $basebam.qp.R $bamfile 2>&1
-if [ "$?" != "0" ]; then
+  rc=$?
+fi
+if [ "$build" = "38" ]; then
+  hmkangfiles=/net/fantasia/home/hmkang/code/working/gotcloud_topmed_tmp
+  /usr/cluster/bin/samtools view -uh -T /data/local/ref/gotcloud.ref/hg38/hs38DH.fa $bamfile | $hmkangfiles/gotcloud/bin/qplot --reference /data/local/ref/gotcloud.ref/hg38/hs38DH.fa --dbsnp /data/local/ref/gotcloud.ref/hg38/dbsnp_142.b38.vcf.gz --stats $basebam.qp.stats --Rcode $basebam.qp.R -.ubam 2>&1
+  rc=$?
+fi
+if [ "$rc" = "none" ]; then
+  echo "Unknown build '$build', cannot continue with qplot for '$bamfile'"
+  $topmedcmd mark $bamid $markverb failed
+  exit 3
+fi
+if [ "$rc" != "0" ]; then
   echo "QPLOT failed for '$bamfile'"
   $topmedcmd mark $bamid $markverb failed
   rm -f $basebam.*
@@ -106,11 +116,29 @@ etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "QPLOT on '$bamfile' successful (at second $etime)"
 
+nwdid=`$topmedcmd show $bamid expt_sampleid`
+if [ "$nwdid" = "" ]; then
+  echo "Unable to find the NWDID for '$bamid'"
+  exit 6
+fi
+
 #   Run verifybamid, output written to current working directory
-$gcbin/verifyBamID --bam  $bamfile --vcf $gcref/hapmap_3.3.b37.sites.vcf.gz	\
-  --site --free-full --chip-none --ignoreRG --precise --maxDepth 80 \
-  --grid 0.02	--out  $basebam.vb 2>&1
-if [ "$?" != "0" ]; then
+#   Notice the special case for a cram.  Very non-production looking
+if [ "$extension" = "cram" ]; then
+  hmkangfiles=/net/fantasia/home/hmkang/code/working/gotcloud_topmed_tmp
+  $hmkangfiles/contamination-finder/build/ContaminationFinder --UDPath $hmkangfiles/resources/1000g.100k.vcf.gz.dat.UD --BedPath $hmkangfiles/resources/100k.build38.bed --MeanPath $hmkangfiles/resources/1000g.100k.vcf.gz.dat.mu --Reference /data/local/ref/gotcloud.ref/hg38/hs38DH.fa --BamFile $bamfile > $basebam.vb
+  #   Convert this verifybamid output ($basebam.vb.selfSM ) like all others
+  if [ "$rc" = "0" ]; then
+    awk -f $fixverifybamid -v NWD=$nwdid $basebam.vb
+    rc=$?
+  fi
+else
+  $gcbin/verifyBamID --bam  $bamfile --vcf $gcref/hapmap_3.3.b37.sites.vcf.gz	\
+    --site --free-full --chip-none --ignoreRG --precise --maxDepth 80 \
+    --grid 0.02	--out  $basebam.vb 2>&1
+    rc=$?
+fi
+if [ "$rc" != "0" ]; then
   echo "VerifyBAMID failed for '$bamid'"
   $topmedcmd mark $bamid $markverb failed
   rm -f $basebam.*
@@ -125,11 +153,6 @@ echo "Command completed in $etime seconds. Created files:"
 ls -la $basebam.*
 
 #   Now attempt to put the QPLOT data into the database
-nwdid=`$topmedcmd show $bamid expt_sampleid`
-if [ "$nwdid" = "" ]; then
-  echo "Unable to find the NWDID for '$bamid'"
-  exit 6
-fi
 $topmedqplot $outdir $nwdid
 if [ "$?" != "0" ]; then
   echo "Unable to update the database with the QCPLOT results for '$bamid' [$outdir $nwdid]"
