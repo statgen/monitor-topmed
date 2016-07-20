@@ -174,7 +174,10 @@ if (in_array($_SERVER['REMOTE_USER'], $REQMGRS)) { $iammgr = 1; }
 if ($iammgr) {
 $SHOWQUEUES .= " &nbsp;&nbsp;&nbsp; <a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=control' " .
     "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=control\",680,720); " .
-    "return false;'>Control Jobs</a>";
+    "return false;'>Control Jobs</a>" .
+    " &nbsp;&nbsp;&nbsp; <a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=restart' " .
+    "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=restart\",680,720); " .
+    "return false;'>Restart Jobs</a>";
 }
 print doheader($HDR['title'], 1);
 
@@ -201,7 +204,7 @@ print "<p class='intro'>The <a href='http://www.nhlbi.nih.gov/'>NHLBI</a> provid
 //  Real parameters for each form, default is ''
 $parmcols = array('fcn', 'maxdir', 'desc', 'center',
     'run', 'runid', 'bamid', 'centerid', 'fetchpath', 'hostname', 'col',
-    'op', 'id');
+    'op', 'id', 'samplestate');
 extract (isolate_parms($parmcols));
 if (! $center) { $center = 'all'; }
 if (! $fcn)    { $fcn = 'runs'; }
@@ -255,6 +258,20 @@ if ($fcn == 'permit') {
 }
 if ($fcn == 'control') {
     print ControlJobs('');
+    print dofooter($HDR['footer']);
+    exit;
+}
+if ($fcn == 'restart') {
+    print RestartJobs('');
+    print dofooter($HDR['footer']);
+    exit;
+}
+if ($fcn == 'restartjobs') {
+    $h = HandleRestartJobs($run, $samplestate, $op);
+    if ($h != "") {
+        print $h;
+        print RestartJobs('');
+    }
     print dofooter($HDR['footer']);
     exit;
 }
@@ -527,7 +544,7 @@ function ViewRuns($center, $maxdirs, $iammgr) {
 ---------------------------------------------------------------*/
 function ShowRunYear($cid, $maxdirs, $datayear, $iammgr) {
     global $LDB;
-    $hdrcols  = array('dirname', 'status', 'bamcount');
+    $hdrcols  = array('dirname', 'status', 'bamcount', 'build');
 
     //  Walk through database getting data for this center
     $sql = 'SELECT * FROM ' . $LDB['runs'] . " WHERE centerid=$cid AND datayear=$datayear";
@@ -538,7 +555,12 @@ function ShowRunYear($cid, $maxdirs, $datayear, $iammgr) {
     $centers2show = array();    // Get list of runs for this query
     for ($i=0; $i<$numrows; $i++) {
         $row = SQL_Fetch($result);
-        $rows[$row['runid']] = $row;
+        //  Get build for run. This should be done much smarter in SQL
+        $buildsql = "SELECT build FROM " . $LDB['bamfiles'] . " WHERE runid=" . $row['runid'] . " LIMIT 1";
+        $buildresult = SQL_Query($buildsql);
+        $buildrow = SQL_Fetch($buildresult);
+        $row['build'] = $buildrow['build'];
+         $rows[$row['runid']] = $row;
     }
     if (! count($rows)) { return ''; }        // Nothing here
 
@@ -902,12 +924,103 @@ function HandlePermit($op, $center, $run, $id) {
     
     //  Set a permission
     if (! in_array($op, $validfunctions)) {
-        return Emsg("Invalid operation '$op' - How'd you do that?", 0);
+        return Emsg("Invalid operation '$op' - How'd you do that?", 1);
     }
     $cmd = escapeshellcmd($LDB['bindir'] . "/topmedcmd.pl permit add $op $center $run");
     $s = `$cmd 2>&1`;
     return "<pre>$s</pre>\n";
     //return "<pre>cmd=$cmd\n$s</pre>\n";
+}
+
+/*---------------------------------------------------------------
+#   html = RestartJobs($h)
+#   Restart failed, running, or queued jobs
+---------------------------------------------------------------*/
+function RestartJobs($h) {
+    global $LDB, $SHOWQUEUES, $CENTERS, $CENTERNAME2ID, $validfunctions;
+    $url = $_SERVER['PHP_SELF'] . "?fcn=restart";    
+    $html = '';
+
+    //  Dump table for each permission for now
+    $html .= "<h3 align='center'>Restart Failed Jobs</h3>\n" .
+        "<h4 align='center'>Use this to restart failed jobs for a run. Beware this affects <u>all</u><br>" .
+        "samples in the selected state for the specified run.</h4>\n";
+            $html .= "$SHOWQUEUES</center><br/>\n";
+    if ($h) { $html .= "<div class='indent'><span class='surprise'>$h</span></div>\n"; }
+
+    //  Prompt for classes of jobs to be restarted
+    $html .= "<form action='$url' method='post'>\n" .
+        "<input type='hidden' name='fcn' value='restartjobs'>\n" .
+        "<table align='left' width='80%' border='0'>\n" .
+        "<tr>" .
+        "<td align='right'><b>Name of Run</b></td>" .
+        "<td>&nbsp;</td>" .
+        "<td><input type='text' name='run' length='16' value='none'></td>" .
+        "<td>&nbsp;</td>" .
+        "<td><font color='green'> 2015aug22.weiss.06, 2015oct14 etc. </font></td>" .
+        "</tr>\n" .
+
+        "<tr>" .
+        "<td align='right'><b>Current State of Sample</b></td>" .
+        "<td>&nbsp;</td>";
+    $html .= "<td><select name='samplestate'>" .
+        "<option value='99'>Failed</option>" .
+        "<option value='2'>Submitted (for Terry)</option>" .
+        "<option value='3'>Running (for Terry)</option>" .
+        "</select></td>" .
+        "<td><font color='green'>&nbsp;</font></td>" .
+        "<td>&nbsp;</td>" .
+        "</tr>\n" .
+
+        "<tr>" .
+        "<td align='right'><b>Operation</b></td>" .
+        "<td>&nbsp;</td>";
+    $html .= "<td><select name='op'>" .
+        "<option value='none'>none</option>" .
+        "<option value='verify'>verify</option>" .
+        "<option value='bai'>bai</option>" .
+        "<option value='qplot'>qplot</option>" .
+        "<option value='cram'>cram</option>" .
+        "</select></td>" .
+        "<td><font color='green'>&nbsp; </font></td>" .
+        "<td>&nbsp;</td>" .
+        "</tr>\n" .
+
+        "<tr>" .
+        "<td><input type='submit' value=' Restart Operation '></td>" .
+        "<td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>" .
+        "</tr>\n" .
+        "</table>\n</form>\n";
+    
+    return $html;
+}
+
+/*---------------------------------------------------------------
+#   html = HandleRestartJobs($run, $samplestate, $op)
+#   Update database for groups of samples in state to new state
+---------------------------------------------------------------*/
+function HandleRestartJobs($dirname, $samplestate, $op) {
+    global $validfunctions, $LDB;
+    if ($dirname == 'none' || $op == 'none') {
+        return Emsg("Run or Operation was not specified, try again", 1);
+    }
+
+    $sql = 'SELECT runid FROM ' . $LDB['runs'] . " WHERE dirname='$dirname'";
+    $result = SQL_Query($sql);
+    $row = SQL_Fetch($result);
+    $runid = $row['runid'];
+    if (! $runid) {
+        return Emsg("Run '$dirname' is not known, try again", 1);
+    }
+
+    $sql = "UPDATE " . $LDB['bamfiles'] . " SET state_$op=0 WHERE runid=$runid AND state_$op=$samplestate";
+    $html = "<h3>Changing State for Samples in '$dirname'</h3>\n" .
+        "SQL=$sql<br>\n";
+    $result = SQL_Query($sql);
+    $changes = SQL_AffectedRows();
+    $html .= Emsg("Changed $changes rows, hope that was what you wanted", 1);
+    $html .= "<br/><br/>\n";
+    return $html;
 }
 
 /*---------------------------------------------------------------
