@@ -37,6 +37,14 @@ if [ "$1" = "-submit" ]; then
     qos="--qos=${l[1]}-cram"
   fi
 
+  #   Get destination directory for backup files
+  l=(`$topmedcmd where $1 backup`)
+  backupdir="${l[0]}"
+  if [ "$backupdir" = "" ]; then
+    echo "Unable to determine backup directory for '$bamid'. No job submitted."
+    exit 2
+  fi
+
   #  Is this squeezed or not?  For now this is only files from the Broad usually,
   #  however, not quite always.  $qual is the number of distinct base call quality 
   #  score values plus one if the bam is not squeezed.  (from Tom)
@@ -76,9 +84,16 @@ fi
 bamid=$1
 bamfile=$2
 
+#   Is this a cram or bam
+extension="${bamfile##*.}"
+
 #   Get destination directory for backup files
-l=(`$topmedcmd where $1 backup`)        # Get backupdir and backupfile and host
+l=(`$topmedcmd where $bamid backup`)
 backupdir="${l[0]}"
+if [ "$backupdir" = "" ]; then
+  echo "Unable to determine backup directory for '$bamid'"
+  exit 2
+fi
 
 d=`date +%Y/%m/%d`
 mkdir -p $backupdir
@@ -98,21 +113,13 @@ stime=`date +%s`
 #   Try to force everything as readonly
 chmod 555 $bamfile 2> /dev/null
 
-chkname=`basename $bamfile .bam`
-nwdid=`$samtools view -H $bamfile | grep '^@RG' | grep -o 'SM:\S*' | sort -u | cut -d \: -f 2`
-if [ "$nwdid" = "" ]; then
-   echo "Unable to extract NWDID from header of '$bamfile'"
-   $topmedcmd mark $bamid $markverb failed
-   exit 2
-fi
 #   Be sure that NWDID is set in database
-$topmedcmd set $bamid expt_sampleid $nwdid
-if [ "$?" != "0" ]; then
-  echo "Command failed: $topmedcmd set $bamid expt_sampleid $nwdid"
+nwdid=`$topmedcmd show $bamid expt_sampleid`
+if [ "$nwdid" = "" ]; then
+  echo "NWDID not set for $bamid $bamfile"
   $topmedcmd mark $bamid $markverb failed
   exit 3
 fi
-
 newname="$nwdid.src.cram"
 
 #======================================================================
@@ -121,25 +128,23 @@ newname="$nwdid.src.cram"
 #   Some centers deliver us a cram. In this case we do not need to
 #   create a cram, but just copy it elsewhere.
 #======================================================================
-a=`echo $bamfile | grep .cram`
-if [ "$a" != "" ]; then
+if [ "$extension" = "cram" ]; then
   now=`date +%s`
+  cp -p $bamfile.crai $backupdir/$newname.crai
+  if [ "$?" != "0" ]; then
+    echo "Copy command failed: cp -p $bamfile.crai $backupdir/$newname.crai"
+    $topmedcmd mark $bamid $markverb failed
+    exit 3
+  fi
+
   cp -p $bamfile $backupdir/$newname
   if [ "$?" != "0" ]; then
     echo "Copy command failed: cp -p $bamfile $backupdir/$newname"
     $topmedcmd mark $bamid $markverb failed
     exit 3
   fi
+  chmod 444 $backupdir/$newname
   s=`date +%s`; s=`expr $s - $now`; echo "Copy completed in $s seconds"
-
-  now=`date +%s`
-  $samtools index $newname
-  if [ "$?" != "0" ]; then
-    echo "Command failed: $samtools index $newname"
-    $topmedcmd mark $bamid $markverb failed
-    exit 3
-  fi
-  s=`date +%s`; s=`expr $s - $now`; echo "samtools index completed in $s seconds"
 
   # The md5 for the backup is the same as that for the input
   md5=`$topmedcmd show $bamid checksum`
@@ -154,12 +159,15 @@ if [ "$a" != "" ]; then
   etime=`date +%s`
   etime=`expr $etime - $stime`
   echo `date` cram $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
+  echo "CRAM backup completed, created $backupdir/$newname"
   exit
 fi
 
 #======================================================================
 #   Original input file was a bam
 #======================================================================
+chkname=`basename $bamfile .bam`
+
 #   Get flagstat for original input file
 now=`date +%s`
 $topmedflagstat $bamfile $bamid bamflagstat /tmp/${chkname}.init.stat
