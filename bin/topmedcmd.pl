@@ -81,6 +81,7 @@ our %opts = (
     permissions_table => 'permissions',
     runs_table => 'runs',
     netdir => '/net/topmed',
+    qcresultsdir => 'incoming/qc.results',
     incomingdir => 'incoming/topmed',
     backupsdir => 'working/backups/incoming/topmed',
     resultsdir => 'working/schelcj/results',
@@ -117,7 +118,7 @@ if ($#ARGV < 0 || $opts{help}) {
         "  or\n" .
         "$m squeue\n" .
         "  or\n" .
-        "$m where bamid|nwdid bam|backup|b37|b38\n" .
+        "$m where bamid|nwdid bam|backup|qcresults|b37|b38\n" .
         "  or\n" .
         "$m whatbamid bamname\n" .
         "  or\n" .
@@ -563,6 +564,7 @@ sub ReFormatPartitionData {
 #   Print paths to various things for bamid based on $set
 #     bam       Print directory where BAM actually exists, no symlink, and host for BAM
 #     backup    Print directory for backups and file (might not exist) and host for backup
+#     qcresults Print directory where qc.results for a bamfile
 #     b37       Print directory for remapped b37 and file (might not exist)
 #     b38       Print directory for remapped b38 and file (might not exist)
 #==================================================================
@@ -598,65 +600,31 @@ sub Where {
     if ($set eq 'bam') {
         my $bamhost = 'none';
         my $bamfdir = abs_path("$opts{netdir}/$opts{incomingdir}/$centername/$rundir");
+        if (! $bamfdir) { exit; }
         if ($bamfdir =~ /\/net\/([^\/]+)\//) { $bamhost = $1; }
         print "$bamfdir $bamhost\n";         # File might not really exist
         exit;
     }
  
-    #   Try to guess where the backup CRAM lives
+    #   Find where the backup CRAM lives
     if ($set eq 'backup') {
         my $backuphost = 'none';
         my $bakbamfdir = abs_path("$opts{netdir}/$opts{backupsdir}/$centername/$rundir");
+        if (! $bakbamfdir) { exit; }
         my $bakfile = abs_path("$bakbamfdir/$cramname");
+        if (! $bakfile) { exit; }
         if ($bakbamfdir =~ /\/net\/([^\/]+)\//) { $backuphost = $1; }
         print "$bakbamfdir $bakfile $backuphost\n";     # File might not really exist
         exit;
     }
 
-    #   Try to guess where the b37 remapped CRAM lives
-    if ($set eq 'b37-cannotwork') {
-        my $b37fdir = abs_path("$opts{netdir}/$opts{resultsdir}/$centername/$piname/$nwdid/bams");
-        if (! $b37fdir) { die "$Script - symlink to b37 path $opts{netdir}/$opts{resultsdir}/$centername/$piname are not defined\n"; }
-        my $b37file = abs_path("$b37fdir/$nwdid.recal.cram");
-        print "$b37fdir $b37file\n";            # Note that file might not really exist
+    #   Print where qc.results are 
+    if ($set eq 'qcresults') {
+        my $qcdir = abs_path("$opts{netdir}/$opts{qcresultsdir}/$centername/$rundir");
+        print "$qcdir\n";                       # File might not really exist
         exit;
     }
-
-    if ($set eq 'bamx') {
-        my $bamfdir = '';
-        my $bamhost = '';
-        foreach ('', '2', '3', '4', '5', '6') {
-            $bamfdir = "$opts{netdir}$_/$opts{incomingdir}/$centername";
-            if (! -l $bamfdir) { last; }        # Found non-symlink to center directory
-        }
-        if (! $bamfdir) { die "$Script - BAMID=$bamid Unable to find real directory for '$centername'\n"; }
-
-        my $d = abs_path("$bamfdir/$rundir");
-        if ($d =~ /^\/net\/(\w+)/) { $bamhost = $1; }
-        print "$d $bamhost\n";
-        exit;
-    }
-
-    if ($set eq 'backupx') {
-        my $bakbamfdir = '';
-        my $bakfile = '';
-        my $backuphost = '';
-        foreach ('', '2', '3', '4', '5', '6') {
-            $bakbamfdir = "$opts{netdir}$_/$opts{backupsdir}/$centername";
-            $bakfile = "$bakbamfdir/$rundir/$cramname";
-            if (-f $bakfile) {
-                if (! -l $bakbamfdir) { last; }        # Found non-symlink to remapped file
-            }
-        }
-        if (! -d $bakbamfdir) { $bakbamfdir = $backuphost = 'none'; }
-        else {
-            $bakbamfdir = abs_path("$bakbamfdir/$rundir");
-            if ($bakbamfdir =~ /^\/net\/(\w+)/) { $backuphost = $1; }
-        }
-        print "$bakbamfdir $bakfile $backuphost\n";     # Note that file might not really exist
-        exit;
-    }
-
+ 
     #   Try to guess where the b37 remapped CRAM lives
     if ($set eq 'b37') {
         my $b37fdir = '';
@@ -675,7 +643,7 @@ sub Where {
 
     #   Try to guess where the b38 remapped CRAM lives -- this likely needs to be corrected
     if ($set eq 'b38') {
-        die "$Script - b38 paths are not set yet\n";
+        die "$Script - b38 paths are not known yet\n";
     }
 
     die "$Script - Unknown Where option '$set'\n";
@@ -980,6 +948,7 @@ topmedcmd.pl - Update the database for NHLBI TopMed
  
   topmedcmd.pl where 2199 bam              # Returns real path to bam and host of bam
   topmedcmd.pl where 2199 backup           # Returns path to backups directory and to backup file and host
+  topmedcmd.pl where 2199 qcresults        # Returns path to directory for qc.results
   topmedcmd.pl where NWD00234 b37          # Returns path to remapped b37 directory and to file
   topmedcmd.pl where 2199 b38              # Returns path to remapped b38 directory and to file
 
@@ -1076,12 +1045,13 @@ Use this to get the bamid for a particular bamname.
 B<whatnwdid bamid|nwdid>
 Use this to get some details for a particular bam.
 
-B<where bamid|nwdid bam|backup|b37|b38>
+B<where bamid|nwdid bam|backup|qcresults|b37|b38>
 If B<bam> was specified, display the path to the real bam file, not one that is symlinked
 and the host where the bam exists (or null string).
 If B<backup> was specified, display the path to the backup directory 
 and the path to the backup file (neither of which may not exist)
-and the host where the backup BAM file should exist (or null string).
+If B<qcresults> was specified, display the path to the directory where
+the qc.results for this bamid will be (which may not exist)
 If B<b37> was specified, display the path to the directory of remapped data for build 37 (or 'none')
 and the path to the remapped file (which may not exist).
 If B<b38> was specified, display the path to the directory of remapped data for build 38 (or 'none')
