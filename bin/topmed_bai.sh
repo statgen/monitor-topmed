@@ -5,7 +5,7 @@
 #	Create BAI index for a BAM file
 #
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
-gcbin=/net/mario/gotcloud/bin
+samtools=/net/mario/gotcloud/bin/samtools
 mem=8G                  # Artificially high so not too many on small nodes
 console=/net/topmed/working/topmed-output
 slurmp=topmed
@@ -44,6 +44,9 @@ fi
 bamid=$1
 bamfile=$2
 
+#   Is this a cram or bam
+extension="${bamfile##*.}"
+
 #   Mark this as started
 $topmedcmd mark $bamid baid started
 d=`date +%Y/%m/%d`
@@ -51,14 +54,17 @@ s=`hostname`
 echo "#========= $d host=$s $SLURM_JOB_ID $0 bamid=$bamid bamfile=$bamfile ========="
 stime=`date +%s`
 bai=$bamfile.bai
+if [ "$extension" = "cram" ]; then
+  bai=$bamfile.crai
+fi
 if [ -f $bai ]; then
-  echo "Using existing BAI file '$bai'"
+  echo "Using existing index file '$bai'"
   $topmedcmd mark $bamid baid completed
   exit 0
 fi
 
 echo "Creating index file '$bai'"
-$gcbin/samtools index $bamfile 2>&1
+$samtools index $bamfile 2>&1
 if [ "$?" != "0" ]; then
   echo "Unable to create index file"
   $topmedcmd mark $bamid baid failed
