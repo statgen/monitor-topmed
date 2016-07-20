@@ -54,6 +54,9 @@ bamid=$1
 checksum=$2
 bamfile=$3
 
+#   Is this a cram or bam
+extension="${bamfile##*.}"
+
 tmpfile=/tmp/$$.md5
 echo "$checksum  $bamfile" > $tmpfile
 
@@ -62,6 +65,8 @@ $topmedcmd mark $bamid $markverb started
 d=`date +%Y/%m/%d`
 s=`hostname`
 echo "#========= '$d' host=$s $SLURM_JOB_ID $0 bamid=$bamid checksum=$checksum bamfile=$bamfile ========="
+
+#   Verify the MD5
 stime=`date +%s`
 md5sum -c $tmpfile
 rc=$?
@@ -81,13 +86,25 @@ sz=`ls -L -l $bamfile | awk '{print $5}'`
 $topmedcmd set $bamid bamsize $sz
 
 #   Get the paired reads count for this file
+stime=`date +%s`
 $topmedflagstat $bamfile $bamid bamflagstat
 if [ "$?" != "0" ]; then
   $topmedcmd mark $bamid $markverb failed
   exit 1
 fi
+etime=`date +%s`
+etime=`expr $etime - $stime`
+echo "Calculated bamflagstat in $etime seconds"
 
-#   Rename the BAM file and change the MD5 entry
+#   If original file was cram, then some fields are the same for both cram and bam
+if [ "$extension" = "cram" ]; then
+  a=`$topmedcmd show $bamid bamflagstat`
+  $topmedcmd set $bamid cramflagstat $a
+  a=`$topmedcmd show $bamid checksum`
+  $topmedcmd set $bamid cramchecksum $a
+fi
+
+#   Rename the BAM file
 chmod 0444 $bamfile
 $topmedrename $bamid $bamfile
 if [ "$?" != "0" ]; then
