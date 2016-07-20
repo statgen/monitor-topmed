@@ -126,7 +126,8 @@ fi
 #   Notice the special case for a cram.  Very non-production looking
 if [ "$extension" = "cram" ]; then
   hmkangfiles=/net/fantasia/home/hmkang/code/working/gotcloud_topmed_tmp
-  $hmkangfiles/contamination-finder/build/ContaminationFinder --UDPath $hmkangfiles/resources/1000g.100k.vcf.gz.dat.UD --BedPath $hmkangfiles/resources/100k.build38.bed --MeanPath $hmkangfiles/resources/1000g.100k.vcf.gz.dat.mu --Reference /data/local/ref/gotcloud.ref/hg38/hs38DH.fa --BamFile $bamfile > $basebam.vb
+  $hmkangfiles/contamination-finder/build/ContaminationFinder --UDPath $hmkangfiles/resources/1000g.10k.vcf.gz.dat.UD --BedPath $hmkangfiles/resources/10k.build38.bed --MeanPath $hmkangfiles/resources/1000g.10k.vcf.gz.dat.mu --Reference /data/local/ref/gotcloud.ref/hg38/hs38DH.fa --BamFile $bamfile > $basebam.vb
+  rc=$?
   #   Convert this verifybamid output ($basebam.vb.selfSM ) like all others
   if [ "$rc" = "0" ]; then
     awk -f $fixverifybamid -v NWD=$nwdid $basebam.vb
