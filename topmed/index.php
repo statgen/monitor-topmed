@@ -206,7 +206,7 @@ $parmcols = array('fcn', 'maxdir', 'desc', 'center',
     'run', 'runid', 'bamid', 'centerid', 'fetchpath', 'hostname', 'col',
     'op', 'id', 'samplestate');
 extract (isolate_parms($parmcols));
-if (! $center) { $center = 'all'; }
+if (! $center) { $center = 'year2'; }
 if (! $fcn)    { $fcn = 'runs'; }
 if (! $maxdir) { $maxdir = 0; }     // Show all data
 
@@ -507,9 +507,11 @@ function ViewRuns($center, $maxdirs, $iammgr) {
         //"&nbsp;&nbsp;&nbsp; or &nbsp;&nbsp;&nbsp;" .
         //"<a href='" . $_SERVER['SCRIPT_NAME'] . "?" . $_SERVER['QUERY_STRING'] .
         //"'>Refresh</a><br>" .
-        "\nChoose a Center: " .
+        "\nChoose: " .
         "&nbsp;&nbsp;<a href='" . $_SERVER['SCRIPT_NAME'] .
-        "?center=all&amp;maxdir=$maxdirs'>All</a>&nbsp;&nbsp;\n";
+        "?center=year2&amp;maxdir=$maxdirs'>Year 2</a>&nbsp;&nbsp;\n" .
+        "&nbsp;&nbsp;<a href='" . $_SERVER['SCRIPT_NAME'] .
+        "?center=year1&amp;maxdir=$maxdirs'>Year 1</a>&nbsp;&nbsp;\n";
     foreach ($CENTERS as $c) {
         $html .= "&nbsp;&nbsp;<a href='" . $_SERVER['SCRIPT_NAME'] .
             "?center=$c&amp;maxdir=$maxdirs'>" . strtoupper($c) . "</a>&nbsp;&nbsp;\n";
@@ -517,11 +519,17 @@ function ViewRuns($center, $maxdirs, $iammgr) {
     $html .= "<br/>$SHOWQUEUES</center>\n";
 
     $centers2show = array();                // Get list of centers for this query
-    if ($center == 'all') { $centers2show = $CENTERS; }
+    $yearstart = 2;
+    $yearstop = 0;
+    if ($center == 'year1' || $center == 'year2') {
+        $centers2show = $CENTERS;
+        if ($center == 'year1') { $yearstart = 1; }
+        if ($center == 'year2') { $yearstart = 2; $yearstop = 1; }
+    }
     else { array_push($centers2show, $center); }
 
     //  Show data for center by datayear
-    for ($datayear=2; $datayear>0; $datayear--) {
+    for ($datayear=$yearstart; $datayear>$yearstop; $datayear--) {
         //  For each center show details from database ($rows)
         foreach ($centers2show as $centr) {
             $cid = $CENTERNAME2ID[$centr];
