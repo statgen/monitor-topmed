@@ -146,6 +146,20 @@ function SQL_NumRows($res) {
 }
 
 /*---------------------------------------------------------------
+# SQL_AffectedRows - Get number of rows affected by update
+#
+# Parameters:
+#   none
+#
+# Returns:
+#   integer
+---------------------------------------------------------------*/
+function SQL_AffectedRows() {
+    global $dbh;
+    return mysqli_affected_rows($dbh);
+}
+
+/*---------------------------------------------------------------
 # SQL_Escape - Escapes special characters so it is safe in an SQL query
 #
 # Parameters:
