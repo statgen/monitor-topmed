@@ -229,7 +229,7 @@ if ($fcn eq 'cram') {
         foreach my $runid (keys %{$runsref}) {
             my $dirname = $runsref->{$runid};
             #   Get list of all bams that have not yet arrived properly
-            my $sql = "SELECT bamid,bamname,state_md5ver,state_cram FROM " .
+            my $sql = "SELECT bamid,bamname,state_md5ver,state_cram,state_bai FROM " .
                 $opts{bamfiles_table} . " WHERE runid='$runid'";
             my $sth = DoSQL($sql);
             my $rowsofdata = $sth->rows();
@@ -239,6 +239,7 @@ if ($fcn eq 'cram') {
                 my $f = $opts{topdir} . "/$centername/$dirname/" . $href->{bamname};
                 #   Only create cram if file has been verified
                 if ($href->{state_md5ver} != $COMPLETED) { next; }
+                if ($href->{state_bai} != $COMPLETED) { next; }
                 if ($opts{suberr} && $href->{state_cram} >= $FAILEDCHECKSUM) { $href->{state_cram} = $REQUESTED; }
                 if ($href->{state_cram} != $NOTSET && $href->{state_cram} != $REQUESTED) { next; }
                 #   Run the command
