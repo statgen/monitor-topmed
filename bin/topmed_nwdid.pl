@@ -169,7 +169,10 @@ if ($opts{bamid}) {
 #--------------------------------------------------------------
 if (! $opts{nonwdid}) {
     my $qcdir = dirname($bamfile);
-    $qcdir =~ s:$opts{topdir}:$opts{qcresults}:;
+    if ($qcdir !~ /\/([^\/]+)\/([^\/]+)$/) {    # Grab center and run
+        die "$Script - Unable to parse center/run/ from '$qcdir'\n";
+    }
+    $qcdir = $opts{qcresults} . "/$1/$2";
     $cmd = "mkdir -p $qcdir";
     if (! -d $qcdir) {
         system("mkdir -p $qcdir") && die "Unable to make directory: $qcdir\n";
@@ -178,8 +181,10 @@ if (! $opts{nonwdid}) {
 
     my $line = "$bamfile $smvalue $smcount $pi_name $study\n";
 
-    my $nwdidfile = $qcdir . '/' . basename($bamfile, '.bam') . '.nwdid';
-    #if ($opts{verbose}) {  print "Create file '$nwdidfile' in that directory with this line:\n  $line\n"; }
+    my $b = basename($bamfile);
+    if ($b =~ /^(\S+)\./) { $b = $1; }
+    my $nwdidfile = $qcdir . "/$b.nwdid";
+    if ($opts{verbose}) {  print "Create file '$nwdidfile' in that directory with this line:\n  $line\n"; }
     open(OUT,'>' . $nwdidfile) ||
         die "Unable to create file '$nwdidfile': $!\n";
     print OUT $line;
