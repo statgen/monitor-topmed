@@ -27,11 +27,6 @@ fi
 bamid=$1
 bamfile=$2
 
-homehost=`echo $bamfile | cut -d / -f 3`    # Should be topmed or topmed2
-if [ "$homehost" != "" ]; then
-  console=/net/$homehost/working/topmed-output
-fi
-
 #   Mark this as started
 $topmedcmd mark $bamid arrived started || exit $?
 
