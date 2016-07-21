@@ -119,7 +119,7 @@ if ($#ARGV < 0 || $opts{help}) {
         "  or\n" .
         "$m squeue\n" .
         "  or\n" .
-        "$m where bamid|nwdid bam|backup|qcresults|b37|b38\n" .
+        "$m where bamid|nwdid bam|backup|qcresults|console|b37|b38\n" .
         "  or\n" .
         "$m whatbamid bamname\n" .
         "  or\n" .
@@ -597,17 +597,18 @@ sub ReFormatPartitionData {
 
 #==================================================================
 # Subroutine:
-#   Where($bamid, $set)
+#   Where($bamid, $set, $extra1)
 #
 #   Print paths to various things for bamid based on $set
 #     bam       Print directory where BAM actually exists, no symlink, and host for BAM
 #     backup    Print directory for backups and file (might not exist) and host for backup
 #     qcresults Print directory where qc.results for a bamfile
+#     console   Print directory where SLURM console output lives
 #     b37       Print directory for remapped b37 and file (might not exist)
 #     b38       Print directory for remapped b38 and file (might not exist)
 #==================================================================
 sub Where {
-    my ($bamid, $set) = @_;
+    my ($bamid, $set, $extra1) = @_;
     if ((! defined($set) || ! $set)) { $set = 'unset'; }    # Default
 
     $bamid = GetBamid($bamid);
@@ -660,6 +661,15 @@ sub Where {
     if ($set eq 'qcresults') {
         my $qcdir = abs_path("$opts{netdir}/$opts{qcresultsdir}/$centername/$rundir");
         print "$qcdir\n";                       # File might not really exist
+        exit;
+    }
+ 
+    #   Print where SLURM console output can be found
+    if ($set eq 'console') {
+        my $dir = abs_path("$opts{netdir}/$opts{consoledir}");
+        my $outfile = '';
+        if (defined($extra1)) { $outfile = "$dir/$bamid-$extra1.out"; }
+        print "$dir $outfile\n";
         exit;
     }
  
@@ -987,6 +997,7 @@ topmedcmd.pl - Update the database for NHLBI TopMed
   topmedcmd.pl where 2199 bam              # Returns real path to bam and host of bam
   topmedcmd.pl where 2199 backup           # Returns path to backups directory and to backup file and host
   topmedcmd.pl where 2199 qcresults        # Returns path to directory for qc.results
+  topmedcmd.pl where 2199 console qplot    # Returns path to directory for SLURM output
   topmedcmd.pl where NWD00234 b37          # Returns path to remapped b37 directory and to file
   topmedcmd.pl where 2199 b38              # Returns path to remapped b38 directory and to file
 
@@ -1083,15 +1094,23 @@ Use this to get the bamid for a particular bamname.
 B<whatnwdid bamid|nwdid>
 Use this to get some details for a particular bam.
 
-B<where bamid|nwdid bam|backup|qcresults|b37|b38>
+B<where bamid|nwdid bam|backup|qcresults|console|b37|b38>
 If B<bam> was specified, display the path to the real bam file, not one that is symlinked
 and the host where the bam exists (or null string).
+
 If B<backup> was specified, display the path to the backup directory 
 and the path to the backup file (neither of which may not exist)
+
 If B<qcresults> was specified, display the path to the directory where
 the qc.results for this bamid will be (which may not exist)
+
+If B<console> was specified, display the path to the directory where
+the SLURM console output. If an additional field is provided (e.g. B<qplot>)
+than this the path to the qplot output is also provided.
+
 If B<b37> was specified, display the path to the directory of remapped data for build 37 (or 'none')
 and the path to the remapped file (which may not exist).
+
 If B<b38> was specified, display the path to the directory of remapped data for build 38 (or 'none')
 and the path to the remapped file (which may not exist).
 
