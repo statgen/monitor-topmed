@@ -84,6 +84,7 @@ our %opts = (
     qcresultsdir => 'incoming/qc.results',
     incomingdir => 'incoming/topmed',
     backupsdir => 'working/backups/incoming/topmed',
+    consoledir => 'working/topmed-output',
     resultsdir => 'working/schelcj/results',
     ascpcmd => "/usr/cluster/bin/ascp -i ".
         "/net/topmed/incoming/study.reference/send2ncbi/topmed-2-ncbi.pri -l 800M -k 1",
@@ -458,6 +459,43 @@ sub SQueue {
         printf("  %-18s %3d running / %3d queued / %3d not user topmed \n", $p, $running{$p}{count}, $queued{$p}{count}, $nottopmed); 
     }
     print "\n";
+
+    #   Get summary of IO data for key nodes
+    my @iostatinfo = ();
+    if (opendir(my $dh, "$opts{netdir}/$opts{consoledir}")) {
+        @iostatinfo = grep { /iostat.topmed\d*.txt/ } readdir($dh);
+        closedir $dh;
+        print "I/O Load          Incoming MB/s   Working MB/s\n" .
+            "         IOWait   reads  writes   reads  writes    Time\n";
+        foreach my $f (sort @iostatinfo) {
+            if (open(IN,"$opts{netdir}/$opts{consoledir}/$f")) {
+                #   Linux 3.13.0-85-generic (topmed5) 	07/21/2016 	_x86_64_	(120 CPU)
+                #
+                #   07/21/2016 09:54:01 AM
+                #   avg-cpu:  %user   %nice %system %iowait  %steal   %idle
+                #          32.50    0.00    2.17    2.95    0.00   62.38
+                #
+                #   Device:            tps    MB_read/s    MB_wrtn/s    MB_read    MB_wrtn
+                #   md20           3288.32        78.27        18.02  498062274  114686675
+                #   md21           3196.36        91.78         1.36  584041063    8643316                my ($datestamp, 
+                $_ = <IN>;                  # blank
+                $_ = <IN>;                  # Device etc
+                my ($date, $tod) = split(' ', <IN>);    # Get date and time
+                $_ = <IN>;                  # avg-cpu etc
+                my ($user, $nice, $system, $iowait) = split(' ', <IN>);     # Get iowait
+                $_ = <IN>;                  # blank
+                $_ = <IN>;                  # Device etc
+                my ($dev1, $tps1, $MB_reads1, $MB_writes1) = split(' ', <IN>);
+                my ($dev2, $tps2, $MB_reads2, $MB_writes2) = split(' ', <IN>);
+                close(IN);
+                if ($f =~ /(topmed\d*)\./) {
+                    printf("%-7s %6s%% %7s %7s %7s %7s  %s\n",
+                        $1, $iowait, $MB_reads1, $MB_writes1, $MB_reads2, $MB_writes2, $tod);
+                }
+            }
+        }
+        print "\n";
+    }
 
     #   Show summary of QOS
     print "QOS Summary\n";
