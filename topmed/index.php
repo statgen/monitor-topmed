@@ -243,6 +243,26 @@ if ($fcn == 'bamdetail') {
     print dofooter($HDR['footer']);
     exit;
 }
+if ($fcn == 'showout') {                // Show output from a SLURM job
+    $s='none';
+    if ($samplestate == '5') { $s = 'verify'; }
+    if ($samplestate == 'I') { $s = 'bai'; }
+    if ($samplestate == 'Q') { $s = 'qplot'; }
+    if ($samplestate == 'C') { $s = 'cram'; }
+    $cmd = "/usr/cluster/monitor/bin/topmedcmd.pl where $bamid console $s";
+    $ss = `$cmd`;
+    $a = explode(' ', $ss);
+    print "<h4 align='center'>SLURM console log for '$s' BAMID=$bamid</h4>\n<pre>\n";
+    if (! isset($a['1'])) { print "No console log known for this BAMID\n"; }
+    else {
+        $cmd = 'cat ' . $a['1'];
+        //print "CMD=$cmd\n\n";
+        print `$cmd`;
+    }
+    print "</pre>\n";
+    print dofooter($HDR['footer']);
+    exit;
+}
 if ($fcn == 'reqshow') {
     $a = 1;
     if ($iammgr) { $a = 0; }
@@ -681,7 +701,7 @@ function ViewBams($runid, $maxdirs, $iammgr) {
 
     //  Show details for each bam
     $url = $HDR['home'] . "/index.php?center=$centername&amp;maxdir=50";
-    $html .= "<h3 align='center'>$bamcount BAM Files for '$runname' [$runid] in center " .
+    $html .= "<h3 align='center'>$bamcount Files for '$runname' [$runid] in center " .
         "<a href='$url'>$center</a></h3>\n";
     $html .= "<p align='center'/>$SHOWQUEUES</p>\n";
 
@@ -696,7 +716,12 @@ function ViewBams($runid, $maxdirs, $iammgr) {
         $row = SQL_Fetch($result);
         reset($hdrcols);
         foreach ($hdrcols as $c) {
-            if ($c == 'QUIKSTAT') { $d = QuickStatus($row); }
+            if ($c == 'QUIKSTAT') {
+                $u = $_SERVER['SCRIPT_NAME'] . "?fcn=showout&amp;bamid=" .
+                    $row['bamid'] . "&amp;samplestate=XX";
+                $u = "<a href='$u' onclick='javascript:popup2(\"$u\",680,720); return false;'>XX</a>";
+                $d = QuickStatus($row, $u);     // Pass on URL for failing states
+            }
             else { $d = $row[$c]; }
             if ((! isset($d)) || ($d == '')) { $d = '&nbsp;'; }
             if ($c == 'bamname') {
@@ -1055,20 +1080,27 @@ function GetCenters() {
 }
 
 /*---------------------------------------------------------------
-# href = QuickStatus($r)
-#   $r = row of data for this BAM, contains dates for tasks
-#       datearrived,datemd5ver,datebackup,datecp2ncbi
+# href = QuickStatus($r, $url)
+#   $r = row of data for this BAM
+#   $url is a url to wrap around failed states. XX needs to be replaced
 #   Generate a short summary of the state for this directory
 #   Parameter is the row from the database
+#   Returns HTML
 ---------------------------------------------------------------*/
-function QuickStatus($r) {
+function QuickStatus($r, $url) {
     global $quickcols, $quickletter;
     $h = '';
+    $col = '';
     $span='notset';
     $cols = array_keys($quickcols);
     foreach ($cols as $c) {
         $val = DateState($r[$c]);
-        $h .= "<span class='$val'>&nbsp;" . $quickletter[$c] . "&nbsp;</span>";
+        //  For those marked as failed, set up link
+        $s =  $quickletter[$c];
+        if ($val == 'failed') {
+            $s = str_replace('XX', $quickletter[$c], $url);
+        } 
+        $h .= "<span class='$val'>&nbsp;" . $s . "&nbsp;</span>";
     }
     return $h;
 }
