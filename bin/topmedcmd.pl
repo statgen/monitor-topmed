@@ -435,7 +435,7 @@ sub SQueue {
             next;
         }
         if ($c[1] ne 'topmed') { next; }    # Not interested in anything but topmed
-        if ($c[4] ne 'topmed') { $nottopmed++; next; }    # Not topmed user
+        if ($c[4] ne 'topmed' && $c[4] ne 'schelcj') { $nottopmed++; next; }    # Not topmed user
         $partitions{$c[1]} = 1;
         if ($c[5] eq 'PD') {        # Queued
             push @{$queued{$c[1]}{data}},$l;
@@ -516,6 +516,7 @@ sub SQueue {
         foreach my $l (@{$running{$p}{data}}) {
             my @c = split(' ', $l);
             $c[3] =~ s/\d+\-//;             # Remove bamid from jobname
+            $c[3] =~ s/^NWD\d+/NWD/;        # This is remapping job
             $hosts{$c[8]}{$c[3]}++;         # Increment $hosts{topmed2}{cram}
         }
         print "   Partition $p:\n";
@@ -545,6 +546,7 @@ sub SQueue {
         my %longjobs = ();
         foreach my $l (@{$running{$p}{data}}) {
             my @c = split(' ', $l);
+            if ($c[3] =~ /^NWD/) { next; }
             my $t = $c[6];                  # Normalize all times to dd-hh:mm:ss
             my $days = '00-';
             if ($t =~ /^(\d+\-)(.+)/) { $days = $1; $t = $2; }
