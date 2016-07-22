@@ -72,7 +72,7 @@ md5sum -c $tmpfile
 rc=$?
 etime=`date +%s`
 etime=`expr $etime - $stime`
-echo "Command completed in $etime seconds"
+echo "MD5SUM  completed in $etime seconds"
 rm -f $tmpfile
 if [ "$rc" != "0" ]; then
   $topmedcmd mark $bamid $markverb failed
@@ -87,6 +87,7 @@ $topmedcmd set $bamid bamsize $sz
 
 #   Get the paired reads count for this file
 stime=`date +%s`
+echo "Calculate bamflagstat"
 $topmedflagstat $bamfile $bamid bamflagstat
 if [ "$?" != "0" ]; then
   $topmedcmd mark $bamid $markverb failed
