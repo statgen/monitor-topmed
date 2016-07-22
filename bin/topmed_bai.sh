@@ -6,7 +6,7 @@
 #
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 samtools=/net/mario/gotcloud/bin/samtools
-mem=8G                  # Artificially high so not too many on small nodes
+mem=4G                  # Artificially high so not too many on small nodes
 console=/net/topmed/working/topmed-output
 slurmp=topmed
 qos=topmed-bai
