@@ -75,42 +75,43 @@ etime=`expr $etime - $stime`
 echo "MD5SUM  completed in $etime seconds"
 rm -f $tmpfile
 if [ "$rc" != "0" ]; then
-  $topmedcmd mark $bamid $markverb failed
+  $topmedcmd -persist mark $bamid $markverb failed
   exit 1
 fi
-$topmedcmd mark $bamid $markverb completed
-echo `date` verify $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
 
 #   Set bamsize again to be sure
 sz=`ls -L -l $bamfile | awk '{print $5}'`
-$topmedcmd set $bamid bamsize $sz
+$topmedcmd -persist set $bamid bamsize $sz
 
 #   Get the paired reads count for this file
 stime=`date +%s`
 echo "Calculate bamflagstat"
 $topmedflagstat $bamfile $bamid bamflagstat
 if [ "$?" != "0" ]; then
-  $topmedcmd mark $bamid $markverb failed
+  $topmedcmd -persist mark $bamid $markverb failed
   exit 1
 fi
 etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "Calculated bamflagstat in $etime seconds"
 
+chmod 0444 $bamfile
+
 #   If original file was cram, then some fields are the same for both cram and bam
 if [ "$extension" = "cram" ]; then
-  a=`$topmedcmd show $bamid bamflagstat`
-  $topmedcmd set $bamid cramflagstat $a
-  a=`$topmedcmd show $bamid checksum`
-  $topmedcmd set $bamid cramchecksum $a
+  a=`$topmedcmd -persist show $bamid bamflagstat`
+  $topmedcmd -persist set $bamid cramflagstat $a
+  a=`$topmedcmd -persist show $bamid checksum`
+  $topmedcmd -persist set $bamid cramchecksum $a
+else
+  #   Rename the BAM file
+  $topmedrename $bamid $bamfile
+  if [ "$?" != "0" ]; then
+    $topmedcmd -persist mark $bamid $markverb failed
+    exit 1
+  fi
 fi
 
-#   Rename the BAM file
-chmod 0444 $bamfile
-$topmedrename $bamid $bamfile
-if [ "$?" != "0" ]; then
-  $topmedcmd mark $bamid $markverb failed
-  exit 1
-fi
-
+$topmedcmd -persist mark $bamid $markverb completed
+echo `date` verify $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
 exit
