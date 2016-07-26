@@ -77,6 +77,11 @@ fi
 
 #   Create output directory and CD there
 outdir=`$topmedcmd where $bamid qcresults`
+if [ "$outdir" = "" ]; then
+  echo "Unable to get QCRESULTS directory for '$bamid' - $outdir"
+  $topmedcmd mark $bamid $markverb failed
+  exit 3
+fi
 mkdir -p $outdir
 cd $outdir
 if [ "$?" != "0" ]; then
