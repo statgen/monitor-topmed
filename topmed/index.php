@@ -572,7 +572,7 @@ function ViewRuns($center, $maxdirs, $iammgr) {
 ---------------------------------------------------------------*/
 function ShowRunYear($cid, $maxdirs, $datayear, $iammgr) {
     global $LDB;
-    $hdrcols  = array('dirname', 'status', 'bamcount', 'build');
+    $hdrcols  = array('dirname', 'status', 'bamcount', 'build', 'offsite');
 
     //  Walk through database getting data for this center
     $sql = 'SELECT * FROM ' . $LDB['runs'] . " WHERE centerid=$cid AND datayear=$datayear";
