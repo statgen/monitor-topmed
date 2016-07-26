@@ -135,22 +135,6 @@ if ($#ARGV < 0 || $opts{help}) {
 }
 my $fcn = shift @ARGV;
 
-#   Our network can get flakey and the DBConnect can fail
-#   Catch when this happens and wait a bit and try again
-my $dbh;
-my $sleeptime = 10;
-for (1 .. 10) {
-    eval { $dbh = DBConnect($opts{realm}); };
-    if ($@) {                           # Failed, wait a bit and try again
-        print "Datbase connection failed, wait and retry\n";
-        sleep($sleeptime);
-        $sleeptime += 10;
-    }
-    else { last; }
-}
-if ($@) { die $@ . "\n"; }
-#my $dbh = DBConnect($opts{realm});
-
 #--------------------------------------------------------------
 #   Execute the command provided
 #--------------------------------------------------------------
@@ -183,7 +167,7 @@ sub Mark {
     }
 
     #   Make sure this is a bam we know
-    my $sth = DoSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE bamid=$bamid", 0);
+    my $sth = ExecSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
 
@@ -191,53 +175,53 @@ sub Mark {
     my $col = $VALIDVERBS{$op};
     my $done = 0;
     if ($state eq 'requested') {
-        DoSQL("UPDATE $opts{bamfiles_table} SET $col=$REQUESTED WHERE bamid=$bamid");
+        ExecSQL("UPDATE $opts{bamfiles_table} SET $col=$REQUESTED WHERE bamid=$bamid");
         $done++;
     }
     if ($state eq 'completed') {
-        DoSQL("UPDATE $opts{bamfiles_table} SET $col=$COMPLETED WHERE bamid=$bamid");
+        ExecSQL("UPDATE $opts{bamfiles_table} SET $col=$COMPLETED WHERE bamid=$bamid");
         if ($col eq 'state_arrive') {       # hack for Chris until new code in place
-            DoSQL("UPDATE $opts{bamfiles_table} SET datearrived='" . time() . "' WHERE bamid=$bamid");
+            ExecSQL("UPDATE $opts{bamfiles_table} SET datearrived='" . time() . "' WHERE bamid=$bamid");
         }
         if ($col eq 'state_md5ver') {       # hack for Chris until new code in place
-            DoSQL("UPDATE $opts{bamfiles_table} SET datemd5ver='" . time() . "' WHERE bamid=$bamid");
+            ExecSQL("UPDATE $opts{bamfiles_table} SET datemd5ver='" . time() . "' WHERE bamid=$bamid");
         }
         if ($col eq 'state_b37') {          # hack for Chris until new code in place
-            DoSQL("UPDATE $opts{bamfiles_table} SET datemapping='" . time() . "' WHERE bamid=$bamid");
+            ExecSQL("UPDATE $opts{bamfiles_table} SET datemapping='" . time() . "' WHERE bamid=$bamid");
         }
         $done++;
     }
     if ($state eq 'delivered') {
-        DoSQL("UPDATE $opts{bamfiles_table} SET $col=$DELIVERED WHERE bamid=$bamid");
+        ExecSQL("UPDATE $opts{bamfiles_table} SET $col=$DELIVERED WHERE bamid=$bamid");
         $done++;
     }
     if ($state eq 'started') {
-        DoSQL("UPDATE $opts{bamfiles_table} SET $col=$STARTED WHERE bamid=$bamid");
+        ExecSQL("UPDATE $opts{bamfiles_table} SET $col=$STARTED WHERE bamid=$bamid");
         $done++;
     }
     if ($state eq 'failed') {
-        DoSQL("UPDATE $opts{bamfiles_table} SET $col=$FAILED WHERE bamid=$bamid");
+        ExecSQL("UPDATE $opts{bamfiles_table} SET $col=$FAILED WHERE bamid=$bamid");
         if ($col eq 'state_arrive') {       # hack for Chris until new code in place
-            DoSQL("UPDATE $opts{bamfiles_table} SET datearrived='-1' WHERE bamid=$bamid");
+            ExecSQL("UPDATE $opts{bamfiles_table} SET datearrived='-1' WHERE bamid=$bamid");
         }
         if ($col eq 'state_md5ver') {       # hack for Chris until new code in place
-            DoSQL("UPDATE $opts{bamfiles_table} SET datemd5ver='-1' WHERE bamid=$bamid");
+            ExecSQL("UPDATE $opts{bamfiles_table} SET datemd5ver='-1' WHERE bamid=$bamid");
         }
         if ($col eq 'state_b37') {          # hack for Chris until new code in place
-            DoSQL("UPDATE $opts{bamfiles_table} SET datemapping='-1' WHERE bamid=$bamid");
+            ExecSQL("UPDATE $opts{bamfiles_table} SET datemapping='-1' WHERE bamid=$bamid");
         }
         $done++;
     }
     if ($state eq 'cancelled') {
-        DoSQL("UPDATE $opts{bamfiles_table} SET $col=$CANCELLED WHERE bamid=$bamid");
+        ExecSQL("UPDATE $opts{bamfiles_table} SET $col=$CANCELLED WHERE bamid=$bamid");
         $done++;
     }
     if ($state eq 'submitted') {
-        DoSQL("UPDATE $opts{bamfiles_table} SET $col=$SUBMITTED WHERE bamid=$bamid");
+        ExecSQL("UPDATE $opts{bamfiles_table} SET $col=$SUBMITTED WHERE bamid=$bamid");
         $done++;
     }
     if ($state eq 'notset') {
-        DoSQL("UPDATE $opts{bamfiles_table} SET $col=$NOTSET WHERE bamid=$bamid");
+        ExecSQL("UPDATE $opts{bamfiles_table} SET $col=$NOTSET WHERE bamid=$bamid");
         $done++;
     }
     if ($done) {
@@ -260,12 +244,12 @@ sub UnMark {
     }
 
     #   Make sure this is a bam we know
-    my $sth = DoSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE bamid=$bamid", 0);
+    my $sth = ExecSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
 
     my $col = $VALIDVERBS{$op};
-    DoSQL("UPDATE $opts{bamfiles_table} SET $col=$NOTSET WHERE bamid=$bamid");
+    ExecSQL("UPDATE $opts{bamfiles_table} SET $col=$NOTSET WHERE bamid=$bamid");
     if ($opts{verbose}) { print "$Script  'unmark $bamid $op'  successful\n"; }
 }
 
@@ -286,6 +270,7 @@ sub Export {
     print $s . "FULLPATH\n";
     
     #   Get all the known centers in the database
+    DBConnect($opts{realm});
     my $centersref = GetCenters();
     foreach my $cid (keys %{$centersref}) {
         my $centername = $centersref->{$cid};
@@ -296,7 +281,7 @@ sub Export {
             #   Get list of all bams that have not yet arrived properly
             my $sql = "SELECT * FROM " .
                 $opts{bamfiles_table} . " WHERE runid='$runid'";
-            my $sth = DoSQL($sql);
+            my $sth = ExecSQL($sql);
             my $rowsofdata = $sth->rows();
             if (! $rowsofdata) { next; }
             for (my $i=1; $i<=$rowsofdata; $i++) {
@@ -329,7 +314,7 @@ sub WhatBAMID {
     my ($bamname) = @_;
 
     if ($bamname =~ /\/(\S+)$/) { $bamname = $1; }
-    my $sth = DoSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE bamname='$bamname'", 0);
+    my $sth = ExecSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE bamname='$bamname'");
     if (! $sth) { exit 1; }
     my $href = $sth->fetchrow_hashref;
     if (defined($href->{bamid})) { print $href->{bamid} . "\n"; }
@@ -345,7 +330,7 @@ sub WhatNWDID {
     my ($nwdid) = @_;
 
     if ($nwdid =~ /^\d+/) {             # If bamid, get NWDID
-        my $sth = DoSQL("SELECT expt_sampleid FROM $opts{bamfiles_table} WHERE bamid=$nwdid", 0);
+        my $sth = ExecSQL("SELECT expt_sampleid FROM $opts{bamfiles_table} WHERE bamid=$nwdid");
         if ($sth) {
             my $href = $sth->fetchrow_hashref;
             $nwdid = $href->{expt_sampleid};
@@ -356,15 +341,15 @@ sub WhatNWDID {
     }
 
     #   Reconstruct partial path to BAM
-    my $sth = DoSQL("SELECT runid,bamid FROM $opts{bamfiles_table} WHERE expt_sampleid='$nwdid'", 0);
+    my $sth = ExecSQL("SELECT runid,bamid FROM $opts{bamfiles_table} WHERE expt_sampleid='$nwdid'");
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - NWDID '$nwdid' is unknown\n"; }
     my $href = $sth->fetchrow_hashref;
     my $bamid = $href->{bamid};
-    $sth = DoSQL("SELECT centerid,dirname FROM $opts{runs_table} WHERE runid=$href->{runid}");
+    $sth = ExecSQL("SELECT centerid,dirname FROM $opts{runs_table} WHERE runid=$href->{runid}");
     $href = $sth->fetchrow_hashref;
     my $run = $href->{dirname};
-    $sth = DoSQL("SELECT centername FROM $opts{centers_table} WHERE centerid=$href->{centerid}");
+    $sth = ExecSQL("SELECT centername FROM $opts{centers_table} WHERE centerid=$href->{centerid}");
     $href = $sth->fetchrow_hashref;
     my $center = uc($href->{centername});
     print "$nwdid/$bamid can be found in run '$run' for center $center\n";
@@ -583,11 +568,11 @@ sub ReFormatPartitionData {
     my $dir = '?';
     if ($c[3] =~ /^(\d+)/) {
         my $bamid=$1;
-        my $sth = DoSQL("SELECT runid,expt_sampleid FROM $opts{bamfiles_table} WHERE bamid=$bamid", 0);
+        my $sth = ExecSQL("SELECT runid,expt_sampleid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
         if ($sth) {
             my $href = $sth->fetchrow_hashref;
             if (defined($href->{expt_sampleid})) { $nwdid = $href->{expt_sampleid}; }
-            $sth = DoSQL("SELECT dirname FROM $opts{runs_table} WHERE runid=$href->{runid}", 0);
+            $sth = ExecSQL("SELECT dirname FROM $opts{runs_table} WHERE runid=$href->{runid}");
             if ($sth) {
                 $href = $sth->fetchrow_hashref;
                 $dir = $href->{dirname};
@@ -616,7 +601,7 @@ sub Where {
     $bamid = GetBamid($bamid);
 
     #   Get values of interest from the database
-    my $sth = DoSQL("SELECT runid,bamname,cramname,piname,expt_sampleid FROM $opts{bamfiles_table} WHERE bamid=$bamid", 0);
+    my $sth = ExecSQL("SELECT runid,bamname,cramname,piname,expt_sampleid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
     my $href = $sth->fetchrow_hashref;
@@ -625,13 +610,13 @@ sub Where {
     my $piname = $href->{piname};
     my $nwdid = $href->{expt_sampleid};
     my $runid = $href->{runid};
-    $sth = DoSQL("SELECT centerid,dirname FROM $opts{runs_table} WHERE runid=$runid", 0);
+    $sth = ExecSQL("SELECT centerid,dirname FROM $opts{runs_table} WHERE runid=$runid");
     $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' run '$runid' is unknown\n"; }
     $href = $sth->fetchrow_hashref;
     my $rundir = $href->{dirname};
     my $centerid = $href->{centerid};
-    $sth = DoSQL("SELECT centername FROM $opts{centers_table} WHERE centerid=$centerid", 0);
+    $sth = ExecSQL("SELECT centername FROM $opts{centers_table} WHERE centerid=$centerid");
     $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' center '$centerid' is unknown\n"; }
     $href = $sth->fetchrow_hashref;
@@ -723,7 +708,7 @@ sub Permit {
         my ($centerid, $runid) = GetBamidInfo($bamid);
 
         #   This is a small table, read it all
-        $sth = DoSQL("SELECT runid,centerid,operation FROM $opts{permissions_table}", 0);
+        $sth = ExecSQL("SELECT runid,centerid,operation FROM $opts{permissions_table}");
         $rowsofdata = $sth->rows();
         if (! $rowsofdata) { exit(1); }                 # Table empty, permitted
         for (my $i=1; $i<=$rowsofdata; $i++) {
@@ -744,13 +729,13 @@ sub Permit {
     if ($fcn eq 'remove') {
         my ($id) = @_;
         $sql = "SELECT * FROM $opts{permissions_table} WHERE id=$id";
-        $sth = DoSQL($sql, 0);
+        $sth = ExecSQL($sql);
         $rowsofdata = $sth->rows();
         if (! $rowsofdata) { die "Permission '$id' does not exist\n"; }
         $href = $sth->fetchrow_hashref;
         my $s = "$href->{centername} / $href->{dirname} / $href->{operation}";
         $sql = "DELETE FROM $opts{permissions_table} WHERE id='$id'";
-        $sth = DoSQL($sql, 0);
+        $sth = ExecSQL($sql);
         if (! $sth) { die "Failed to remove permission '$fcn' for 'id=$id $s'\nSQL=$sql"; }
         print "Deleted permission control for '$s'\n";
         exit;
@@ -771,7 +756,7 @@ sub Permit {
     #   Verify op and run and center setting runid and centerid
     if ($center ne 'all') {
         $sql = "SELECT centerid FROM $opts{centers_table} WHERE centername='$center'";
-        $sth = DoSQL($sql, 0);
+        $sth = ExecSQL($sql);
         $rowsofdata = $sth->rows();
         if (! $rowsofdata) { die "Center '$center' is not known\n"; }
         $href = $sth->fetchrow_hashref;
@@ -780,7 +765,7 @@ sub Permit {
 
     if ($run ne 'all') {
         $sql = "SELECT runid FROM $opts{runs_table} WHERE dirname='$run'";
-        $sth = DoSQL($sql, 0);
+        $sth = ExecSQL($sql);
         $rowsofdata = $sth->rows();
         if (! $rowsofdata) { die "Run '$run' is not known\n"; }
         $href = $sth->fetchrow_hashref;
@@ -790,7 +775,7 @@ sub Permit {
     $sql = "INSERT INTO $opts{permissions_table} " .
         "(centername,dirname,centerid,runid,operation) " .
         "VALUES ('$center', '$run', $centerid, $runid, '$op')";
-    $sth = DoSQL($sql, 0);
+    $sth = ExecSQL($sql);
     if (! $sth) { die "Failed to add permission '$fcn' for '$op'\nSQL=$sql"; }
     print "Added permission '$center / $runid / $op'\n";
     exit;
@@ -806,12 +791,12 @@ sub GetBamidInfo {
     my ($bamid) = @_;
 
     if ($bamid !~ /^\d+$/) { return (0,0); }     # No bamid, no ids
-    my $sth = DoSQL("SELECT runid FROM $opts{bamfiles_table} WHERE bamid=$bamid", 0);
+    my $sth = ExecSQL("SELECT runid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
     my $href = $sth->fetchrow_hashref;
     my $runid = $href->{runid};
-    $sth = DoSQL("SELECT centerid FROM $opts{runs_table} WHERE runid=$runid", 0);
+    $sth = ExecSQL("SELECT centerid FROM $opts{runs_table} WHERE runid=$runid");
     $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' has no center?  How'd that happen?\n"; }
     $href = $sth->fetchrow_hashref;
@@ -830,12 +815,12 @@ sub Set {
     $bamid = GetBamid($bamid);
 
     #   Make sure this is a bam we know
-    $sth = DoSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE bamid=$bamid", 0);
+    $sth = ExecSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
     $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
 
     if ($col eq 'nwdid') { $col = 'expt_sampleid'; }
-    DoSQL("UPDATE $opts{bamfiles_table} SET $col='$val' WHERE bamid=$bamid");
+    ExecSQL("UPDATE $opts{bamfiles_table} SET $col='$val' WHERE bamid=$bamid");
 }
 
 #==================================================================
@@ -852,7 +837,7 @@ sub Show {
     my ($sth, $rowsofdata, $href);
     $bamid = GetBamid($bamid);
     
-    $sth = DoSQL("SELECT bamid,runid FROM $opts{bamfiles_table} WHERE bamid=$bamid", 0);
+    $sth = ExecSQL("SELECT bamid,runid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
     $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
     $href = $sth->fetchrow_hashref;
@@ -860,7 +845,7 @@ sub Show {
 
     #   Get run if asked for it
     if ($col eq 'run') {
-        $sth = DoSQL("SELECT centerid,dirname FROM $opts{runs_table} WHERE runid=$href->{runid}", 0);
+        $sth = ExecSQL("SELECT centerid,dirname FROM $opts{runs_table} WHERE runid=$href->{runid}");
         $rowsofdata = $sth->rows();
         if (! $rowsofdata) { die "$Script - RUNID '$href->runid' is unknown\n"; }
         $href = $sth->fetchrow_hashref;
@@ -870,12 +855,12 @@ sub Show {
 
     #   Get center if asked for it
     if ($col eq 'center') {
-        $sth = DoSQL("SELECT centerid FROM $opts{runs_table} WHERE runid=$href->{runid}", 0);
+        $sth = ExecSQL("SELECT centerid FROM $opts{runs_table} WHERE runid=$href->{runid}");
         $rowsofdata = $sth->rows();
         if (! $rowsofdata) { die "$Script - RUNID '$href->runid' is unknown\n"; }
         $href = $sth->fetchrow_hashref;
 
-        $sth = DoSQL("SELECT centername FROM $opts{centers_table} WHERE centerid=$href->{centerid}", 0);
+        $sth = ExecSQL("SELECT centername FROM $opts{centers_table} WHERE centerid=$href->{centerid}");
         $rowsofdata = $sth->rows();
         if (! $rowsofdata) { die "$Script - CENTERID '$href->centerid' is unknown\n"; }
         $href = $sth->fetchrow_hashref;
@@ -885,19 +870,19 @@ sub Show {
 
     #   Show everything in YAML format
     if ($col eq 'yaml') {
-        $sth = DoSQL("SELECT centerid,dirname FROM $opts{runs_table} WHERE runid=$runid", 0);
+        $sth = ExecSQL("SELECT centerid,dirname FROM $opts{runs_table} WHERE runid=$runid");
         $rowsofdata = $sth->rows();
         if (! $rowsofdata) { die "$Script - RUNID '$runid' is unknown\n"; }
         $href = $sth->fetchrow_hashref;
         my $run = $href->{dirname};
 
-        $sth = DoSQL("SELECT centername FROM $opts{centers_table} WHERE centerid=$href->{centerid}", 0);
+        $sth = ExecSQL("SELECT centername FROM $opts{centers_table} WHERE centerid=$href->{centerid}");
         $rowsofdata = $sth->rows();
         if (! $rowsofdata) { die "$Script - CENTERID '$href->centerid' is unknown\n"; }
         $href = $sth->fetchrow_hashref;
         my $center = $href->{centername};
 
-        $sth = DoSQL("SELECT * FROM $opts{bamfiles_table} WHERE bamid=$bamid", 0);
+        $sth = ExecSQL("SELECT * FROM $opts{bamfiles_table} WHERE bamid=$bamid");
         $rowsofdata = $sth->rows();
         if (! $rowsofdata) { die "$Script - BAM '$bamid' or column '$col' is unknown\n"; }
         $href = $sth->fetchrow_hashref;
@@ -908,7 +893,7 @@ sub Show {
     }
 
     #   Get value of column we asked for
-    $sth = DoSQL("SELECT $col FROM $opts{bamfiles_table} WHERE bamid=$bamid", 0);
+    $sth = ExecSQL("SELECT $col FROM $opts{bamfiles_table} WHERE bamid=$bamid");
     $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' or column '$col' is unknown\n"; }
     $href = $sth->fetchrow_hashref;
@@ -924,6 +909,7 @@ sub Show {
 sub ShowArrived {
     my ($fcn) = @_;
     #   Get all the known centers in the database
+    DBConnect($opts{realm});
     my $centersref = GetCenters();
     foreach my $cid (keys %{$centersref}) {
         my $centername = $centersref->{$cid};
@@ -934,7 +920,7 @@ sub ShowArrived {
             #   Get list of all bams that have not yet arrived properly
             my $sql = "SELECT bamid,bamname,state_arrived FROM " .
                 $opts{bamfiles_table} . " WHERE runid='$runid'";
-            my $sth = DoSQL($sql);
+            my $sth = ExecSQL($sql);
             my $rowsofdata = $sth->rows();
             if (! $rowsofdata) { next; }
             for (my $i=1; $i<=$rowsofdata; $i++) {
@@ -962,7 +948,7 @@ sub GetBamid {
     if ($bamid =~ /^\d+$/) { return $bamid; }
 
     if ($bamid =~ /^NWD/){
-        $sth = DoSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE expt_sampleid='$bamid'", 0);
+        $sth = ExecSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE expt_sampleid='$bamid'");
         $rowsofdata = $sth->rows();
         if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
         $href = $sth->fetchrow_hashref;
@@ -972,6 +958,19 @@ sub GetBamid {
         die "$Script - Invalid bamid or NWDID ($bamid). Try '$Script -help'\n";
     }
     return $bamid;
+}
+
+#==================================================================
+# Subroutine:
+#   ExecSQL($sql)
+#
+#   Execute SQL.  Keep trying if connection lost.
+#
+#   Returns handle for SQL
+#==================================================================
+sub ExecSQL {
+    my ($sql) = @_;
+    return PersistDoSQL($opts{realm}, $sql)
 }
 
 #==================================================================

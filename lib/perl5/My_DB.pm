@@ -12,8 +12,8 @@ use vars qw(@EXPORT_OK @EXPORT @ISA $DBC $DBH);
 use Exporter;
 
 @ISA = qw(Exporter);
-@EXPORT_OK = qw(DBConnect DoSQL);
-@EXPORT    = qw(DBConnect DoSQL);
+@EXPORT_OK = qw(DBConnect DoSQL PersistDBConnect PersistDoSQL);
+@EXPORT    = qw(DBConnect DoSQL PersistDBConnect PersistDoSQL);
 
 our ($DBC, $DBH);
 
@@ -47,6 +47,44 @@ sub DBConnect {
 
 #==================================================================
 # Subroutine:
+#   PersistDBConnect($realm)
+#
+#   Connect to our database using realm '$realm'. Return a DB handle.
+#   Get the connection information from DBIx::Connector
+#   Fully qualified realm file may be provided
+#   If the connection fails, keep trying for quite some time.
+#==================================================================
+sub PersistDBConnect {
+    my ($realm) = @_;
+    if (! $realm) { die "PersistDBConnect: No REALM provided\n"; }
+
+    #   Networks can get flakey and the DBConnect can fail. Be persistent
+    for (my $maxsleep=120; $maxsleep>0; $maxsleep-=10) {
+        undef($DBH);
+        #   Get the connection information FROM DBIx::Connector
+        #   Fully qualified realm file may be provided
+        if ($realm =~ /^(\/.+)\/([^\/]+)$/) {
+            my $d = $1;
+            $realm = $2;
+            $DBC = new DBIx::Connector(-realm => $realm, -connection_dir => $d);
+        }
+        else {
+            $DBC = new DBIx::Connector(-realm => $realm);
+        }
+        if ($DBC) { $DBH = $DBC->connect(); }
+        if ($DBH) {                         # Connect seems to have succeeded
+            $DBH->{mysql_auto_reconnect} = 1;       # On timeout, reconnect please
+            return $DBH;
+        }
+        #   Connection failed, wait and retry
+        if ($main::opts{verbose} > 1) { warn "PersistDBConnect: Datbase connection failed, wait and retry\n"; }
+        sleep(10);
+    }
+    die "PersistDBConnect: After many retries, never able to connect to database. REALM=$realm\n";
+}
+
+#==================================================================
+# Subroutine:
 #   DoSQL - Execute an SQL command
 #
 # Arguments:
@@ -62,15 +100,54 @@ sub DoSQL {
     if (! defined($die)) { $die = 1; }
     if ($main::opts{verbose} > 1) { warn "DEBUG: SQL=$sql\n"; }
     my $sth = $DBH->prepare($sql);
-    {
-        if (! $die) { $DBH->{RaiseError} = 0; $DBH->{PrintError} = 0; }
-        $sth->execute();
-    }
+    if (! $die) { $DBH->{RaiseError} = 0; $DBH->{PrintError} = 0; }
+    $sth->execute();
     if ($DBI::err) {
         if (! $die) { return 0; }
         die "SQL failure: $DBI::errstr\n  SQL=$sql\n";
     }
     return $sth;
+}
+
+#==================================================================
+# Subroutine:
+#   PersistDoSQL($realm, $sql)
+#   Connect to our database using realm '$realm' and Execute SQL.
+#   If this fails for some environment error (e.g. lost connection)
+#   persist for a long time.
+#   Our intent is that this SQL command simply must complete
+#   unless the SQL itself is invalid.
+#
+# Arguments:
+#   realm - realm giving DB connection information
+#   sql - String of SQL to run
+#
+# Returns:
+#   SQL handle for subsequent MySQL actions
+#   Does not return if error detected
+#==================================================================
+sub PersistDoSQL {
+    my ($realm, $sql) = @_;
+    my $emsg;
+    if ($main::opts{verbose} > 1) { warn "DEBUG: SQL=$sql\n"; }
+
+    for (my $maxsleep=120; $maxsleep>0; $maxsleep-=5) {   
+        if (! $DBH) { PersistDBConnect($realm); }
+        my $sth = $DBH->prepare($sql);
+        if ($sth) {
+            $sth->execute();
+            if (! $DBI::err) { return $sth; }   # Success !
+        }
+        #   Failed. Keep trying for certain kinds of errors, else fail
+        $emsg = $DBI::errstr;
+        if ($emsg !~ /Lost connection/) {
+            die "SQL failure: $emsg\n  SQL=$sql\n";
+        }
+        undef($DBH);                    # Force reconnect to server
+        if ($main::opts{verbose} > 1) { warn "PersistDoSQL: $emsg, wait and retry\n"; }
+        sleep(5);
+    }
+     die "SQL failure: $emsg\n  SQL=$sql\n";
 }
 
 #==================================================================
