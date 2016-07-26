@@ -71,29 +71,29 @@ if [ "$extension" = "cram" ]; then
 fi
 if [ ! -f $bai ]; then
   echo "Index '$bai' does not exist"
-  $topmedcmd mark $bamid $markverb failed
+  $topmedcmd -persist mark $bamid $markverb failed
   exit 3
 fi
 
 #   Create output directory and CD there
-outdir=`$topmedcmd where $bamid qcresults`
+outdir=`$topmedcmd -persist where $bamid qcresults`
 if [ "$outdir" = "" ]; then
   echo "Unable to get QCRESULTS directory for '$bamid' - $outdir"
-  $topmedcmd mark $bamid $markverb failed
+  $topmedcmd -persist mark $bamid $markverb failed
   exit 3
 fi
 mkdir -p $outdir
 cd $outdir
 if [ "$?" != "0" ]; then
   echo "Unable to CD to qplot output directory for '$bamid' - $outdir"
-  $topmedcmd mark $bamid $markverb failed
+  $topmedcmd -persist mark $bamid $markverb failed
   exit 3
 fi
 echo "Files will be created in $outdir"
 
 #   Run qplot, output written to current working directory
 basebam=`basename $bamfile .$extension`
-build=`$topmedcmd show $bamid build`
+build=`$topmedcmd -persist show $bamid build`
 rc=none
 echo "Running qplot for build '$build'"
 if [ "$build" = "37" ]; then
@@ -108,12 +108,12 @@ if [ "$build" = "38" ]; then
 fi
 if [ "$rc" = "none" ]; then
   echo "Unknown build '$build', cannot continue with qplot for '$bamfile'"
-  $topmedcmd mark $bamid $markverb failed
+  $topmedcmd -persist mark $bamid $markverb failed
   exit 3
 fi
 if [ "$rc" != "0" ]; then
   echo "QPLOT failed for '$bamfile'"
-  $topmedcmd mark $bamid $markverb failed
+  $topmedcmd -persist mark $bamid $markverb failed
   rm -f $basebam.*
   exit 4
 fi
@@ -121,7 +121,7 @@ etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "QPLOT on '$bamfile' successful (at second $etime)"
 
-nwdid=`$topmedcmd show $bamid expt_sampleid`
+nwdid=`$topmedcmd -persist show $bamid expt_sampleid`
 if [ "$nwdid" = "" ]; then
   echo "Unable to find the NWDID for '$bamid'"
   exit 6
@@ -146,7 +146,7 @@ else
 fi
 if [ "$rc" != "0" ]; then
   echo "VerifyBAMID failed for '$bamid'"
-  $topmedcmd mark $bamid $markverb failed
+  $topmedcmd -persist mark $bamid $markverb failed
   rm -f $basebam.*
   exit 5
 fi
@@ -162,10 +162,10 @@ ls -la $basebam.*
 $topmedqplot $outdir $nwdid
 if [ "$?" != "0" ]; then
   echo "Unable to update the database with the QCPLOT results for '$bamid' [$outdir $nwdid]"
-  $topmedcmd mark $bamid $markverb failed
+  $topmedcmd -persist mark $bamid $markverb failed
   exit 7
 fi
 
-$topmedcmd mark $bamid $markverb completed
+$topmedcmd -persist mark $bamid $markverb completed
   echo `date` qplot $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
 exit 0

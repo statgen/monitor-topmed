@@ -6,7 +6,7 @@
 #
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 samtools=/net/mario/gotcloud/bin/samtools
-mem=4G                  # Artificially high so not too many on small nodes
+mem=4G
 console=/net/topmed/working/topmed-output
 slurmp=topmed
 qos=topmed-bai
@@ -58,8 +58,9 @@ if [ "$extension" = "cram" ]; then
   bai=$bamfile.crai
 fi
 if [ -f $bai ]; then
+  chmod 0444 $bai
   echo "Using existing index file '$bai'"
-  $topmedcmd mark $bamid baid completed
+  $topmedcmd -persist mark $bamid baid completed
   exit 0
 fi
 
@@ -67,12 +68,12 @@ echo "Creating index file '$bai'"
 $samtools index $bamfile 2>&1
 if [ "$?" != "0" ]; then
   echo "Unable to create index file"
-  $topmedcmd mark $bamid baid failed
+  $topmedcmd -persist mark $bamid baid failed
   exit 2
 fi
 etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "Created index '$bai' (at second $etime)"
-$topmedcmd mark $bamid baid completed
+$topmedcmd -persist mark $bamid baid completed
 echo `date` bai $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
 
