@@ -1010,7 +1010,7 @@ function RestartJobs($h) {
         "<td>&nbsp;</td>";
     $html .= "<td><select name='op'>" .
         "<option value='none'>none</option>" .
-        "<option value='verify'>verify</option>" .
+        "<option value='md5ver'>verify</option>" .
         "<option value='bai'>bai</option>" .
         "<option value='qplot'>qplot</option>" .
         "<option value='cram'>cram</option>" .
