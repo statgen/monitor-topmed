@@ -92,6 +92,7 @@ l=(`$topmedcmd where $bamid backup`)
 backupdir="${l[0]}"
 if [ "$backupdir" = "" ]; then
   echo "Unable to determine backup directory for '$bamid'"
+  $topmedcmd -persist mark $bamid $markverb failed
   exit 2
 fi
 
@@ -100,7 +101,7 @@ mkdir -p $backupdir
 cd $backupdir
 if [ "$?" != "0" ]; then
   echo "Unable to CD $backupdir"
-  $topmedcmd mark $bamid $markverb failed
+  $topmedcmd -persist mark $bamid $markverb failed
   exit 2
 fi
 s=`hostname`
@@ -117,7 +118,7 @@ chmod 555 $bamfile 2> /dev/null
 nwdid=`$topmedcmd show $bamid expt_sampleid`
 if [ "$nwdid" = "" ]; then
   echo "NWDID not set for $bamid $bamfile"
-  $topmedcmd mark $bamid $markverb failed
+  $topmedcmd -persist mark $bamid $markverb failed
   exit 3
 fi
 newname="$nwdid.src.cram"
@@ -129,33 +130,39 @@ newname="$nwdid.src.cram"
 #   create a cram, but just copy it elsewhere.
 #======================================================================
 if [ "$extension" = "cram" ]; then
-  now=`date +%s`
-  cp -p $bamfile.crai $backupdir/$newname.crai
-  if [ "$?" != "0" ]; then
-    echo "Copy command failed: cp -p $bamfile.crai $backupdir/$newname.crai"
-    $topmedcmd mark $bamid $markverb failed
-    exit 3
-  fi
+  d=`$topmedcmd -persist show $bamid run`
+  offsite=`$topmedcmd -persist show $d offsite`
+  if [ "$offsite" = "N" ]; then
+    now=`date +%s`
+    cp -p $bamfile.crai $backupdir/$newname.crai
+    if [ "$?" != "0" ]; then
+      echo "Copy command failed: cp -p $bamfile.crai $backupdir/$newname.crai"
+      $topmedcmd -persist mark $bamid $markverb failed
+      exit 3
+    fi
 
-  cp -p $bamfile $backupdir/$newname
-  if [ "$?" != "0" ]; then
-    echo "Copy command failed: cp -p $bamfile $backupdir/$newname"
-    $topmedcmd mark $bamid $markverb failed
-    exit 3
+    cp -p $bamfile $backupdir/$newname
+    if [ "$?" != "0" ]; then
+      echo "Copy command failed: cp -p $bamfile $backupdir/$newname"
+      $topmedcmd -persist mark $bamid $markverb failed
+      exit 3
+    fi
+    chmod 0444 $backupdir/$newname
+    s=`date +%s`; s=`expr $s - $now`; echo "Copy completed in $s seconds"
+  else
+    echo "No copy of '$bamfile made because this will be copied offsite"
   fi
-  chmod 444 $backupdir/$newname
-  s=`date +%s`; s=`expr $s - $now`; echo "Copy completed in $s seconds"
 
   # The md5 for the backup is the same as that for the input
   md5=`$topmedcmd show $bamid checksum`
-  $topmedcmd set $bamid cramchecksum $md5
+  $topmedcmd -persist set $bamid cramchecksum $md5
 
   #   Paired reads count for this file is unchanged
-  reads=`$topmedcmd show $bamid bamflagstat`
-  $topmedcmd set $bamid cramflagstat $reads
+  reads=`$topmedcmd -persist show $bamid bamflagstat`
+  $topmedcmd -persist set $bamid cramflagstat $reads
 
   #   All was good
-  $topmedcmd mark $bamid $markverb completed
+  $topmedcmd -persist mark $bamid $markverb completed
   etime=`date +%s`
   etime=`expr $etime - $stime`
   echo `date` cram $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
@@ -173,7 +180,7 @@ now=`date +%s`
 $topmedflagstat $bamfile $bamid bamflagstat /tmp/${chkname}.init.stat
 if [ "$?" != "0" ]; then
   echo "Command failed: $flagstat $bamfile"
-  $topmedcmd mark $bamid $markverb failed
+  $topmedcmd -persist mark $bamid $markverb failed
   exit 3
 fi
 s=`date +%s`; s=`expr $s - $now`; echo "$flagstat completed in $s seconds"
@@ -199,7 +206,7 @@ else
 fi
 if [ "$?" != "0" ]; then
   echo "Command failed: $bindir/bam squeeze  --in $bamfile ..."
-  $topmedcmd mark $bamid $markverb failed
+  $topmedcmd -persist mark $bamid $markverb failed
   exit 1
 fi
 s=`date +%s`; s=`expr $s - $now`; echo "Cram created in $s seconds"
@@ -209,7 +216,7 @@ now=`date +%s`
 $samtools index $newname
 if [ "$?" != "0" ]; then
   echo "Command failed: $samtools index $newname"
-  $topmedcmd mark $bamid $markverb failed
+  $topmedcmd -persist mark $bamid $markverb failed
   exit 3
 fi
 s=`date +%s`; s=`expr $s - $now`; echo "Cram index created in $s seconds"
@@ -219,7 +226,7 @@ now=`date +%s`
 $topmedflagstat $newname $bamid cramflagstat /tmp/${chkname}.cram.stat
 if [ "$?" != "0" ]; then
   echo "Command failed: $flagstat $bamfile"
-  $topmedcmd mark $bamid $markverb failed
+  $topmedcmd -persist mark $bamid $markverb failed
   exit 3
 fi
 s=`date +%s`; s=`expr $s - $now`; echo "$flagstat for cram completed in $s seconds"
@@ -229,7 +236,7 @@ diff=`diff  /tmp/${chkname}.init.stat  /tmp/${chkname}.cram.stat | wc -l`
 if [ "$diff" != "0" ]; then
   echo "Stat for backup CRAM file differs from that for original BAM"
   diff  /tmp/${chkname}.init.stat  /tmp/${chkname}.cram.stat
-  $topmedcmd mark $bamid $markverb failed
+  $topmedcmd -persist mark $bamid $markverb failed
   exit 2
 fi
 echo "Stat for CRAM file matches that of original"
@@ -241,7 +248,7 @@ now=`date +%s`
 md5=`$calcmd5 $newname | awk '{print $1}'`
 if [ "$md5" = "" ]; then
   echo "Command failed: md5sum $newname"
-  $topmedcmd mark $bamid $markverb failed
+  $topmedcmd -persist mark $bamid $markverb failed
   exit 3
 fi
 $topmedcmd set $bamid cramchecksum $md5
@@ -251,5 +258,5 @@ here=`pwd`
 etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "BAM to CRAM backup completed in $etime seconds, created $here/$newname"
-$topmedcmd mark $bamid $markverb completed
+$topmedcmd -persist mark $bamid $markverb completed
 echo `date` cram $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
