@@ -58,6 +58,7 @@ CREATE TABLE runs (
   status       VARCHAR(256),
   bamcount     INT,
   datayear     INT DEFAULT 2,          /* Year of project: 1, 2 ... */
+  offsite      CHAR(1) DEFAULT('N'),   /* Original files kept offsite (N,Y,D) */
   xmlfound     INT DEFAULT 0,          /* Remove this */
   arrived      CHAR(1) DEFAULT('N'),   /* Y or N that all files arrived for this run */
 
@@ -74,7 +75,7 @@ CREATE INDEX index_dirname ON runs(dirname);
 DROP TABLE IF EXISTS bamfiles;
 CREATE TABLE bamfiles (
   dateinit     VARCHAR(12),
-  datayear     INT DEFAULT 2,          /* Year of project: 1, 2 ... */
+  datayear     INT DEFAULT 2,           /* Year of project: 1, 2 ... */
   build        VARCHAR(4) DEFAULT '37', /* Build original input file user, 37, 38 etc */
   bamid        INT         NOT NULL AUTO_INCREMENT,
   runid        INT         NOT NULL,
@@ -180,7 +181,7 @@ CREATE INDEX index_nwdid   ON bamfiles(expt_sampleid);
 CREATE INDEX index_refname ON bamfiles(refname);
 
 /* ALTER TABLE bamfiles ADD COLUMN datebai VARCHAR(12) AFTER datebackup; */
-
+/* ALTER TABLE runs ADD  COLUMN offsitebackup CHAR(1) DEFAULT 'N' AFTER datayear */
 
 /*  This table is regularly loaded from a tab delimited summary file from NCBI
     The NCBI data is loaded into this table to make it easier for us to garner
