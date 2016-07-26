@@ -148,7 +148,9 @@ function Modify($table, $id) {
         if ($k == $pkey) { continue; }
         $val = stripslashes($val);          // Canonicalize data first
         $val = SQL_Escape($val);
-        $sql .= "$k=$val,";
+        //  July 2016 we suddenly need to quote fields
+        if (substr($val,0,1) == "'") { $sql .= "$k=$val,"; }
+        else { $sql .= "$k='$val',"; }
 	}
     $sql = substr($sql,0,strlen($sql)-1);   // Drop last comma
     $sql .= " WHERE $pkey='$inp[$pkey]'";
