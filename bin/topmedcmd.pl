@@ -95,21 +95,19 @@ our %opts = (
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose center=s runs=s maxlongjobs=i
+    help realm=s verbose maxlongjobs=i persist
     )) || die "$Script - Failed to parse options\n";
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    my $m = "$Script [options]";
+    my $m = "$Script [options] [-persist]";
     my $verbs = join(',', sort keys %VALIDVERBS);
     my $requests = join(',', sort keys %VALIDSTATUS);
     warn "$m mark bamid|nwdid $verbs $requests\n" .
         "  or\n" .
         "$m unmark bamid|nwdid [same list as mark]\n" .
         "  or\n" .
-        "$m set bamid|nwdid colname value\n" .
-        "  or\n" .
-        "$m show arrived\n" .
+        "$m set bamid|nwdid|dirname colname value\n" .
         "  or\n" .
         "$m show bamid|nwdid colname|run|center|yaml\n" .
         "  or\n" .
@@ -134,6 +132,9 @@ if ($#ARGV < 0 || $opts{help}) {
     exit 1;
 }
 my $fcn = shift @ARGV;
+
+if ($opts{persist}) { DBConnect($opts{realm}); }    # Open database
+else  { PersistDBConnect($opts{realm}); }
 
 #--------------------------------------------------------------
 #   Execute the command provided
@@ -270,7 +271,6 @@ sub Export {
     print $s . "FULLPATH\n";
     
     #   Get all the known centers in the database
-    DBConnect($opts{realm});
     my $centersref = GetCenters();
     foreach my $cid (keys %{$centersref}) {
         my $centername = $centersref->{$cid};
@@ -783,28 +783,6 @@ sub Permit {
 
 #==================================================================
 # Subroutine:
-#   ($centerid, $runid) = GetBamidInfo($bamid)
-#
-#   Return id for the center and run for a bamid
-#==================================================================
-sub GetBamidInfo {
-    my ($bamid) = @_;
-
-    if ($bamid !~ /^\d+$/) { return (0,0); }     # No bamid, no ids
-    my $sth = ExecSQL("SELECT runid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
-    my $href = $sth->fetchrow_hashref;
-    my $runid = $href->{runid};
-    $sth = ExecSQL("SELECT centerid FROM $opts{runs_table} WHERE runid=$runid");
-    $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "$Script - BAM '$bamid' has no center?  How'd that happen?\n"; }
-    $href = $sth->fetchrow_hashref;
-    return ($href->{centerid}, $runid);
-}
-
-#==================================================================
-# Subroutine:
 #   Set($bamid, $col, $val)
 #
 #   Set a database column
@@ -812,6 +790,17 @@ sub GetBamidInfo {
 sub Set {
     my ($bamid, $col, $val) = @_;
     my ($sth, $rowsofdata, $href);
+
+    #   This could be a run name
+    $sth = ExecSQL("SELECT runid FROM $opts{runs_table} WHERE dirname='$bamid'", 0);
+    $rowsofdata = $sth->rows();
+    if ($rowsofdata) {
+        $href = $sth->fetchrow_hashref;
+        ExecSQL("UPDATE $opts{runs_table} SET $col='$val' WHERE runid='$href->{runid}'");
+        return;
+    }
+
+    #   This is bamid or nwdid
     $bamid = GetBamid($bamid);
 
     #   Make sure this is a bam we know
@@ -832,9 +821,20 @@ sub Set {
 #==================================================================
 sub Show {
     my ($bamid, $col) = @_;
-    if ($bamid eq 'arrived') { return ShowArrived($bamid); }
-
     my ($sth, $rowsofdata, $href);
+
+    #   This could be a run name
+    $sth = ExecSQL("SELECT runid,$col FROM $opts{runs_table} WHERE dirname='$bamid'", 0);
+    if ($sth) {
+        $rowsofdata = $sth->rows();
+        if ($rowsofdata) {
+            $href = $sth->fetchrow_hashref;
+            print $href->{$col} . "\n";
+            return;
+        }
+    }
+
+    #   This is bamid or nwdid
     $bamid = GetBamid($bamid);
     
     $sth = ExecSQL("SELECT bamid,runid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
@@ -902,42 +902,6 @@ sub Show {
 
 #==================================================================
 # Subroutine:
-#   ShowArrived($fcn)
-#
-#   Generate list of information from the database
-#==================================================================
-sub ShowArrived {
-    my ($fcn) = @_;
-    #   Get all the known centers in the database
-    DBConnect($opts{realm});
-    my $centersref = GetCenters();
-    foreach my $cid (keys %{$centersref}) {
-        my $centername = $centersref->{$cid};
-        my $runsref = GetRuns($cid) || next;
-        #   For each run, see if there are bamfiles that arrived
-        foreach my $runid (keys %{$runsref}) {
-            my $dirname = $runsref->{$runid};
-            #   Get list of all bams that have not yet arrived properly
-            my $sql = "SELECT bamid,bamname,state_arrived FROM " .
-                $opts{bamfiles_table} . " WHERE runid='$runid'";
-            my $sth = ExecSQL($sql);
-            my $rowsofdata = $sth->rows();
-            if (! $rowsofdata) { next; }
-            for (my $i=1; $i<=$rowsofdata; $i++) {
-                my $href = $sth->fetchrow_hashref;
-                my $f = $opts{topdir} . "/$centername/$dirname/" .
-                    $href->{bamname};
-                #   See if this has arrived. Few states possible
-                if ($href->{state_arrive} != $COMPLETED) { next; }
-                #   Run the command
-                print "$href->{bamid} $centername $dirname $f\n";
-            }
-        }
-    }
-}
-
-#==================================================================
-# Subroutine:
 #   GetBamid($bamid)
 #
 #   Return bamid for bamid or expt_sampleid
@@ -950,9 +914,10 @@ sub GetBamid {
     if ($bamid =~ /^NWD/){
         $sth = ExecSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE expt_sampleid='$bamid'");
         $rowsofdata = $sth->rows();
-        if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
-        $href = $sth->fetchrow_hashref;
-        $bamid = $href->{bamid};
+        if ($rowsofdata) {
+            $href = $sth->fetchrow_hashref;
+            return $href->{bamid};
+        }
     }
     if ($bamid !~ /^\d+$/){
         die "$Script - Invalid bamid or NWDID ($bamid). Try '$Script -help'\n";
@@ -962,15 +927,16 @@ sub GetBamid {
 
 #==================================================================
 # Subroutine:
-#   ExecSQL($sql)
+#   ExecSQL($sql, $die)
 #
 #   Execute SQL.  Keep trying if connection lost.
 #
 #   Returns handle for SQL
 #==================================================================
 sub ExecSQL {
-    my ($sql) = @_;
-    return PersistDoSQL($opts{realm}, $sql)
+    my ($sql, $die) = @_;
+    if ($opts{persist}) { return PersistDoSQL($opts{realm}, $sql); }
+    return DoSQL($sql, $die);
 }
 
 #==================================================================
@@ -989,10 +955,13 @@ topmedcmd.pl - Update the database for NHLBI TopMed
   topmedcmd.pl unmark 33 arrived           # Reset BAM has arrived
 
   topmedcmd.pl set 33 jobidqplot 123445    # Set jobidqplot in bamfiles
+  topmedcmd.pl set NWD123433 jobidqplot 123445    # Set jobidqplot in bamfiles
+  topmedcmd.pl set 2016apr20 offsite N     # Set 2016apr20 in runs
 
   topmedcmd.pl show 2199 state_cram        # Show a column
   topmedcmd.pl show 2199 center            # Show center 
   topmedcmd.pl show NWD00234 run           # Show run
+  topmedcmd.pl show 2016apr20 offsite      # Show offsite for run
   topmedcmd.pl show NWD00234 yaml          # Show everything known about a bamid
  
   topmedcmd.pl where 2199 bam              # Returns real path to bam and host of bam
@@ -1017,12 +986,6 @@ See B<perldoc DBIx::Connector> for details defining the database.
 
 =over 4
 
-=item B<-center NAME>
-
-Specifies a specific center name on which to run the action, e.g. B<uw>.
-This is useful for testing.
-The default is to run against all centers.
-
 =item B<-help>
 
 Generates this output.
@@ -1032,18 +995,16 @@ Generates this output.
 Specifies how many of the longest running jobs to show.
 This defaults to B<10>.
 
+=item B<-persist>
+
+Specifies that SQL connection errors will not fail, but will be retried many times
+before finally failing.
+
 =item B<-realm NAME>
 
 Specifies the realm name to be used.
 This defaults to B<$opts{realm}> in the same directory as
 where this program is to be found.
-
-=item B<-runs NAME[,NAME,...]>
-
-Specifies a specific set of runs on which to run the action,
-e.g. B<2015jun05.weiss.02,2015jun05.weiss.03>.
-This is useful for testing.
-The default is to run against all runs for the center.
 
 =item B<-verbose>
 
@@ -1072,25 +1033,21 @@ B<permit test operation bamid>
 Use this to test if an operation (e.g. backup, verify etc) may be submitted 
 for a particular bam.
 
-B<set bamid|nwdid columnname value>
-Use this to set the value for a column for a particular BAM file.
+B<set bamid|nwdid|dirname columnname value>
+Use this to set the value for a column for a particular BAM file
+or run.
 
 B<send2ncbi filelist>
 Use this to copy data to NCBI with ascp.
 
-B<show arrived>
-Use this to show the bamids for all BAMs that are marked arrived.
-
-B<show bamid|nwdid colname|center|run|yaml>
-Use this to show information about a particular bamid (or expt_sampleid).
+B<show bamid|nwdid|dirname colname|center|run|yaml>
+Use this to show information about a particular bamid (or expt_sampleid)
+or run name.
 Use 'yaml' to display everything known about the bam of interest.
 
 B<unmark bamid|nwdid [verb]>
 Use this to reset the state for a particular BAM file to the default
 database value.
-
-B<whatbamid bamname>
-Use this to get the bamid for a particular bamname.
 
 B<whatnwdid bamid|nwdid>
 Use this to get some details for a particular bam.
