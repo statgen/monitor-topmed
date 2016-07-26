@@ -24,6 +24,7 @@ our ($DBC, $DBH);
 #   Connect to our database using realm '$realm'. Return a DB handle.
 #   Get the connection information from DBIx::Connector
 #   Fully qualified realm file may be provided
+#   Subsequent SQL errors will generate an error message.
 #==================================================================
 sub DBConnect {
     my ($realm) = @_;
@@ -53,6 +54,7 @@ sub DBConnect {
 #   Get the connection information from DBIx::Connector
 #   Fully qualified realm file may be provided
 #   If the connection fails, keep trying for quite some time.
+#   Subsequent SQL errors will NOT generate an error message.
 #==================================================================
 sub PersistDBConnect {
     my ($realm) = @_;
@@ -66,10 +68,12 @@ sub PersistDBConnect {
         if ($realm =~ /^(\/.+)\/([^\/]+)$/) {
             my $d = $1;
             $realm = $2;
-            $DBC = new DBIx::Connector(-realm => $realm, -connection_dir => $d);
+            $DBC = new DBIx::Connector(-realm => $realm, -connection_dir => $d,
+                -dbi_options => {RaiseError => 0, PrintError => 0});
         }
         else {
-            $DBC = new DBIx::Connector(-realm => $realm);
+            $DBC = new DBIx::Connector(-realm => $realm,
+                -dbi_options => {RaiseError => 0, PrintError => 0});
         }
         if ($DBC) { $DBH = $DBC->connect(); }
         if ($DBH) {                         # Connect seems to have succeeded
