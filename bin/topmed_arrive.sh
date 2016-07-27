@@ -49,8 +49,9 @@ if [ "$build" = "" ]; then
   echo "Unable to determine build for '$bamfile' (L2=${l[2]} L5=${l[5]}"
   $topmedcmd mark $bamid arrived failed
   exit 4
-
 fi
+echo "File '$bamfile' [$bamid] is from build $build"
+$topmedcmd -persist set $bamid build $build
 
 #   Set NWDID and other database fields
 $topmednwd -bamid $bamid $bamfile
