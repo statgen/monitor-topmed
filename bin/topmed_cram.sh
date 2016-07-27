@@ -131,6 +131,11 @@ newname="$nwdid.src.cram"
 #======================================================================
 if [ "$extension" = "cram" ]; then
   d=`$topmedcmd -persist show $bamid run`
+  if [ "$d" = "" ]; then
+    echo "Unable to determine name of run for '$bamid'"
+    $topmedcmd -persist mark $bamid $markverb failed
+    exit 3
+  fi
   offsite=`$topmedcmd -persist show $d offsite`
   if [ "$offsite" = "N" ]; then
     now=`date +%s`
