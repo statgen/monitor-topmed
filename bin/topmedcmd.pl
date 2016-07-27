@@ -795,6 +795,9 @@ sub Set {
     $sth = ExecSQL("SELECT runid FROM $opts{runs_table} WHERE dirname='$bamid'", 0);
     $rowsofdata = $sth->rows();
     if ($rowsofdata) {
+        if ($rowsofdata > 1) {
+            die "$Script - Eeek, there are $rowsofdata runs named '$bamid'\n";
+        }
         $href = $sth->fetchrow_hashref;
         ExecSQL("UPDATE $opts{runs_table} SET $col='$val' WHERE runid='$href->{runid}'");
         return;
@@ -823,14 +826,16 @@ sub Show {
     my ($bamid, $col) = @_;
     my ($sth, $rowsofdata, $href);
 
-    #   This could be a run name
-    $sth = ExecSQL("SELECT runid,$col FROM $opts{runs_table} WHERE dirname='$bamid'", 0);
-    if ($sth) {
-        $rowsofdata = $sth->rows();
-        if ($rowsofdata) {
-            $href = $sth->fetchrow_hashref;
-            print $href->{$col} . "\n";
-            return;
+    #   This could be a run name.g Does not start with NWD, not all digits
+    if ($bamid !~ /^NWD/ && $bamid =~ /\D+/) {
+        $sth = ExecSQL("SELECT runid,$col FROM $opts{runs_table} WHERE dirname='$bamid'", 0);
+        if ($sth) {
+            $rowsofdata = $sth->rows();
+            if ($rowsofdata) {
+                $href = $sth->fetchrow_hashref;
+                print $href->{$col} . "\n";
+                return;
+            }
         }
     }
 
@@ -923,6 +928,28 @@ sub GetBamid {
         die "$Script - Invalid bamid or NWDID ($bamid). Try '$Script -help'\n";
     }
     return $bamid;
+}
+
+#==================================================================
+# Subroutine:
+#   ($centerid, $runid) = GetBamidInfo($bamid)
+#
+#   Return id for the center and run for a bamid
+#==================================================================
+sub GetBamidInfo {
+    my ($bamid) = @_;
+
+    if ($bamid !~ /^\d+$/) { return (0,0); }     # No bamid, no ids
+    my $sth = ExecSQL("SELECT runid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
+    my $href = $sth->fetchrow_hashref;
+    my $runid = $href->{runid};
+    $sth = ExecSQL("SELECT centerid FROM $opts{runs_table} WHERE runid=$runid");
+    $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { die "$Script - BAM '$bamid' has no center?  How'd that happen?\n"; }
+    $href = $sth->fetchrow_hashref;
+    return ($href->{centerid}, $runid);
 }
 
 #==================================================================
