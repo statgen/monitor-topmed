@@ -83,6 +83,9 @@ $RUNNOTE = "<p><b>Note:</b><br>" .
     "<span class='failed'> at least one failure </span>&nbsp;" .
     "<br>" .
     "<i>Steps:</i> $STATUSLETTERS<br>" .
+    "<i>Source Files Copied Offsite:</i> <b>E</b> Expected to be copied, " .
+    "<b>D</b> Done, have been copied, " .
+    "<b>N</b> Not to be copied<br>" .
     "</p>\n";
 
 $quickcols = array(                     // Map of status column to topmedcmd verb
