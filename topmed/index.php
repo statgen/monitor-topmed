@@ -28,7 +28,7 @@ $STATUSLETTERS =  "<i><b>A</b>=File Arrived, <b>5</b>=MD5 Verified, <b>C</b>=BAM
     "<b>Q</b>=qplot run, <b>7</b>=Remapped Build=37, <b>8</b>=Remapped Build=38, <b>X</b>=EXPT=>NCBI<br/>" .
     "<b>S</b>=Secondary BAM=>NCBI, <b>P=</b>B37=>Primary BAM=>NCBI, <b>T</b>=b38=>Tertiary BAM=>NCBI";
 
-$SHOWQUEUES = "STATUS: &nbsp;&nbsp;&nbsp;" .
+$SHOWSTATUS = "STATUS: &nbsp;&nbsp;&nbsp;" .
     "<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=showqlocal' " .
     "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=showqlocal\",680,720); " .
     "return false;'>Local Queue</a> &nbsp;&nbsp;&nbsp;" .
@@ -49,16 +49,16 @@ $SHOWQUEUES = "STATUS: &nbsp;&nbsp;&nbsp;" .
     //" NCBI Log</a> &nbsp;&nbsp;&nbsp;" .
 
     if ($oldsite) { 
-        $SHOWQUEUES .= "<a href='/monitor/topmed/plot.php' target='plots'> " .
+        $SHOWSTATUS .= "<a href='/monitor/topmed/plot.php' target='plots'> " .
             " Plots</a> &nbsp;&nbsp;&nbsp;" .
             "<a href='http://gcsdev.sph.umich.edu/topmed/' target='newcode'> New Site </a> &nbsp;&nbsp;&nbsp;";
     }
     else {
-        $SHOWQUEUES .= "<a href='/topmed/plot.php' target='plots'> " .
+        $SHOWSTATUS .= "<a href='/topmed/plot.php' target='plots'> " .
             " Plots</a> &nbsp;&nbsp;&nbsp;";
     }
 
-    $SHOWQUEUES .="<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=logs' " .
+    $SHOWSTATUS .="<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=logs' " .
     "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=logs\",680,720); " .
     "return false;'>Tail Logs</a>";
 
@@ -172,7 +172,7 @@ if (in_array($_SERVER['REMOTE_USER'], $MGRS)) { $iammgr = 1; }
 if (in_array($_SERVER['REMOTE_USER'], $REQMGRS)) { $iammgr = 1; }
 //  If a manager, allow them to control job submission
 if ($iammgr) {
-$SHOWQUEUES .= " &nbsp;&nbsp;&nbsp; <a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=control' " .
+$SHOWSTATUS .= " &nbsp;&nbsp;&nbsp; <a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=control' " .
     "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=control\",680,720); " .
     "return false;'>Control Jobs</a>" .
     " &nbsp;&nbsp;&nbsp; <a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=restart' " .
@@ -235,6 +235,7 @@ if ($fcn == 'rundetail') {
 }
 if ($fcn == 'bams') {
     print ViewBams($runid, $maxdir, $iammgr);
+    print "<br/><br/><center>" . GetChooseLines() . "<br/>$SHOWSTATUS</center>\n";
     print dofooter($HDR['footer']);
     exit;
 }
@@ -297,14 +298,14 @@ if ($fcn == 'restartjobs') {
 }
 
 if ($fcn == 'showqlocal') {
-    print "<center>$SHOWQUEUES &nbsp;&nbsp;&nbsp;</center>\n";
+    print "<center>$SHOWSTATUS &nbsp;&nbsp;&nbsp;</center>\n";
     $cmd = "/usr/cluster/monitor/bin/slurm_query.sh -squeue ignored ignored";
     print `$cmd`;
     exit;
 }
 
 if ($fcn == 'df') {
-    print "<center>$SHOWQUEUES &nbsp;&nbsp;&nbsp;</center>\n";
+    print "<center>$SHOWSTATUS &nbsp;&nbsp;&nbsp;</center>\n";
     if ($oldsite) {
         $cmd = "/usr/cluster/monitor/bin/slurm_query.sh -df ignored";
         print `$cmd`;
@@ -317,7 +318,7 @@ if ($fcn == 'df') {
 }
 
 if ($fcn == 'logs') {
-    print "<center>$SHOWQUEUES &nbsp;&nbsp;&nbsp;</center>\n";
+    print "<center>$SHOWSTATUS &nbsp;&nbsp;&nbsp;</center>\n";
     if ($oldsite) {
         $cmd = "/usr/cluster/monitor/bin/slurm_query.sh -logs ignored";
         print `$cmd`;
@@ -514,29 +515,13 @@ function ViewPullQueue($cid, $onlyactive=1) {
 #   Show summary of directories of runs for all datayears
 ---------------------------------------------------------------*/
 function ViewRuns($center, $maxdirs, $iammgr) {
-    global $CENTERS, $CENTERNAME2ID, $RUNNOTE, $SHOWQUEUES;
+    global $CENTERS, $CENTERNAME2ID, $RUNNOTE, $SHOWSTATUS;
     $hdrcols  = array('dirname', 'status', 'bamcount');
 
     //  Generate HTML header for page
     //  Get list of centers doing:  select distinct(project) from status;
     $html = "<h3 align='center'>Summary of Runs</h3>\n" .
-        "<center>" .
-        //"<a href='" . $_SERVER['SCRIPT_NAME'] . "?maxdirs=25'>Show Last 25</a>" .
-        //"&nbsp;&nbsp;&nbsp; or &nbsp;&nbsp;&nbsp;" .
-        //"<a href='" . $_SERVER['SCRIPT_NAME'] . "?maxdir=75'>Show Last 75</a>" .
-        //"&nbsp;&nbsp;&nbsp; or &nbsp;&nbsp;&nbsp;" .
-        //"<a href='" . $_SERVER['SCRIPT_NAME'] . "?" . $_SERVER['QUERY_STRING'] .
-        //"'>Refresh</a><br>" .
-        "\nChoose: " .
-        "&nbsp;&nbsp;<a href='" . $_SERVER['SCRIPT_NAME'] .
-        "?center=year2&amp;maxdir=$maxdirs'>Year 2</a>&nbsp;&nbsp;\n" .
-        "&nbsp;&nbsp;<a href='" . $_SERVER['SCRIPT_NAME'] .
-        "?center=year1&amp;maxdir=$maxdirs'>Year 1</a>&nbsp;&nbsp;\n";
-    foreach ($CENTERS as $c) {
-        $html .= "&nbsp;&nbsp;<a href='" . $_SERVER['SCRIPT_NAME'] .
-            "?center=$c&amp;maxdir=$maxdirs'>" . strtoupper($c) . "</a>&nbsp;&nbsp;\n";
-    }
-    $html .= "<br/>$SHOWQUEUES</center>\n";
+        "<center>" . GetChooseLines() . "<br/>$SHOWSTATUS</center>\n";
 
     $centers2show = array();                // Get list of centers for this query
     $yearstart = 2;
@@ -677,7 +662,7 @@ function ViewRunDetail($runid) {
 #   Show list of BAM files for a particular run
 ---------------------------------------------------------------*/
 function ViewBams($runid, $maxdirs, $iammgr) {
-    global $LDB, $HDR, $CENTERS, $CENTERID2NAME, $CENTERNAME2ID, $FILES, $BAMNOTE, $SHOWQUEUES;
+    global $LDB, $HDR, $CENTERS, $CENTERID2NAME, $CENTERNAME2ID, $FILES, $BAMNOTE, $SHOWSTATUS;
     $hdrcols  = array('bamname', 'QUIKSTAT', 'bamsize', 'piname');
     $html = '';
     $maxdirs = 0;                   // For now, show all BAMs
@@ -703,7 +688,7 @@ function ViewBams($runid, $maxdirs, $iammgr) {
     $url = $HDR['home'] . "/index.php?center=$centername&amp;maxdir=50";
     $html .= "<h3 align='center'>$bamcount Files for '$runname' [$runid] in center " .
         "<a href='$url'>$center</a></h3>\n";
-    $html .= "<p align='center'/>$SHOWQUEUES</p>\n";
+    $html .= "<p align='center'/>$SHOWSTATUS</p>\n";
 
     $html .= "<table align='center' width='100%' border='1'><tr>\n";
     foreach ($hdrcols as $c) {
@@ -861,14 +846,14 @@ function ViewBamDetail($bamid) {
 #   Show details for a particular run
 ---------------------------------------------------------------*/
 function ControlJobs($h) {
-    global $LDB, $SHOWQUEUES, $CENTERS, $CENTERNAME2ID, $validfunctions;
+    global $LDB, $SHOWSTATUS, $CENTERS, $CENTERNAME2ID, $validfunctions;
     $url = $_SERVER['PHP_SELF'] . "?fcn=permit";    
     $html = '';
 
     //  Dump table for each permission for now
     $html .= "<h3 align='center'>Control Job Submission</h3>\n";
     $html .= "<center>These controls do not affect jobs already submitted<br>" .
-        "$SHOWQUEUES</center><br/>\n";
+        "$SHOWSTATUS</center><br/>\n";
     if ($h) { $html .= "<div class='indent'><span class='surprise'>$h</span></div>\n"; }
 
     //  Prompt for fields which can control permissions
@@ -970,7 +955,7 @@ function HandlePermit($op, $center, $run, $id) {
 #   Restart failed, running, or queued jobs
 ---------------------------------------------------------------*/
 function RestartJobs($h) {
-    global $LDB, $SHOWQUEUES, $CENTERS, $CENTERNAME2ID, $validfunctions;
+    global $LDB, $SHOWSTATUS, $CENTERS, $CENTERNAME2ID, $validfunctions;
     $url = $_SERVER['PHP_SELF'] . "?fcn=restart";    
     $html = '';
 
@@ -978,7 +963,7 @@ function RestartJobs($h) {
     $html .= "<h3 align='center'>Restart Failed Jobs</h3>\n" .
         "<h4 align='center'>Use this to restart failed jobs for a run. Beware this affects <u>all</u><br>" .
         "samples in the selected state for the specified run.</h4>\n";
-            $html .= "$SHOWQUEUES</center><br/>\n";
+            $html .= "$SHOWSTATUS</center><br/>\n";
     if ($h) { $html .= "<div class='indent'><span class='surprise'>$h</span></div>\n"; }
 
     //  Prompt for classes of jobs to be restarted
@@ -1053,6 +1038,25 @@ function HandleRestartJobs($dirname, $samplestate, $op) {
     $changes = SQL_AffectedRows();
     $html .= Emsg("Changed $changes rows, hope that was what you wanted", 1);
     $html .= "<br/><br/>\n";
+    return $html;
+}
+
+/*---------------------------------------------------------------
+#   $html = GetChooseLines()
+#   Set globals with details about all centers
+---------------------------------------------------------------*/
+function GetChooseLines() {
+    global $CENTERS, $maxdir;
+
+     $html = "Choose: " .
+        "&nbsp;&nbsp;<a href='" . $_SERVER['SCRIPT_NAME'] .
+        "?center=year2&amp;maxdir=$maxdir'>Year 2</a>&nbsp;&nbsp;\n" .
+        "&nbsp;&nbsp;<a href='" . $_SERVER['SCRIPT_NAME'] .
+        "?center=year1&amp;maxdir=$maxdir'>Year 1</a>&nbsp;&nbsp;\n";
+    foreach ($CENTERS as $c) {
+        $html .= "&nbsp;&nbsp;<a href='" . $_SERVER['SCRIPT_NAME'] .
+            "?center=$c&amp;maxdir=$maxdir'>" . strtoupper($c) . "</a>&nbsp;&nbsp;\n";
+    }
     return $html;
 }
 
