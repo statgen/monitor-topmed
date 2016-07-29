@@ -44,6 +44,7 @@ our %opts = (
     runs_table => 'runs',
     studies_table => 'studies',
     bamfiles_table => 'bamfiles',
+    ncbi_table => 'ncbi_summary',
     topdir  => '/net/topmed/incoming/topmed',
     backupdir => '/net/topmed/working/backups/incoming/topmed',
     backupdir2 => '/net/topmed2/working/backups/incoming/topmed',
@@ -59,7 +60,7 @@ Getopt::Long::GetOptions( \%opts,qw(
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$Script [options] nwd|rename|crammd5|fixdups|fixmapping|bamcount\n" .
+    warn "$Script [options] nwd|rename|crammd5|fixdups|fixmapping|bamcount|flagstat|checkncbi\n" .
         "Fix problems with various hacks.\n";
     exit 1;
 }
@@ -105,6 +106,139 @@ if ($fcn eq 'nwd') {
     }
     exit;
 }
+
+#--------------------------------------------------------------
+#   Find empty flagstat fields and fix them or make a list
+#   of redoflagstat runs that need to be done
+#--------------------------------------------------------------
+if ($fcn eq 'flagstat') {
+    my $updates = 0;
+    my $matches = 0;
+    my $missmatches = 0;
+    my $badcram = 0;
+    my $tobedone = 0;
+    #   Get all the known centers in the database
+    my $centersref = GetCenters();
+    foreach my $cid (keys %{$centersref}) {
+        my $centername = $centersref->{$cid};
+        my $runsref = GetRuns($cid) || next;
+        #   For each run, see if there are bamfiles that arrived
+        foreach my $runid (keys %{$runsref}) {
+            my $dirname = $runsref->{$runid};
+            print "Doing $dirname\n";
+            #   Get list of all bams that have not yet arrived properly
+            my $sql = "SELECT * FROM $opts{bamfiles_table} WHERE runid='$runid'";
+            my $sth = DoSQL($sql);
+            my $rowsofdata = $sth->rows();
+            if (! $rowsofdata) { next; }
+            for (my $i=1; $i<=$rowsofdata; $i++) {
+                my $href = $sth->fetchrow_hashref;
+                #   Both set, we are probably done
+                if (! defined($href->{bamflagstat}))  { $href->{bamflagstat} = 0; }
+                if (! defined($href->{cramflagstat})) { $href->{cramflagstat} = 0; }
+                if ($href->{bamflagstat} =~ /^[1-9]/ && $href->{cramflagstat} =~ /^[1-9]/) {
+                    if ($href->{bamflagstat} != $href->{cramflagstat}) {
+                        print "$Script - flagstats $href->{bamname} [$href->{bamid}] do not match\n" .
+                            "  bamflagstat=$href->{bamflagstat} cramflagstat=$href->{cramflagstat}\n";
+                        $missmatches++;
+                    }
+                    else { $matches++; }
+                    next;
+                }
+
+                #   cramflagstat set, use it to set bamflagstat
+                if ($href->{cramflagstat} =~ /^[1-9]/) {
+                    my $s = "UPDATE $opts{bamfiles_table} SET bamflagstat=$href->{cramflagstat} WHERE bamid=$href->{bamid}";
+                    #print $s . "\n";
+                    DoSQL($s);
+                    $updates++;
+                    next;
+                }
+
+                #   bamflagstat set and state_cram done, set cramflagstat ??
+                if ($href->{bamflagstat} =~ /^\d/) {
+                    if ($href->{state_cram} != $COMPLETED) { $tobedone++; next; }    # This will get set
+                    print "/net/topmed/working/topmed-output/redocramflagstat.sh -submit $href->{bamid}\n";
+                    #print "$Script - cramflagstat for $href->{bamname} [$href->{bamid}] not set but state_cram is done\n";
+                    $badcram++;
+                    next;
+                }
+            }
+        }
+    }
+    print "Updates=$updates  Matches=$matches  Missmatches=$missmatches Badcram=$badcram  TobeDone=$tobedone\n";
+    exit;
+}
+
+#--------------------------------------------------------------
+#   Compare the status at NCBI in the summary file with our database
+#   ####### This is not done yet #######
+#-------------------------------------------------------------- 
+if ($fcn eq 'ncbi_summary') {
+    #   Get all the known centers in the database
+    my $centersref = GetCenters();
+    foreach my $cid (keys %{$centersref}) {
+        my $centername = $centersref->{$cid};
+        my $runsref = GetRuns($cid) || next;
+
+        #   For each run, get NCBI status for each bamid
+        foreach my $runid (keys %{$runsref}) {
+            my $dirname = $runsref->{$runid};
+            print "Checking NCBI status for bams in $dirname\n";
+            my $sql = "SELECT bamid,expt_sampleid,state_ncbiexpt,state_ncbiorig,state_ncbib37,state_ncbib38 " .
+                " FROM $opts{bamfiles_table} WHERE runid='$runid'";
+            my $sth = DoSQL($sql);
+            my $rowsofdata = $sth->rows();
+            if (! $rowsofdata) { next; }
+            for (my $i=1; $i<=$rowsofdata; $i++) {
+                my $href = $sth->fetchrow_hashref;
+                my $sqlncbi = "SELECT file_name,file_md5sum,file_status,file_error " .
+                    " FROM $opts{ncbi_table} WHERE file_name like '" . $href->{expt_sampleid} . "%'";
+                my $sthncbi = DoSQL($sqlncbi);
+                my $rowsofncbi = $sthncbi->rows();
+                if (! $rowsofncbi) {            # NWDID is not at NCBI
+                    Summarize($href, 0);
+                    next;
+                }
+                #   Go through every NWDID record at NCBI
+                #   Ignore submits of XML
+                for (my $ii=1; $ii<=$rowsofncbi; $ii++) {
+                    my $hrefncbi = $sthncbi->fetchrow_hashref;
+                    my $name = $hrefncbi->{file_name};
+                    if ($name =~ /submit/) { next; }
+                    my @nameparts = split(/[\.\-]/,$name)
+                }
+                my $ncbitype = '';
+                #if ($hrefncbi->{file_name} =~ /^(NWD\d+)\-(\w+)\.(\w+)\.(\w+)\.
+
+            }
+
+        #   
+        }
+    }
+}
+
+#==================================================================
+# Subroutine:
+#   Summarize($href,$hrefncbi)
+#
+#   Execute command or just show what would be done
+#==================================================================
+my %summary = ();
+sub Summarize {
+    my ($href, $ncbihref) = @_;
+
+    #   No NCBI data
+    if (! $ncbihref) {
+        $summary{notatncbi}++;
+        $summary{notatncbilist} .= $href->{expt_sampleid} . ',';
+        #   See if WE think there is data there
+        return;
+    }
+}
+
+
+
 #--------------------------------------------------------------
 #   Calculate MD5 for all our CRAMs
 #--------------------------------------------------------------
