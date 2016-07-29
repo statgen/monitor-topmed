@@ -31,15 +31,14 @@ if [ "$1" = "-submit" ]; then
   fi 
 
   # Run this on node where bam lives
-  l=(`$topmedcmd where $1 bam`)
-  if [ "${l[1]}" != "" ]; then
-    realhost="--nodelist=${l[1]}"
-    qos="--qos=${l[1]}-cram"
+  h=`$topmedcmd whathost $1 bam`
+  if [ "$h" != "" ]; then
+    realhost="--nodelist=$h"
+    qos="--qos=$h-cram"
   fi
 
   #   Get destination directory for backup files
-  l=(`$topmedcmd where $1 backup`)
-  backupdir="${l[0]}"
+  backupdir=`$topmedcmd wherepath $1 backup`
   if [ "$backupdir" = "" ]; then
     echo "Unable to determine backup directory for '$bamid'. No job submitted."
     exit 2
@@ -88,8 +87,7 @@ bamfile=$2
 extension="${bamfile##*.}"
 
 #   Get destination directory for backup files
-l=(`$topmedcmd where $bamid backup`)
-backupdir="${l[0]}"
+backupdir=`$topmedcmd wherepath $bamid backup`
 if [ "$backupdir" = "" ]; then
   echo "Unable to determine backup directory for '$bamid'"
   $topmedcmd -persist mark $bamid $markverb failed

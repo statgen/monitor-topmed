@@ -27,9 +27,9 @@ if [ "$1" = "-submit" ]; then
   fi 
 
   # Run this on node where bam lives
-  l=(`$topmedcmd where $1 bam`)
-  if [ "${l[1]}" != "" ]; then
-    qos="--qos=${l[1]}-qplot"
+  h=`$topmedcmd whathost $1 bam`
+  if [ "$h" != "" ]; then
+    qos="--qos=$h-qplot"
   fi
 
   #   Can run anywhere. Low rate of access to cram, small output
@@ -76,7 +76,7 @@ if [ ! -f $bai ]; then
 fi
 
 #   Create output directory and CD there
-outdir=`$topmedcmd -persist where $bamid qcresults`
+outdir=`$topmedcmd -persist wherepath $bamid qcresults`
 if [ "$outdir" = "" ]; then
   echo "Unable to get QCRESULTS directory for '$bamid' - $outdir"
   $topmedcmd -persist mark $bamid $markverb failed

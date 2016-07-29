@@ -24,10 +24,10 @@ if [ "$1" = "-submit" ]; then
   fi 
 
   # Run this on node where bam lives
-  l=(`$topmedcmd where $1 bam`)
-  if [ "${l[1]}" != "" ]; then
-    realhost="--nodelist=${l[1]}"
-    qos="${l[1]}-verify"
+  h=`$topmedcmd whathost $1 bam`
+  if [ "$h" != "" ]; then
+    realhost="--nodelist=$h"
+    qos="$h-verify"
   fi
 
   l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos $realhost -J $1-verify --output=$console/$1-verify.out $0 $*`)

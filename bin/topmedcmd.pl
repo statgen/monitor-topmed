@@ -117,7 +117,11 @@ if ($#ARGV < 0 || $opts{help}) {
         "  or\n" .
         "$m squeue\n" .
         "  or\n" .
-        "$m where bamid|nwdid bam|backup|qcresults|console|b37|b38\n" .
+        "$m wherepath|where bamid|nwdid bam|backup|qcresults|console|b37|b38\n" .
+        "  or\n" .
+        "$m wherehost bamid|nwdid bam|backup|qcresults\n" .
+        "  or\n" .
+        "$m wherefile bamid|nwdid bam|backup|qcresults\n" .
         "  or\n" .
         "$m whatbamid bamname\n" .
         "  or\n" .
@@ -146,7 +150,9 @@ if ($fcn eq 'show')      { Show(@ARGV); exit; }
 if ($fcn eq 'export')    { Export(@ARGV); exit; }
 if ($fcn eq 'send2ncbi') { Send2NCBI(@ARGV); exit; }
 if ($fcn eq 'squeue')    { SQueue(@ARGV); exit; }
-if ($fcn eq 'where')     { Where(@ARGV); exit; }
+if ($fcn eq 'where' || $fcn eq 'wherepath') { WherePath(@ARGV); exit; }
+if ($fcn eq 'whathost')  { WhatHost(@ARGV); exit; }
+if ($fcn eq 'wherefile') { WhereFile(@ARGV); exit; }
 if ($fcn eq 'whatbamid') { WhatBAMID(@ARGV); exit; }
 if ($fcn eq 'whatnwdid') { WhatNWDID(@ARGV); exit; }
 if ($fcn eq 'permit')    { Permit(@ARGV); exit; }
@@ -584,29 +590,27 @@ sub ReFormatPartitionData {
 
 #==================================================================
 # Subroutine:
-#   Where($bamid, $set, $extra1)
+#   $path = WherePath($bamid, $set, $extra1)
 #
 #   Print paths to various things for bamid based on $set
-#     bam       Print directory where BAM actually exists, no symlink, and host for BAM
-#     backup    Print directory for backups and file (might not exist) and host for backup
+#     bam       Print directory for a bam
+#     backup    Print directory for backups file
 #     qcresults Print directory where qc.results for a bamfile
 #     console   Print directory where SLURM console output lives
-#     b37       Print directory for remapped b37 and file (might not exist)
-#     b38       Print directory for remapped b38 and file (might not exist)
+#     b37       Print directory for remapped b37
+#     b38       Print directory for remapped b38
 #==================================================================
-sub Where {
+sub WherePath {
     my ($bamid, $set, $extra1) = @_;
     if ((! defined($set) || ! $set)) { $set = 'unset'; }    # Default
 
     $bamid = GetBamid($bamid);
 
     #   Get values of interest from the database
-    my $sth = ExecSQL("SELECT runid,bamname,cramname,piname,expt_sampleid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
+    my $sth = ExecSQL("SELECT runid,piname,expt_sampleid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
     my $href = $sth->fetchrow_hashref;
-    my $bamname = $href->{bamname};
-    my $cramname = $href->{cramname} || 'CRAMNAME_not_SET';
     my $piname = $href->{piname};
     my $nwdid = $href->{expt_sampleid};
     my $runid = $href->{runid};
@@ -626,21 +630,14 @@ sub Where {
     if ($set eq 'bam') {
         my $bamhost = 'none';
         my $bamfdir = abs_path("$opts{netdir}/$opts{incomingdir}/$centername/$rundir");
-        if (! $bamfdir) { exit; }
-        if ($bamfdir =~ /\/net\/([^\/]+)\//) { $bamhost = $1; }
-        print "$bamfdir $bamhost\n";         # File might not really exist
+        print "$bamfdir\n";
         exit;
     }
  
-    #   Find where the backup CRAM lives
+    #   Find where the backup file lives
     if ($set eq 'backup') {
-        my $backuphost = 'none';
         my $bakbamfdir = abs_path("$opts{netdir}/$opts{backupsdir}/$centername/$rundir");
-        if (! $bakbamfdir) { exit; }
-        my $bakfile = abs_path("$bakbamfdir/$cramname");
-        if (! $bakfile) { exit; }
-        if ($bakbamfdir =~ /\/net\/([^\/]+)\//) { $backuphost = $1; }
-        print "$bakbamfdir $bakfile $backuphost\n";     # File might not really exist
+        print "$bakbamfdir\n";
         exit;
     }
 
@@ -654,9 +651,7 @@ sub Where {
     #   Print where SLURM console output can be found
     if ($set eq 'console') {
         my $dir = abs_path("$opts{netdir}/$opts{consoledir}");
-        my $outfile = '';
-        if (defined($extra1)) { $outfile = "$dir/$bamid-$extra1.out"; }
-        print "$dir $outfile\n";
+        print "$dir\n";
         exit;
     }
  
@@ -665,14 +660,12 @@ sub Where {
         my $b37fdir = '';
         my $b37file = '';
         foreach ('', '2', '3', '4', '5', '6') {
-            $b37fdir = "$opts{netdir}$_/$opts{resultsdir}/$centername/$piname/$nwdid/bams";
-            $b37file = "$b37fdir/$nwdid.recal.cram";
-            if (-f $b37file) {
-                if (! -l $b37fdir) { last; }        # Found non-symlink to remapped file
+            $b37fdir = abs_path("$opts{netdir}$_/$opts{resultsdir}/$centername/$piname/$nwdid/bams");
+            if ($b37file) {
+                print "$b37fdir\n";
+                exit;
             }
         }
-        #if (! -d $b37fdir) { $b37fdir = 'none'; }
-        print "$b37fdir $b37file\n";            # Note that file might not really exist
         exit;
     }
 
@@ -681,6 +674,133 @@ sub Where {
         die "$Script - b38 paths are not known yet\n";
     }
 
+    die "$Script - Unknown Where option '$set'\n";
+}
+
+#==================================================================
+# Subroutine:
+#   $host = WhatHost($bamid, $set)
+#
+#   Print host name for the path to various things for bamid based on $set
+#     bam       Print host where BAM actually exists
+#     backup    Print host for backups file
+#     qcresults Print host where qc.results for a bamfile is
+#==================================================================
+sub WhatHost {
+    my ($bamid, $set, $extra1) = @_;
+    if ((! defined($set) || ! $set)) { $set = 'unset'; }    # Default
+
+    $bamid = GetBamid($bamid);
+
+    #   Get values of interest from the database
+    my $sth = ExecSQL("SELECT runid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
+    my $href = $sth->fetchrow_hashref;
+    my $runid = $href->{runid};
+    $sth = ExecSQL("SELECT centerid,dirname FROM $opts{runs_table} WHERE runid=$runid");
+    $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { die "$Script - BAM '$bamid' run '$runid' is unknown\n"; }
+    $href = $sth->fetchrow_hashref;
+    my $rundir = $href->{dirname};
+    my $centerid = $href->{centerid};
+    $sth = ExecSQL("SELECT centername FROM $opts{centers_table} WHERE centerid=$centerid");
+    $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { die "$Script - BAM '$bamid' center '$centerid' is unknown\n"; }
+    $href = $sth->fetchrow_hashref;
+    my $centername = $href->{centername};
+
+    #   BAM is in one of those $opts{netdir} trees where without a symlink
+    if ($set eq 'bam') {
+        my $bamhost = 'none';
+        my $bamfdir = abs_path("$opts{netdir}/$opts{incomingdir}/$centername/$rundir");
+        if (! $bamfdir) { exit; }
+        if ($bamfdir =~ /\/net\/([^\/]+)\//) { $bamhost = $1; }
+        print "$bamhost\n";
+        exit;
+    }
+ 
+    #   Find where the backup CRAM lives and show host
+    if ($set eq 'backup') {
+        my $backuphost = 'none';
+        my $bakbamfdir = abs_path("$opts{netdir}/$opts{backupsdir}/$centername/$rundir");
+        if ($bakbamfdir =~ /\/net\/([^\/]+)\//) { $backuphost = $1; }
+        print "$backuphost\n";
+        exit;
+    }
+
+    #   Print where qc.results are and show host
+    if ($set eq 'qcresults') {
+        my $qchost = 'none';
+        my $qcdir = abs_path("$opts{netdir}/$opts{qcresultsdir}/$centername/$rundir");
+        if ($qcdir =~ /\/net\/([^\/]+)\//) { $qcdir = $1; }
+        print "$qcdir\n";
+        exit;
+    }
+ 
+    die "$Script - Unknown Where option '$set'\n";
+}
+
+#==================================================================
+# Subroutine:
+#   $filepath = WhereFile($bamid, $set)
+#
+#   Print paths to various files for bamid based on $set
+#     bam       Print file path where BAM actually exists, no symlink,
+#     backup    Print file path for backups
+#     qcresults Print file path to selfSM in qc.results for a bamfile
+#==================================================================
+sub WhereFile {
+    my ($bamid, $set) = @_;
+    if ((! defined($set) || ! $set)) { $set = 'unset'; }    # Default
+
+    $bamid = GetBamid($bamid);
+
+    #   Get values of interest from the database
+    my $sth = ExecSQL("SELECT runid,bamname,cramname,piname,expt_sampleid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
+    my $href = $sth->fetchrow_hashref;
+    my $bamname = $href->{bamname};
+    my $cramname = $href->{cramname} || 'CRAMNAME_not_SET';
+    my $runid = $href->{runid};
+    $sth = ExecSQL("SELECT centerid,dirname FROM $opts{runs_table} WHERE runid=$runid");
+    $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { die "$Script - BAM '$bamid' run '$runid' is unknown\n"; }
+    $href = $sth->fetchrow_hashref;
+    my $rundir = $href->{dirname};
+    my $centerid = $href->{centerid};
+    $sth = ExecSQL("SELECT centername FROM $opts{centers_table} WHERE centerid=$centerid");
+    $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { die "$Script - BAM '$bamid' center '$centerid' is unknown\n"; }
+    $href = $sth->fetchrow_hashref;
+    my $centername = $href->{centername};
+
+    #   BAM is in one of those $opts{netdir} trees where without a symlink
+    if ($set eq 'bam') {
+        my $bamfile = abs_path("$opts{netdir}/$opts{incomingdir}/$centername/$rundir");
+        if ($bamfile) { $bamfile .= '/' . $bamname; }
+        print "$bamfile\n";
+        exit;
+    }
+ 
+    #   Find where the backup CRAM lives
+    if ($set eq 'backup') {
+        my $bakfile = abs_path("$opts{netdir}/$opts{backupsdir}/$centername/$rundir");
+        if ($bakfile) { $bakfile .= '/' . $cramname; }
+        print "$bakfile\n";
+        exit;
+    }
+
+    #   Print where qc.results we are interested are
+    if ($set eq 'qcresults') {
+        my $qcdir = abs_path("$opts{netdir}/$opts{qcresultsdir}/$centername/$rundir");
+        $bamname =~ s/\.bam//;                   # Remove the extension
+        $bamname =~ s/\.cram//;
+        print "$qcdir/$bamname.vb.selfSM\n";
+        exit;
+    }
+ 
     die "$Script - Unknown Where option '$set'\n";
 }
 
@@ -991,12 +1111,20 @@ topmedcmd.pl - Update the database for NHLBI TopMed
   topmedcmd.pl show 2016apr20 offsite      # Show offsite for run
   topmedcmd.pl show NWD00234 yaml          # Show everything known about a bamid
  
-  topmedcmd.pl where 2199 bam              # Returns real path to bam and host of bam
-  topmedcmd.pl where 2199 backup           # Returns path to backups directory and to backup file and host
-  topmedcmd.pl where 2199 qcresults        # Returns path to directory for qc.results
-  topmedcmd.pl where 2199 console qplot    # Returns path to directory for SLURM output
-  topmedcmd.pl where NWD00234 b37          # Returns path to remapped b37 directory and to file
-  topmedcmd.pl where 2199 b38              # Returns path to remapped b38 directory and to file
+  topmedcmd.pl wherepath 2199 bam          # Returns real path to bam
+  topmedcmd.pl wherepath 2199 backup       # Returns path to backups directory
+  topmedcmd.pl wherepath 2199 qcresults    # Returns path to directory for qc.results
+  topmedcmd.pl wherepath 2199 console      # Returns path to directory for SLURM output
+  topmedcmd.pl wherepath NWD00234 b37      # Returns path to remapped b37 directory and to file
+  topmedcmd.pl wherepath 2199 b38          # Returns path to remapped b38 directory and to file
+
+  topmedcmd.pl whathost 2199 bam           # Returns host for bam
+  topmedcmd.pl whathost 2199 backup        # Returns host for backups directory
+  topmedcmd.pl whathost 2199 qcresults     # Returns host for directory for qc.results
+
+  topmedcmd.pl wherefile 2199 bam          # Returns path to bam file (may not exist)
+  topmedcmd.pl wherefile 2199 backup       # Returns path for backups file (may not exist)
+  topmedcmd.pl wherefile 2199 qcresults    # Returns path for qc.results *.vb.SelfSM file (may not exist)
 
   topmedcmd.pl permit add bai braod 2015oct18   # Stop bai job submissions for a run
   topmedcmd.pl permit remove 12             # Remove a permit control
@@ -1079,25 +1207,27 @@ database value.
 B<whatnwdid bamid|nwdid>
 Use this to get some details for a particular bam.
 
-B<where bamid|nwdid bam|backup|qcresults|console|b37|b38>
-If B<bam> was specified, display the path to the real bam file, not one that is symlinked
-and the host where the bam exists (or null string).
+B<wherepath bamid|nwdid bam|backup|qcresults|console|b37|b38>
+If B<bam> was specified, display the path to the real bam file.
 
-If B<backup> was specified, display the path to the backup directory 
-and the path to the backup file (neither of which may not exist)
+If B<backup> was specified, display the path to the backup directory.
 
 If B<qcresults> was specified, display the path to the directory where
-the qc.results for this bamid will be (which may not exist)
+the qc.results for this bamid will be.
 
 If B<console> was specified, display the path to the directory where
-the SLURM console output. If an additional field is provided (e.g. B<qplot>)
-than this the path to the qplot output is also provided.
+the SLURM console output.
 
-If B<b37> was specified, display the path to the directory of remapped data for build 37 (or 'none')
-and the path to the remapped file (which may not exist).
+If B<b37> was specified, display the path to the directory of remapped data for build 37 results can be found.
 
-If B<b38> was specified, display the path to the directory of remapped data for build 38 (or 'none')
-and the path to the remapped file (which may not exist).
+If B<b38> was specified, display the path to the directory of remapped data for build 37 results can be found.
+
+B<whathhost bamid|nwdid bam|backup|qcresults>
+returns the host for the bam, backup or qc.results for the bam file.
+
+B<wherefile bamid|nwdid bam|backup|qcresults>
+returns the path to the file for the bam, backup or qc.results. This file may not exist
+
 
 =head1 EXIT
 
