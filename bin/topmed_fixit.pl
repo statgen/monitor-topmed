@@ -172,9 +172,8 @@ if ($fcn eq 'flagstat') {
 
 #--------------------------------------------------------------
 #   Compare the status at NCBI in the summary file with our database
-#   ####### This is not done yet #######
 #-------------------------------------------------------------- 
-if ($fcn eq 'ncbi_summary') {
+if ($fcn eq 'checkncbi') {
     #   Get all the known centers in the database
     my $centersref = GetCenters();
     foreach my $cid (keys %{$centersref}) {
@@ -182,61 +181,121 @@ if ($fcn eq 'ncbi_summary') {
         my $runsref = GetRuns($cid) || next;
 
         #   For each run, get NCBI status for each bamid
+        my %count = (
+            unknownncbi => 0,                # Count of unknown NCBI records
+            notatncbi => 0,                  # Count of samples not at ncbi
+            ncbierrs => 0,                   # Count of NCBI entries with errors
+            ncbixmlignored => 0,             # NCBI XML records we ignored
+            exptatncbi => 0,                 # Count of experiments at NCBI
+            exptonlyatncbi => 0,             # Count of experiments only at NCBI
+            exptatboth => 0,                 # Count of experiments at both sites
+            origatncbi => 0,                 # Count of original src files at NCBI
+            origonlyatncbi => 0,             # Count of original src files only at NCBI
+            origatboth => 0,                 # Count of original src files at both sites
+            b37atncbi => 0,                  # Count of b37 src files at NCBI
+            b37onlyatncbi => 0,              # Count of b37 src files only at NCBI
+            b37atboth => 0,                  # Count of b37 src files at both sites
+        );
         foreach my $runid (keys %{$runsref}) {
             my $dirname = $runsref->{$runid};
-            print "Checking NCBI status for bams in $dirname\n";
-            my $sql = "SELECT bamid,expt_sampleid,state_ncbiexpt,state_ncbiorig,state_ncbib37,state_ncbib38 " .
-                " FROM $opts{bamfiles_table} WHERE runid='$runid'";
+            my $sql = "SELECT bamcount FROM $opts{runs_table} WHERE runid=$runid";
             my $sth = DoSQL($sql);
+            my $href = $sth->fetchrow_hashref;
+            print "\nCENTER $centername  RUN  $dirname  [$href->{bamcount}]\n";
+            
+            $sql = "SELECT bamid,expt_sampleid,state_ncbiexpt,state_ncbiorig," .
+                "state_ncbib37,state_ncbib38 FROM $opts{bamfiles_table} WHERE runid=$runid";
+            $sth = DoSQL($sql);
             my $rowsofdata = $sth->rows();
             if (! $rowsofdata) { next; }
+            %count = ();
             for (my $i=1; $i<=$rowsofdata; $i++) {
-                my $href = $sth->fetchrow_hashref;
+                $href = $sth->fetchrow_hashref;
+                my $bamid = $href->{bamid};
+
+                #   Now get all NCBI records for this sample
                 my $sqlncbi = "SELECT file_name,file_md5sum,file_status,file_error " .
-                    " FROM $opts{ncbi_table} WHERE file_name like '" . $href->{expt_sampleid} . "%'";
+                    "FROM $opts{ncbi_table} WHERE file_name like '" . 
+                    $href->{expt_sampleid} . "%'";
                 my $sthncbi = DoSQL($sqlncbi);
                 my $rowsofncbi = $sthncbi->rows();
-                if (! $rowsofncbi) {            # NWDID is not at NCBI
-                    Summarize($href, 0);
+                if (! $rowsofncbi) {                            # NWDID is not at NCBI
+                    if ($opts{verbose}) { print "BAMID $bamid [$href->{expt_sampleid}] not at NCBI\n"; }
+                    $count{notatncbi}++;
                     next;
                 }
                 #   Go through every NWDID record at NCBI
                 #   Ignore submits of XML
                 for (my $ii=1; $ii<=$rowsofncbi; $ii++) {
                     my $hrefncbi = $sthncbi->fetchrow_hashref;
-                    my $name = $hrefncbi->{file_name};
-                    if ($name =~ /submit/) { next; }
-                    my @nameparts = split(/[\.\-]/,$name)
+                    #   Only interested in good loaded records
+                    if ($hrefncbi->{file_error}  ne '-') {
+                        print "Ignored Error $hrefncbi->{file_name} - $hrefncbi->{file_error}\n";
+                        $count{ncbierrs}++;
+                        next;
+                    }
+                    if ($hrefncbi->{file_status} ne 'loaded') { next; }
+                    if ($hrefncbi->{file_name} !~ /\.expt.xml/ &&
+                        $hrefncbi->{file_name} =~ /\.xml$/) {
+                        #if ($opts{verbose}) { print "Ignored: $hrefncbi->{file_name} $hrefncbi->{file_status}\n"; }
+                        #$count{ncbixmlignored}++;
+                        next;
+                    }
+
+                    #   Figure out what kind of NCBI data this is
+                    #   and see if OUR database thinks this happened also
+                    my $bmsg = 'at NCBI, but not marked in our database';
+                    my $gmsg = 'at NCBI and in our database';
+                    if ($hrefncbi->{file_name} =~ /\.expt\.xml/) {
+                        $count{exptatncbi}++;
+                        if ($href->{state_ncbiexpt} != $COMPLETED) {
+                            print "BAMID $bamid experiment completed $bmsg\n";
+                            $count{exptonlyatncbi}++;
+                            next;
+                        }
+                        if ($opts{verbose}) { print "BAMID $bamid experiment completed $gmsg\n"; }
+                        $count{exptatboth}++;
+                        next;
+                    }
+
+                    if ($hrefncbi->{file_name} =~ /\.recal\.37\.bam/ || # Bma is my error
+                        $hrefncbi->{file_name} =~ /\.recal\.37\.cram/ ||
+                        $hrefncbi->{file_name} =~ /\.recal\.cram/) {    # recal aline is my error
+                        $count{b37atncbi}++;
+                        if ($href->{state_ncbib37} != $COMPLETED) {
+                            print "BAMID $bamid B37 file loaded $bmsg\n";
+                            $count{b37onlyatncbi}++;
+                            next;
+                        }
+                        if ($opts{verbose}) { print "BAMID $bamid B37 file loaded $gmsg\n"; }
+                        $count{b37atboth}++;
+                        next;
+                    }
+
+                    if ($hrefncbi->{file_name} =~ /\.src\.[bc]r*am/ |
+                        $hrefncbi->{file_name} =~ /\.final\.sqz\.bam/) {    # My screw up in name
+                        $count{origatncbi}++;
+                        if ($href->{state_ncbiorig} != $COMPLETED) {
+                            print "BAMID $bamid original file loaded $bmsg\n";
+                            $count{origonlyatncbi}++;
+                            next;
+                        }
+                        if ($opts{verbose}) { print "BAMID $bamid original file loaded $gmsg\n"; }
+                        $count{origatboth}++;
+                        next;
+                    }
+
+
+                    #   We did know what this was
+                    print "Unknown NCBI record for filename=$hrefncbi->{file_name}\n";
+                    $count{unknownncbi}++;
                 }
-                my $ncbitype = '';
-                #if ($hrefncbi->{file_name} =~ /^(NWD\d+)\-(\w+)\.(\w+)\.(\w+)\.
-
             }
-
-        #   
+            foreach my $key (sort keys %count) { print "    $key = $count{$key}\n"; }
         }
     }
+    exit;   
 }
-
-#==================================================================
-# Subroutine:
-#   Summarize($href,$hrefncbi)
-#
-#   Execute command or just show what would be done
-#==================================================================
-my %summary = ();
-sub Summarize {
-    my ($href, $ncbihref) = @_;
-
-    #   No NCBI data
-    if (! $ncbihref) {
-        $summary{notatncbi}++;
-        $summary{notatncbilist} .= $href->{expt_sampleid} . ',';
-        #   See if WE think there is data there
-        return;
-    }
-}
-
 
 
 #--------------------------------------------------------------
