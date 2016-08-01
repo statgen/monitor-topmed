@@ -39,7 +39,7 @@ else
   if [ "${l[2]}" = "LN:248956422" -a "${l[5]}" = "LN:242193529" ]; then
     build=38
   else
-    a=`echo $1 | grep illumina`
+    a=`echo $2 | grep illumina`
     if [ "$a" != "" ]; then       # Path has illumina in it
       build=37
     fi
