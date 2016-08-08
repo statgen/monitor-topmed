@@ -254,12 +254,12 @@ if ($fcn == 'showout') {                // Show output from a SLURM job
     if ($samplestate == 'Q') { $s = 'qplot'; }
     if ($samplestate == 'C') { $s = 'cram'; }
     $cmd = "/usr/cluster/monitor/bin/topmedcmd.pl where $bamid console $s";
-    $ss = `$cmd`;
-    $a = explode(' ', $ss);
+    $ss = rtrim(`$cmd`);
+    $a = $ss . '/' . $bamid . "-$s.out";
     print "<h4 align='center'>SLURM console log for '$s' BAMID=$bamid</h4>\n<pre>\n";
-    if (! isset($a['1'])) { print "No console log known for this BAMID\n"; }
+    if (! file_exists($a)) { print "No console file found for '$bamid' ($a)\n"; }
     else {
-        $cmd = 'cat ' . $a['1'];
+        $cmd = "cat $a";
         //print "CMD=$cmd\n\n";
         print `$cmd`;
     }
