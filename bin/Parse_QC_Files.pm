@@ -98,7 +98,7 @@ sub parseQCFiles {
     close(IN);
     
     my @F = split(/\s+/,$line);
-    push(@metrics,sprintf("%.1lf",$F[6]*100));
+    push(@metrics,sprintf("%.3lf",$F[6]*100));
 
     #   Read second file
     #   @flags indicates the fields in statfile we want
