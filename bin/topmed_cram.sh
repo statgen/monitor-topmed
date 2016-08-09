@@ -95,10 +95,10 @@ if [ "$backupdir" = "" ]; then
 fi
 
 d=`date +%Y/%m/%d`
-mkdir -p $backupdir
+#mkdir -p $backupdir            # Run out of space if we make it ourselves
 cd $backupdir
 if [ "$?" != "0" ]; then
-  echo "Unable to CD $backupdir"
+  echo "Unable to CD $backupdir. This directory must be created first."
   $topmedcmd -persist mark $bamid $markverb failed
   exit 2
 fi
