@@ -32,7 +32,7 @@ $topmedcmd mark $bamid arrived started || exit $?
 
 #   Determine build used to generate this bam/cram
 build=''
-l=(`$samtools view -H $bamfile | grep '@SQ' | cut -f 1-3 | head -2`)
+l=(`$samtools view -H $bamfile | grep '@SQ' | cut -f 1-3 2>/dev/null | head -2`)
 if [ "${l[2]}" = "LN:249250621" -a "${l[5]}" = "LN:243199373" ]; then
   build=37
 else
