@@ -95,7 +95,7 @@ our %opts = (
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose maxlongjobs=i persist
+    help realm=s verbose maxlongjobs=i persist with-bamid|bamid
     )) || die "$Script - Failed to parse options\n";
 
 #   Simple help if requested
@@ -110,6 +110,8 @@ if ($#ARGV < 0 || $opts{help}) {
         "$m set bamid|nwdid|dirname colname value\n" .
         "  or\n" .
         "$m show bamid|nwdid colname|run|center|yaml\n" .
+        "  or\n" .
+        "$m [-with-bamid] showrun runname\n" .
         "  or\n" .
         "$m export\n" .
         "  or\n" .
@@ -147,6 +149,7 @@ if ($fcn eq 'mark')      { Mark(@ARGV); exit; }
 if ($fcn eq 'unmark')    { UnMark(@ARGV); exit; }
 if ($fcn eq 'set')       { Set(@ARGV); exit; }
 if ($fcn eq 'show')      { Show(@ARGV); exit; }
+if ($fcn eq 'showrun')   { ShowRun(@ARGV); exit; }
 if ($fcn eq 'export')    { Export(@ARGV); exit; }
 if ($fcn eq 'send2ncbi') { Send2NCBI(@ARGV); exit; }
 if ($fcn eq 'squeue')    { SQueue(@ARGV); exit; }
@@ -937,6 +940,31 @@ sub Set {
 
 #==================================================================
 # Subroutine:
+#   ShowRun($runname)
+#
+#   Generate list of nwdids (and maybe bamids) for a run
+#==================================================================
+sub ShowRun {
+    my ($runname) = @_;
+    my $s;
+
+    my $sth = ExecSQL("SELECT runid FROM $opts{runs_table} WHERE dirname='$runname'", 0);
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { die "$Script - Unknown run '$runname'\n"; }
+    my $href = $sth->fetchrow_hashref;
+    my $runid = $href->{runid};
+    $sth = ExecSQL("SELECT bamid,expt_sampleid FROM $opts{bamfiles_table} WHERE runid=$runid");
+    $rowsofdata = $sth->rows();
+    for (my $i=1; $i<=$rowsofdata; $i++) {
+        $href = $sth->fetchrow_hashref;
+        $s = $href->{expt_sampleid};
+        if ($opts{'with-bamid'}) { $s .= ' ' . $href->{bamid}; }
+        print $s . "\n";
+    }
+}
+
+#==================================================================
+# Subroutine:
 #   Show($fcn, $bamid, $col)
 #
 #   Generate list of information from the database
@@ -1110,6 +1138,9 @@ topmedcmd.pl - Update the database for NHLBI TopMed
   topmedcmd.pl show NWD00234 run           # Show run
   topmedcmd.pl show 2016apr20 offsite      # Show offsite for run
   topmedcmd.pl show NWD00234 yaml          # Show everything known about a bamid
+
+  topmedcmd.pl showrun 20150604            # Show all NWDID for run
+  topmedcmd.pl -bamid showrun 20150604     # Show all NWDID and bamid for run
  
   topmedcmd.pl wherepath 2199 bam          # Returns real path to bam
   topmedcmd.pl wherepath 2199 backup       # Returns path to backups directory
@@ -1140,6 +1171,10 @@ See B<perldoc DBIx::Connector> for details defining the database.
 =head1 OPTIONS
 
 =over 4
+
+=item B<-bamid  -with-bamid>
+
+Include the bamid for the output from showrun.
 
 =item B<-help>
 
@@ -1199,6 +1234,10 @@ B<show bamid|nwdid|dirname colname|center|run|yaml>
 Use this to show information about a particular bamid (or expt_sampleid)
 or run name.
 Use 'yaml' to display everything known about the bam of interest.
+
+B<showrun runname>
+Use this to show a list of all the NWDIDs for a run.
+The option B<-bamid> will cause the bamid to be shown in addition.
 
 B<unmark bamid|nwdid [verb]>
 Use this to reset the state for a particular BAM file to the default
