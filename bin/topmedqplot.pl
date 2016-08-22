@@ -92,7 +92,7 @@ if ($opts{remove}) {
 }
 
 #--------------------------------------------------------------
-#   Extract qplot valies or die trying
+#   Extract qplot values or die trying
 #--------------------------------------------------------------
 my $f = $dirname . '/' . $nwdid;
 my $self  = `ls $f*.vb.selfSM`;
@@ -110,22 +110,8 @@ if ($#colnames != $#metrics) {
 #--------------------------------------------------------------
 #   Update database with values we obtained
 #--------------------------------------------------------------
-#   Our network can get flakey and the DBConnect can fail
-#   Catch when this happens and wait a bit and try again
-my $sleeptime = 10;
-for (1 .. 10) {
-    eval { $dbh = DBConnect($opts{realm}); };
-    if ($@) {                           # Failed, wait a bit and try again
-        print "Datbase connection failed, wait and retry\n";
-        sleep($sleeptime);
-        $sleeptime += 10;
-    }
-    else { last; }
-}
-if ($@) { die $@ . "\n"; }
-
 #   See if the NWDID we were provided is valid
-my $sth = DoSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE expt_sampleid='$nwdid'", 0);
+my $sth = PersistDoSQL($opts{realm},"SELECT bamid FROM $opts{bamfiles_table} WHERE expt_sampleid='$nwdid'");
 my $rowsofdata = $sth->rows();
 if (! $rowsofdata) { die "$Script - NWDID '$nwdid' is unknown\n"; }
 my $href = $sth->fetchrow_hashref;
@@ -136,7 +122,7 @@ $_ = shift(@colnames);              # Ignore name of this first column
 my $sql;
 
 #   See if there already is a qc result for this NWDID
-$sth = DoSQL("SELECT bam_id FROM $opts{qcdata_table} WHERE bam_id=$bamid", 0);
+$sth = PersistDoSQL($opts{realm},"SELECT bam_id FROM $opts{qcdata_table} WHERE bam_id=$bamid");
 $rowsofdata = $sth->rows();
 if ($rowsofdata) {                  # This already exists, do UPDATE
     $sql = "UPDATE $opts{qcdata_table} SET created_at='$date',";
@@ -157,7 +143,7 @@ else {                              # First time, do INSERT
     $sql .= ')';
 }
 if ($opts{verbose}) { print "SQL=$sql\n"; }
-$sth = DoSQL($sql, 0);
+$sth = PersistDoSQL($opts{realm},$sql);
 if (! $sth) { die "$Script Failed to update database. SQL=$sql\n"; }
 
 print "Updated QC database data for '$nwdid'\n";
