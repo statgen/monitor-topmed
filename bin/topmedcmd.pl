@@ -274,7 +274,7 @@ sub Export {
     #my ($center, $run) = @_;
 
     #   Generate header for CSV file
-    my @cols = qw(bamname studyname piname expt_sampleid state_b37 state_b38 datayear);
+    my @cols = qw(cramname studyname piname expt_sampleid state_b37 state_b38 datayear cramflagstat);
     my $s = 'CENTER,DIRNAME,';
     foreach (@cols) { $s .= uc($_) . ','; }
     print $s . "FULLPATH\n";
@@ -295,11 +295,11 @@ sub Export {
             if (! $rowsofdata) { next; }
             for (my $i=1; $i<=$rowsofdata; $i++) {
                 my $href = $sth->fetchrow_hashref;
-                my $f = "$opts{netdir}/$opts{incomingdir}/$centername/$dirname/" .
-                    $href->{bamname};
                 #   See if this has been verified
                 if ($href->{state_md5ver} != $COMPLETED) { next; }
-                #   Show data for this BAM
+                #   Show data for this CRAM
+                my $f = "$opts{netdir}/$opts{backupsdir}/$centername/$dirname/" .
+                    $href->{cramname};
                 $s = "$centername,$dirname,";
                 foreach (@cols) {
                     if (! defined($href->{$_})) { $s .= ','; }
