@@ -20,7 +20,7 @@ samtools=/usr/cluster/bin/samtools
 awkcalcend=/usr/cluster/monitor/bin/topmed_calc_cram_end.awk
 
 for n in 1 2 3 4 5 6 7 8 9; do
-  offset=`samtools view -H $1 | awk -f $awkcalcend`
+  offset=`$samtools view -H $1 | awk -f $awkcalcend`
   l=`$samtools view $1 $offset 2>&1 | grep truncate`
   if [ "$l" = "" ]; then
     md5sum $1               # Let caller trap results
