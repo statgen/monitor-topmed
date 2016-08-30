@@ -162,6 +162,7 @@ ls -la $basebam.*
 $topmedqplot $outdir $nwdid
 if [ "$?" != "0" ]; then
   echo "Unable to update the database with the QCPLOT results for '$bamid' [$outdir $nwdid]"
+  echo "Maybe try again later with: $topmedqplot $outdir $nwdid"
   $topmedcmd -persist mark $bamid $markverb failed
   exit 7
 fi
