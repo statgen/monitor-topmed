@@ -32,15 +32,14 @@ $SHOWSTATUS = "STATUS: &nbsp;&nbsp;&nbsp;" .
     "<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=showqlocal' " .
     "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=showqlocal\",680,720); " .
     "return false;'>Local Queue</a> &nbsp;&nbsp;&nbsp;" .
-
     "<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=df' " .
     "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=df\",680,720); " .
     "return false;'>Disk Usage</a> &nbsp;&nbsp;&nbsp;";
 
-    $SHOWSTATUS .= "<a href='/topmed/plot.php' target='plots'> " .
-        " Plots</a> &nbsp;&nbsp;&nbsp;";
+$SHOWSTATUS .= "<a href='/topmed/plot.php' target='plots'> " .
+    " Plots</a> &nbsp;&nbsp;&nbsp;";
 
-    $SHOWSTATUS .="<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=logs' " .
+$SHOWSTATUS .="<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=logs' " .
     "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=logs\",680,720); " .
     "return false;'>Tail Logs</a>";
 
@@ -157,12 +156,14 @@ if (in_array($_SERVER['REMOTE_USER'], $MGRS)) { $iammgr = 1; }
 if (in_array($_SERVER['REMOTE_USER'], $REQMGRS)) { $iammgr = 1; }
 //  If a manager, allow them to control job submission
 if ($iammgr) {
+    $s = str_replace("index", "datadump", $_SERVER['SCRIPT_NAME']);
     $SHOWSTATUS .= " &nbsp;&nbsp;&nbsp; <a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=control' " .
         "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=control\",680,720); " .
         "return false;'>Control Jobs</a>" .
         " &nbsp;&nbsp;&nbsp; <a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=restart' " .
         "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=restart\",680,720); " .
-        "return false;'>Restart Jobs</a>";
+        "return false;'>Restart Jobs</a>" .
+        " &nbsp;&nbsp;&nbsp; <a href='$s'>DataDump</a>";
 }
 print doheader($HDR['title'], 1);
 
@@ -347,7 +348,7 @@ if ($iammgr) {
         print dofooter($HDR['footer']);
         exit;
     }
-    
+
     if ($fcn == 'editrun') {
         $sql = 'SELECT * FROM ' . $LDB['runs'] . " WHERE runid='$runid'";
         $result = SQL_Query($sql);
