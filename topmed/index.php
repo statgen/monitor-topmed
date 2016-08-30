@@ -33,30 +33,12 @@ $SHOWSTATUS = "STATUS: &nbsp;&nbsp;&nbsp;" .
     "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=showqlocal\",680,720); " .
     "return false;'>Local Queue</a> &nbsp;&nbsp;&nbsp;" .
 
-    //"<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=showqrmt' " .
-    //"onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=showqrmt\",680,720); " .
-    //"return false;'>Remote Queue</a> &nbsp;&nbsp;&nbsp;" .
-
     "<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=df' " .
     "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=df\",680,720); " .
     "return false;'>Disk Usage</a> &nbsp;&nbsp;&nbsp;";
 
-    //"<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=errorcheck' " .
-    //"onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=errorcheck\",680,720); " .
-    //"return false;'>Error Check</a> &nbsp;&nbsp;&nbsp;" .
-
-    //"<a href='/topmed/loadedfiles.txt' target='blank'> " .
-    //" NCBI Log</a> &nbsp;&nbsp;&nbsp;" .
-
-    if ($oldsite) { 
-        $SHOWSTATUS .= "<a href='/monitor/topmed/plot.php' target='plots'> " .
-            " Plots</a> &nbsp;&nbsp;&nbsp;" .
-            "<a href='http://gcsdev.sph.umich.edu/topmed/' target='newcode'> New Site </a> &nbsp;&nbsp;&nbsp;";
-    }
-    else {
-        $SHOWSTATUS .= "<a href='/topmed/plot.php' target='plots'> " .
-            " Plots</a> &nbsp;&nbsp;&nbsp;";
-    }
+    $SHOWSTATUS .= "<a href='/topmed/plot.php' target='plots'> " .
+        " Plots</a> &nbsp;&nbsp;&nbsp;";
 
     $SHOWSTATUS .="<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=logs' " .
     "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=logs\",680,720); " .
@@ -175,12 +157,12 @@ if (in_array($_SERVER['REMOTE_USER'], $MGRS)) { $iammgr = 1; }
 if (in_array($_SERVER['REMOTE_USER'], $REQMGRS)) { $iammgr = 1; }
 //  If a manager, allow them to control job submission
 if ($iammgr) {
-$SHOWSTATUS .= " &nbsp;&nbsp;&nbsp; <a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=control' " .
-    "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=control\",680,720); " .
-    "return false;'>Control Jobs</a>" .
-    " &nbsp;&nbsp;&nbsp; <a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=restart' " .
-    "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=restart\",680,720); " .
-    "return false;'>Restart Jobs</a>";
+    $SHOWSTATUS .= " &nbsp;&nbsp;&nbsp; <a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=control' " .
+        "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=control\",680,720); " .
+        "return false;'>Control Jobs</a>" .
+        " &nbsp;&nbsp;&nbsp; <a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=restart' " .
+        "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=restart\",680,720); " .
+        "return false;'>Restart Jobs</a>";
 }
 print doheader($HDR['title'], 1);
 
@@ -260,7 +242,6 @@ if ($fcn == 'showout') {                // Show output from a SLURM job
     if (! file_exists($a)) { print "No console file found for '$bamid' ($a)\n"; }
     else {
         $cmd = "cat $a";
-        //print "CMD=$cmd\n\n";
         print `$cmd`;
     }
     print "</pre>\n";
@@ -1104,7 +1085,7 @@ function QuickStatus($r, $url) {
         $val = DateState($r[$c]);
         //  For those marked as failed, set up link
         $s =  $quickletter[$c];
-        if ($val == 'failed') {
+        if ($val == 'failed' || $val == 'started') {
             $s = str_replace('XX', $quickletter[$c], $url);
         } 
         $h .= "<span class='$val'>&nbsp;" . $s . "&nbsp;</span>";
