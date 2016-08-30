@@ -482,7 +482,7 @@ sub SQueue {
                 my ($dev1, $tps1, $MB_reads1, $MB_writes1) = split(' ', <IN>);
                 my ($dev2, $tps2, $MB_reads2, $MB_writes2) = split(' ', <IN>);
                 close(IN);
-                if ($f =~ /(topmed\d*)\./) {
+                if ($f =~ /(topmed\d*)\./ && defined($iowait)) {
                     printf("%-7s %6s%% %7s %7s %7s %7s  %s\n",
                         $1, $iowait, $MB_reads1, $MB_writes1, $MB_reads2, $MB_writes2, $tod);
                 }
