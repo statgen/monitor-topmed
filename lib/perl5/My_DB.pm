@@ -28,7 +28,7 @@ our ($DBC, $DBH);
 #==================================================================
 sub DBConnect {
     my ($realm) = @_;
-    if (! $realm) { return 0; }
+    if (! $realm) { warn "DBConnect: No REALM provided\n";  return 0; }
     #   Get the connection information FROM DBIx::Connector
     #   Fully qualified realm file may be provided
     if ($realm =~ /^(\/.+)\/([^\/]+)$/) {
@@ -42,7 +42,6 @@ sub DBConnect {
             -dbi_options => {RaiseError => 1, PrintError => 1});
     }
     $DBH = $DBC->connect();
-    $DBH->{mysql_auto_reconnect} = 1;   # On timeout, reconnect please
     return $DBH;
 }
 
@@ -60,31 +59,37 @@ sub PersistDBConnect {
     my ($realm) = @_;
     if (! $realm) { die "PersistDBConnect: No REALM provided\n"; }
 
-    #   Networks can get flakey and the DBConnect can fail. Be persistent
-    for (my $maxsleep=120; $maxsleep>0; $maxsleep-=10) {
-        undef($DBH);
-        #   Get the connection information FROM DBIx::Connector
-        #   Fully qualified realm file may be provided
-        if ($realm =~ /^(\/.+)\/([^\/]+)$/) {
-            my $d = $1;
-            $realm = $2;
-            $DBC = new DBIx::Connector(-realm => $realm, -connection_dir => $d,
-                -dbi_options => {RaiseError => 0, PrintError => 0});
-        }
-        else {
-            $DBC = new DBIx::Connector(-realm => $realm,
-                -dbi_options => {RaiseError => 0, PrintError => 0});
-        }
-        if ($DBC) { $DBH = $DBC->connect(); }
-        if ($DBH) {                         # Connect seems to have succeeded
-            $DBH->{mysql_auto_reconnect} = 1;       # On timeout, reconnect please
-            return $DBH;
-        }
-        #   Connection failed, wait and retry
-        if ($main::opts{verbose} > 1) { warn "PersistDBConnect: Datbase connection failed, wait and retry\n"; }
-        sleep(10);
+    #   Get the connection information FROM DBIx::Connector
+    #   Fully qualified realm file may be provided
+    if ($realm =~ /^(\/.+)\/([^\/]+)$/) {
+        my $d = $1;
+        $realm = $2;
+        $DBC = new DBIx::Connector(-realm => $realm, -connection_dir => $d,
+            -max_wait => '20min', -max_interval => '20sec', -callback => \&PersistCallBack,
+            -dbi_options => {RaiseError => 0, PrintError => 0});
     }
-    die "PersistDBConnect: After many retries, never able to connect to database. REALM=$realm\n";
+    else {
+        $DBC = new DBIx::Connector(-realm => $realm,
+            -max_wait => '20min', -max_interval => '20sec', -callback => \&PersistCallBack,
+            -dbi_options => {RaiseError => 0, PrintError => 0});
+    }
+    if ($DBC) { $DBH = $DBC->connect(); }
+    return $DBH;
+}
+
+#==================================================================
+# Subroutine:
+#   PersistCallBack - Invoked by DBI when a connect fails
+#   See DBIx::Connector for more details
+#
+# Arguments:
+#   Hash as described in 
+#   realm - realm name DBIx::Connector
+#
+#==================================================================
+sub PersistCallBack {
+    warn "PersistDBConnect: Datbase connection failed for realm '$_[1]', " ,
+        "waiting $_[5] secs to retry. Emsg=$_[9]\n"; 
 }
 
 #==================================================================
