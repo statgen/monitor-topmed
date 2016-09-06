@@ -12,7 +12,7 @@ medir=`dirname $0`
 calcmd5=/usr/cluster/monitor/bin/topmed_calcmd5.sh
 mem=2G
 console=/net/topmed/working/topmed-output
-tmpconsole=/working/topmed-output
+tmpconsole=/net/topmed/working/topmed-output
 topmeddir=/net/topmed/incoming/topmed
 build=37
 version=secondary
@@ -162,7 +162,7 @@ $ascpcmd $sendfile
 rc=$?
 rm -f $sendfile
 if [ "$rc" != "0" ]; then
-  echo "FAILED to send data file '$sendfile'"
+  echo "FAILED to send data file '$sendfile' (rc=$rc)"
   $topmedcmd -persist mark $bamid $markverb failed
   exit 2
 fi
