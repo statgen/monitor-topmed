@@ -418,6 +418,7 @@ sub SQueue {
     my $cmd = $opts{squeuecmd} . '| grep topmed';
     my %partitions = ();            # Unique partition names
     my %qos = ();                   # Unique QOS names
+    my %qosheld = ();               # Count of held jobs in QOS
     my %running = ();
     my %mosixrunning = ();          # Counts of jobs by nomosix users
     my %queued = ();
@@ -435,6 +436,7 @@ sub SQueue {
             push @{$queued{$c[1]}{data}},$l;
             $queued{$c[1]}{count}++;
             $qos{$c[2]}{queued}++;
+            if ($l =~ /held state/) { $qos{$c[2]}{held}++; }
             next;
         }
         if ($c[5] eq 'R') {         # Running
@@ -494,11 +496,12 @@ sub SQueue {
     #   Show summary of QOS
     print "QOS Summary\n";
     foreach my $q (sort keys %qos) {
+        my $s = $qos{$q}{held} || '';
         if (! defined($qos{$q}{running}))  { $qos{$q}{running} = 0; }
         if (! defined($qos{$q}{queued}))   { $qos{$q}{queued} = 0; }
         my $qq = $q;                    # Patch normal to be something meaningful?
         if ($q eq 'normal') { $qq = 'default_qos'; }
-        printf("  %-18s %3d running / %3d queued\n", $qq, $qos{$q}{running}, $qos{$q}{queued}); 
+        printf("  %-18s %3d running / %3d queued   %s\n", $qq, $qos{$q}{running}, $qos{$q}{queued}, $s); 
     }
     print "\n";
 
