@@ -59,6 +59,13 @@ bamfile=$2
 #   Is this a cram or bam
 extension="${bamfile##*.}"
 
+#   Maybe this is already running or completed?
+s=`$topmedcmd show $bamid state_qplot`
+if [ "$s" = "20" -o "$s" = "3" ]; then
+  echo "bamid=$bamid bamfile=$bamfile already running or completed"
+  exit
+fi
+
 #   Mark this as started
 $topmedcmd mark $bamid $markverb started
 d=`date +%Y/%m/%d`

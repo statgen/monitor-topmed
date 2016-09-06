@@ -86,6 +86,13 @@ bamfile=$2
 #   Is this a cram or bam
 extension="${bamfile##*.}"
 
+#   Maybe this is already running or completed?
+s=`$topmedcmd show $bamid state_cram`
+if [ "$s" = "20" -o "$s" = "3" ]; then
+  echo "bamid=$bamid bamfile=$bamfile already running or completed"
+  exit
+fi
+
 #   Get destination directory for backup files
 backupdir=`$topmedcmd wherepath $bamid backup`
 if [ "$backupdir" = "" ]; then
