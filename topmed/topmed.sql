@@ -6,6 +6,13 @@ GRANT ALL    ON nhlbi.* TO sqlnhlbi@"localhost"   IDENTIFIED BY 'password';
 GRANT SELECT ON nhlbi.* TO sqlnhlbiro@"localhost" IDENTIFIED BY 'password';
 flush privileges;
 
+#   When you see instruction to do:  mysqladmin flush-hosts do:
+ssh d
+ssh root@g
+mysql -h f-db -p    (Use FuS password)
+flush hosts;
+#   Verify it works by connecting on host that is having the problem
+
 #   Clone the old database to the new
 mysqldump -u sqlnhlbi --password=g9X+6iaO -h f-db nhlbi > /tmp/nhlbi.sql
 mysql -u sqlnhlbi --password=g9X+6iaO -h localhost nhlbi < /tmp/nhlbi.sql
