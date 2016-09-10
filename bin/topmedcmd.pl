@@ -497,6 +497,7 @@ sub SQueue {
     print "QOS Summary\n";
     foreach my $q (sort keys %qos) {
         my $s = $qos{$q}{held} || '';
+        if ($s) { $s .= ' jobs held'; }
         if (! defined($qos{$q}{running}))  { $qos{$q}{running} = 0; }
         if (! defined($qos{$q}{queued}))   { $qos{$q}{queued} = 0; }
         my $qq = $q;                    # Patch normal to be something meaningful?
@@ -527,14 +528,17 @@ sub SQueue {
             printf ($format . "\n", $h, $s);
         }
     }
-    $format = "    %-8s  %s\n";
-    print "  Partition nomosix jobs on topmed hosts:\n";
-    printf ($format, 'User', 'Job count');
-    foreach my $u (sort keys %mosixrunning) {
-        printf($format, $u, "  [" . $mosixrunning{$u} . '] ');
-    }
     print "\n";
-
+    if (%mosixrunning) {
+        $format = "    %-8s  %s\n";
+        print "  Partition nomosix jobs on topmed hosts:\n";
+        printf ($format, 'User', 'Job count');
+        foreach my $u (sort keys %mosixrunning) {
+            printf($format, $u, "  [" . $mosixrunning{$u} . '] ');
+        }
+        print "\n";
+    }
+    
     #   Show longest running jobs
     print "Longest running jobs per partition\n";
     foreach my $p (sort keys %partitions) {
