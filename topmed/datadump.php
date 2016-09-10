@@ -45,11 +45,19 @@ for ($r=0; $r<$runnumrows; $r++) {
     for ($b=0; $b<$bamnumrows; $b++) {
         $row = SQL_Fetch($bamresult);
         if ($row['expt_sampleid'] && $row['datayear']) {
-            $dumpstring .= $CENTERID2NAME[$cid] . "\t$dirname\t" . $row['expt_sampleid'] .
-                "\t" . $row['datayear'] . "\n";
+            $dumpstring .= $row['expt_sampleid'] .  "\t" .
+                $row['datayear'] .  "\t" .
+                $row['piname'] .  "\t" .
+                $CENTERID2NAME[$cid] .  "\t" .
+                $dirname .  "\t" .
+                $runid .  "\t" .
+                $row['state_ncbiorig'] . "\t" .
+                $row['state_ncbib37'] . "\t" .
+                $row['state_ncbib38'] . "\n";
         }
     }
 }
+//print "<pre>\n$dumpstring</pre>\n"; exit;
 Download($fn='bamfile_datadump.txt', $dumpstring);
 exit;
 
