@@ -119,11 +119,11 @@ if ($#ARGV < 0 || $opts{help}) {
         "  or\n" .
         "$m squeue\n" .
         "  or\n" .
-        "$m wherepath|where bamid|nwdid bam|backup|qcresults|console|b37|b38\n" .
+        "$m wherepath|where bamid|nwdid bam|backup|qcresults|console\n" .
         "  or\n" .
         "$m wherehost bamid|nwdid bam|backup|qcresults\n" .
         "  or\n" .
-        "$m wherefile bamid|nwdid bam|backup|qcresults\n" .
+        "$m wherefile bamid|nwdid bam|backup|qcresults|b37|b38\n" .
         "  or\n" .
         "$m whatbamid bamname\n" .
         "  or\n" .
@@ -607,8 +607,6 @@ sub ReFormatPartitionData {
 #     backup    Print directory for backups file
 #     qcresults Print directory where qc.results for a bamfile
 #     console   Print directory where SLURM console output lives
-#     b37       Print directory for remapped b37
-#     b38       Print directory for remapped b38
 #==================================================================
 sub WherePath {
     my ($bamid, $set, $extra1) = @_;
@@ -665,25 +663,6 @@ sub WherePath {
         exit;
     }
  
-    #   Try to guess where the b37 remapped CRAM lives
-    if ($set eq 'b37') {
-        my $b37fdir = '';
-        my $b37file = '';
-        foreach ('', '2', '3', '4', '5', '6') {
-            $b37fdir = abs_path("$opts{netdir}$_/$opts{resultsdir}/$centername/$piname/$nwdid/bams");
-            if ($b37file) {
-                print "$b37fdir\n";
-                exit;
-            }
-        }
-        exit;
-    }
-
-    #   Try to guess where the b38 remapped CRAM lives -- this likely needs to be corrected
-    if ($set eq 'b38') {
-        die "$Script - b38 paths are not known yet\n";
-    }
-
     die "$Script - Unknown Where option '$set'\n";
 }
 
@@ -759,6 +738,8 @@ sub WhatHost {
 #     bam       Print file path where BAM actually exists, no symlink,
 #     backup    Print file path for backups
 #     qcresults Print file path to selfSM in qc.results for a bamfile
+#     b37       Print directory for remapped b37
+#     b38       Print directory for remapped b38
 #==================================================================
 sub WhereFile {
     my ($bamid, $set) = @_;
@@ -773,6 +754,8 @@ sub WhereFile {
     my $href = $sth->fetchrow_hashref;
     my $bamname = $href->{bamname};
     my $cramname = $href->{cramname} || 'CRAMNAME_not_SET';
+    my $piname = $href->{piname};
+    my $nwdid = $href->{expt_sampleid};
     my $runid = $href->{runid};
     $sth = ExecSQL("SELECT centerid,dirname FROM $opts{runs_table} WHERE runid=$runid");
     $rowsofdata = $sth->rows();
@@ -810,7 +793,26 @@ sub WhereFile {
         print "$qcdir/$bamname.vb.selfSM\n";
         exit;
     }
- 
+
+    #   Try to guess where the b37 remapped CRAM lives
+    if ($set eq 'b37') {
+        my $b37file = '';
+        foreach ('', '2', '3', '4', '5', '6') {
+            $b37file = abs_path("$opts{netdir}$_/$opts{resultsdir}/$centername/$piname/$nwdid/bams/$nwdid.recal.cram");
+            if ($b37file) {
+                print "$b37file\n";
+                exit;
+            }
+        }
+        exit;
+    }
+
+    #   Try to guess where the b38 remapped CRAM lives
+    if ($set eq 'b38') {
+        die "$Script - b38 file paths are not known yet\n";
+    }
+
+
     die "$Script - Unknown Where option '$set'\n";
 }
 
