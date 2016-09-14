@@ -95,8 +95,8 @@ CREATE TABLE bamfiles (
   library_name VARCHAR(96),
   cramname     VARCHAR(96) NOT NULL,
   cramchecksum VARCHAR(96) NOT NULL,
-  b37bamchecksum VARCHAR(96) NOT NULL,
-  b38bamchecksum VARCHAR(96) NOT NULL,
+  b37cramchecksum VARCHAR(96) NOT NULL,
+  b38cramchecksum VARCHAR(96) NOT NULL,
   bamflagstat  BIGINT UNSIGNED DEFAULT NULL,
   cramflagstat BIGINT UNSIGNED DEFAULT NULL,
   b37flagstat  BIGINT UNSIGNED DEFAULT NULL,
@@ -175,6 +175,7 @@ select bamid,bamname from bamfiles where cramb37checksum='d41d8cd98f00b204e98009
 #   Added for remapping with build37
   cramb37sent CHAR(1) DEFAULT 'N',
   cramb37checksum VARCHAR(96) NOT NULL,
+  cramb38checksum VARCHAR(96) NOT NULL,
   bam_delivered VARCHAR(12),
   jobidcp2ncbi VARCHAR(12),
   jobidmapping VARCHAR(12),
