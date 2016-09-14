@@ -36,7 +36,7 @@ $SHOWSTATUS = "STATUS: &nbsp;&nbsp;&nbsp;" .
     "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=df\",680,720); " .
     "return false;'>Disk Usage</a> &nbsp;&nbsp;&nbsp;";
 
-$SHOWSTATUS .= "<a href='/topmed/plot.php' target='plots'> " .
+$SHOWSTATUS .= "<a href='/monitor/topmed/plot.php' target='plots'> " .
     " Plots</a> &nbsp;&nbsp;&nbsp;";
 
 $SHOWSTATUS .="<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=logs' " .
