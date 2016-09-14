@@ -21,6 +21,7 @@ jobname=orig
 slurmp=topmed
 qos=topmed-ncbi
 realhost=''
+realhost="--nodelist=topmed"       # Force to machine with external interface
 
 if [ "$1" = "-submit" ]; then
   shift
@@ -31,10 +32,10 @@ if [ "$1" = "-submit" ]; then
   fi 
 
   #  Submit this script to be run
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos --workdir=$console -J $1-$jobname --output=$console/$1-$jobname.out $0 $*`)
+  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos $realhost --workdir=$console -J $1-$jobname --output=$console/$1-$jobname.out $0 $*`)
   if [ "$?" != "0" ]; then
     echo "Failed to submit command to SLURM"
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos --workdir=$console -J $1-$jobname --output=$console/$1-$jobname.out $0 $*"
+    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos $realhost --workdir=$console -J $1-$jobname --output=$console/$1-$jobname.out $0 $*"
     exit 1
   fi
   $topmedcmd mark $1 $markverb submitted
