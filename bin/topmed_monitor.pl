@@ -414,12 +414,17 @@ if ($fcn eq 'sb37') {
             for (my $i=1; $i<=$rowsofdata; $i++) {
                 my $href = $sth->fetchrow_hashref;
 
-                #   Only send the primary BAM if the experiment was accepted at NCBI
+                #   Only send the remapped b37 file for this year's data
+                if ($href->{datayear} ne '1') {
+                    print "  BAM '$href->{bamname}' [$href->{bamid}] is ignored because it is not year 1\n";
+                    next;
+                }
+
+                #   Only send the remapped file if the experiment was accepted at NCBI
                 if ($href->{state_ncbiexpt} != $COMPLETED) { next; }
 
                 #   Check important fields for this BAM are possibly correct
                 my $skip = '';
-                #foreach my $col (qw(cramname cramchecksum expt_sampleid)) {
                 foreach my $col (qw(cramname expt_sampleid)) {
                     if (exists($href->{$col}) && $href->{$col}) { next; }
                     if ($opts{verbose}) { print "  No value for '$col'\n"; }
@@ -431,8 +436,57 @@ if ($fcn eq 'sb37') {
                 }
                 if ($opts{suberr} && $href->{state_ncbib37} >= $FAILEDCHECKSUM) { $href->{state_ncbib37} = $REQUESTED; }
                 if ($href->{state_ncbib37} != $NOTSET && $href->{state_ncbib37} != $REQUESTED) { next; }
-                #   Send the primary CRAM (as BAM) to NCBI
+                #   Send the remapped CRAM to NCBI
                 BatchSubmit("$opts{topmedncbib37} -submit $href->{bamid}");
+            }
+        }
+    }
+    ShowSummary($fcn);
+    exit;
+}
+
+#--------------------------------------------------------------
+#   Get a list of remapped primary BAMs to be sent to NCBI
+#--------------------------------------------------------------
+if ($fcn eq 'sb38') {
+    #   Get all the known centers in the database
+    my $centersref = GetCenters();
+    foreach my $cid (keys %{$centersref}) {
+        my $centername = $centersref->{$cid};
+        my $runsref = GetRuns($cid) || next;
+        #   For each run, see if there are bamfiles to be delivered to NCBI
+        foreach my $runid (keys %{$runsref}) {
+            my $dirname = $runsref->{$runid};
+            #   Get list of all bams known at NCBI and that have not been sent
+            my $sql = "SELECT * FROM $opts{bamfiles_table} " .
+                "WHERE runid='$runid' AND nwdid_known='Y'";
+            my $sth = DoSQL($sql);
+            my $rowsofdata = $sth->rows();
+            if (! $rowsofdata) { next; }
+            for (my $i=1; $i<=$rowsofdata; $i++) {
+                my $href = $sth->fetchrow_hashref;
+
+                #   Only send the remapped b38 file for this year's data
+                if ($href->{datayear} ne '2') { next; }
+
+                #   Only send the remapped file if the experiment was accepted at NCBI
+                if ($href->{state_ncbiexpt} != $COMPLETED) { next; }
+
+                #   Check important fields for this BAM are possibly correct
+                my $skip = '';
+                foreach my $col (qw(cramname expt_sampleid)) {
+                    if (exists($href->{$col}) && $href->{$col}) { next; }
+                    if ($opts{verbose}) { print "  No value for '$col'\n"; }
+                    $skip .= "$col ";
+                }
+                if ($skip) {
+                    print "  BAM '$href->{bamname}' [$href->{bamid}] is ignored because of incomplete data for: $skip\n";
+                    next;
+                }
+                if ($opts{suberr} && $href->{state_ncbib38} >= $FAILEDCHECKSUM) { $href->{state_ncbib38} = $REQUESTED; }
+                if ($href->{state_ncbib38} != $NOTSET && $href->{state_ncbib38} != $REQUESTED) { next; }
+                #   Send the remapped CRAM to NCBI
+                BatchSubmit("$opts{topmedncbib38} -submit $href->{bamid}");
             }
         }
     }
