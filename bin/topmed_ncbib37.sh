@@ -13,8 +13,6 @@ calcmd5=/usr/cluster/monitor/bin/topmed_calcmd5.sh
 mem=2G
 console=/net/topmed/working/topmed-output
 tmpconsole=/net/topmed/working/topmed-output
-topmeddir=/net/topmed/incoming/topmed
-remapdir="/net/topmed/working/schelcj/results /net/topmed2/working/schelcj/results /net/topmed3/working/schelcj/results /net/topmed4/working/schelcj/results /net/topmed5/working/schelcj/results  /net/topmed6/working/schelcj/results"
 build=37
 version=remap
 markverb=sentb$build
@@ -23,6 +21,7 @@ xmlonly=N
 slurmp=topmed
 qos=topmed-ncbi
 realhost=''
+realhost="--nodelist=topmed"       # Force to machine with external interface
 
 if [ "$1" = "-xmlonly" ]; then shift; xmlonly=Y; fi    # Force just XML to be sent to NCBI
 if [ "$1" = "-submit" ]; then
@@ -34,10 +33,10 @@ if [ "$1" = "-submit" ]; then
   fi 
 
   #  Submit this script to be run
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos --workdir=$console -J $1-$jobname --output=$console/$1-$jobname.out $0 $*`)
+  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos $realhost --workdir=$console -J $1-$jobname --output=$console/$1-$jobname.out $0 $*`)
   if [ "$?" != "0" ]; then
     echo "Failed to submit command to SLURM"
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos --workdir=$console -J $1-$jobname --output=$console/$1-$jobname.out $0 $*"
+    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos $realhost --workdir=$console -J $1-$jobname --output=$console/$1-$jobname.out $0 $*"
     exit 1
   fi
   $topmedcmd mark $1 $markverb submitted
@@ -89,21 +88,13 @@ cd XMLfiles
 here=`pwd`
 
 #   Figure out what file to send
-sendfile=doesnotexist
-for d in $remapdir; do
-  dd="$d/$center/$piname/$nwdid/bams"
-  if [ -f "$dd/$nwdid.recal.cram" ]; then
-    ln -sf $dd/$nwdid.recal.cram $nwdid.recal.$build.cram
-    sendfile=$nwdid.recal.$build.cram
-    break;
-  fi
-done
-if [ ! -f "$sendfile" ]; then
+sendfile=`$topmedcmd wherefile $bamid b37`
+if [ "$sendfile" = '' ]; then
   echo "Remapped CRAM for Build $build for bamid '$bamid' not found ($sendfile)"
   $topmedcmd -persist mark $bamid $markverb failed
   exit 2
 fi
-checksum=`$topmedcmd show $bamid cramb37checksum`
+checksum=`$topmedcmd show $bamid b37cramchecksum`
 if [ "$checksum" = "" ]; then
   echo "Calculating MD5 for CRAM"
   stime=`date +%s`
@@ -113,12 +104,12 @@ if [ "$checksum" = "" ]; then
     $topmedcmd -persist mark $bamid $markverb failed
     exit 3
   fi
-  $topmedcmd set $bamid cramb37checksum $checksum
+  $topmedcmd set $bamid b37cramchecksum $checksum
   etime=`date +%s`
   etime=`expr $etime - $stime`
   echo "MD5 calculated for CRAM in $etime seconds"
 else
-  echo "Obtained cramb37checksum for bamid $bamid from database ($checksum)"
+  echo "Obtained b37cramchecksum for bamid $bamid from database ($checksum)"
 fi
 
 d=`date +%Y/%m/%d`
