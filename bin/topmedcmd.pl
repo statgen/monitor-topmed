@@ -85,7 +85,8 @@ our %opts = (
     incomingdir => 'incoming/topmed',
     backupsdir => 'working/backups/incoming/topmed',
     consoledir => 'working/topmed-output',
-    resultsdir => 'working/schelcj/results',
+    results37dir => 'working/schelcj/results',
+    results38dir => 'working/mapping/results',
     ascpcmd => "/usr/cluster/bin/ascp -i ".
         "/net/topmed/incoming/study.reference/send2ncbi/topmed-2-ncbi.pri -l 800M -k 1",
     ascpdest => 'asp-um-sph@gap-submit.ncbi.nlm.nih.gov:protected',
@@ -798,7 +799,7 @@ sub WhereFile {
     if ($set eq 'b37') {
         my $b37file = '';
         foreach ('', '2', '3', '4', '5', '6') {
-            $b37file = abs_path("$opts{netdir}$_/$opts{resultsdir}/$centername/$piname/$nwdid/bams/$nwdid.recal.cram");
+            $b37file = abs_path("$opts{netdir}$_/$opts{results37dir}/$centername/$piname/$nwdid/bams/$nwdid.recal.cram");
             if ($b37file) {
                 print "$b37file\n";
                 exit;
@@ -809,7 +810,16 @@ sub WhereFile {
 
     #   Try to guess where the b38 remapped CRAM lives
     if ($set eq 'b38') {
-        die "$Script - b38 file paths are not known yet\n";
+        die "$Script - b38 file paths are not really known yet\n";
+        my $b38file = '';
+        foreach ('', '2', '3', '4', '5', '6') {
+            $b38file = abs_path("$opts{netdir}$_/$opts{results38dir}/$centername/hg38/$nwdid/bams/$nwdid.recal.cram");
+            if ($b38file) {
+                print "$b38file\n";
+                exit;
+            }
+        }
+        exit;
     }
 
 
@@ -1155,8 +1165,9 @@ topmedcmd.pl - Update the database for NHLBI TopMed
   topmedcmd.pl wherepath 2199 backup       # Returns path to backups directory
   topmedcmd.pl wherepath 2199 qcresults    # Returns path to directory for qc.results
   topmedcmd.pl wherepath 2199 console      # Returns path to directory for SLURM output
-  topmedcmd.pl wherepath NWD00234 b37      # Returns path to remapped b37 directory and to file
-  topmedcmd.pl wherepath 2199 b38          # Returns path to remapped b38 directory and to file
+  
+  topmedcmd.pl wherefile NWD00234 b37      # Returns path to remapped b37 directory and to file
+  topmedcmd.pl wherefile 2199 b38          # Returns path to remapped b38 directory and to file
 
   topmedcmd.pl whathost 2199 bam           # Returns host for bam
   topmedcmd.pl whathost 2199 backup        # Returns host for backups directory
