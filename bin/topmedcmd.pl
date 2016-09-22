@@ -611,7 +611,7 @@ sub ReFormatPartitionData {
 #==================================================================
 sub WherePath {
     my ($bamid, $set, $extra1) = @_;
-    if ((! defined($set) || ! $set)) { $set = 'unset'; }    # Default
+    if ((! defined($set) || ! $set)) { $set = 'function_missing'; }    # Default
 
     $bamid = GetBamid($bamid);
 
