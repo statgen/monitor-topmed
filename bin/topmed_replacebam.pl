@@ -1,7 +1,7 @@
 #!/usr/bin/perl -I/usr/cluster/lib/perl5/site_perl -I/usr/cluster/monitor/lib/perl5 -I /usr/cluster/monitor/bin
 ###################################################################
 #
-# Name: replacebam.pl
+# Name: topmed_replacebam.pl
 #
 # Description:
 #   Every now and then we are sent a bad BAM/CRAM input file.
@@ -11,7 +11,7 @@
 #   TODO:  Add code to deal with delete, to remove everything ??
 #
 # ChangeLog:
-#   $Log: replacebam.pl,v $
+#   $Log: topmed_replacebam.pl,v $
 #
 # This is free software; you can redistribute it and/or modify it under the
 # terms of the GNU General Public License as published by the Free Software
@@ -257,25 +257,25 @@ __END__
 
 =head1 NAME
 
-replacebam.pl - Replace a bam/cram incoming file
+topmed_replacebam.pl - Replace a bam/cram incoming file
 
 =head1 SYNOPSIS
 
-  replacebam.pl NWD508042 NWD508042.macrogen.bam 76c3dc5ee5ebce4d1cac300a7dce24bf
-  replacebam.pl 28829 NWD508042.macrogen.bam 76c3dc5ee5ebce4d1cac300a7dce24bf
+  topmed_replacebam.pl NWD508042 NWD508042.macrogen.bam 76c3dc5ee5ebce4d1cac300a7dce24bf
+  topmed_replacebam.pl 28829 NWD508042.macrogen.bam 76c3dc5ee5ebce4d1cac300a7dce24bf
 
-  replacebam.pl -manifest Manifest.txt NWD508042 NWD508042.macrogen.bam
-  replacebam.pl -manifest Manifest.txt -findnwdid xx NWD508042.macrogen.bam
+  topmed_replacebam.pl -manifest Manifest.txt NWD508042 NWD508042.macrogen.bam
+  topmed_replacebam.pl -manifest Manifest.txt -findnwdid xx NWD508042.macrogen.bam
 
-  replacebam.pl -bai -manifest Manifest.txt -findnwdid xx NWD508042.macrogen.bam
+  topmed_replacebam.pl -bai -manifest Manifest.txt -findnwdid xx NWD508042.macrogen.bam
 
   #    CD to where new replacement files are
   #    Create a place for files to be backed up
-  #    Walk all BAMs and invoke replacebam.pl to replace the file
+  #    Walk all BAMs and invoke topmed_replacebam.pl to replace the file
   #    Do not prompt, use the Manifest.txt in replacement files directory
   #    copy the BAI file, find the NWDID from the file to be copied
   cd /net/topmed4/incoming/topmed/macrogen/2016.0729.mathias.29
-  for bam in *.bam; do /tmp/replacebam.pl / 
+  for bam in *.bam; do /tmp/topmed_replacebam.pl / 
      -back /net/topmed4/incoming/topmed/macrogen/.2016.0920.files.replaced \ 
      -bai -fin -man Manifest.txt -nop  xx $bam \ 
      | tee -a /net/topmed4/incoming/topmed/macrogen/.2016.0920.files.replaced/log.txt \ 
