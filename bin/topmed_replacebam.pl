@@ -8,8 +8,6 @@
 #   This script is used to replace the bam file and associated
 #   data and cause it all to be reprocessed.
 #
-#   TODO:  Add code to deal with delete, to remove everything ??
-#
 # ChangeLog:
 #   $Log: topmed_replacebam.pl,v $
 #
@@ -186,7 +184,7 @@ if ($opts{backupdir}) {
     }
     else { print "Backup $opts{manifestfile} already done\n"; }
 }
-else { print "No backup were done\n"; }
+else { print "No backup was done\n"; }
 
 print "Copying new file to $bamname  (will be slow)\n";
 chmod(0600, $bamname_filepath);
