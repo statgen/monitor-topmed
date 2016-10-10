@@ -39,7 +39,7 @@ my %VALIDVERBS = (                  # Valid verbs to database colum
     arrived     => 'state_arrive',
     md5verified => 'state_md5ver',
     backedup    => 'state_backup',  
-    baid        => 'state_bai',  
+    baid        => 'state_bai',
     qploted     => 'state_qplot',
     cramed      => 'state_cram',   
     sentexpt    => 'state_ncbiexpt',
@@ -67,6 +67,8 @@ my %VALIDOPS = (                    # Used for permit
     qplot => 1,
     cram => 1,
     nwdid => 1,
+    sexpt => 1,
+    sorig => 1,
     sb37 => 1,
     sb38 => 1,
 );
@@ -85,7 +87,8 @@ our %opts = (
     incomingdir => 'incoming/topmed',
     backupsdir => 'working/backups/incoming/topmed',
     consoledir => 'working/topmed-output',
-    results37dir => 'working/schelcj/results',
+    wresults37dir => 'working/schelcj/results',
+    iresults37dir => 'incoming/schelcj/results',
     results38dir => 'working/mapping/results',
     ascpcmd => "/usr/cluster/bin/ascp -i ".
         "/net/topmed/incoming/study.reference/send2ncbi/topmed-2-ncbi.pri -l 800M -k 1",
@@ -797,31 +800,32 @@ sub WhereFile {
 
     #   Try to guess where the b37 remapped CRAM lives
     if ($set eq 'b37') {
-        my $b37file = '';
-        foreach ('', '2', '3', '4', '5', '6') {
-            $b37file = abs_path("$opts{netdir}$_/$opts{results37dir}/$centername/$piname/$nwdid/bams/$nwdid.recal.cram");
-            if ($b37file) {
-                print "$b37file\n";
-                exit;
-            }
+        my @b37file = ();
+        foreach ('', '2', '3', '4', '5', '6', '7', '8') {
+            $_ = abs_path("$opts{netdir}$_/$opts{wresults37dir}/$centername/$piname/$nwdid/bams/$nwdid.recal.cram");
+            if ($_) { push @b37file,$_; next;}
+            $_ = abs_path("$opts{netdir}$_/$opts{iresults37dir}/$centername/$piname/$nwdid/bams/$nwdid.recal.cram");
+            if ($_) { push @b37file,$_; next;}
         }
-        exit;
+        if (! @b37file) { exit; }           # Nothing found
+        if ($#b37file == 1) { print $b37file[0]; exit; }
+        die "$Script - Found " . scalar(@b37file) . " files: " . join("\n", @b37files) . "\n";
     }
 
     #   Try to guess where the b38 remapped CRAM lives
     if ($set eq 'b38') {
         die "$Script - b38 file paths are not really known yet\n";
-        my $b38file = '';
-        foreach ('', '2', '3', '4', '5', '6') {
-            $b38file = abs_path("$opts{netdir}$_/$opts{results38dir}/$centername/hg38/$nwdid/bams/$nwdid.recal.cram");
-            if ($b38file) {
-                print "$b38file\n";
-                exit;
-            }
+        my @b38file = ();
+        foreach ('', '2', '3', '4', '5', '6', '7', '8') {
+            $_ = abs_path("$opts{netdir}$_/$opts{wresults38dir}/$centername/$piname/$nwdid/bams/$nwdid.recal.cram");
+            if ($_) { push @b38file,$_; next;}
+            $_ = abs_path("$opts{netdir}$_/$opts{iresults38dir}/$centername/$piname/$nwdid/bams/$nwdid.recal.cram");
+            if ($_) { push @b38file,$_; next;}
         }
-        exit;
+        if (! @b38file) { exit; }           # Nothing found
+        if ($#b38file == 1) { print $b38file[0]; exit; }
+        die "$Script - Found " . scalar(@b38file) . " files: " . join("\n", @b38files) . "\n";
     }
-
 
     die "$Script - Unknown Where option '$set'\n";
 }
