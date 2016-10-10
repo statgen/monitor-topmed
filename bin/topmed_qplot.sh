@@ -5,6 +5,7 @@
 #	Run QPLOT on a BAM file
 #
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
+topmedpath=/usr/cluster/monitor/bin/topmedpath.pl
 topmedqplot=/usr/cluster/monitor/bin/topmedqplot.pl
 console=/net/topmed/working/topmed-output
 gcbin=/net/mario/gotcloud/bin
@@ -27,7 +28,7 @@ if [ "$1" = "-submit" ]; then
   fi 
 
   # Run this on node where bam lives
-  h=`$topmedcmd whathost $1 bam`
+  h=`$topmedpath whathost $1 bam`
   if [ "$h" != "" ]; then
     qos="--qos=$h-qplot"
   fi

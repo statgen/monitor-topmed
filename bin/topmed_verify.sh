@@ -6,6 +6,7 @@
 #   Do not specify a QOS for verify so it runs before QPLOT
 #
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
+topmedpath=/usr/cluster/monitor/bin/topmedpath.pl
 topmedrename=/usr/cluster/monitor/bin/topmedrename.pl
 topmedflagstat=/usr/cluster/monitor/bin/topmed_flagstat.sh
 console=/net/topmed/working/topmed-output
@@ -24,7 +25,7 @@ if [ "$1" = "-submit" ]; then
   fi 
 
   # Run this on node where bam lives
-  h=`$topmedcmd whathost $1 bam`
+  h=`$topmedpath whathost $1 bam`
   if [ "$h" != "" ]; then
     realhost="--nodelist=$h"
     qos="$h-verify"

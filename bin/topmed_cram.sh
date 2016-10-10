@@ -9,6 +9,7 @@ samtools=/net/mario/gotcloud/bin/samtools
 ref=/net/mario/gotcloud/gotcloud.ref/hs37d5.fa
 illuminaref=/net/topmed/incoming/study.reference/study.reference/illumina.hg19.fa
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
+topmedpath=/usr/cluster/monitor/bin/topmedpath.pl
 topmedflagstat=/usr/cluster/monitor/bin/topmed_flagstat.sh
 backupdir=/net/topmed/working/backups
 medir=`dirname $0`
@@ -31,14 +32,14 @@ if [ "$1" = "-submit" ]; then
   fi 
 
   # Run this on node where bam lives
-  h=`$topmedcmd whathost $1 bam`
+  h=`$topmedpath whathost $1 bam`
   if [ "$h" != "" ]; then
     realhost="--nodelist=$h"
     qos="--qos=$h-cram"
   fi
 
   #   Get destination directory for backup files
-  backupdir=`$topmedcmd wherepath $1 backup`
+  backupdir=`$topmedpath wherepath $1 backup`
   if [ "$backupdir" = "" ]; then
     echo "Unable to determine backup directory for '$bamid'. No job submitted."
     exit 2
@@ -94,7 +95,7 @@ if [ "$s" = "20" -o "$s" = "3" ]; then
 fi
 
 #   Get destination directory for backup files
-backupdir=`$topmedcmd wherepath $bamid backup`
+backupdir=`$topmedpath wherepath $bamid backup`
 if [ "$backupdir" = "" ]; then
   echo "Unable to determine backup directory for '$bamid'"
   $topmedcmd -persist mark $bamid $markverb failed
