@@ -20,7 +20,7 @@ if [ "$?" != "0" ]; then
   echo "$0 - Unable to CD to '$1'"
   exit 4
 fi
-echo "Forcing '$1' to be writable for the monitor"
+# echo "Forcing '$1' to be writable for the monitor"
 chgrp topmed .
 chmod 770 .
 chmod 664 Manifest.txt *.md5 2> /dev/null   # Failure is OK
