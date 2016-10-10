@@ -102,13 +102,6 @@ if [ "$backupdir" = "" ]; then
 fi
 
 d=`date +%Y/%m/%d`
-#mkdir -p $backupdir            # Run out of space if we make it ourselves
-cd $backupdir
-if [ "$?" != "0" ]; then
-  echo "Unable to CD $backupdir. This directory must be created first."
-  $topmedcmd -persist mark $bamid $markverb failed
-  exit 2
-fi
 s=`hostname`
 p=`pwd`
 echo "#========= '$d' host=$s $SLURM_JOB_ID squeezed=$squeezed $0 bamid=$bamid bamfile=$bamfile backupdir=$backupdir pwd=$p========="
@@ -160,7 +153,21 @@ if [ "$extension" = "cram" ]; then
     chmod 0444 $backupdir/$newname
     s=`date +%s`; s=`expr $s - $now`; echo "Copy completed in $s seconds"
   else
-    echo "No copy of '$bamfile made because this will be copied offsite"
+    echo "Create symlink to original file since backup is offsite"
+    mkdir -p $backupdir             # Safe to make backup dir cause it is small
+    cd $backupdir
+    if [ "$?" != "0" ]; then
+        echo "Unable to CD $backupdir. This directory must be created first."
+        $topmedcmd -persist mark $bamid $markverb failed
+        exit 2
+    fi
+    ln -sf $bamfile $newname        # Create backup file as symlink
+    ln -sf $bamfile.crai $newname.crai
+    if [ ! -f $newname ]; then
+        echo "Unable to create backup file '$newname' in '$backupdir'"
+        $topmedcmd -persist mark $bamid $markverb failed
+        exit 2
+    fi
   fi
 
   # The md5 for the backup is the same as that for the input
@@ -183,6 +190,14 @@ fi
 #======================================================================
 #   Original input file was a bam
 #======================================================================
+#mkdir -p $backupdir            # We run out of space if we make it ourselves
+cd $backupdir
+if [ "$?" != "0" ]; then
+  echo "Unable to CD $backupdir. This directory must be created first."
+  $topmedcmd -persist mark $bamid $markverb failed
+  exit 2
+fi
+
 chkname=`basename $bamfile .bam`
 
 #   Get flagstat for original input file
