@@ -276,31 +276,35 @@ sub WhereFile {
 
     #   Try to guess where the b37 remapped CRAM lives
     if ($set eq 'b37') {
-        my @b37files = ();
+        my %files = ();
         foreach ('', '2', '3', '4', '5', '6', '7', '8') {
-            $_ = abs_path("$opts{netdir}$_/$opts{wresults37dir}/$centername/$piname/$nwdid/bams/$nwdid.recal.cram");
-            if ($_) { push @b37files,$_; next;}
-            $_ = abs_path("$opts{netdir}$_/$opts{iresults37dir}/$centername/$piname/$nwdid/bams/$nwdid.recal.cram");
-            if ($_) { push @b37files,$_; next;}
+            my $p = abs_path("$opts{netdir}$_/$opts{wresults37dir}/$centername/$piname/$nwdid/bams/$nwdid.recal.cram");
+            if ($p) { $files{$p} = 1; next; }
+            $p = abs_path("$opts{netdir}$_/$opts{iresults37dir}/$centername/$piname/$nwdid/bams/$nwdid.recal.cram");
+            if ($p) { $files{$p} = 1; next; }
         }
-        if (! @b37files) { exit; }           # Nothing found
-        if ($#b37files == 1) { print $b37files[0]; exit; }
-        die "$Script - Found " . scalar(@b37files) . " files: " . join("\n", @b37files) . "\n";
+        my @found = keys %files;
+        if (! @found) { exit; }           # Nothing found
+        if ($#found == 0) { print $found[0]; exit; }
+        print "$Script - Found " . scalar(@found) . " files: \n";
+        foreach (@found) { print "   "; system("ls -l $_"); }
+        exit(1);
     }
 
     #   Try to guess where the b38 remapped CRAM lives
     if ($set eq 'b38') {
         die "$Script - b38 file paths are not really known yet\n";
-        my @b38files = ();
+        my %files = ();
         foreach ('', '2', '3', '4', '5', '6', '7', '8') {
-            $_ = abs_path("$opts{netdir}$_/$opts{wresults38dir}/$centername/$piname/$nwdid/bams/$nwdid.recal.cram");
-            if ($_) { push @b38files,$_; next;}
-            $_ = abs_path("$opts{netdir}$_/$opts{iresults38dir}/$centername/$piname/$nwdid/bams/$nwdid.recal.cram");
-            if ($_) { push @b38files,$_; next;}
+            my $p = abs_path("$opts{netdir}$_/$opts{results38dir}/$centername/$piname/$nwdid/bams/$nwdid.recal.cram");
+            if ($p) { $files{$p} = 1; next; }
         }
-        if (! @b38files) { exit; }           # Nothing found
-        if ($#b38files == 1) { print $b38files[0]; exit; }
-        die "$Script - Found " . scalar(@b38files) . " files: " . join("\n", @b38files) . "\n";
+        my @found = keys %files;
+        if (! @found) { exit; }           # Nothing found
+        if ($#found == 0) { print $found[0]; exit; }
+        print "$Script - Found " . scalar(@found) . " files: \n";
+        foreach (@found) { print "   "; system("ls -l $_"); }
+        exit(1);
     }
 
     die "$Script - Unknown Where option '$set'\n";
