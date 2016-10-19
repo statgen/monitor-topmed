@@ -116,7 +116,8 @@ if (defined($href2->{designdesc}) && $href2->{designdesc} ne '') {
     $opts{design_description} = $href2->{designdesc};
 }
 
-my $d = $topmed . "/incoming/topmed/$center/$run";
+#   CD some place nice and safe, just in case.  I don't think this is necessary
+my $d = '/tmp';
 if (! chdir($d)) {
     die "$Script Unable to CD to '$d', how can that happen?\n";
 }
@@ -219,6 +220,8 @@ sub GenRUNXML {
 
     my $ext = 'bam';
     if ($filename =~ /\.(\w+)$/) { $ext = $1; }  # Should be cram or bam
+    my $provider = 'IRC Harmonized';
+    if ($filename =~ /\.src\./) { $provider = 'Sequencing Center'; }
     my $xml .= "<RUN\n" .
         "  alias = \"$alias\"\n" .
         "  center_name = \"$centerdesc\"\n" .
@@ -243,6 +246,12 @@ sub GenRUNXML {
         "    <TAG>assembly</TAG>\n" .
         "    <VALUE>GRCh37</VALUE>\n" .
         "  </RUN_ATTRIBUTE>\n" .
+
+        "  <RUN_ATTRIBUTE>\n" .                     #   Add another run_attribute per Adam Stine
+        "    <TAG>Alignment Provider</TAG>\n" .
+        "    <VALUE>$provider</VALUE>\n" .          # Sequencing Center for src or IRC Harmonized
+        "  </RUN_ATTRIBUTE>\n" .
+
         "</RUN_ATTRIBUTES>\n" .
         "</RUN>\n";
     return $xml;
