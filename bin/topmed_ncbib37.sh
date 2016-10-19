@@ -6,6 +6,7 @@
 #
 samtools=/net/mario/gotcloud/bin/samtools
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
+topmedpath=/usr/cluster/monitor/bin/topmedpath.pl
 ascpcmd="$topmedcmd send2ncbi"
 topmedxml="/usr/cluster/monitor/bin/topmed_xml.pl"
 medir=`dirname $0`
@@ -88,7 +89,7 @@ cd XMLfiles
 here=`pwd`
 
 #   Figure out what file to send
-sendfile=`$topmedcmd wherefile $bamid b37`
+sendfile=`$topmedpath wherefile $bamid b37`
 if [ "$sendfile" = '' ]; then
   echo "Remapped CRAM for Build $build for bamid '$bamid' not found ($sendfile)"
   $topmedcmd -persist mark $bamid $markverb failed
@@ -150,7 +151,7 @@ if [ "$xmlonly" != "Y" ]; then
   stime=`date +%s`
   $ascpcmd $sendfile
   rc=$?
-  rm -f $sendfile
+  #rm -f $sendfile
   if [ "$rc" != "0" ]; then
     echo "FAILED to send data file '$sendfile'"
     $topmedcmd -persist mark $bamid $markverb failed
