@@ -956,11 +956,11 @@ function RestartJobs($h) {
         "<input type='hidden' name='fcn' value='restartjobs'>\n" .
         "<table align='left' width='80%' border='0'>\n" .
         "<tr>" .
-        "<td align='right'><b>Name of Run</b></td>" .
+        "<td align='right'><b>Name or Runid of Run</b></td>" .
         "<td>&nbsp;</td>" .
         "<td><input type='text' name='run' length='16' value='none'></td>" .
         "<td>&nbsp;</td>" .
-        "<td><font color='green'> 2015aug22.weiss.06, 2015oct14 etc. </font></td>" .
+        "<td><font color='green'> 2015aug22.weiss.06, 244, etc. </font></td>" .
         "</tr>\n" .
 
         "<tr>" .
@@ -968,8 +968,8 @@ function RestartJobs($h) {
         "<td>&nbsp;</td>";
     $html .= "<td><select name='samplestate'>" .
         "<option value='99'>Failed</option>" .
-        "<option value='2'>Submitted (for Terry)</option>" .
-        "<option value='3'>Running (for Terry)</option>" .
+        "<option value='2'>Submitted</option>" .
+        "<option value='3'>Running</option>" .
         "</select></td>" .
         "<td><font color='green'>&nbsp;</font></td>" .
         "<td>&nbsp;</td>" .
@@ -980,6 +980,7 @@ function RestartJobs($h) {
         "<td>&nbsp;</td>";
     $html .= "<td><select name='op'>" .
         "<option value='none'>none</option>" .
+        "<option value='arrive'>arrive</option>" .
         "<option value='md5ver'>verify</option>" .
         "<option value='bai'>bai</option>" .
         "<option value='qplot'>qplot</option>" .
@@ -1011,7 +1012,9 @@ function HandleRestartJobs($dirname, $samplestate, $op) {
         return Emsg("Run or Operation was not specified, try again", 1);
     }
 
-    $sql = 'SELECT runid FROM ' . $LDB['runs'] . " WHERE dirname='$dirname'";
+    if (preg_match('/^\d+$/', $dirname)) { $col = 'runid'; }
+    else { $col = 'dirname'; }
+    $sql = 'SELECT runid FROM ' . $LDB['runs'] . " WHERE $col='$dirname'";
     $result = SQL_Query($sql);
     $row = SQL_Fetch($result);
     $runid = $row['runid'];
