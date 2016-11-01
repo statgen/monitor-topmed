@@ -84,7 +84,7 @@ if [ ! -f $bai ]; then
 fi
 
 #   Create output directory and CD there
-outdir=`$topmedcmd -persist wherepath $bamid qcresults`
+outdir=`$topmedpath wherepath $bamid qcresults`
 if [ "$outdir" = "" ]; then
   echo "Unable to get QCRESULTS directory for '$bamid' - $outdir"
   $topmedcmd -persist mark $bamid $markverb failed
