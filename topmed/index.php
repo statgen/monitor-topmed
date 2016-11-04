@@ -648,7 +648,7 @@ function ViewRunDetail($runid) {
 ---------------------------------------------------------------*/
 function ViewBams($runid, $maxdirs, $iammgr) {
     global $LDB, $HDR, $CENTERS, $CENTERID2NAME, $CENTERNAME2ID, $FILES, $BAMNOTE, $SHOWSTATUS;
-    $hdrcols  = array('bamname', 'QUIKSTAT', 'bamsize', 'piname');
+    $hdrcols  = array('bamname', 'QUIKSTAT', 'bamsize', 'piname', 'ncbierr');
     $html = '';
     $maxdirs = 0;                   // For now, show all BAMs
 
