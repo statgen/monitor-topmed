@@ -206,6 +206,9 @@ die "Invalid request '$fcn'. Try '$Script --help'\n";
 sub SummaryTableMerge {
     my ($f) = @_;
     #   Walk through each file and update the database
+    #   3 Might started with NWDxxxxxx
+    #   9 loaded, error etc
+    #   12 Possibly a useful error msg
     my @xdbcols = qw(
         realm
         upload_id
@@ -234,6 +237,8 @@ sub SummaryTableMerge {
     print "Merging data from '$f' ";
     my $upd = 0;
     my $ins = 0;
+    my %ERRORS = ();                    # NWDID to hash of path to error msg
+    my %LOADED = ();                    # NWDID loaded files of interest to NWDID
     while (<INSQL>) {
         chomp();
         my @cols = split("\t",$_);
@@ -242,6 +247,17 @@ sub SummaryTableMerge {
             die "$Script - Number columns in $. of '$f' was incorrect " .
                 "($#cols != $#dbcols)\n";
         }
+        if ($cols[3] !~ /^(NWD\d{6})/) {
+            die "$Script - error field detected, but unable to get NWDid, line $. of '$f'. Line=$_\n";
+        }
+        my $nwd = $1;
+
+        #   Clean up some fields for easier post processing or to fix errors in names
+        if ($cols[12] eq '-') { $cols[12] = ''; }
+        if ($cols[3] =~ /\.recal\./)  { $cols[3] =~ s/\.recal\./\.remap\./; }
+        if ($cols[3] =~ /\.remap\.bam/)  { $cols[3] =~ s/\.remap\.bam/\.remap\.37\.bam/; }
+        if ($cols[3] =~ /\.remap\.cram/) { $cols[3] =~ s/\.remap\.cram/\.remap\.37\.cram/; }
+        if ($cols[3] =~ /\.sqz.bam/) { next; }  # Ignore old bug in my code
 
         my $setsql = 'SET ';
         for (my $i=0; $i<=$#dbcols; $i++) {
@@ -256,9 +272,60 @@ sub SummaryTableMerge {
             $ins++;
         }
         else { $upd++; }
+
+        #   Keep track of all BAMs or CRAMs that were loaded so we can delete the errors
+        if ($cols[9] eq 'loaded' && $cols[3] =~ /am$/) { $LOADED{$cols[3]} = $nwd; }
+
+        #   Catch errors here in %ERRORS    cols[3]=file_name cols[12]=file_error
+        if ($cols[9] ne 'error') { next; }
+        if ($cols[3] =~ /submit.xml/) { next; }     # Ignore errors on submits
+        my %E = ();
+        my $eref = $ERRORS{$nwd} || \%E;        # Either previous errors or new one
+        if ($cols[12] =~ /^Run_\w+_is_rej(.+)/) { $cols[12] = 'Rej' . $1; }
+        $eref->{$cols[3]} .= $cols[12] . "\n";
+        $ERRORS{$nwd} = $eref;
     }
     close(INSQL);
-    print "  ($upd updates, $ins inserts)\n";
+
+    #   Remove any error messages for loaded Files from msgs like this
+    #     protected 5399247 2016-02-07T14:27:12 NWD433184-remap.37.run.xml ... error
+    #     protected 5399248 2016-02-08T11:56:21 NWD433184.remap.37.cram ... loaded   (cram or bam)
+    #     protected 5401844 2016-02-08T12:03:34	NWD433184-secondary.37.run.xml ... error
+    #     protected 5468239 2016-02-25T15:43:55	NWD433184.src.bam ... loaded   (cram or bam)
+    my $removederrs = 0;
+    foreach my $file (keys %LOADED) {
+        my $nwd = $LOADED{$file};
+        if ($file =~ /$nwd\.src\.\w+am$/) {
+            if (delete $ERRORS{$nwd}{"$nwd-secondary.37.run.xml"}) { 
+                if ($opts{verbose}) { print "Removed errors for $file\n"; }
+                $removederrs++;
+            }
+            next;
+        }
+        if ($file =~ /$nwd\.remap\.(3\d)\.\w+am$/) {
+            if (delete $ERRORS{$nwd}{"$nwd-remap.$1.run.xml"}) { 
+                if ($opts{verbose}) { print "Removed errors for $file\n"; }
+                $removederrs++;
+            }
+            next;
+        }
+        print "Did not know what to do with '$file'\n";
+    }
+
+    #   Update database with all the error messages
+    my $nwderrs = 0;
+    foreach my $nwdid (keys %ERRORS) {
+        if ($opts{verbose}) { print $nwdid . ":\n"; }
+        my $eref = $ERRORS{$nwdid};
+        foreach my $k (keys %$eref) {
+            if ($opts{verbose}) { print "  $k => $eref->{$k}"; }
+            $eref->{$k} =~ s/_/ /g;         # Spaces make the msg more readable
+            my $sql =  "UPDATE $opts{bamfiles_table} SET ncbierr='$k => $eref->{$k}' WHERE expt_sampleid='$nwdid'";
+            DoSQL($sql);
+            $nwderrs++;
+        }
+    }
+    print "  ($upd updates, $ins inserts, found $nwderrs NWDID errors, removed $removederrs errors)\n";
 }
 
 #==================================================================
