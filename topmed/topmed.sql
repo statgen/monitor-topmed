@@ -107,6 +107,7 @@ CREATE TABLE bamfiles (
   phs_consent_short_name VARCHAR(24),
   phs_sra_sample_id VARCHAR(24),
   phs_sra_data_details VARCHAR(255),
+  ncbierr      VARCHAR(255),
   checksum     VARCHAR(96) NOT NULL,
   expt_sampleid VARCHAR(24) DEFAULT 'UNKNOWN',  /* NWDID */
   nwdid_known  CHAR(1) DEFAULT 'N',
