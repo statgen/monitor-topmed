@@ -18,7 +18,7 @@ realhost="--nodelist=topmed"       # Force to machine with external interface
 if [ "$1" = "-submit" ]; then
   shift
   #   May I submit this job?
-  $topmedcmd permit test expt $1
+  $topmedcmd permit test sexpt $1
   if [ "$?" = "0" ]; then
     exit 4
   fi 
