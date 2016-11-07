@@ -401,7 +401,7 @@ sub LookFor {
         my $bamid = $href->{bamid};
         my $nwdid = $href->{expt_sampleid};
         my $cramchecksum = $href->{cramchecksum};
-        my $checksum = $href->{checksum};
+        my $checksum = $href->{checksum} || 'notset';
         my @searchfiles = ();
         foreach (@exts) { push @searchfiles,$nwdid . '.' . $_; }
         $href = GetSummaryStatus(@searchfiles);
@@ -424,12 +424,11 @@ sub LookFor {
             if ($opts{verbose}) { print "$nwdid $type received $href->{upload_date}\n"; }
             #   Received could have an incorrect checksum
             if ($href->{file_name} =~ /cram/) { $checksum = $cramchecksum; }
-            if ($href->{file_md5sum} ne $checksum) {
+            if ($type ne 'expt' && $href->{file_md5sum} ne $checksum) {
                 $statsref->{$type . 'checksumerror'}++;
                 my $statecol = 'state_ncbi' . $type;         # Mark this column in error
                 my $sql = "UPDATE $opts{bamfiles_table} SET $statecol=$FAILEDCHECKSUM WHERE bamid=$bamid";
                 if ($opts{verbose}) { print "$nwdid: NCBI checksum incorrect, $bamid $statecol forced to FAILEDCHECKSUM\n"; }
-print "$nwdid: NCBI checksum incorrect, $bamid $statecol forced to FAILEDCHECKSUM\n";
                 DoSQL($sql);
             }
             next;
