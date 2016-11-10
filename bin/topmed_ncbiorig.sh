@@ -4,7 +4,7 @@
 #
 #	Send the proper set of files to NCBI for the original bams
 #
-samtools=/net/mario/gotcloud/bin/samtools
+samtools=/usr/cluster/bin/samtools
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 ascpcmd="$topmedcmd send2ncbi"
 topmedxml="/usr/cluster/monitor/bin/topmed_xml.pl"

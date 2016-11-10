@@ -5,7 +5,7 @@
 #	Create BAI index for a BAM file
 #
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
-samtools=/net/mario/gotcloud/bin/samtools
+samtools=/usr/cluster/bin/samtools
 mem=4G
 console=/net/topmed/working/topmed-output
 slurmp=topmed

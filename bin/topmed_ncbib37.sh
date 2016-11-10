@@ -4,7 +4,7 @@
 #
 #	Send the proper set of files to NCBI for the remapped bam build 37
 #
-samtools=/net/mario/gotcloud/bin/samtools
+samtools=/usr/cluster/bin/samtools
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 topmedpath=/usr/cluster/monitor/bin/topmedpath.pl
 ascpcmd="$topmedcmd send2ncbi"

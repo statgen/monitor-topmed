@@ -7,6 +7,7 @@
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 topmedpath=/usr/cluster/monitor/bin/topmedpath.pl
 topmedqplot=/usr/cluster/monitor/bin/topmedqplot.pl
+samtools=/usr/cluster/bin/samtools
 console=/net/topmed/working/topmed-output
 gcbin=/net/mario/gotcloud/bin
 gcref=/net/mario/nodeDataMaster/local/ref/gotcloud.ref
@@ -111,7 +112,7 @@ if [ "$build" = "37" ]; then
 fi
 if [ "$build" = "38" ]; then
   hmkangfiles=/net/fantasia/home/hmkang/code/working/gotcloud_topmed_tmp
-  /usr/cluster/bin/samtools view -uh -T /data/local/ref/gotcloud.ref/hg38/hs38DH.fa $bamfile | $hmkangfiles/gotcloud/bin/qplot --reference /data/local/ref/gotcloud.ref/hg38/hs38DH.fa --dbsnp /data/local/ref/gotcloud.ref/hg38/dbsnp_142.b38.vcf.gz --stats $basebam.qp.stats --Rcode $basebam.qp.R -.ubam 2>&1
+  $samtools view -uh -T /data/local/ref/gotcloud.ref/hg38/hs38DH.fa $bamfile | $hmkangfiles/gotcloud/bin/qplot --reference /data/local/ref/gotcloud.ref/hg38/hs38DH.fa --dbsnp /data/local/ref/gotcloud.ref/hg38/dbsnp_142.b38.vcf.gz --stats $basebam.qp.stats --Rcode $basebam.qp.R -.ubam 2>&1
   rc=$?
 fi
 if [ "$rc" = "none" ]; then

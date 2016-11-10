@@ -5,7 +5,7 @@
 #	Backup the original BAM as a CRAM file
 #
 bindir=/usr/cluster/bin
-samtools=/net/mario/gotcloud/bin/samtools
+samtools=/usr/cluster/bin/samtools
 ref=/net/mario/gotcloud/gotcloud.ref/hs37d5.fa
 illuminaref=/net/topmed/incoming/study.reference/study.reference/illumina.hg19.fa
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
