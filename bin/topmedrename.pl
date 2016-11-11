@@ -64,8 +64,8 @@ chdir($dirname) ||
     die "$Script Unable to CD to '$dirname': $!\n";
 my $bamfile = basename($bamfilepath);
 
-#   Rename the BAM file unless they already use NWDID
-if ($bamfile !~ /^NWD/) {
+#   Rename the BAM file if this is bam and the filename does not start with NWDID
+if ($bamfile =~ /\.bam$/ && $bamfile !~ /^NWD/) {
     my $newbamfile = $bamfile;
     if ($newbamfile !~ /^[^.]+\.(.+)/) { die "$Script Unable to parse '$newbamfile'\n"; }
     $newbamfile = $nwdid . '.' . $1;
@@ -81,6 +81,20 @@ if ($bamfile !~ /^NWD/) {
         }
         DoSQL("UPDATE $opts{bamfiles_table} SET bamname='$newbamfile' WHERE bamid=$bamid");
     }
+}
+
+#   Rename the BAM file if this is a cram and the extension is just .cram
+if ($bamfile =~ /NWD\d+\.cram$/) {
+    my $newbamfile = $nwdid . '.src.cram';
+    #   Aspera screws us up by re-transmitting the file if we rename it
+    #   We ignore that in this case, hoping Aspera dies a long slow death :-)
+    system("mv $bamfile $newbamfile") &&
+        die "$Script Unable to rename $bamfile for $newbamfile (bamid=$bamid)\n";
+    if ($opts{verbose}) { print "$Script Renamed $bamfile for $newbamfile\n"; }
+    #   Save original bamname once in database, change name in database
+    DoSQL("UPDATE $opts{bamfiles_table} SET bamname_orig='$bamfile' WHERE bamid=$bamid");
+    DoSQL("UPDATE $opts{bamfiles_table} SET bamname='$newbamfile' WHERE bamid=$bamid");
+    
 }
 
 exit;
