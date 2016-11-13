@@ -236,7 +236,7 @@ if ($fcn == 'showout') {                // Show output from a SLURM job
     if ($samplestate == 'I') { $s = 'bai'; }
     if ($samplestate == 'Q') { $s = 'qplot'; }
     if ($samplestate == 'C') { $s = 'cram'; }
-    $cmd = "/usr/cluster/monitor/bin/topmedcmd.pl where $bamid console $s";
+    $cmd = "/usr/cluster/monitor/bin/topmedpath.pl wherepath $bamid console $s";
     $ss = rtrim(`$cmd`);
     $a = $ss . '/' . $bamid . "-$s.out";
     print "<h4 align='center'>SLURM console log for '$s' BAMID=$bamid</h4>\n<pre>\n";
