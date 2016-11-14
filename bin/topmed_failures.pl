@@ -1,7 +1,7 @@
-#!/usr/bin/perl -I/usr/cluster/lib/perl5/site_perl
+#!/usr/bin/perl -I/usr/cluster/lib/perl5/site_perl -I/usr/cluster/monitor/lib/perl5 -I /usr/cluster/monitor/bin
 ###################################################################
 #
-# Name: topmed_failures.pl     WARNING: This has not been used much
+# Name: topmed_failures.pl
 #
 # Description:
 #   Use this program to automatically find jobs which have
@@ -18,13 +18,14 @@
 ###################################################################
 use strict;
 use warnings;
+
 use FindBin qw($Bin $Script);
 use lib "$FindBin::Bin";
 use lib "$FindBin::Bin/../lib";
 use lib "$FindBin::Bin/../lib/perl5";
 use My_DB;
-use TopMed_Get;
 use Getopt::Long;
+use Cwd qw(realpath abs_path);
 use POSIX qw(strftime);
 
 #--------------------------------------------------------------
@@ -39,10 +40,36 @@ our %opts = (
     centers_table => 'centers',
     runs_table => 'runs',
     bamfiles_table => 'bamfiles',
-    outdir => '/working/topmed-output',
-    verbose => 0,
+    outdir => '/net/topmed/working/topmed-output',
     maxjobs => 50,
+    verbose => 0,                       # Must be defined for My_DB
+    sqlprefix => '',                    # Convenience for development
+    sqlsuffix => '',
 );
+
+my $STARTED   = 3;                      # Task started
+my %col2name = (
+    md5ver => 'verify',
+    bai => 'bai',
+    qplot => 'qplot',
+    cram => 'cram',
+    ncbiexpt => 'sexpt',
+    ncbiorig => 'sorig',
+    ncbib37 => 'sb37',
+    ncbib38 => 'sb38',
+);
+my @cols2check = keys %col2name;
+my @astatecols = ();                    # Array of state column names
+my $statecolsstarted = '';              # State cols with started value for SQL
+foreach my $c (@cols2check) {
+    my $s = "state_" . $c;
+    push @astatecols, $s;
+    $statecolsstarted .= "$s=$STARTED || ";
+}
+my $statecols = join(',',@astatecols);  # String of state column names
+$statecolsstarted = substr($statecolsstarted,0, length($statecolsstarted)-4);
+
+
 
 #   This is a map of part of a column name to the name in the log file
 my %col2logname = (
@@ -63,16 +90,16 @@ foreach my $c (@colnames) { $sqlors .= 'date' . $c . '=-1 OR '; }
 $sqlors = substr($sqlors,0,-4);     # Drop ' OR '
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose=n center=s runs=s resubmit maxjobs=n
+    help realm=s verbose center=s runs=s resubmit maxjobs=n sqlprefix=s sqlsuffix=s
     memory=s partition=s qos=s noprompt
     )) || die "Failed to parse options\n";
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$Script [options] look4failures\n" .
+    warn "$Script [options] show\n" .
         "or\n" .
         "$Script [options] resubmit\n" .
-        "Find runs which were cancelled and we do not know about them.\n" .
+        "Find tasks which we think were started, but do not seem to be running.\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
     exit 1;
@@ -83,15 +110,48 @@ my $dbh = DBConnect($opts{realm});
 
 my $nowdate = strftime('%Y/%m/%d %H:%M', localtime);
 
-#   Set environment variables for shell scripts that do -submit
-if ($opts{memory})    { $ENV{TOPMED_MEMORY} = $opts{memory}; }
-if ($opts{partition}) { $ENV{TOPMED_PARTITION} = $opts{partition}; }
-if ($opts{qos})       { $ENV{TOPMED_QOS} = $opts{qos}; }
+#--------------------------------------------------------------
+#   Get a list of jobs that have been submitted, see if any failed
+#--------------------------------------------------------------
+if ($fcn =~ /^show/) {
+    #   Remove these comments and change runid for testing on a single run
+    #$opts{sqlprefix} = ' runid=387 && (';   # Set for development
+    #$opts{sqlsuffix} = ') LIMIT 100';
+    my $sql = "SELECT bamid,bamname,$statecols FROM $opts{bamfiles_table} WHERE " .
+        $opts{sqlprefix} . $statecolsstarted . $opts{sqlsuffix};
+    my $sth = DoSQL($sql);
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { die "$nowdate $Script - No jobs are running\n"; }
+    $opts{job_count} = 0;
+    #   For each bamid with something started, check each task state
+    for (my $i=1; $i<=$rowsofdata; $i++) {
+        my $href = $sth->fetchrow_hashref;
+        for (my $j=0; $j<=$#astatecols; $j++) {
+            my $kstate = $astatecols[$j];
+            my $k = $cols2check[$j];
+            if (defined($href->{$kstate}) && $href->{$kstate} ne $STARTED) { next; }
+            if (! $col2name{$k}) { die "$Script - Got lost. No col2name for '$k'\n"; }
+            #   We have a task that is started for this bamid
+            $opts{job_count}++;
+            #   Find failure for this href, state_ncbib37, ncbib37, b37 
+            Find_Failure($href, $kstate, $k, $col2name{$k});
+        }
+    }
+    #   Give summary of what we found out   Stats start with job_
+    print $nowdate . ' ';
+    foreach my $k (sort keys %opts) {
+        if ($k !~ /^job_/) { next; }
+        my $kmsg = $k;
+        $kmsg =~ s/_/ /g;
+        print "  $kmsg = $opts{$k}\n";
+    }
+    exit;    
+}
 
 #--------------------------------------------------------------
 #   Get a list of jobs that have been submitted, see if any failed
 #--------------------------------------------------------------
-if ($fcn =~ /^look/) {
+if ($fcn =~ /^lookusused/) {
     #   Get all the known centers in the database
     my $centersref = GetCenters();
     foreach my $cid (keys %{$centersref}) {
@@ -122,6 +182,12 @@ if ($fcn =~ /^look/) {
 #   Find all failed jobs and attempt to resubmit them
 #--------------------------------------------------------------
 if ($fcn eq 'resubmit') {
+
+    #   Set environment variables for shell scripts that do -submit
+    if ($opts{memory})    { $ENV{TOPMED_MEMORY} = $opts{memory}; }
+    if ($opts{partition}) { $ENV{TOPMED_PARTITION} = $opts{partition}; }
+    if ($opts{qos})       { $ENV{TOPMED_QOS} = $opts{qos}; }
+
     #   Get all the known centers in the database
     my $centersref = GetCenters();
     foreach my $cid (keys %{$centersref}) {
@@ -153,21 +219,10 @@ if ($fcn eq 'resubmit') {
 
 die "Invalid request '$fcn'. Try '$Script --help'\n";
 
-#--------------------------------------------------------------
-#   dateXXXX columns are either a time when something was done
-#   or a flag indicating varying states. For example with verify:
-#   datemd5ver not defined   - nothing every happened
-#   datemd5ver > 10    verify successfully
-#   datemd5ver < 0     started to verify
-#   datemd5ver = -1    verify failed
-#   datemd5ver = 0     verify requested
-#   datemd5ver = 2     verify submitted to be done (not done for arrived)
-#   datemd5ver = 1     verify cancelled
-#--------------------------------------------------------------
-
 #==================================================================
 # Subroutine:
-#   Find_Failure - For any tasks which have jobs submitted
+#   Find_Failure - Check state of jobs that have started
+#
 #       see if the job has failed in SLURM
 #       Mark any failed step in the database
 #
@@ -184,41 +239,46 @@ die "Invalid request '$fcn'. Try '$Script --help'\n";
 #   nothing
 #==================================================================
 sub Find_Failure {
-    my ($href) = @_;
+    my ($h, $cstate, $c, $cname) = @_;  # href, state_ncbib37, ncbib37, b37 
 
-    foreach my $date (@colnames) {
-        my $col = 'date' . $date;
-        if (! defined($href->{$col})) { next; }
-        if ($href->{$col} eq '') { next; }
-        if (! ($href->{$col} eq '2' || $href->{$col} < -10)) { next; }
-        $col = 'jobid' . $date;
-        if (! defined($href->{$col})) { next; }
-        if ($href->{$col} eq '') { next; }
-        #if ($href->{$col} =~ /\D/) { next; }
-        #   This jobid has been submitted, but not completed
-        my $cmd = $opts{sacct} . ' -j ' . $href->{$col};
-        my $s = `$cmd 2>&1`;
-        if ($opts{verbose} > 1) { print "Checking job $href->{$col}\n$s"; }
-        if ($s !~ /CANCELLED/ && $s !~ /NODE_FAIL/  && $s !~ /FAILED/) { next; }
-
-        #   Job failed 
-        print "Jobid='$href->{$col}' $date FAILED because of SLURM\n" .
-            "  BAMID=$href->{bamid} BAMNAME=$href->{bamid}\n$s\n";
-        # See if we can find something in the output that tells us why
-        my $logfile = $opts{outdir} . '/' . $href->{bamid} . '-' .
-            $col2logname{$date} . '.out';
-        if (open(IN,$logfile)) {
-            while(<IN>) {
-                if (/slurmstepd/) { print '  ' . $_; }
-            }
-            close(IN);
-        }
-        #   Mark this as a failed job $topmedcmd mark $bamid backedup failed
-        $cmd = "$opts{topmedcmd} mark $href->{bamid} $col2verb{$date} failed";
-        system($cmd) && print "Failed to mark job as failed\n  CMD=$cmd\n";
-        $opts{jobcount}++;
+    #   See if there is a log file laying around for this task. If so, the job is
+    #   recent and we can check it. No log file and and started is a bad thing.    
+    my $f = $opts{outdir} . "/$h->{bamid}-$cname.out";
+    if (! open(IN,$f)) { $opts{job_no_log_file}++; return; }
+    #$opts{job_found_log_file}++;
+    #   Read log file, searching for line with slurm Jobid
+    my $slurmid;
+    while (<IN>) {
+        my @words = split(' ', $_);
+        if ($words[0] !~ /^#==/) { next; }
+        $slurmid = $words[3];
+        last;
+    }
+    close(IN);
+    if (! $slurmid) {
+        warn "$Script - Unable to get SLURMID for '$f' - status unknown\n";
         return;
     }
+
+    #   See what SLURM thinks of this job
+    my $cmd = $opts{sacct} . ' -j ' . $slurmid;
+    my @lines = split("\n", `$cmd 2>&1`);
+    my @words = split(' ', $lines[2]);
+    if ($words[0] ne $slurmid) { next; }
+    my $msg = "We think $c job is running, but it is $words[5]: " .
+        "bamid=$h->{bamid} slurmid=$slurmid status=$words[6]\n";
+    if ($words[5] eq 'COMPLETED') {         # Running job succeeded
+        print $msg;
+        $opts{job_started_and_completed}++;
+        return;
+    }
+    if ($words[5] =~ /CANCELLED|NODE_FAIL|FAILED/) {    # Running job failed
+        print $msg;
+        $opts{job_started_and_failed}++;
+        return;
+    }
+    if ($opts{verbose}) { print "Job $h->{bamid} $h->{bamname} $f is still running\n"; }
+    $opts{job_still_running}++;
     return;
 }
 
