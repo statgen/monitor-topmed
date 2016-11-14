@@ -7,7 +7,7 @@
 samtools=/usr/cluster/bin/samtools
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 ascpcmd="$topmedcmd send2ncbi"
-topmedxml="/usr/cluster/monitor/bin/topmed_xml.pl"
+topmedxml=/usr/cluster/monitor/bin/topmed_xml.pl
 medir=`dirname $0`
 calcmd5=/usr/cluster/monitor/bin/topmed_calcmd5.sh
 mem=2G

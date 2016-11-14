@@ -59,7 +59,7 @@ our %opts = (
     xmlns_run => "$xmlns_url.run.xsd?view=co\">\n",
     xmlns_experiment => "$xmlns_url.experiment.xsd?view=co\">\n",
     xmlns_submission => "$xmlns_url.submission.xsd?view=co\"\n",
-    processingsectiondir => "$topmed/incoming/study.reference/send2ncbi",
+    processingsectiondir => "$topmed/incoming/study.reference/seq.xml.extend",
     experiment_title => "30x whole genome DNA sequence for NHLBI TOPMed sample",
     schema =>  'http://www.ncbi.nlm.nih.gov/viewvc/v1/trunk/sra/doc/SRA/SRA.%TYPE%.xsd?view=co',
 );
@@ -161,7 +161,7 @@ sub CreateRun {
     $filename = basename($filename);            # No fully qualified path
 
     if ($opts{type} eq 'secondary') {           # Original bam
-        $processingfile = "$opts{processingsectiondir}/$center.run_processing.txt";
+        $processingfile = "$opts{processingsectiondir}/$center.$href->{build}.run_processing.txt";
         $title = "Secondary mapping Build $opts{build} for $href->{expt_sampleid} [$href->{bamid}]";
         if ($filename =~ /(^NWD\d+)/) {         # BAM we send should be called NWDxxxxx.src.bam
             my $n = $1;
@@ -174,7 +174,7 @@ sub CreateRun {
     else {
         if (! defined($filename)) { die "$Script filename not provided for RUN XML\n"; }
         if (! defined($checksum)) { die "$Script Checksum not provided for file '$filename'\n"; }
-        $processingfile =  "$opts{processingsectiondir}/um$opts{build}.run_processing.txt";
+        $processingfile =  "$opts{processingsectiondir}/umich.$opts{build}.run_processing.txt";
         $title = 'Undefined';
         if ($opts{type} eq 'remap') { $title = 'Remapped file'; }
         if ($opts{type} eq 'primary') { $title = 'Primary mapping'; }
