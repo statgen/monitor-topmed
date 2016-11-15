@@ -35,6 +35,7 @@ use File::Basename;
 our %opts = (
     realm => '/usr/cluster/monitor/etc/.db_connections/topmed',
     topmedcmd => '/usr/cluster/monitor/bin/topmedcmd.pl',
+    topmedpath => '/usr/cluster/monitor/bin/topmedpath.pl',
     backupprefix => '../../../../../../',
     centers_table => 'centers',
     bamfiles_table => 'bamfiles',
@@ -87,9 +88,9 @@ foreach my $cid (keys %{$centersref}) {
         #   Assumes all files for a run are the same type
         my $original_file = $href->{bamname};
         my $bamid = $href->{bamid};
-        my $incomingdir = `$opts{topmedcmd} wherepath $bamid bam`;
+        my $incomingdir = `$opts{topmedpath} wherepath $bamid bam`;
         chomp($incomingdir);
-        my $backupsdir = `$opts{topmedcmd} wherepath $bamid backup`;
+        my $backupsdir = `$opts{topmedpath} wherepath $bamid backup`;
         chomp($backupsdir);
 
         #   If original file was a bam, just check that backups can be done
@@ -117,22 +118,26 @@ foreach my $cid (keys %{$centersref}) {
             }
             #   Run is a cram to be backed up offsite
             if ($incomingdir eq $backupsdir) { $count{offsite_backup_exists}++; next; }
-            if (-d $backupsdir) {                       # Local directory exists, remove this
-                print "Local backup directory for '$center/$dirname' should be removed.\n" .
-                    "  Correct using something like this -- BE VERY CAREFUL!\n" .
-                    "  cd $backupsdir      # As user TOPMED\n" .
-                    "  ls -l      # Be sure these should be removed\n" .
-                    "  rm -rf $backupsdir\n\n";
+            if (! -l $backupsdir) {                 # Symlink exists, mark to be removed
+                my $d = $backupsdir . '.removeme';
+                if ((! -e $d) && (-d $backupsdir)) {
+                    system("mv $backupsdir $d");
+                    print "Local backup directory for '$center/$dirname' renamed to be removed.\n";
                     $count{must_remove_local_backup}++;
+                }
             }
-            my $d = substr($incomingdir,4);         # Remove /net
-            $d = $opts{backupprefix} . $d;
-            print "You must create a backup directory for '$center/$dirname'\n" .
-                "This backup should point to the incoming directory since backup files are offsite:\n" .                            
-                "  cd " . dirname($backupsdir) . "    # As user TOPMED\n" .
-                "  ln -s $d $dirname\n\n";
+            #   Create the symlink for the backup
+            my $cmd = "ln -s $opts{backupprefix}" . 'topmed/incoming/topmed/' .
+                    "$center/$dirname /net/topmed/working/backups/incoming/topmed/$center/$dirname";
+            if (system($cmd)) {
+                print "$Script - Unable to create backup symlink:  $cmd\n";
                 $count{must_create_offsite_backup}++;
-                next;
+            }
+            else {
+                print "$Script - Created symlink for backup for '$center/$dirname'\n";
+                $count{created_offsite_backup_link}++;
+            }
+            next;
         }
         print "$Script - Unable to determine type of files in '$center/$dirname'\n";
     }
