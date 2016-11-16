@@ -244,7 +244,7 @@ sub GenRUNXML {
         "<RUN_ATTRIBUTES>\n" .
         "  <RUN_ATTRIBUTE>\n" .
         "    <TAG>assembly</TAG>\n" .
-        "    <VALUE>GRCh37</VALUE>\n" .
+        "    <VALUE>GRCh$opts{build}</VALUE>\n" .
         "  </RUN_ATTRIBUTE>\n" .
 
         "  <RUN_ATTRIBUTE>\n" .                     #   Add another run_attribute per Adam Stine

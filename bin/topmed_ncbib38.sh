@@ -119,7 +119,7 @@ d=`date +%Y/%m/%d`
 echo "#========= $d $SLURM_JOB_ID $0 bamid=$bamid file=$sendfile ========="
 
 #   Create the XML to be sent
-$topmedxml -xmlprefix $here/ -type $version $bamid $sendfile $checksum
+$topmedxml -xmlprefix $here/ -type $version -build $build $bamid $sendfile $checksum
 if [ "$?" != "0" ]; then
   echo "Unable to create $version run XML files"
   $topmedcmd -persist mark $bamid $markverb failed
