@@ -17,6 +17,26 @@ include_once 'DBMySQL.php';
 include_once "download.php";
 
 //print "<!-- _POST=\n"; print_r($_POST); print " -->\n";
+$NOTSET = 0;                // Not set
+$REQUESTED = 1;             // Task requested
+$SUBMITTED = 2;             // Task submitted to be run
+$STARTED   = 3;             // Task started
+$DELIVERED = 19;            // Data delivered, but not confirmed
+$COMPLETED = 20;            // Task completed successfully
+$CANCELLED = 89;            // Task cancelled
+$FAILEDCHECKSUM = 98;       // Task failed, because checksum at NCBI bad
+$FAILED    = 99;            // Task failed
+$state2str = array(         // Values here are class for SPAN tag
+    $NOTSET => 'notset',
+    $REQUESTED => 'requested',
+    $SUBMITTED => 'submitted',
+    $STARTED => 'started',
+    $DELIVERED => 'delivered',
+    $COMPLETED => 'completed',
+    $CANCELLED => 'cancelled',
+    $FAILEDCHECKSUM => 'failedchecksum',
+    $FAILED => 'failed'
+);
 
 //-------------------------------------------------------------------
 //  You could also do this in one giant select like this
@@ -28,7 +48,7 @@ include_once "download.php";
 DB_Connect($LDB['realm']);
 GetCenters();                   // Get maps to identify centers
 
-$dumpstring = '';
+$dumpstring = "expt_sampleid\tdatayear\tpiname\tcenter\trun\trunid\tstate_ncbiorig\tstate_ncbib37\tstate_ncbib38" . "\n";
 //  Dump all nwdid, run and center
 $sql = 'SELECT * FROM ' . $LDB['runs'] . ' ORDER BY centerid';
 $runresult = SQL_Query($sql);
@@ -51,9 +71,9 @@ for ($r=0; $r<$runnumrows; $r++) {
                 $CENTERID2NAME[$cid] .  "\t" .
                 $dirname .  "\t" .
                 $runid .  "\t" .
-                $row['state_ncbiorig'] . "\t" .
-                $row['state_ncbib37'] . "\t" .
-                $row['state_ncbib38'] . "\n";
+                $state2str{$row['state_ncbiorig']} . "\t" .
+                $state2str{$row['state_ncbib37']} . "\t" .
+                $state2str{$row['state_ncbib38']} . "\n";
         }
     }
 }
