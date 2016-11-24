@@ -545,7 +545,7 @@ function ShowRunYear($cid, $maxdirs, $datayear, $iammgr) {
     $hdrcols  = array('dirname', 'status', 'bamcount', 'build', 'offsite');
 
     //  Walk through database getting data for this center
-    $sql = 'SELECT * FROM ' . $LDB['runs'] . " WHERE centerid=$cid AND datayear=$datayear";
+    $sql = 'SELECT * FROM ' . $LDB['runs'] . " WHERE centerid=$cid AND datayear=$datayear ORDER BY runid DESC";
     if ($maxdirs) { $sql .= " LIMIT $maxdirs"; }
     $result = SQL_Query($sql);
     $numrows = SQL_NumRows($result);
