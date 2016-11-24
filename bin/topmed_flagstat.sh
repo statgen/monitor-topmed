@@ -6,15 +6,18 @@
 #   and save it in a database column
 #   This can handle bam or cram input files
 #   If bamid is set, this can handle illumina files
+#      If bamid is set, then amfile can be bam or cram and we will
+#      calculate the path based on the bamid
 #   If colname is provided, the flagstat value will be saved in this column of the database
 #   If outfile is provided the flagstat results will be copied to this file
 samtools=/usr/cluster/bin/samtools
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
+topmedpath=/usr/cluster/monitor/bin/topmedpath.pl
 ref=/net/mario/gotcloud/gotcloud.ref/hs37d5.fa
 illuminaref=/net/topmed/incoming/study.reference/study.reference/illumina.hg19.fa
+me=`basename $0`
 
 if [ "$1" = "" ]; then
-  me=`basename $0`
   echo "Usage: $me amfile [[bamid colname] outfile]"
   echo ""
   echo "Calculate the flagstat paired in sequencing number for a file"
@@ -25,17 +28,26 @@ bamid=$2
 colname=$3
 myoutfile=$4
 
-outfile=`basename $amfile`              # Calculate temp file for flagstat results
-outfile="/tmp/$outfile.tmp"
-
 if [ "$bamid" != "" ]; then
+  #   Figure out path to file to check based on bamid
+  if [ "$amfile" = "bam" ]; then
+    amfile=`$topmedpath wherefile $bamid bam`
+  fi
+  if [ "$amfile" = "cram" ]; then
+    amfile=`$topmedpath wherefile $bamid cram`
+  fi
+  # Special hack for this center
   center=`$topmedcmd show $bamid center`
-  if [ "$center" = "illumina" ]; then    # Special hack for this center
+  if [ "$center" = "illumina" ]; then
     ref=$illuminaref
   fi
 fi
 
+outfile=`basename $amfile`              # Calculate temp file for flagstat results
+outfile="/tmp/$outfile.tmp"
+
 #   Get flagstat values for bam or cram
+echo "Calculating $colname for $amfile"
 a=`echo $amfile | grep .cram`
 if [ "$a" = "" ]; then
   $samtools flagstat  $amfile > $outfile
