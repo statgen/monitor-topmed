@@ -57,11 +57,6 @@ bai=$bamfile.bai
 if [ "$extension" = "cram" ]; then
   bai=$bamfile.crai
 fi
-f="`basename $bamfile .bam`.bai"    # Maybe use bai user provided ?
-if [ -f $f  ]; then
-  mv $f $bai
-  touch $bai
-fi
 if [ -f $bai ]; then
   chmod 0444 $bai
   echo "Using existing index file '$bai'"
