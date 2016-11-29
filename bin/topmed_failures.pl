@@ -48,6 +48,7 @@ our %opts = (
 );
 
 my $STARTED   = 3;                      # Task started
+my $FAILED    = 99;                     # Task failed
 my %col2name = (
     md5ver => 'verify',
     bai => 'bai',
@@ -90,15 +91,13 @@ foreach my $c (@colnames) { $sqlors .= 'date' . $c . '=-1 OR '; }
 $sqlors = substr($sqlors,0,-4);     # Drop ' OR '
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose center=s runs=s resubmit maxjobs=n sqlprefix=s sqlsuffix=s
+    help realm=s verbose center=s runs=s mark sqlprefix=s sqlsuffix=s
     memory=s partition=s qos=s noprompt
     )) || die "Failed to parse options\n";
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
     warn "$Script [options] show\n" .
-        "or\n" .
-        "$Script [options] resubmit\n" .
         "Find tasks which we think were started, but do not seem to be running.\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
@@ -116,6 +115,7 @@ my $nowdate = strftime('%Y/%m/%d %H:%M', localtime);
 if ($fcn =~ /^show/) {
     #   Remove these comments and change runid for testing on a single run
     #$opts{sqlprefix} = ' runid=387 && (';   # Set for development
+    #$opts{sqlprefix} = ' bamid=59941 && (';   # Set for development
     #$opts{sqlsuffix} = ') LIMIT 100';
     my $sql = "SELECT bamid,bamname,$statecols FROM $opts{bamfiles_table} WHERE " .
         $opts{sqlprefix} . $statecolsstarted . $opts{sqlsuffix};
@@ -146,75 +146,6 @@ if ($fcn =~ /^show/) {
         print "  $kmsg = $opts{$k}\n";
     }
     exit;    
-}
-
-#--------------------------------------------------------------
-#   Get a list of jobs that have been submitted, see if any failed
-#--------------------------------------------------------------
-if ($fcn =~ /^lookusused/) {
-    #   Get all the known centers in the database
-    my $centersref = GetCenters();
-    foreach my $cid (keys %{$centersref}) {
-        my $centername = $centersref->{$cid};
-        if ($opts{verbose}) { print $centername . "\n"; }
-        my $runsref = GetRuns($cid) || next;
-        #   For each run, see if there are bamfiles that arrived
-        foreach my $runid (keys %{$runsref}) {
-            my $dirname = $runsref->{$runid};
-            if ($opts{verbose}) { print "  $dirname\n"; }
-            #   Get list of all bams that have not yet arrived properly
-            my $sql = "SELECT * FROM $opts{bamfiles_table} WHERE runid='$runid'";
-            my $sth = DoSQL($sql);
-            my $rowsofdata = $sth->rows();
-            if (! $rowsofdata) { next; }
-            for (my $i=1; $i<=$rowsofdata; $i++) {
-                if (! $opts{maxjobs}) { last; }
-                my $href = $sth->fetchrow_hashref;
-                Find_Failure($href);
-            }
-        }
-    }
-    if ($opts{jobcount}) { print "$opts{jobcount} job failures detected\n"; }
-    exit;
-}
-
-#--------------------------------------------------------------
-#   Find all failed jobs and attempt to resubmit them
-#--------------------------------------------------------------
-if ($fcn eq 'resubmit') {
-
-    #   Set environment variables for shell scripts that do -submit
-    if ($opts{memory})    { $ENV{TOPMED_MEMORY} = $opts{memory}; }
-    if ($opts{partition}) { $ENV{TOPMED_PARTITION} = $opts{partition}; }
-    if ($opts{qos})       { $ENV{TOPMED_QOS} = $opts{qos}; }
-
-    #   Get all the known centers in the database
-    my $centersref = GetCenters();
-    foreach my $cid (keys %{$centersref}) {
-        my $centername = $centersref->{$cid};
-        if ($opts{verbose}) { print $centername . "\n"; }
-        my $runsref = GetRuns($cid) || next;
-        #   For each run, see if there are bamfiles that arrived
-        foreach my $runid (keys %{$runsref}) {
-            my $dirname = $runsref->{$runid};
-            if ($opts{verbose}) { print "  $dirname\n"; }
-            #   Get list of all bams that have arrived
-            my $sql = "SELECT * FROM $opts{bamfiles_table} " .
-                "WHERE runid='$runid' AND ($sqlors)";
-            my $sth = DoSQL($sql);
-            my $rowsofdata = $sth->rows();
-            if (! $rowsofdata) { next; }
-            for (my $i=1; $i<=$rowsofdata; $i++) {
-                if (! $opts{maxjobs}) { last; }
-                my $href = $sth->fetchrow_hashref;
-                my $f = $opts{topdir} . "/$centername/$dirname/" . $href->{bamname};
-                if (! -f $f) { next; }          # If BAM not there, do not submit
-                Resubmit_Failure($f, $href);    # Something here failed
-            }
-        }
-    }
-    if ($opts{jobcount}) { print "$opts{jobcount} failed jobs have been resubmitted\n"; }
-    exit;
 }
 
 die "Invalid request '$fcn'. Try '$Script --help'\n";
@@ -249,6 +180,21 @@ sub Find_Failure {
     #   Read log file, searching for line with slurm Jobid
     my $slurmid;
     while (<IN>) {
+        #   Maybe the job was cancelled by SLURM right away
+        if (/CANCELLED AT \S+\s+(.+)/) {
+            my $msg = "$c job (bamid=$h->{bamid}) never got started, cancelled by SLURM $1\n";
+            print $msg;
+            $opts{job_started_and_failed}++;
+            if ($opts{mark}) {
+                my $cmd = "$opts{topmedcmd} set $h->{bamid} $cstate $FAILED";
+                my $rc = system($cmd);
+                if ($rc) { print "$h->{bamid} $cstate marked as failed\n"; }
+                else { print "Unable to mark $h->{bamid} $cstate as failed\n"; }
+            }
+            close(IN);
+            return;
+        }
+        #   Look through log file for SLURMID printed by script
         my @words = split(' ', $_);
         if ($words[0] !~ /^#==/) { next; }
         $slurmid = $words[3];
@@ -272,53 +218,20 @@ sub Find_Failure {
         $opts{job_started_and_completed}++;
         return;
     }
-    if ($words[5] =~ /CANCELLED|NODE_FAIL|FAILED/) {    # Running job failed
+    if ($words[5] =~ /CANCELLED|NODE_FAIL|FAILED|TIMEOUT/) {    # Running job failed
         print $msg;
         $opts{job_started_and_failed}++;
+        if ($opts{mark}) {
+            $cmd = "$opts{topmedcmd} set $h->{bamid} $cstate $FAILED";
+            my $rc = system($cmd);
+            if ($rc) { print "$h->{bamid} $cstate marked as failed\n"; }
+            else { print "Unable to mark $h->{bamid} $cstate as failed\n"; }
+        }
         return;
     }
     if ($opts{verbose}) { print "Job $h->{bamid} $h->{bamname} $f is still running\n"; }
     $opts{job_still_running}++;
     return;
-}
-
-#==================================================================
-# Subroutine:
-#   Resubmit_Failure - Resubmit a failed task
-#
-# Arguments:
-#   file - fully qualified path to BAM
-#   href - hash reference to columns in a database row
-#
-# Returns:
-#   nothing
-#==================================================================
-sub Resubmit_Failure {
-    my ($file, $href) = @_;
-
-    #   One or more of these tasks need to be resubmitted
-    foreach my $date (@colnames) {
-        my $col = 'date' . $date;
-        if (! defined($href->{$col})) { next; }
-        if ($href->{$col} eq '') { next; }
-        if ($href->{$col} ne '-1') { next; }    # Not failed
-        #   This task failed, resubmit it
-        my $cmd = "$topmedbin/topmed_$col2logname{$date}.sh -submit $href->{bamid} $file";
-        if ($date eq 'md5ver') {
-            $cmd = "$topmedbin/topmed_$col2logname{$date}.sh -submit $href->{bamid} $href->{checksum} $file";
-        }
-        if (! $opts{noprompt}) {
-            print "Submit this job?\n  $cmd\n  Enter 'y' or 'n' or 'q': ";
-            $_ = <STDIN>;
-            if ($_ eq "q\n") { exit; }
-            if ($_ ne "y\n") { print "Nothing submitted\n"; return; }
-        }
-        system($cmd) && die "Failed to submit job\n  cmd=$cmd\n";
-        print "Submitted $date job for bamid=$href->{bamid}\n";
-        $opts{jobcount}++;
-        $opts{maxjobs}--;
-        if ($opts{maxjobs} == 0) { print "Maximum limit of jobs that can be submitted has been reached\n"; }
-    }
 }
 
 #==================================================================
@@ -332,16 +245,16 @@ topmed_failures.pl - Find runs that had a failure
 
 =head1 SYNOPSIS
 
-  topmed_failures.pl look
-  topmed_failures.pl resubmit
+  topmed_failures.pl show
+  topmed_failures.pl -mark show
 
 =head1 DESCRIPTION
 
 Use program as a crontab job to find runs that have failed
-(usually cancelled by SLURM).
-When one is found the database will be correct to show failure
-and if we are lucky the task can be requeued to be tried
-again (e.g. with a larger memory)
+(sometimes cancelled by SLURM).
+When one is found the database will be corrected to show a failure
+so it will be resubmitted for another try.
+
 
 =head1 OPTIONS
 
@@ -357,21 +270,9 @@ The default is to run against all centers.
 
 Generates this output.
 
-=item B<-memory nG>
+=item B<-mark>
 
-Force the sbatch --mem setting when submitting a job.
-
-=item B<-noprompt>
-
-Do not prompt to submit a job.
-
-=item B<-partition name>
-
-Force the sbatch --partition setting when submitting a job.
-
-=item B<-qos name>
-
-Force the sbatch --qos setting when submitting a job.
+If a job has failed and we thought it was running, mark it as failed in the database.
 
 =item B<-realm NAME>
 
@@ -384,7 +285,19 @@ e.g. B<2015jun05.weiss.02,2015jun05.weiss.03>.
 This is useful for testing.
 The default is to run against all runs for the center.
 
-=item B<-verbose N>
+=item B<-sqlprefix=string>
+
+Use this to in debugging to more precisely control which jobs are checked for failures.
+For instance you might want to specify B<-sqlprefix runid=387 && (>.
+If you specify this option, you must also specify B<sqlsuffix>.
+
+=item B<-sqlsuffix=string>
+
+Use this to in debugging to more precisely control which jobs are checked for failures.
+For instance you might want to specify B<-sqlprefix )>.
+If you specify this option, you must also specify B<sqlprefix>.
+
+=item B<-verbose>
 
 Provided for developers to see additional information.
 
@@ -394,16 +307,11 @@ Provided for developers to see additional information.
 
 =over 4
 
-=item B<look4failures>
+=item B<show>
 
-Directs this program to look for runs that have failed in some step.
-These are detected, summary information about it is generated
-and the task is marked as failed in the database.
-
-=item B<resubmit>
-
-Directs this program to attempt to resubmit failed jobs.
-You are prompted for each submit.
+Directs this program to look for runs that have failed in a non-standard way
+(e.g. typically cancelled by SLURM).
+You may want to specify B<-mark> so that the database record is updated as failed.
 
 =back
 
@@ -415,7 +323,7 @@ return code of 0. Any error will set a non-zero return code.
 
 =head1 AUTHOR
 
-Written by Terry Gliedt I<E<lt>tpg@umich.eduE<gt>> in 2015 and is
+Written by Terry Gliedt I<E<lt>tpg@umich.eduE<gt>> in 2015-2016 and is
 is free software; you can redistribute it and/or modify it under the
 terms of the GNU General Public License as published by the Free Software
 Foundation; See http://www.gnu.org/copyleft/gpl.html
