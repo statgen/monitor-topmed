@@ -416,7 +416,9 @@ if ($fcn eq 'sb37') {
 
                 #   Only send the remapped b37 file for this year's data
                 if ($href->{datayear} ne '1') {
-                    print "  BAM '$href->{bamname}' [$href->{bamid}] is ignored because it is not year 1\n";
+                    if ($opts{verbose}) {
+                        print "  BAM '$href->{bamname}' [$href->{bamid}] ignored because it is not year 1\n";
+                    }
                     next;
                 }
 
