@@ -188,8 +188,8 @@ sub Find_Failure {
             if ($opts{mark}) {
                 my $cmd = "$opts{topmedcmd} set $h->{bamid} $cstate $FAILED";
                 my $rc = system($cmd);
-                if ($rc) { print "$h->{bamid} $cstate marked as failed\n"; }
-                else { print "Unable to mark $h->{bamid} $cstate as failed\n"; }
+                if (! $rc) { print "$h->{bamid} $cstate marked as failed\n"; }
+                else { print "Unable to mark $h->{bamid} $cstate as failed: $cmd\n"; }
             }
             close(IN);
             return;
@@ -224,13 +224,13 @@ sub Find_Failure {
         if ($opts{mark}) {
             $cmd = "$opts{topmedcmd} set $h->{bamid} $cstate $FAILED";
             my $rc = system($cmd);
-            if ($rc) { print "$h->{bamid} $cstate marked as failed\n"; }
-            else { print "Unable to mark $h->{bamid} $cstate as failed\n"; }
+            if (! $rc) { print "$h->{bamid} $cstate marked as failed\n"; }
+            else { print "Unable to mark $h->{bamid} $cstate as failed: $cmd\n"; }
         }
         return;
     }
     if ($opts{verbose}) { print "Job $h->{bamid} $h->{bamname} $f is still running\n"; }
-    $opts{job_still_running}++;
+    $opts{jobs_still_running}++;
     return;
 }
 
