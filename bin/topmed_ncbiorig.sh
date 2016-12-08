@@ -2,10 +2,11 @@
 #
 #   topmed_ncbiorig.sh -submit bamid
 #
-#	Send the proper set of files to NCBI for the original bams
+#	Send the proper set of files to NCBI for the original files
 #
 samtools=/usr/cluster/bin/samtools
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
+topmedpath=/usr/cluster/monitor/bin/topmedpath.pl
 ascpcmd="$topmedcmd send2ncbi"
 topmedxml=/usr/cluster/monitor/bin/topmed_xml.pl
 medir=`dirname $0`
@@ -49,7 +50,7 @@ if [ "$1" = "" ]; then
   me=`basename $0`
   echo "Usage: $me [-submit] bamid"
   echo ""
-  echo "Send original BAM files to NCBI"
+  echo "Send original files to NCBI"
   exit 1
 fi
 bamid=$1
@@ -66,6 +67,12 @@ fi
 center=`$topmedcmd show $bamid center`
 if [ "$center" = "" ]; then
   echo "Invalid bamid '$bamid'. CENTER not known"
+  $topmedcmd -persist mark $bamid $markverb failed
+  exit 2
+fi
+build=`$topmedcmd show $bamid build`
+if [ "$build" = "" ]; then
+  echo "Invalid build '$build'. BUILD not known"
   $topmedcmd -persist mark $bamid $markverb failed
   exit 2
 fi
@@ -89,8 +96,8 @@ here=`pwd`
 
 #   Figure out what file to send. Either a BAM or a CRAM
 if [ "$center" = "broad" ]; then
-  l=(`$topmedcmd where $bamid backup`)      # Get backupdir and backupfile and host
-  sendfile="${l[1]}"
+  l=(`$topmedpath wherefile $bamid backup`)        # Get backupdir and backupfile and host
+  sendfile="${l[0]}"
   sf=$nwdid.src.cram
   ln -sf $sendfile $sf
   checksum=`$topmedcmd -persist show $bamid cramchecksum`
@@ -108,11 +115,12 @@ if [ "$center" = "broad" ]; then
     fi
   fi
 else
-  l=(`$topmedcmd where $bamid bam`)         # Get pathofbam and host for bam
+  l=(`$topmedpath wherefile $bamid bam`)       # Get pathofbam for bam
   sendfile=$nwdid.src.bam
-  ln -sf ${l[0]}/$origbam $sendfile
+  ln -sf ${l[0]} $sendfile
   checksum=`$topmedcmd -persist show $bamid checksum`
 fi
+
 if [ "$checksum" = "" ]; then
   echo "Invalid bamid '$bamid' ($sendfile). CHECKSUM not known"
   $topmedcmd -persist mark $bamid $markverb failed
@@ -129,7 +137,7 @@ d=`date +%Y/%m/%d`
 echo "#========= $d $SLURM_JOB_ID $0 bamid=$bamid file=$sendfile ========="
 
 #   Create the XML to be sent
-$topmedxml -xmlprefix $here/ -type $version $bamid $sendfile $checksum
+$topmedxml -xmlprefix $here/ -build $build -type $version $bamid $sendfile $checksum
 if [ "$?" != "0" ]; then
   echo "Unable to create $version run XML files"
   $topmedcmd -persist mark $bamid $markverb failed

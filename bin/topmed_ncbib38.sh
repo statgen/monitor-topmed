@@ -6,6 +6,7 @@
 #
 samtools=/usr/cluster/bin/samtools
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
+topmedpath=/usr/cluster/monitor/bin/topmedpath.pl
 ascpcmd="$topmedcmd send2ncbi"
 topmedxml="/usr/cluster/monitor/bin/topmed_xml.pl"
 medir=`dirname $0`
@@ -91,7 +92,7 @@ cd XMLfiles
 here=`pwd`
 
 #   Figure out what file to send
-sendfile=`$topmedcmd wherefile $bamid b38`
+sendfile=`$topmedpath wherefile $bamid b38`
 if [ "$sendfile" = '' ]; then
   echo "Remapped CRAM for Build $build for bamid '$bamid' not found ($sendfile)"
   $topmedcmd -persist mark $bamid $markverb failed
