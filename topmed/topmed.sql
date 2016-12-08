@@ -46,11 +46,12 @@ CREATE TABLE centers (
   PRIMARY KEY  (centerid)
 );
 INSERT INTO centers (centername,centerdesc,designdesc) VALUES('broad', 'Broad Institute','Illumina sequencing of Homo sapiens via random selection');
-INSERT INTO centers (centername,centerdesc,designdesc) VALUES('illumina', 'Illumina Fast Track Services','PCR-Free Paired-end libraries are manually generated from 500ng-1ug of gDNA using the Illumina TruSeq DNA Sample Preparation Kit (Catalog #: FC-121-2001), based on the protocol in the TruSeq DNA PCR-Free Sample Preparation Guide.  Pre-fragmentation gDNA cleanup is performed using paramagnetic sample purification beads (Agencourt (TM) AMPure (TM) XP reagents, Beckman Coulter).  Samples are fragmented and libraries are size selected following fragmentation and end-repair using paramagnetic sample purification beads, targeting short inserts.  Final libraries are quality controlled for size using a gel electrophoretic separation system and are quantified.');
+INSERT INTO centers (centername,centerdesc,designdesc) VALUES('illumina', '30x whole genome sequencing using Illumina TruSeq PCR-free library protocol with 500ng-1ug input DNA');
 INSERT INTO centers (centername,centerdesc,designdesc) VALUES('nygc', 'New York Genome Center','Whole genome sequencing using Illumina TruSeq PCR-free DNA library preparation with 500ng input DNA, sequenced to >30x mean coverage with 2x150bp reads on HiSeq X.');
-INSERT INTO centers (centername,centerdesc,designdesc) VALUES('uw', 'University of Washington Genome Sciences','equivalent to Illumina TruSeq PCR-free DNA sample prep');
-INSERT INTO centers (centername,centerdesc,designdesc) VALUES('baylor', 'UNKNOWN center','UNKNOWN Design Desc');
-INSERT INTO centers (centername,centerdesc,designdesc) VALUES('Macrogen', 'UNKNOWN center','UNKNOWN Design Desc');
+INSERT INTO centers (centername,centerdesc,designdesc) VALUES('uw', '30x Illumina whole genome sequencing using Kapa PCR-free DNA library preparation with 500ng input DNA');
+INSERT INTO centers (centername,centerdesc,designdesc) VALUES('baylor', 'BCM','30x Illumina whole genome sequencing using Kapa PCR-free DNA library preparation with 500ng input DNA');
+INSERT INTO centers (centername,centerdesc,designdesc) VALUES('macrogen', 'Macrogen','30x Illumina whole genome sequencing using Kapa PCR-free DNA library preparation with 500ng input DNA');
+INSERT INTO centers (centername,centerdesc,designdesc) VALUES('washu', 'McDonnell Genome Center at Washington University','30x Illumina whole genome sequencing using Kapa PCR-free DNA library preparation with 500ng input DNA');
 
 /*  The second of these is used to overwhelm a bug on the part of NCBI */
 UPDATE centers set centerdesc='New York Genome Center' where centerid=3;
@@ -111,7 +112,7 @@ CREATE TABLE bamfiles (
   checksum     VARCHAR(96) NOT NULL,
   expt_sampleid VARCHAR(24) DEFAULT 'UNKNOWN',  /* NWDID */
   nwdid_known  CHAR(1) DEFAULT 'N',
-
+ 
 /* Fields to track state for each step */
 /*
 my $NOTSET    = 0;            # Not set
