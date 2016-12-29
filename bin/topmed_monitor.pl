@@ -75,7 +75,7 @@ our %opts = (
 );
 Getopt::Long::GetOptions( \%opts,qw(
     help realm=s verbose topdir=s center=s runs=s maxjobs=i
-    memory=s partition=s qos=s topmedhost=s dryrun suberr
+    dryrun suberr datayear=i
     )) || die "Failed to parse options\n";
 
 #   Simple help if requested
@@ -92,12 +92,6 @@ my $dbh = DBConnect($opts{realm});
 
 my $nowdate = strftime('%Y/%m/%d %H:%M', localtime);
 
-#   Set environment variables for shell scripts that do -submit
-if ($opts{memory})     { $ENV{TOPMED_MEMORY} = $opts{memory}; }
-if ($opts{topmedhost}) { $ENV{TOPMED_HOST} = $opts{topmedhost}; }
-if ($opts{partition})  { $ENV{TOPMED_PARTITION} = $opts{partition}; }
-if ($opts{qos})        { $ENV{TOPMED_QOS} = $opts{qos}; }
-
 #--------------------------------------------------------------
 #   Get a list of BAMs we have not noticed they arrived yet
 #--------------------------------------------------------------
@@ -113,6 +107,7 @@ if ($fcn eq 'arrive') {
             #   Get list of all bams that have not yet arrived properly
             my $sql = "SELECT bamid,bamname,state_arrive FROM $opts{bamfiles_table} " .
                 "WHERE runid='$runid'";
+            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
             my $sth = DoSQL($sql);
             my $rowsofdata = $sth->rows();
             if (! $rowsofdata) { next; }
@@ -153,6 +148,7 @@ if ($fcn eq 'verify') {
             #   Get list of all bams that have not yet arrived properly
             my $sql = "SELECT bamid,bamname,state_arrive,state_md5ver,checksum,bamsize FROM " .
                 $opts{bamfiles_table} . " WHERE runid='$runid'";
+            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
             my $sth = DoSQL($sql);
             my $rowsofdata = $sth->rows();
             if (! $rowsofdata) { next; }
@@ -197,6 +193,7 @@ if ($fcn eq 'bai') {
             #   Get list of all bams that have not yet arrived properly
             my $sql = "SELECT bamid,bamname,state_md5ver,state_bai FROM " .
                 $opts{bamfiles_table} . " WHERE runid='$runid'";
+            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
             my $sth = DoSQL($sql);
             my $rowsofdata = $sth->rows();
             if (! $rowsofdata) { next; }
@@ -231,6 +228,7 @@ if ($fcn eq 'cram') {
             #   Get list of all bams that have not yet arrived properly
             my $sql = "SELECT bamid,bamname,state_md5ver,state_cram,state_bai FROM " .
                 $opts{bamfiles_table} . " WHERE runid='$runid'";
+            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
             my $sth = DoSQL($sql);
             my $rowsofdata = $sth->rows();
             if (! $rowsofdata) { next; }
@@ -266,6 +264,7 @@ if ($fcn eq 'qplot') {
             #   Get list of all bams that have not yet arrived properly
             my $sql = "SELECT bamid,bamname,state_bai,state_qplot FROM " .
                 $opts{bamfiles_table} . " WHERE runid='$runid'";
+            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
             my $sth = DoSQL($sql);
             my $rowsofdata = $sth->rows();
             if (! $rowsofdata) { next; }
@@ -305,6 +304,7 @@ if ($fcn eq 'sexpt') {
             #   Get list of all bams known at NCBI and that have not been sent
             my $sql = "SELECT * FROM $opts{bamfiles_table} " .
                 "WHERE runid='$runid' AND nwdid_known='Y'";
+            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
             my $sth = DoSQL($sql);
             my $rowsofdata = $sth->rows();
             if (! $rowsofdata) {
@@ -359,6 +359,7 @@ if ($fcn eq 'sorig') {
             #   Get list of all bams known at NCBI and that have not been sent
             my $sql = "SELECT * FROM $opts{bamfiles_table} " .
                 "WHERE runid='$runid' AND nwdid_known='Y'";
+            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
             my $sth = DoSQL($sql);
             my $rowsofdata = $sth->rows();
             if (! $rowsofdata) {
@@ -408,6 +409,7 @@ if ($fcn eq 'sb37') {
             #   Get list of all bams known at NCBI and that have not been sent
             my $sql = "SELECT * FROM $opts{bamfiles_table} " .
                 "WHERE runid='$runid' AND nwdid_known='Y'";
+            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
             my $sth = DoSQL($sql);
             my $rowsofdata = $sth->rows();
             if (! $rowsofdata) { next; }
@@ -462,6 +464,7 @@ if ($fcn eq 'sb38') {
             #   Get list of all bams known at NCBI and that have not been sent
             my $sql = "SELECT * FROM $opts{bamfiles_table} " .
                 "WHERE runid='$runid' AND nwdid_known='Y'";
+            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
             my $sth = DoSQL($sql);
             my $rowsofdata = $sth->rows();
             if (! $rowsofdata) { next; }
@@ -668,7 +671,11 @@ sub BatchSubmit {
     if ($opts{dryrun}) { print "dryrun => $cmd\n"; return; }
     my $rc = system("$cmd 2>&1");
     $rc = $rc >> 8;
-    if ($rc == 0) { $opts{jobcount}++; return; }
+    if ($rc == 0) {
+        $opts{jobcount}++;
+        if ($opts{verbose}) { print "submitted => $cmd\n"; }
+        return;
+    }
     $opts{maxjobs}++;                   # Submit failed, keep trying
     if ($rc == 4) { $opts{jobsnotpermitted}++; }
     else { $opts{jobsfailedsubmission}++; }
@@ -705,7 +712,7 @@ sub ShowSummary {
 #==================================================================
 sub FindPrefix {
     my ($f) = @_;
-    foreach my $pfx ('topdir','topdir2','topdir3', 'topdir4', 'topmed5', 'topmed6') {                    
+    foreach my $pfx ('topdir','topdir2','topdir3', 'topdir4', 'topmed5', 'topmed6','topmed7', 'topmed8') {                    
         if (-f "$opts{$pfx}/$f") { return $opts{$pfx}; }
     }
     return '';
@@ -723,10 +730,10 @@ topmed_monitor.pl - Find runs that need some action
 =head1 SYNOPSIS
 
   topmed_monitor.pl verify
-  topmed_monitor.pl -host topmed3 verify   # Force partition 'topmed3-incoming'
-  topmed_monitor.pl -host topmed3 -qos bai verify   # and using QOS 'topmed3-bai'
-  topmed_monitor.pl -memory 10G verify     # Force SLURM memory to be '10G'
-  topmed_monitor.pl -qos bai verify   # Force QOS 'topmed_bai'
+  topmed_monitor.pl -run 20150604 verify   # Select only samples from one run
+  topmed_monitor.pl -center nygc verify    # Select only samples from a center
+  topmed_monitor.pl -maxjobs 5 sorig       # Only submit a few jobs
+  topmed_monitor.pl -datayear 2 sexpt      # Send only year 2 samples
 
 =head1 DESCRIPTION
 
@@ -749,6 +756,10 @@ Specifies a specific center name on which to run the action, e.g. B<uw>.
 This is useful for testing.
 The default is to run against all centers.
 
+=item B<-datayear N>
+
+Submit only jobs for samples in a specific year.
+
 =item B<-dryrun>
 
 Do not submit any jobs, just show the command to be executed.
@@ -761,21 +772,6 @@ Generates this output.
 
 Do not submit more than N jobs for this invocation.
 The default for B<-maxjobs> is B<100>.
-
-=item B<-memory nG>
-
-Force the sbatch --mem setting when submitting a job.
-This requires the SHELL scripts to handle the environment variable, TOPMED_MEMORY.
-
-=item B<-partition name>
-
-Force the sbatch --partition setting when submitting a job.
-This requires the SHELL scripts to handle the environment variable, TOPMED_PARTITION.
-
-=item B<-qos name>
-
-Force the sbatch --qos setting when submitting a job.
-This requires the SHELL scripts to handle the environment variable, TOPMED_QOS.
 
 =item B<-realm NAME>
 
@@ -796,11 +792,6 @@ are not submitted to be run.
 =item B<-topdir PATH>
 
 Specifies the path to where the tree of BAMs exists. This defaults to  B</incoming/topmed>;
-
-=item B<-topmedhost host>
-
-Force the sbatch --partition setting when submitting a job.
-This requires the SHELL scripts to handle the environment variable, TOPMED_HOST.
 
 =item B<-verbose>
 
