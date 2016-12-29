@@ -19,6 +19,7 @@ constraint=''                   # "--constraint eth-10g"
 qos=''
 slurmp=topmed
 realhost=''
+nodefile=''
 
 if [ "$1" = "-submit" ]; then
   shift
@@ -34,8 +35,13 @@ if [ "$1" = "-submit" ]; then
     qos="--qos=$h-qplot"
   fi
 
+  # Maybe a list of nodes was specified to constrain where something runs?
+  f=/tmp/qplot.nodelist.txt
+  if [ -f $f ]; then
+    nodefile="--nodefile=$f"
+  fi
   #   Can run anywhere. Low rate of access to cram, small output
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $qos --workdir=$console -J $1-qplot --output=$console/$1-qplot.out $0 $*`)
+  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $qos $nodefile --workdir=$console -J $1-qplot --output=$console/$1-qplot.out $0 $*`)
   if [ "$?" != "0" ]; then
     echo "Failed to submit command to SLURM"
     echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $qos --workdir=$console -J $1-qplot --output=$console/$1-qplot.out $0 $*"
@@ -43,7 +49,7 @@ if [ "$1" = "-submit" ]; then
   fi
   $topmedcmd mark $1 $markverb submitted
   if [ "${l[0]}" = "Submitted" ]; then      # Job was submitted, save job details
-    echo `date` qplot ${l[3]} $slurmp $qos $realhost $mem >> $console/$1.jobids
+    echo `date` qplot ${l[3]} $slurmp $qos $realhost $mem $realhost >> $console/$1.jobids
   fi
   exit
 fi
