@@ -78,7 +78,7 @@ CREATE TABLE runs (
 );
 CREATE INDEX index_centerid_dirname ON runs(centerid,dirname);
 CREATE INDEX index_dirname ON runs(dirname);
-
+ 
 /* Lists all BAMs we know about (e.g. NWDID)  Must be tied to a run */
 DROP TABLE IF EXISTS bamfiles;
 CREATE TABLE bamfiles (
@@ -133,10 +133,15 @@ my $FAILED    = 99;           # Task failed
   state_qplot    INT DEFAULT 0,
   state_b37      INT DEFAULT 0,
   state_b38      INT DEFAULT 0,
-  state_ncbiexpt INT DEFAULT 0,
-  state_ncbiorig INT DEFAULT 0,
-  state_ncbib37  INT DEFAULT 0,
-  state_ncbib38  INT DEFAULT 0,
+  state_ncbiexpt INT DEFAULT 0,     /* Experiment defined at NCBI (X) */
+  state_ncbiorig INT DEFAULT 0,     /* Original input file as bam or cram (S) */
+  state_ncbib37  INT DEFAULT 0,     /* Remapped cram build 37 as cram (P) */
+  state_ncbib38  INT DEFAULT 0,     /* Remapped cram build 38 as cram (T) */
+
+  time_ncbiexpt  CHAR(19),          /* yyy-mm-ssThh:hh:ss when loaded */
+  time_ncbiorig  CHAR(19),
+  time_ncbib37   CHAR(19),
+  time_ncbib38   CHAR(19),
 
   PRIMARY KEY  (bamid)
 
@@ -399,3 +404,23 @@ CREATE TABLE requestfiles (
   PRIMARY KEY  (reqid)
 );
 CREATE INDEX index_reqid ON requestfiles(centerid);
+
+
+/* Table of data received from Adam Stine - I think this shows all files they have */
+DROP TABLE IF EXISTS adam;
+CREATE TABLE adam (
+  id           INT         NOT NULL AUTO_INCREMENT,
+  name_1       VARCHAR(64),
+  md5sum_1     VARCHAR(32),
+  upload_id_1  INT,
+  track_date_1 VARCHAR(8),
+  status1      VARCHAR(16),
+  name_2       VARCHAR(64),
+  md5sum_2     VARCHAR(32),
+  upload_id_2  INT,
+  track_date_2 VARCHAR(8),
+  status_2      VARCHAR(16),
+  PRIMARY KEY  (id)
+);
+
+
