@@ -48,7 +48,22 @@ $state2str = array(         // Values here are class for SPAN tag
 DB_Connect($LDB['realm']);
 GetCenters();                   // Get maps to identify centers
 
-$dumpstring = "expt_sampleid\tdatayear\tpiname\tcenter\trun\trunid\tstate_ncbiorig\tstate_ncbib37\tstate_ncbib38" . "\n";
+$dumppart1 = "center\trun\trunid\t";
+$dumpcols = array("expt_sampleid",
+    "datayear",
+    "piname",
+    "state_ncbiorig",
+    "state_ncbib37",
+    "state_ncbib38",
+    "bamid",
+    "dateinit",
+    "build",
+    "bamflagstat",
+    "cramflagstat",
+    "bamsize"
+);
+$dumpstring = $dumppart1 . implode("\t",$dumpcols) . "\n";
+
 //  Dump all nwdid, run and center
 $sql = 'SELECT * FROM ' . $LDB['runs'] . ' ORDER BY centerid';
 $runresult = SQL_Query($sql);
@@ -65,15 +80,12 @@ for ($r=0; $r<$runnumrows; $r++) {
     for ($b=0; $b<$bamnumrows; $b++) {
         $row = SQL_Fetch($bamresult);
         if ($row['expt_sampleid'] && $row['datayear']) {
-            $dumpstring .= $row['expt_sampleid'] .  "\t" .
-                $row['datayear'] .  "\t" .
-                $row['piname'] .  "\t" .
-                $CENTERID2NAME[$cid] .  "\t" .
-                $dirname .  "\t" .
-                $runid .  "\t" .
-                $state2str{$row['state_ncbiorig']} . "\t" .
-                $state2str{$row['state_ncbib37']} . "\t" .
-                $state2str{$row['state_ncbib38']} . "\n";
+            $dumpstring .= $CENTERID2NAME[$cid] .  "\t" . $dirname .  "\t" . $runid;
+            foreach ($dumpcols as $c) {
+                if (substr($c, 0, 6) == 'state_') { $dumpstring .= "\t" . $state2str{$row[$c]}; }
+                else { $dumpstring .= "\t" . $row[$c]; }
+            }
+            $dumpstring .= "\n";
         }
     }
 }
