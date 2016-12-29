@@ -70,12 +70,11 @@ our %opts = (
     studystatus => 'latest_samples.xml',
     bamsstatus => 'latest_loaded_files.txt.gz',
     summarymysqlcmd => '/home/topmed/.mysql/topmed_ncbiconf.cmd',      # Used to load summary file into database
-    days => 0,
     verbose => 0,
 );
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose center=s runs=s fetchfiles loadsummary xmlfilesdir=s days=i all ncbistatusfile=s
-    )) || die "Failed to parse options\n";
+    help realm=s verbose center=s runs=s fetchfiles loadsummary xmlfilesdir=s all
+)) || die "Failed to parse options\n";
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
@@ -393,7 +392,7 @@ sub LookFor {
     my $sth = DoSQL($initialsql);
     my $rowsofdata = $sth->rows();
     if ($rowsofdata <= 0) { return undef(); }
-    print $type . "delivered=$rowsofdata  ";
+    print $type . " delivered=$rowsofdata  ";
     my @exts = split(' ', $extensions);
 
     for (my $i=1; $i<=$rowsofdata; $i++) {
@@ -409,11 +408,17 @@ sub LookFor {
             #if ($opts{verbose}) { print "$nwdid not found in summary database\n"; }
             next;
         }
-        #   BAM/CRAM is now loaded
-        if ($href->{file_status} eq 'loaded') {
+        my $upload_date = $href->{upload_date} || '';
+        my $loaded_runs = $href->{loaded_runs} || '';
+        #   BAM/CRAM is now loaded - this is algorithm Tom likes (Dec 2016) 
+        if ($href->{file_status} eq 'loaded' && 
+            substr($upload_date,0,2) eq '20' &&     # Year is 20xx
+            ($type eq 'expt' || substr($loaded_runs,0,3) eq 'SRR')) {    # Have SRR
             $statsref->{$type . 'loaded'}++;
-            if ($opts{verbose}) { print "$nwdid $type loaded $href->{upload_date}\n"; }
-            my $sql = "UPDATE $opts{bamfiles_table} SET state_ncbi$type=$COMPLETED " .
+            if ($opts{verbose}) { print "$nwdid $type loaded $upload_date\n"; }
+            my $sql = "UPDATE $opts{bamfiles_table} SET state_ncbi$type=$COMPLETED," .
+                "time_ncbi$type='" . substr($upload_date,0,19) ."'," .
+                "ncbierr='' " .
                 "WHERE bamid=$bamid";
             my $sth = DoSQL($sql);
             next;
@@ -642,24 +647,11 @@ might expect all the data has arrived.
 If B<-fetchfiles> was specified, this option will force all files to
 be fetched, not just the single file we think we want.
 
-=item B<-batchsize N>
-
-When sending sets of files to NCBI, batch them into sets of this size.
-This might possibly make it easier to keep track of what has been sent.
-The default for B<-batchsize> is B<120>.
-
 =item B<-center NAME>
 
 Specifies a specific center name on which to run the action, e.g. B<uw>.
 This is useful for testing.
 The default is to run against all centers.
-
-=item B<-days N>
-
-Specifies the number of days of data from the summary log to parse.
-The summary log is read backwards, so B<-days 3> would process only
-entries for the last three days.
-This only applies when checking the status BAMs/CRAMs that have been sent.
 
 =item B<-fetchfiles>
 
@@ -668,10 +660,6 @@ Causes the summary log file to be fetched from NCBI.
 =item B<-help>
 
 Generates this output.
-
-=item B<-ncbistatusfile FILE>
-
-Use this to force processing on an older summary file from NCBI.
 
 =item B<-realm NAME>
 
