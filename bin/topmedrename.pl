@@ -89,12 +89,19 @@ if ($bamfile =~ /NWD\d+\.cram$/) {
     #   Aspera screws us up by re-transmitting the file if we rename it
     #   We ignore that in this case, hoping Aspera dies a long slow death :-)
     system("mv $bamfile $newbamfile") &&
-        die "$Script Unable to rename $bamfile for $newbamfile (bamid=$bamid)\n";
-    if ($opts{verbose}) { print "$Script Renamed $bamfile for $newbamfile\n"; }
+        die "$Script Unable to rename $bamfile to $newbamfile (bamid=$bamid)\n";
+    if ($opts{verbose}) { print "$Script Renamed $bamfile as $newbamfile\n"; }
+    
+    #   If there was a crai provided, rename that too
+    my $f = $bamfile . '.crai';
+    if (-f $f) {
+        system("mv $f $newbamfile.crai") &&
+            die "$Script Unable to rename $f to $newbamfile.crai (bamid=$bamid)\n";
+        if ($opts{verbose}) { print "$Script Renamed $f as $newbamfile.crai\n"; }
+    }
     #   Save original bamname once in database, change name in database
     DoSQL("UPDATE $opts{bamfiles_table} SET bamname_orig='$bamfile' WHERE bamid=$bamid");
     DoSQL("UPDATE $opts{bamfiles_table} SET bamname='$newbamfile' WHERE bamid=$bamid");
-    
 }
 
 exit;
