@@ -21,6 +21,16 @@ use lib "$FindBin::Bin/../lib";
 use lib "$FindBin::Bin/../lib/perl5";
 use Getopt::Long;
 use Cwd qw(abs_path);
+use My_DB;
+
+my $NOTSET = 0;                     # Not set
+my $REQUESTED = 1;                  # Task requested
+my $SUBMITTED = 2;                  # Task submitted to be run
+my $STARTED   = 3;                  # Task started
+my $DELIVERED = 19;                 # Data delivered, but not confirmed
+my $COMPLETED = 20;                 # Task completed successfully
+my $CANCELLED = 89;                 # Task cancelled
+my $FAILED    = 99;                 # Task failed
 
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
@@ -29,6 +39,8 @@ our %opts = (
     logfile => '/net/topmed/working/topmed-output/XMLfiles/ncbiemail.log.txt',
     maildir => '/net/topmed/working/topmed-output/ncbimail',
     mailext => '.txt',                  # Mail files end with this
+    realm => '/usr/cluster/monitor/etc/.db_connections/topmed',
+    bamfiles_table => 'bamfiles',
     keep => 0,                          # Do not delete input file
     verbose => 0,
 );
@@ -41,6 +53,11 @@ Getopt::Long::GetOptions( \%opts,qw(
 if ($#ARGV < 0 || $opts{help}) {
     my $m = "$Script [options] parsemail";
     warn "$Script [options] parsemail\n" .
+        "or\n" .
+        "$Script [options] summarizemail\n" .
+        "or\n" .
+        "$Script [options] checkmail\n" .
+        "\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
     exit 1;
@@ -52,7 +69,9 @@ $opts{maildir} = abs_path($opts{maildir});
 #--------------------------------------------------------------
 #   Execute the command provided
 #--------------------------------------------------------------
-if ($fcn eq 'parsemail') { Parse($opts{maildir}, $opts{logfile}); exit; }
+if ($fcn =~ /^par/)     { Parse($opts{maildir}, $opts{logfile}); exit; }
+if ($fcn =~ /^sum/)     { Summary($opts{logfile}); exit; }
+if ($fcn =~ /^check/)   { Check($opts{logfile}); exit; }
 
 die "$Script  - Invalid function '$fcn'\n";
 exit;
@@ -180,6 +199,109 @@ sub Parse {
 
 #==================================================================
 # Subroutine:
+#   Summary($log)
+#
+#   Summarize the log file of Email from NCBI
+#==================================================================
+sub Summary {
+    my ($log) = @_;
+    my %count = ();
+    my $in;
+
+    open($in, $log) ||
+        die "$Script - Unable to open file '$log': $!\n";
+    while (my $l = <$in>) {
+        if ($l !~ /^(NWD\d+)\.(\S+)\s+(.+)\s+20\d\d/) { next; }
+        my $nwdid = $1;
+        my $ext = $2;
+        my $msg = $3;
+        $count{$ext}++;
+        my $s = $ext . ' ' . $msg;
+        $count{$s}++;
+    }
+    close($in);
+
+    #   Show summary
+    foreach my $k (keys %count) {
+        print "$k   $count{$k}\n";
+    }
+}
+    
+#==================================================================
+# Subroutine:
+#   Check($log)
+#
+#   Parse log file and check consistency of NCBI states indicated
+#   by the log file with the monitor database
+#==================================================================
+sub Check {
+    my ($log) = @_;
+    my $in;
+    my $needscorrection = 0;
+    my $correct = 0;
+    my $duplicates = 0;
+    DBConnect($opts{realm});        # Open database
+
+    my %alreadyseen = ();
+    open($in, $log) ||
+        die "$Script - Unable to open file '$log': $!\n";
+    while (my $l = <$in>) {
+        if ($l !~ /^(NWD\d+)\.(\S+)\s+(.+)\s+20\d\d/) { next; }
+        my $nwdid = $1;
+        my $ext = $2;
+        my $msg = $3;
+        #   Figure out what database column is to be checked
+        my $dbcol = '';
+        if ($ext =~ /expt.submit/)      { $dbcol = 'state_ncbiexpt'; }
+        if ($ext =~ /secondary.submit/) { $dbcol = 'state_ncbiorig'; }
+        if ($ext =~ /remap.submit/)     { $dbcol = 'state_ncbib37'; }
+        if (! $dbcol) {
+            print "Unable to determine a column for '$ext'. Line=$l";
+            next;
+        }
+        my $sth = ExecSQL("SELECT $dbcol FROM $opts{bamfiles_table} WHERE expt_sampleid='$nwdid'");
+        my $rowsofdata = $sth->rows();
+        if (! $rowsofdata) {
+            print "Unable to find '$nwdid' in the monitor database\n";
+            next;
+        }
+        my $k = $nwdid . '.' . $ext . ' ' . $msg;
+        if (exists($alreadyseen{$k})) {
+            $duplicates++;
+            if ($opts{verbose}) { print "   Ignored duplicate: $k\n"; }
+            next;
+        }
+        $alreadyseen{$k}++;
+        my $href = $sth->fetchrow_hashref;
+        #   Now based on the NCBI Email text, see if our database agrees
+        if ($msg =~ /has errors/) {
+            if ($href->{$dbcol} ne $FAILED) {
+                print "NWDID=$nwdid has errors, but $dbcol not correct ($href->{$dbcol})\n";
+                $needscorrection++;
+            }
+            else { $correct++; }
+            next;
+        }
+
+        if ($msg =~ /waiting for runs/) {
+            if ($href->{$dbcol} ne $COMPLETED) {
+                print "NWDID=$nwdid is waiting for runs, but $dbcol not correct ($href->{$dbcol})\n";
+                $needscorrection++;
+            }
+            else { $correct++; }
+            next;
+        }
+        print "Unable to check msg=$msg  Line=$l";
+    }
+    close($in);
+
+    print "Monitor database fields that are correct=$correct\n";
+    print "Monitor database fields that are incorrect=$needscorrection\n";
+    print "Ignored $duplicates duplicate Email entries\n";
+}
+
+#==================================================================
+# Subroutine:
 #   Append($file, $txt)
 #
 #   Append $txt to $file
@@ -190,6 +312,20 @@ sub Append {
         die "$Script - Unable to append to '$file': $!\n";
     print OUT $txt;
     close(OUT);
+}
+
+#==================================================================
+# Subroutine:
+#   ExecSQL($sql, $die)
+#
+#   Execute SQL.  Keep trying if connection lost.
+#
+#   Returns handle for SQL
+#==================================================================
+sub ExecSQL {
+    my ($sql, $die) = @_;
+    if ($opts{persist}) { return PersistDoSQL($opts{realm}, $sql); }
+    return DoSQL($sql, $die);
 }
 
 #==================================================================
