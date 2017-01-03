@@ -488,7 +488,7 @@ sub SummarizeStats {
 #     hash reference to database query results
 #==================================================================
 sub GetSummaryStatus {
-    my $sql = "SELECT file_name,file_status,file_error,upload_date,file_md5sum from $opts{summary_table} WHERE";
+    my $sql = "SELECT file_name,file_status,file_error,upload_date,loaded_runs,file_md5sum from $opts{summary_table} WHERE";
     foreach my $f (@_) {
         my $s = $sql . " file_name='$f'";
         my $sth = DoSQL($s);
