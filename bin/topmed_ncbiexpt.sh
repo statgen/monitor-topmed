@@ -47,14 +47,6 @@ fi
 bamid=$1
 shift
 
-############# Temporary hook to disable sending certain data #############
-center=`$topmedcmd show $bamid center`
-if [ "$center" = "illumina" ]; then
-  echo "Sending data for $center is disabled"
-  exit
-fi
-############# Temporary hook to disable sending certain data #############
-
 $topmedcmd mark $bamid $markverb started
 
 nwdid=`$topmedcmd show $bamid expt_sampleid`
