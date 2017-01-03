@@ -274,6 +274,11 @@ sub Check {
         $alreadyseen{$k}++;
         my $href = $sth->fetchrow_hashref;
         #   Now based on the NCBI Email text, see if our database agrees
+        if ($msg =~ /has been released/) {  # Informational only, nothing done or to do
+            $correct++;
+            next;
+        }
+
         if ($msg =~ /has errors/) {
             if ($href->{$dbcol} ne $FAILED) {
                 print "NWDID=$nwdid has errors, but $dbcol not correct ($href->{$dbcol})\n";
