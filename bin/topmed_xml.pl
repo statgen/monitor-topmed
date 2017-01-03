@@ -195,12 +195,10 @@ sub CreateRun {
     print OUT "<RUN_SET\n" . $opts{xmlns_run};
     my $refname = "$href->{expt_sampleid}-expt";
     #   What a POS.  NYGC created their own experiments, so we need to know what
-    #   they used for the name. Oh, except for three particular samples :-((
+    #   they used for the name. Fortunately, this mess only belongs to Burchard
     if ($center eq 'nygc' &&
-        ($href->{expt_sampleid} ne 'NWD433184' &&
-        $href->{expt_sampleid} ne 'NWD143123' &&
-        $href->{expt_sampleid} ne 'NWD901849')
-        ) {
+        $href->{piname} eq 'Burchard' &&
+        $href->{datayear} eq '1') {
         $refname = $href->{expt_sampleid};
     }
     my $xml = GenRUNXML($checksum, $title, $refname, $runlines, $filename, $checksum);
