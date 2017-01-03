@@ -2,7 +2,7 @@
 #
 #   topmed_ncbiorig.sh -submit bamid
 #
-#	Send the proper set of files to NCBI for the original files
+#	Send the proper set of files to NCBI for the original/secondary files
 #
 samtools=/usr/cluster/bin/samtools
 topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
@@ -95,20 +95,32 @@ cd XMLfiles
 here=`pwd`
 
 #   Figure out what file to send. Either a BAM or a CRAM
-if [ "$center" = "broad" ]; then
+sendcram='N'
+offsite=`$topmedcmd show $bamid offsite`    # Original file is offsite or local
+datayear=`$topmedcmd show $bamid datayear`  # What year data is this
+if [ "$offsite" = "D" ]; then
+  sendcram='Y'
+else
+  if [ "$center" = "broad" -a "$datayear" != '1' ]; then
+    sendcram='Y'
+  fi
+fi
+
+if [ "$sendcram" = "Y" ]; then
   l=(`$topmedpath wherefile $bamid backup`)        # Get backupdir and backupfile and host
   sendfile="${l[0]}"
   sf=$nwdid.src.cram
   ln -sf $sendfile $sf
   checksum=`$topmedcmd -persist show $bamid cramchecksum`
   sendfile=$sf
+  echo "Sending backup cram instead of original file ($sendfile)"
   # It's not supposed to happen, but sometimes the CRAM checksum is missing
   if [ "$checksum" = "" ]; then
     echo "Calculating MD5 for CRAM"
     stime=`date +%s`
     checksum=`calcmd5 $sendfile | awk '{print $1}'`
     if [ "$checksum" != "" ]; then
-      $topmedcmd set $bamid cramb37checksum $checksum
+      $topmedcmd set $bamid cramchecksum $checksum
       etime=`date +%s`
       etime=`expr $etime - $stime`
       echo "MD5 calculated for CRAM in $etime seconds"
