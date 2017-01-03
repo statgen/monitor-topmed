@@ -971,6 +971,7 @@ function RestartJobs($h) {
         "<option value='2'>Submitted</option>" .
         "<option value='3'>Running</option>" .
         "<option value='19'>Delivered</option>" .
+        "<option value='98'>FailedChecksum</option>" .
         "</select></td>" .
         "<td><font color='green'>&nbsp;</font></td>" .
         "<td>&nbsp;</td>" .
