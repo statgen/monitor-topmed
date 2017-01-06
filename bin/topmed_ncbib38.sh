@@ -10,7 +10,6 @@ topmedpath=/usr/cluster/monitor/bin/topmedpath.pl
 ascpcmd="$topmedcmd send2ncbi"
 topmedxml="/usr/cluster/monitor/bin/topmed_xml.pl"
 medir=`dirname $0`
-calcmd5=/usr/cluster/monitor/bin/topmed_calcmd5.sh
 mem=2G
 console=/net/topmed/working/topmed-output
 tmpconsole=/net/topmed/working/topmed-output
@@ -92,28 +91,35 @@ cd XMLfiles
 here=`pwd`
 
 #   Figure out what file to send
-sendfile=`$topmedpath wherefile $bamid b38`
+$topmedpath wherefile $bamid b{$build}
+if [ "$?" = '1' ]; then
+  echo "Multiple b{$build} crams were found - cannot send to NCBI"
+  $topmedcmd -persist mark $bamid $markverb failed
+  exit 2
+fi
+
+sendfile=`$topmedpath wherefile $bamid b{$build}`
 if [ "$sendfile" = '' ]; then
   echo "Remapped CRAM for Build $build for bamid '$bamid' not found ($sendfile)"
   $topmedcmd -persist mark $bamid $markverb failed
   exit 2
 fi
-checksum=`$topmedcmd show $bamid b38cramchecksum`
+checksum=`$topmedcmd show $bamid b{$build}cramchecksum`
 if [ "$checksum" = "" ]; then
   echo "Calculating MD5 for CRAM"
   stime=`date +%s`
-  checksum=`$calcmd5 $sendfile | awk '{print $1}'`
+  checksum=`md5sum $sendfile | awk '{print $1}'`
   if [ "$checksum" = "" ]; then
     echo "Unable to calculate the MD5 for CRAM: md5sum $sendfile"
     $topmedcmd -persist mark $bamid $markverb failed
     exit 3
   fi
-  $topmedcmd set $bamid b38cramchecksum $checksum
+  $topmedcmd set $bamid b{$build}cramchecksum $checksum
   etime=`date +%s`
   etime=`expr $etime - $stime`
   echo "MD5 calculated for CRAM in $etime seconds"
 else
-  echo "Obtained b38cramchecksum for bamid $bamid from database ($checksum)"
+  echo "Obtained b{$build}cramchecksum for bamid $bamid from database ($checksum)"
 fi
 
 d=`date +%Y/%m/%d`
