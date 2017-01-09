@@ -301,6 +301,24 @@ __PACKAGE__->table("bamfiles");
   is_nullable: 1
   size: 19
 
+=head2 state_gce38push
+
+  data_type: 'integer'
+  default_value: 0
+  is_nullable: 1
+
+=head2 state_gce38pull
+
+  data_type: 'integer'
+  default_value: 0
+  is_nullable: 1
+
+=head2 state_gce38post
+
+  data_type: 'integer'
+  default_value: 0
+  is_nullable: 1
+
 =head2 datearrived
 
   data_type: 'varchar'
@@ -609,6 +627,12 @@ __PACKAGE__->add_columns(
   { data_type => "char", is_nullable => 1, size => 19 },
   "time_ncbib38",
   { data_type => "char", is_nullable => 1, size => 19 },
+  "state_gce38push",
+  { data_type => "integer", default_value => 0, is_nullable => 1 },
+  "state_gce38pull",
+  { data_type => "integer", default_value => 0, is_nullable => 1 },
+  "state_gce38post",
+  { data_type => "integer", default_value => 0, is_nullable => 1 },
   "datearrived",
   { data_type => "varchar", is_nullable => 1, size => 12 },
   "datemd5ver",
@@ -691,6 +715,21 @@ __PACKAGE__->set_primary_key("bamid");
 
 =head1 RELATIONS
 
+=head2 freezes
+
+Type: has_many
+
+Related object: L<Topmed::DB::Schema::Result::Freeze>
+
+=cut
+
+__PACKAGE__->has_many(
+  "freezes",
+  "Topmed::DB::Schema::Result::Freeze",
+  { "foreign.bamid" => "self.bamid" },
+  { cascade_copy => 0, cascade_delete => 0 },
+);
+
 =head2 qc_results
 
 Type: has_many
@@ -707,8 +746,8 @@ __PACKAGE__->has_many(
 );
 
 
-# Created by DBIx::Class::Schema::Loader v0.07046 @ 2017-01-06 14:26:01
-# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:MV1RBO4NZYKnahZk1L3obw
+# Created by DBIx::Class::Schema::Loader v0.07046 @ 2017-01-09 15:30:58
+# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:RBRHsFMiyaQu9101A2sZ0w
 
 
 # You can replace this text with custom code or comments, and it will be preserved on regeneration
