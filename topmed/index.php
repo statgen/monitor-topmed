@@ -25,7 +25,8 @@ else { $oldsite = 0; }
 
 $qurl =  $_SERVER['SCRIPT_NAME'] . "?fcn=queue'";
 $STATUSLETTERS =  "<i><b>A</b>=File Arrived, <b>5</b>=MD5 Verified, <b>C</b>=BAM=>CRAM, <b>I</b>=BAI created<br/>" .
-    "<b>Q</b>=qplot run, <b>7</b>=Remapped Build=37, <b>8</b>=Remapped Build=38, <b>X</b>=EXPT=>NCBI<br/>" .
+    "<b>Q</b>=qplot run, <b>7</b>=Remapped Build=37, <b>s</b>=Push Build=38 to GCE, <b>s</b>=Pull Build=38 from GCE,<br/>" .
+    "<b>Z</b>=PostProcess GCE Build=38 data, <b>8</b>=Remapped Build=38, <b>X</b>=EXPT=>NCBI<br/>" .
     "<b>S</b>=Secondary BAM=>NCBI, <b>P=</b>B37=>Primary BAM=>NCBI, <b>T</b>=b38=>Tertiary BAM=>NCBI";
 
 $SHOWSTATUS = "STATUS: &nbsp;&nbsp;&nbsp;" .
@@ -63,8 +64,8 @@ $RUNNOTE = "<p><b>Note:</b><br>" .
     "<span class='unknown'> unstarted, etc </span>&nbsp;" .
     "<span class='failed'> at least one failure </span>&nbsp;" .
     "<br>" .
-    "<i>Steps:</i> $STATUSLETTERS<br>" .
-    "<i>Source Files Copied Offsite:</i> <b>E</b> Expected to be copied, " .
+    "<br><i>Steps:</i> $STATUSLETTERS<br>" .
+    "<br><i>Source Files Copied Offsite:</i> <b>E</b> Expected to be copied, " .
     "<b>D</b> Done, have been copied, " .
     "<b>N</b> Not to be copied<br>" .
     "</p>\n";
@@ -77,6 +78,9 @@ $quickcols = array(                     // Map of status column to topmedcmd ver
     'state_qplot'    => 'qplot',
     'state_cram'     => 'cramed',
     'state_b37'      => 'mapping37',
+    'state_gce38push'=> 'gce38push',
+    'state_gce38pull'=> 'gce38pull',
+    'state_gce38post'=> 'gce38post',
     'state_b38'      => 'mapping38',
     'state_ncbiexpt' => 'sendexpt',
     'state_ncbiorig' => 'sendorig',
@@ -90,13 +94,16 @@ $quickletter = array(                   // Map of status column to letter we see
     'state_qplot'    => 'Q',
     'state_cram'     => 'C',
     'state_b37'      => '7',
+    'state_gce38push'=> 's',
+    'state_gce38pull'=> 'r',
+    'state_gce38post'=> 'Z',
     'state_b38'      => '8',
     'state_ncbiexpt' => 'X',
     'state_ncbiorig' => 'S',
     'state_ncbib37'  => 'P',
     'state_ncbib38'  => 'T'
 );
-$validfunctions = array('all', 'verify', 'bai', 'qplot', 'cram', 'sexpt', 'sorig', 'sb37', 'sb38');
+$validfunctions = array('all', 'verify', 'bai', 'qplot', 'cram', 'sexpt', 'sorig', 'sb37', 'push38', 'pull38', 'post38', 'sb38');
 $NOTSET = 0;                // Not set
 $REQUESTED = 1;             // Task requested
 $SUBMITTED = 2;             // Task submitted to be run
@@ -118,8 +125,8 @@ $state2str = array(         // Values here are class for SPAN tag
     $FAILED => 'failed'
 );
 
-$NODELIST = array('topmed', 'topmed2', 'topmed3', 'topmed4', 'topmed5', 'topmed6');
-$TOPMEDJOBNAMES = array('verify', 'bai', 'qplot', 'cram', 'expt', 'orig', 'b37', 'b38');
+$NODELIST = array('topmed', 'topmed2', 'topmed3', 'topmed4', 'topmed5', 'topmed6', 'topmed7', 'topmed8');
+$TOPMEDJOBNAMES = array('verify', 'bai', 'qplot', 'cram', 'expt', 'orig', 'b37', 'push38', 'pull38', 'post38', 'b38');
 $LOGFILES = array('topmed_init.log',
     'topmed_monitor_arrive.log',
     'topmed_monitor_bai.log',
