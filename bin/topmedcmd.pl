@@ -110,7 +110,9 @@ if ($#ARGV < 0 || $opts{help}) {
         "  or\n" .
         "$m show bamid|nwdid colname|run|center|yaml\n" .
         "  or\n" .
-        "$m [-with-bamid] showrun runname\n" .
+        "$m list centers\n" .
+        "$m list runs centername\n" .
+        "$m [-with-bamid] list samples runname\n" .
         "  or\n" .
         "$m export\n" .
         "  or\n" .
@@ -142,7 +144,7 @@ if ($fcn eq 'mark')      { Mark(@ARGV); exit; }
 if ($fcn eq 'unmark')    { UnMark(@ARGV); exit; }
 if ($fcn eq 'set')       { Set(@ARGV); exit; }
 if ($fcn eq 'show')      { Show(@ARGV); exit; }
-if ($fcn eq 'showrun')   { ShowRun(@ARGV); exit; }
+if ($fcn eq 'list')      { List(@ARGV); exit; }
 if ($fcn eq 'export')    { Export(@ARGV); exit; }
 if ($fcn eq 'send2ncbi') { Send2NCBI(@ARGV); exit; }
 if ($fcn eq 'squeue')    { SQueue(@ARGV); exit; }
@@ -728,27 +730,57 @@ sub Set {
 
 #==================================================================
 # Subroutine:
-#   ShowRun($runname)
+#   List($fcn, $item)
 #
-#   Generate list of nwdids (and maybe bamids) for a run
+#   Generate a list of data from the database
+#   Where $fcn may be centers, runs or samples
 #==================================================================
-sub ShowRun {
-    my ($runname) = @_;
-    my $s;
-
-    my $sth = ExecSQL("SELECT runid FROM $opts{runs_table} WHERE dirname='$runname'", 0);
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "$Script - Unknown run '$runname'\n"; }
-    my $href = $sth->fetchrow_hashref;
-    my $runid = $href->{runid};
-    $sth = ExecSQL("SELECT bamid,expt_sampleid FROM $opts{bamfiles_table} WHERE runid=$runid");
-    $rowsofdata = $sth->rows();
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        $href = $sth->fetchrow_hashref;
-        $s = $href->{expt_sampleid};
-        if ($opts{'with-bamid'}) { $s .= ' ' . $href->{bamid}; }
-        print $s . "\n";
+sub List {
+    my ($fcn, $item) = @_;
+    if (! $fcn) { die "$Script - List operator was not provided\n"; }
+    if ($fcn eq 'centers') {            # Show all centers
+        my $sth = ExecSQL("SELECT centername FROM $opts{centers_table}");
+        my $rowsofdata = $sth->rows();
+        for (my $i=1; $i<=$rowsofdata; $i++) {
+            my $href = $sth->fetchrow_hashref;
+            print $href->{centername} . "\n";
+        }
+        return;
     }
+    if ($fcn eq 'runs') {               # Show all runs for a center
+        if (! $item) { die "$Script - Centername was not provided\n"; }
+        my $sth = ExecSQL("SELECT centerid FROM $opts{centers_table} WHERE centername='$item'",0);
+        my $rowsofdata = $sth->rows();
+        if (! $rowsofdata) { die "$Script - Unknown centername '$item'\n"; }
+        my $href = $sth->fetchrow_hashref;
+        my $centerid = $href->{centerid};
+        $sth = ExecSQL("SELECT dirname FROM $opts{runs_table} WHERE centerid=$centerid");
+        $rowsofdata = $sth->rows();
+        for (my $i=1; $i<=$rowsofdata; $i++) {
+            my $href = $sth->fetchrow_hashref;
+            print $href->{dirname} . "\n";
+        }
+        return;
+    }
+    if ($fcn eq 'samples') {            # Show all samples for a run
+        if (! $item) { die "$Script - Runname was not provided\n"; }
+        my $sth = ExecSQL("SELECT runid FROM $opts{runs_table} WHERE dirname='$item'", 0);
+        my $rowsofdata = $sth->rows();
+        if (! $rowsofdata) { die "$Script - Unknown run '$item'\n"; }
+        my $href = $sth->fetchrow_hashref;
+        my $runid = $href->{runid};
+        $sth = ExecSQL("SELECT bamid,expt_sampleid FROM $opts{bamfiles_table} WHERE runid=$runid");
+        $rowsofdata = $sth->rows();
+        my $s;
+        for (my $i=1; $i<=$rowsofdata; $i++) {
+            $href = $sth->fetchrow_hashref;
+            $s = $href->{expt_sampleid};
+            if ($opts{'with-bamid'}) { $s .= ' ' . $href->{bamid}; }
+            print $s . "\n";
+        }
+        return;
+    }
+    die "$Script - Unknown list function '$fcn'\n";
 }
 
 #==================================================================
@@ -972,6 +1004,10 @@ Specifies the realm name to be used.
 This defaults to B<$opts{realm}> in the same directory as
 where this program is to be found.
 
+=item B<-with-bamid>
+
+Specifies that B<list samples RUNNAME> should also provide the bamid for the sample.
+
 =item B<-verbose>
 
 Provided for developers to see additional information.
@@ -1011,9 +1047,9 @@ Use this to show information about a particular bamid (or expt_sampleid)
 or run name.
 Use 'yaml' to display everything known about the bam of interest.
 
-B<showrun runname>
-Use this to show a list of all the NWDIDs for a run.
-The option B<-bamid> will cause the bamid to be shown in addition.
+B<list centers|runs|samples  value>
+Use this to show a list of all centers, runs for a center or NWDIDs for a run.
+The option B<-with-bamid> will cause the bamid to be shown in the last case.
 
 B<unmark bamid|nwdid [verb]>
 Use this to reset the state for a particular BAM file to the default

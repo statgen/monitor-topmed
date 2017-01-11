@@ -112,7 +112,7 @@ CREATE TABLE bamfiles (
   checksum     VARCHAR(96) NOT NULL,
   expt_sampleid VARCHAR(24) DEFAULT 'UNKNOWN',  /* NWDID */
   nwdid_known  CHAR(1) DEFAULT 'N',
- 
+
 /* Fields to track state for each step */
 /*
 my $NOTSET    = 0;            # Not set
@@ -133,15 +133,19 @@ my $FAILED    = 99;           # Task failed
   state_qplot    INT DEFAULT 0,
   state_b37      INT DEFAULT 0,
   state_b38      INT DEFAULT 0,
+
   state_ncbiexpt INT DEFAULT 0,     /* Experiment defined at NCBI (X) */
   state_ncbiorig INT DEFAULT 0,     /* Original input file as bam or cram (S) */
   state_ncbib37  INT DEFAULT 0,     /* Remapped cram build 37 as cram (P) */
   state_ncbib38  INT DEFAULT 0,     /* Remapped cram build 38 as cram (T) */
-
   time_ncbiexpt  CHAR(19),          /* yyy-mm-ssThh:hh:ss when loaded */
   time_ncbiorig  CHAR(19),
   time_ncbib37   CHAR(19),
   time_ncbib38   CHAR(19),
+
+  state_gce38push  INT DEFAULT 0,   /* Handling b38 data in Google Cloud */
+  state_gce38pull  INT DEFAULT 0,
+  state_gce38post  INT DEFAULT 0,   /* Post process state_gce38pull data */
 
   PRIMARY KEY  (bamid)
 
@@ -197,6 +201,25 @@ CREATE INDEX index_refname ON bamfiles(refname);
 
 /* ALTER TABLE bamfiles ADD COLUMN datebai VARCHAR(12) AFTER datebackup; */
 /* ALTER TABLE runs ADD  COLUMN offsitebackup CHAR(1) DEFAULT 'N' AFTER datayear */
+
+/*  This table is keeps track of freezes - sets of samples 
+*/
+DROP TABLE IF EXISTS freezes;
+CREATE TABLE freezes (
+  id      INT PRIMARY KEY AUTO_INCREMENT,
+  bamid   INT         NOT NULL,
+  freeze  VARCHAR(45) NOT NULL,
+  created_at   DATETIME  NOT NULL,  /* Cannot use DEFAULT CURRENT_TIMESTAMP, use plugin */
+  modified_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_freezes_1
+    FOREIGN KEY (bamid)
+    REFERENCES bamfiles (bamid)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION
+);
+CREATE INDEX index_bamid   ON freezes(bamid);
+CREATE INDEX index_freeze  ON freezes(freeze);
+
 
 /*  This table is regularly loaded from a tab delimited summary file from NCBI
     The NCBI data is loaded into this table to make it easier for us to garner
