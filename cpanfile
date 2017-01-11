@@ -5,6 +5,8 @@ requires 'Readonly';
 requires 'Import::Base';
 requires 'IPC::System::Simple';
 
+requires 'Class::Method::Modifiers';
+
 requires 'DBIx::Class';
 requires 'DBIx::Class::Schema::Loader';
 

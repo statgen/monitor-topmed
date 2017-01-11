@@ -751,6 +751,10 @@ __PACKAGE__->has_many(
 
 
 # You can replace this text with custom code or comments, and it will be preserved on regeneration
+use Class::Method::Modifiers;
+
+use Topmed::Base;
+
 __PACKAGE__->belongs_to(
   run => 'Topmed::DB::Schema::Result::Run',
   {'foreign.runid' => 'self.runid'}
@@ -765,5 +769,37 @@ __PACKAGE__->belongs_to(
   mapping => 'Topmed::DB::Schema::Result::Mapping',
   {'foreign.bam_id' => 'self.bamid'}
 );
+
+around 'piname' => sub {
+  my $orig = shift;
+  my $self = shift;
+
+  return $self->$orig // 'unknown';
+};
+
+sub center {
+  return shift->run->center->centername;
+}
+
+sub host {
+  my $self = shift;
+  my $ptn  = YASF->new('/net/topmed/working/backups/incoming/topmed/{center}/{run}/{nwdid}.src.cram');
+  my $path = $ptn % {center => $self->center, run => $self->run->dirname, nwdid => $self->expt_sampleid};
+  my $file = Path::Class->file(abs_path($path));
+
+  return ($file->components)[3];
+}
+
+sub hg38_mapped_path {
+  my $self = shift;
+  my $path = YASF->new('/net/{host}/working/mapping/resuls/{center}/{pi}/hg38/{nwdid}');
+
+  return $path % {
+    host   => $self->host,
+    center => $self->center,
+    pi     => $self->piname,
+    nwdid  => $self->expt_sampleid,
+  };
+}
 
 1;
