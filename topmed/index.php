@@ -19,10 +19,6 @@ include_once "edit.php";
 
 //print "<!-- _POST=\n"; print_r($_POST); print " -->\n";
 
-// Hack to tell if we are on statgen or not
-if ( file_exists('/exports/monitor/index.html')) { $oldsite = 1; }
-else { $oldsite = 0; }
-
 $qurl =  $_SERVER['SCRIPT_NAME'] . "?fcn=queue'";
 $STATUSLETTERS =  "<i><b>A</b>=File Arrived, <b>5</b>=MD5 Verified, <b>C</b>=BAM=>CRAM, <b>I</b>=BAI created<br/>" .
     "<b>Q</b>=qplot run, <b>7</b>=Remapped Build=37, <b>s</b>=Push Build=38 to GCE, <b>s</b>=Pull Build=38 from GCE,<br/>" .
@@ -127,17 +123,6 @@ $state2str = array(         // Values here are class for SPAN tag
 
 $NODELIST = array('topmed', 'topmed2', 'topmed3', 'topmed4', 'topmed5', 'topmed6', 'topmed7', 'topmed8');
 $TOPMEDJOBNAMES = array('verify', 'bai', 'qplot', 'cram', 'expt', 'orig', 'b37', 'push38', 'pull38', 'post38', 'b38');
-$LOGFILES = array('topmed_init.log',
-    'topmed_monitor_arrive.log',
-    'topmed_monitor_bai.log',
-    'topmed_monitor_cram.log',
-    'topmed_monitor_expt.log',
-    'topmed_monitor_ncbi.log',
-    'topmed_monitor_orig.log',
-    'topmed_monitor_phs.log',
-    'topmed_monitor_qplot.log',
-    'topmed_monitor_verify.log',
-    'topmed_monitor_b37.log' );
 
 //  These columns are state values to be converted to people readable strings
 //  See DateState() for possible values
@@ -178,15 +163,9 @@ if ($iammgr) {
     $s = "<b>See TOPMed monitor docs " .
         "<a href='https://statgen.sph.umich.edu/wiki/NHLBI_automation_steps' target='_blank'>" .
         "here</a>.</b>\n";
-    if (! $oldsite) {
-        $s .= "<font color='red'>New Web Site, Not Everything Works</font></br>\n";
-    }
 }
 else {
     $s = '';
-    if (! $oldsite) {
-        $s .= "<font color='red'>New Web Site, Not Everything Works</font></br>\n";
-    }
 }
 print "<p class='intro'>The <a href='http://www.nhlbi.nih.gov/'>NHLBI</a> provides " .
     "science-based, plain-language information related to heart, lung " .
@@ -298,32 +277,15 @@ if ($fcn == 'showqlocal') {
 
 if ($fcn == 'df') {
     print "<center>$SHOWSTATUS &nbsp;&nbsp;&nbsp;</center>\n";
-    if ($oldsite) {
-        $cmd = "/usr/cluster/monitor/bin/slurm_query.sh -df ignored";
-        print `$cmd`;
-        exit;
-    }
-    $cmd = "df -h";
-    foreach ($NODELIST as $n) { $cmd .= " /net/$n/incoming /net/$n/working";  }
-    print "<pre>" . `$cmd` . "</pre>\n";
+    $cmd = "/usr/cluster/monitor/bin/slurm_query.sh -df ignored";
+    print `$cmd`;
     exit;
 }
 
 if ($fcn == 'logs') {
     print "<center>$SHOWSTATUS &nbsp;&nbsp;&nbsp;</center>\n";
-    if ($oldsite) {
-        $cmd = "/usr/cluster/monitor/bin/slurm_query.sh -logs ignored";
-        print `$cmd`;
-        exit;
-    }
-    $d = '/net/topmed/working/topmed-output';
-    if (! chdir($d)) {
-        print Emsg("Unable to find logs in '$d'", 1) . "<br/>\n";
-        exit;
-    }
-    $s = '<pre>';
-    foreach ($LOGFILES as $f) { $s .= "<b>Showing $f</b>\n" . `tail -6 $f`; }
-    print "$s</pre>\n";
+    $cmd = "/usr/cluster/monitor/bin/slurm_query.sh -logs ignored";
+    print `$cmd`;
     exit;
 }
 
