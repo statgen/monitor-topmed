@@ -790,9 +790,21 @@ sub host {
   return ($file->components)[3];
 }
 
-sub hg38_mapped_path {
+sub b37_mapped_path {
   my $self = shift;
-  my $path = YASF->new('/net/{host}/working/mapping/resuls/{center}/{pi}/hg38/{nwdid}');
+  my $path = YASF->new('/net/{host}/working/schelcj/results/{center}/{pi}/{nwdid}');
+
+  return $path % {
+    host   => $self->host,
+    center => $self->center,
+    pi     => $self->piname,
+    nwdid  => $self->expt_sampleid,
+  };
+}
+
+sub b38_mapped_path {
+  my $self = shift;
+  my $path = YASF->new('/net/{host}/working/mapping/results/{center}/{pi}/hg38/{nwdid}');
 
   return $path % {
     host   => $self->host,
