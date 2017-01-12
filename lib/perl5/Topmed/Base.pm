@@ -8,12 +8,16 @@ our @IMPORT_MODULES = (
     Data::Dumper
     Modern::Perl
     IO::All
+    YASF
+    Path::Class
   ),
   'autodie' => [qw(:all)],
   'English' => [qw(-no_match_vars)],
+  'Cwd'     => [qw(abs_path)],
 );
 
 our %IMPORT_BUNDLES = (
+
 );
 
 1;
