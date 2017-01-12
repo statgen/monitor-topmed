@@ -2,8 +2,7 @@
 #       Enable this with: crontab -e
 #       View commands in place with: crontab -l
 #
-#       Use "> /dev/null 2> /dev/null" after the command to surpress
-#       getting mail of what happened (non-ROOT users only).
+#       Use "> /dev/null 2> /dev/null" after the command to surpress getting mail of what happened (non-ROOT users only).
 #       Use "2>&1 | /usr/bin/mailx -s BACKUP XXX" to mail to someone special
 #       Capture all output with "cmd > file 2>&1"
 #
@@ -18,42 +17,49 @@
 15   01    *   *     *    find -L /net/topmed4/working/backups/incoming/topmed -name \*.cram -size -10k -exec ls -l {} \;
 16   01    *   *     *    find -L /net/topmed5/working/backups/incoming/topmed -name \*.cram -size -10k -exec ls -l {} \;
 17   01    *   *     *    find -L /net/topmed6/working/backups/incoming/topmed -name \*.cram -size -10k -exec ls -l {} \;
+18   01    *   *     *    find -L /net/topmed7/working/backups/incoming/topmed -name \*.cram -size -10k -exec ls -l {} \;
+19   01    *   *     *    find -L /net/topmed8/working/backups/incoming/topmed -name \*.cram -size -10k -exec ls -l {} \;
 #    Check that backup directories have been created
 10   07    7   *     *    /usr/cluster/monitor/bin/topmedoffsitebackup.pl check | mail -s Offsite_backups michigancsg@umich.edu
 #    Create web page sumary of status
 05   07    *   *     *    (cd /net/topmed/working/topmed-output/qc-report; perl /net/topmed/working/hmkang/scripts/topmed-make-qc-reports.pl 2>&1 | mail -s topmed-make-qc-reports hmkang@umich.edu; rm -rf /net/topmed/working/topmed-output/gc-report)
-#    Remove old console logs
+#    Remove old files
 01   08    7   *     *    find /net/topmed/working/topmed-output/aspera -mtime +14 -print -exec rm -f {} \; > /working/topmed-output/cronrm.log
 11   08    7   *     *    find /working/topmed-output -maxdepth 1 -mtime +14 -print -exec rm -f {} \; > /working/topmed-output/cronrm.log
 22   08    7   *     *    find /working/topmed-output/XMLfiles -mtime +14 -print -exec rm -f {} \; > /working/topmed-output/cronrm.log
-10   1     1   *     *    for d in init arrive verify backup bai qplot cram ncbi failures daemon; do mv /working/topmed-output/topmed_monitor_$d.log /working/topmed-output/topmed_monitor_$d.log.prev 2>/dev/null; done
-#    Monitor incoming files and process them
+10   1     1   *     *    for f in /working/topmed-output/topmed_monitor_*.log; do mv $f $f.prev 2>/dev/null; done
+#   Monitor incoming files and process them
 05    1,7,13,19 * *  *    /usr/cluster/monitor/bin/topmed_init.pl updatedb >> /working/topmed-output/topmed_init.log 2>&1
 09    *    *   *     *    /usr/cluster/monitor/bin/topmed_monitor.pl arrive >> /working/topmed-output/topmed_monitor_arrive.log 2>&1
 19    *    *   *     *    /usr/cluster/monitor/bin/topmed_monitor.pl verify >> /working/topmed-output/topmed_monitor_verify.log 2>&1
 39    *    *   *     *    /usr/cluster/monitor/bin/topmed_monitor.pl bai    >> /working/topmed-output/topmed_monitor_bai.log 2>&1
 49    *    *   *     *    /usr/cluster/monitor/bin/topmed_monitor.pl qplot  >> /working/topmed-output/topmed_monitor_qplot.log 2>&1
 59    *    *   *     *    /usr/cluster/monitor/bin/topmed_monitor.pl cram >> /working/topmed-output/topmed_monitor_cram.log 2>&1
-03    2,4,6,9,13,16,20,23 * * *    for center in baylor macrogen washu illumina uw nygc broad; do /usr/cluster/monitor/bin/topmed_monitor.pl -ce $center -suberr -max 45 sexpt >> /working/topmed-output/topmed_monitor_expt.log 2>&1; /usr/cluster/monitor/bin/topmed_monitor.pl -ce $center -suberr -max 45 sorig >> /working/topmed-output/topmed_monitor_orig.log 2>&1; /usr/cluster/monitor/bin/topmed_monitor.pl -ce $center -suberr -max 45 sb37 >> /working/topmed-output/topmed_monitor_b37.log 2>&1; done
-#15    2,4,6,9,13,16,20,23 * * *    for center in uw broad; do /usr/cluster/monitor/bin/topmed_monitor.pl -ce $center -suberr -max 80 sexpt >> /working/topmed-output/topmed_monitor_expt.log 2>&1; /usr/cluster/monitor/bin/topmed_monitor.pl -ce $center -suberr -max 80 sorig >> /working/topmed-output/topmed_monitor_orig.log 2>&1; done
-#
+#   Update status fields so the monitor will show colored states
 07,27,37,57   *  *  *  *   /usr/cluster/monitor/bin/topmed_status.pl runstatus >> /working/topmed-output/topmed_status.log 2>&1
-#  Hack to sync database from Chris with Topmed -- until he gets things changed
-#57    *    *   *     *    /usr/cluster/monitor/bin/topmed_fixit.pl fixmapping >> /working/topmed-output/topmed_monitor_fixit.log 2>&1
-#  Check NCBI for completed files
+#
+#   Process Emails from NCBI
+06    5    *   *     *    topmedncbiemail.pl parse >> /working/topmed-output/topmed_monitor_ncbimail.log 2>&1
+16    5    *   *     *    topmedncbiemail.pl summary >> /working/topmed-output/topmed_monitor_ncbimail.log 2>&1
+26    5    *   *     *    topmedncbiemail.pl check >> /working/topmed-output/topmed_monitor_ncbimail.log 2>&1
+01   05    *   *     *    find /net/topmed/working/topmed-output/ncbimail/ -name \*.processed -mtime +4 -exec rm -f {} \; 2>&1 > /working/topmed-output/cronrm.log
+#
+#   Possibly send data to NCBI
+03    2,4,6,9,13,16,20,23 * * *    for center in `cat /usr/cluster/monitor/bin/topmedcmd.pl list centers`; do /usr/cluster/monitor/bin/topmed_monitor.pl -ce $center -suberr -max 45 sexpt >> /working/topmed-output/topmed_monitor_expt.log 2>&1; done
+13    2,4,6,9,13,16,20,23 * * *    for center in `cat /usr/cluster/monitor/bin/topmedcmd.pl list centers`; do /usr/cluster/monitor/bin/topmed_monitor.pl -ce $center -suberr -max 45 sorig >> /working/topmed-output/topmed_monitor_orig.log 2>&1; done
+#23    2,4,6,9,13,16,20,23 * * *    for center in `cat /usr/cluster/monitor/bin/topmedcmd.pl list centers`; do /usr/cluster/monitor/bin/topmed_monitor.pl -ce $center -suberr -max 45 sb37 >> /working/topmed-output/topmed_monitor_b37.log 2>&1; done
+#33    2,4,6,9,13,16,20,23 * * *    for center in `cat /usr/cluster/monitor/bin/topmedcmd.pl list centers`; do /usr/cluster/monitor/bin/topmed_monitor.pl -ce $center -suberr -max 45 sb38 >> /working/topmed-output/topmed_monitor_b38.log 2>&1; done
+#   Check NCBI for completed files
 57    1    *   *     *    /usr/cluster/monitor/bin/topmed_ncbiconf.pl -fetch -load updatedb >> /working/topmed-output/topmed_monitor_ncbi.log 2>&1
-#  Update PHS values from NCBI
-49   06  5,20  *     *    /usr/cluster/monitor/bin/topmed_phs.pl fetch update  >> /working/topmed-output/topmed_monitor_phs.log 2>&1
 #  Gather stats for today
 04    5    *   *     *    /usr/cluster/monitor/bin/topmed_updatestats.sh >> /working/topmed-output/topmed_monitor_ncbi.log 2>&1
+#  Update PHS values from NCBI
+49   06  5,20  *     *    /usr/cluster/monitor/bin/topmed_phs.pl fetch update  >> /working/topmed-output/topmed_monitor_phs.log 2>&1
+#
 #  Look for jobs that have failed but were undetected
 20    7    *   *     *    /usr/cluster/monitor/bin/topmed_failures.pl -mark show >> /working/topmed-output/topmed_failures.log 2>&1
+#
 #  Run daemon so we can use squeue anywhere
-#23   05    *   *     *   killall topmed_daemon.pl > /dev/null 2>&1
-#23   06    *   *     *   /usr/cluster/monitor/bin/topmed_daemon.pl >> /working/topmed-output/topmed_daemon.log 2>&1
 23   06    *   *     *   /usr/bin/daemon --name=topmed_daemon --stop 2>/dev/null
 24   06    *   *     *   /usr/bin/daemon --command=/usr/cluster/monitor/bin/topmed_daemon.pl --chdir=/home/topmed --errlog=/working/topmed-output/topmed_daemon.log --name=topmed_daemon
-#   Force permissions for new data coming in so topmed can write in the directories
-#   These are here for documentation only, these commands must be run as root
-#09  2,9,14,19 *  *   *         chmod 770 /net/HOSTNAME/incoming/topmed/*/* 2> /dev/null
 # 

@@ -37,8 +37,9 @@ my $FAILED    = 99;                 # Task failed
 #--------------------------------------------------------------
 our %opts = (
     logfile => '/net/topmed/working/topmed-output/XMLfiles/ncbiemail.log.txt',
-    maildir => '/net/topmed/working/topmed-output/ncbimail',
-    mailext => '.txt',                  # Mail files end with this
+    maildir2 => '/net/topmed/working/topmed-output/ncbimail',
+    maildir => '/net/dumbo/home/tpg/ncbimail',
+    mailext => '.mail',                 # Mail files end with this
     realm => '/usr/cluster/monitor/etc/.db_connections/topmed',
     bamfiles_table => 'bamfiles',
     keep => 0,                          # Do not delete input file

@@ -197,20 +197,8 @@ sub ProcessGet {
         my $s = '';
         if (! chdir($d)) { $s = "Cannot CD to '$d': $!\n"; }
         else {
-            foreach my $f (qw(
-                topmed_failures.log
-                topmed_monitor_arrive.log
-                topmed_monitor_b37.log
-                topmed_monitor_bai.log
-                topmed_monitor_cram.log
-                topmed_monitor_expt.log
-                topmed_monitor_ncbi.log
-                topmed_monitor_orig.log
-                topmed_monitor_phs.log
-                topmed_monitor_qplot.log
-                topmed_monitor_verify.log
-                )) {
-                $s .= "<b>Showing $f</b>\n" . `tail -6 $f`;
+            foreach my $f (`ls topmed*.log`) {
+                if ($f !~ /daemon/) { $s .= "<b>Showing $f</b>" . `tail -6 $f`; }
             }
             #   Show more details for logs we are really interested in at the moment
             foreach my $f (qw(
