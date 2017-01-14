@@ -56,6 +56,13 @@ DISTRIBUTIONS
       perl 5.006
       strict 0
       warnings 0
+  App-cpanminus-1.7042
+    pathname: M/MI/MIYAGAWA/App-cpanminus-1.7042.tar.gz
+    provides:
+      App::cpanminus 1.7042
+    requirements:
+      ExtUtils::MakeMaker 0
+      perl 5.008001
   B-Hooks-EndOfScope-0.21
     pathname: E/ET/ETHER/B-Hooks-EndOfScope-0.21.tar.gz
     provides:
@@ -133,6 +140,49 @@ DISTRIBUTIONS
     requirements:
       ExtUtils::MakeMaker 0
       Test::Exception 0
+  Carton-v1.0.28
+    pathname: M/MI/MIYAGAWA/Carton-v1.0.28.tar.gz
+    provides:
+      Carton 1.000028
+      Carton::Builder undef
+      Carton::CLI undef
+      Carton::CPANfile undef
+      Carton::Dependency undef
+      Carton::Dist undef
+      Carton::Dist::Core undef
+      Carton::Environment undef
+      Carton::Error undef
+      Carton::Error::CPANfileNotFound undef
+      Carton::Error::CommandExit undef
+      Carton::Error::CommandNotFound undef
+      Carton::Error::SnapshotNotFound undef
+      Carton::Error::SnapshotParseError undef
+      Carton::Index undef
+      Carton::Mirror undef
+      Carton::Package undef
+      Carton::Packer undef
+      Carton::Snapshot undef
+      Carton::Snapshot::Emitter undef
+      Carton::Snapshot::Parser undef
+      Carton::Tree undef
+      Carton::Util undef
+    requirements:
+      App::cpanminus 1.703
+      CPAN::Meta 2.120921
+      CPAN::Meta::Requirements 2.121
+      Class::Tiny 1.001
+      ExtUtils::MakeMaker 0
+      Getopt::Long 2.39
+      JSON 2.53
+      Module::CPANfile 0.9031
+      Module::CoreList 0
+      Module::Metadata 1.000003
+      Module::Reader 0.002
+      Path::Tiny 0.033
+      Try::Tiny 0.09
+      parent 0.223
+      perl 5.008005
+      version 0.77
   Class-Accessor-0.34
     pathname: K/KA/KASEI/Class-Accessor-0.34.tar.gz
     provides:
@@ -245,6 +295,17 @@ DISTRIBUTIONS
       Class::Singleton 1.5
     requirements:
       ExtUtils::MakeMaker 0
+  Class-Tiny-1.006
+    pathname: D/DA/DAGOLDEN/Class-Tiny-1.006.tar.gz
+    provides:
+      Class::Tiny 1.006
+      Class::Tiny::Object 1.006
+    requirements:
+      Carp 0
+      ExtUtils::MakeMaker 6.17
+      perl 5.006
+      strict 0
+      warnings 0
   Class-Unload-0.09
     pathname: I/IL/ILMARI/Class-Unload-0.09.tar.gz
     provides:
@@ -1357,6 +1418,15 @@ DISTRIBUTIONS
       perl 5.006
       strict 0
       warnings 0
+  JSON-2.90
+    pathname: M/MA/MAKAMAKA/JSON-2.90.tar.gz
+    provides:
+      JSON 2.90
+      JSON::Backend::PP 2.90
+      JSON::Boolean 2.90
+    requirements:
+      ExtUtils::MakeMaker 0
+      Test::More 0
   JSON-PP-2.27400
     pathname: M/MA/MAKAMAKA/JSON-PP-2.27400.tar.gz
     provides:
@@ -1617,6 +1687,20 @@ DISTRIBUTIONS
       perl 5.006
       strict 0
       warnings 0
+  Module-CPANfile-1.1002
+    pathname: M/MI/MIYAGAWA/Module-CPANfile-1.1002.tar.gz
+    provides:
+      Module::CPANfile 1.1002
+      Module::CPANfile::Environment undef
+      Module::CPANfile::Prereq undef
+      Module::CPANfile::Prereqs undef
+      Module::CPANfile::Requirement undef
+    requirements:
+      CPAN::Meta 2.12091
+      CPAN::Meta::Prereqs 2.12091
+      ExtUtils::MakeMaker 0
+      JSON::PP 2.27300
+      parent 0
   Module-Find-0.13
     pathname: C/CR/CRENZ/Module-Find-0.13.tar.gz
     provides:
@@ -1657,6 +1741,15 @@ DISTRIBUTIONS
       if 0
       perl 5.00503
       strict 0
+  Module-Reader-0.003002
+    pathname: H/HA/HAARG/Module-Reader-0.003002.tar.gz
+    provides:
+      Module::Reader 0.003002
+      Module::Reader::File 0.003002
+    requirements:
+      ExtUtils::MakeMaker 0
+      Scalar::Util 0
+      perl 5.006
   Module-Runtime-0.014
     pathname: Z/ZE/ZEFRAM/Module-Runtime-0.014.tar.gz
     provides:
@@ -1814,6 +1907,31 @@ DISTRIBUTIONS
       overload 0
       parent 0
       strict 0
+  Path-Tiny-0.098
+    pathname: D/DA/DAGOLDEN/Path-Tiny-0.098.tar.gz
+    provides:
+      Path::Tiny 0.098
+      Path::Tiny::Error 0.098
+    requirements:
+      Carp 0
+      Cwd 0
+      Digest 1.03
+      Digest::SHA 5.45
+      Exporter 5.57
+      ExtUtils::MakeMaker 6.17
+      Fcntl 0
+      File::Copy 0
+      File::Glob 0
+      File::Path 2.07
+      File::Spec 0.86
+      File::Temp 0.19
+      File::stat 0
+      constant 0
+      if 0
+      overload 0
+      perl 5.008001
+      strict 0
+      warnings 0
   Readonly-2.05
     pathname: S/SA/SANKO/Readonly-2.05.tar.gz
     provides:
