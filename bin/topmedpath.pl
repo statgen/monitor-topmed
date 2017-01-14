@@ -19,13 +19,21 @@
 use strict;
 use warnings;
 use FindBin qw($Bin $Script);
-use lib "$FindBin::Bin";
-use lib "$FindBin::Bin/../lib";
-use lib "$FindBin::Bin/../lib/perl5";
+
+use lib (
+  qq($FindBin::Bin),
+  qq($FindBin::Bin/../lib),
+  qq($FindBin::Bin/../lib/perl5),
+  qq($FindBin::Bin/../local/lib/perl5),
+);
+use feature qw(say);
+
 use TopMed_Get;
 use My_DB;
 use Getopt::Long;
 use Cwd qw(realpath abs_path);
+
+use Topmed::DB;
 
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
@@ -53,9 +61,9 @@ Getopt::Long::GetOptions( \%opts,qw(
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
     my $m = "$Script [options] [-persist]";
-    warn "$m wherepath|where bamid|nwdid bam|backup|cram|qcresults|console\n" .
+    warn "$m wherepath|where bamid|nwdid bam|backup|cram|qcresults|console|b37|b38\n" .
         "  or\n" .
-        "$m wherehost bamid|nwdid bam|backup|cram|qcresults\n" .
+        "$m wherehost bamid|nwdid bam|backup|cram|qcresults|b37|b38\n" .
         "  or\n" .
         "$m wherefile bamid|nwdid bam|backup|cram|qcresults|b37|b38\n" .
         "  or\n" .
@@ -67,6 +75,7 @@ if ($#ARGV < 0 || $opts{help}) {
 my $fcn = shift @ARGV;
 
 DBConnect($opts{realm});
+my $schema = Topmed::DB->new();
 
 #--------------------------------------------------------------
 #   Execute the command provided
@@ -93,6 +102,7 @@ sub WherePath {
     if ((! defined($set) || ! $set)) { $set = 'function_missing'; }    # Default
 
     $bamid = GetBamid($bamid);
+    my $sample = $schema->resultset('Bamfile')->find($bamid);
 
     #   Get values of interest from the database
     my $sth = ExecSQL("SELECT runid,piname,expt_sampleid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
@@ -142,6 +152,12 @@ sub WherePath {
         print "$dir\n";
         exit;
     }
+
+    if ($set =~ /b(?:37|38)/) {
+      my $meth = qq{${set}_mapped_path};
+      say $sample->$meth;
+      exit;
+    }
  
     die "$Script - Unknown Where option '$set'\n";
 }
@@ -160,6 +176,7 @@ sub WhatHost {
     if ((! defined($set) || ! $set)) { $set = 'unset'; }    # Default
 
     $bamid = GetBamid($bamid);
+    my $sample = $schema->resultset('Bamfile')->find($bamid);
 
     #   Get values of interest from the database
     my $sth = ExecSQL("SELECT runid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
@@ -206,7 +223,12 @@ sub WhatHost {
         print "$qcdir\n";
         exit;
     }
- 
+
+    if ($set =~ /b(?:37|38)/) {
+      say $sample->host;
+      exit;
+    }
+
     die "$Script - Unknown Where option '$set'\n";
 }
 
