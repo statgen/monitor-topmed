@@ -4,6 +4,7 @@ requires 'App::Cmd';
 requires 'Readonly';
 requires 'Import::Base';
 requires 'IPC::System::Simple';
+requires 'YASF';
 
 requires 'Class::Method::Modifiers';
 
