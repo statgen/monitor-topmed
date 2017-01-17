@@ -22,6 +22,7 @@ use lib "$FindBin::Bin/../lib/perl5";
 use Getopt::Long;
 use Cwd qw(abs_path);
 use My_DB;
+use POSIX qw(strftime tmpnam);
 
 my $NOTSET = 0;                     # Not set
 my $REQUESTED = 1;                  # Task requested
@@ -47,7 +48,7 @@ our %opts = (
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help logfile=s maildir=s keep verbose 
+    help logfile=s maildir=s clean keep verbose 
     )) || die "$Script - Failed to parse options\n";
 
 #   Simple help if requested
@@ -59,6 +60,8 @@ if ($#ARGV < 0 || $opts{help}) {
         "or\n" .
         "$Script [options] checkmail\n" .
         "\n" .
+        "$Script [options] clean\n" .
+        "\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
     exit 1;
@@ -66,6 +69,8 @@ if ($#ARGV < 0 || $opts{help}) {
 my $fcn = shift @ARGV;
 $opts{logfile} = abs_path($opts{logfile});  # Don't get fooled by relative paths
 $opts{maildir} = abs_path($opts{maildir});
+
+my $nowdate = strftime('%Y/%m/%d %H:%M', localtime);
 
 #--------------------------------------------------------------
 #   Execute the command provided
@@ -100,6 +105,7 @@ sub Parse {
         Dec => '12'
     );
     #   Make sure the log file does not get deleted by find as an old file
+    print "$nowdate Parsing mail in $dir\n";
     system("touch $log");
 
     #   Get list of files to parse
@@ -209,6 +215,8 @@ sub Summary {
     my %count = ();
     my $in;
 
+    print "$nowdate Summary of $log\n";
+
     open($in, $log) ||
         die "$Script - Unable to open file '$log': $!\n";
     while (my $l = <$in>) {
@@ -243,7 +251,10 @@ sub Check {
     my $duplicates = 0;
     DBConnect($opts{realm});        # Open database
 
+    print "$nowdate Checking states of samples in database against $log\n";
+
     my %alreadyseen = ();
+    my $cleanlog = '';
     open($in, $log) ||
         die "$Script - Unable to open file '$log': $!\n";
     while (my $l = <$in>) {
@@ -273,6 +284,8 @@ sub Check {
             next;
         }
         $alreadyseen{$k}++;
+        if ($opts{clean}) { $cleanlog .= $l; }      # Save if rewriting log file
+        
         my $href = $sth->fetchrow_hashref;
         #   Now based on the NCBI Email text, see if our database agrees
         if ($msg =~ /has been released/) {  # Informational only, nothing done or to do
@@ -301,9 +314,38 @@ sub Check {
     }
     close($in);
 
+    #   Maybe rewrite the log file
+    if ($cleanlog) {
+        my $f = $log . '.clean';
+        my $out;
+        open($out, '>' . $f) ||
+            die "$Script - Unable to rewrite file '$f': $!\n";
+        print $out $cleanlog;
+        close($out);
+        rename($log, "$log.prev") ||
+            die "$Script - Unable to rename log file: $log\n";
+        rename($f, $log) ||
+            die "$Script - Unable to rename $f to $log\n";
+        print "Log file '$log' rewritten to remove duplicates\n";
+    }
+
     print "Monitor database fields that are correct=$correct\n";
     print "Monitor database fields that are incorrect=$needscorrection\n";
     print "Ignored $duplicates duplicate Email entries\n";
+}
+
+#==================================================================
+# Subroutine:
+#   Append($file, $txt)
+#
+#   Append $txt to $file
+#==================================================================
+sub Append {
+    my ($file, $txt) = @_;
+    open(OUT, '>>' . $file) ||
+        die "$Script - Unable to append to '$file': $!\n";
+    print OUT $txt;
+    close(OUT);
 }
 
 #==================================================================
