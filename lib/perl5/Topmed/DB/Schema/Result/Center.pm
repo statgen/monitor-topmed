@@ -106,7 +106,7 @@ __PACKAGE__->set_primary_key("centerid");
 __PACKAGE__->has_many(
   runs =>
   'Topmed::DB::Schema::Result::Run',
-  {'foreign.runid' => 'self.runid'}
+  {'foreign.centerid' => 'self.centerid'}
 );
 
 1;

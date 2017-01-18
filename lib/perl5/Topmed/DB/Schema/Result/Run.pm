@@ -159,4 +159,10 @@ __PACKAGE__->belongs_to(
   {'foreign.centerid' => 'self.centerid'}
 );
 
+__PACKAGE__->has_many(
+  samples =>
+  'Topmed::DB::Schema::Result::Bamfile',
+  {'foreign.runid' => 'self.runid'}
+);
+
 1;
