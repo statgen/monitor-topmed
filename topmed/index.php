@@ -23,7 +23,7 @@ $qurl =  $_SERVER['SCRIPT_NAME'] . "?fcn=queue'";
 $STATUSLETTERS =  "<i><b>A</b>=File Arrived, <b>5</b>=MD5 Verified, <b>C</b>=BAM=>CRAM, <b>I</b>=BAI created<br/>" .
     "<b>Q</b>=qplot run, <b>7</b>=Remapped Build=37, <b>s</b>=Push Build=38 to GCE, <b>s</b>=Pull Build=38 from GCE,<br/>" .
     "<b>Z</b>=PostProcess GCE Build=38 data, <b>8</b>=Remapped Build=38, <b>X</b>=EXPT=>NCBI<br/>" .
-    "<b>S</b>=Secondary BAM=>NCBI, <b>P=</b>B37=>Primary BAM=>NCBI, <b>T</b>=b38=>Tertiary BAM=>NCBI";
+    "<b>S</b>=Secondary BAM=>NCBI, <b>P=</b>B38=>Primary BAM=>NCBI, <b>T</b>=b38=>Tertiary BAM=>NCBI";
 
 $SHOWSTATUS = "STATUS: &nbsp;&nbsp;&nbsp;" .
     "<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=showqlocal' " .
@@ -69,7 +69,6 @@ $RUNNOTE = "<p><b>Note:</b><br>" .
 $quickcols = array(                     // Map of status column to topmedcmd verb
     'state_arrive'   => 'arrived',
     'state_md5ver'   => 'md5ver',
-//    'state_backup'   => 'backedup',
     'state_bai'      => 'bai',
     'state_qplot'    => 'qplot',
     'state_cram'     => 'cramed',
@@ -121,7 +120,6 @@ $state2str = array(         // Values here are class for SPAN tag
     $FAILED => 'failed'
 );
 
-$NODELIST = array('topmed', 'topmed2', 'topmed3', 'topmed4', 'topmed5', 'topmed6', 'topmed7', 'topmed8');
 $TOPMEDJOBNAMES = array('verify', 'bai', 'qplot', 'cram', 'expt', 'orig', 'b37', 'push38', 'pull38', 'post38', 'b38');
 
 //  These columns are state values to be converted to people readable strings
@@ -765,7 +763,7 @@ function ViewBamDetail($bamid) {
         if ($c == 'datecomplete' && $d != '&nbsp;') { $d = date('Y/m/d H:i', $d); }
         if (in_array($c, $conv2dat)) {  // Special field needs formatting
             $val = DateState($d);
-            if ($val != 'notset') {
+            if ($val != '') {
                 $d = "<span class='$val'>$val</span>";
 
                 $url = $_SERVER['PHP_SELF'] . "?bamid=$bamid&amp;col=$c&amp;fcn=setrequest";
