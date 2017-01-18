@@ -4,6 +4,7 @@ use FindBin;
 use lib (qq($FindBin::Bin/../local/lib/perl5), qq($FindBin::Bin/../lib/perl5),);
 
 use Topmed::Base qw(cmds);
+use Topmed::Constants qw(:states);
 use Topmed::DB;
 
 my $schema       = Topmed::DB->new();
@@ -15,6 +16,10 @@ for my $sample ($sample_rs->all) {
   capture([0..1], $cmd);
 
   unless ($EXITVAL) {
+    # TODO - set state_gce38pull to $REQUESTED
+    #
+    # $sample->update({state_gce38pull => $REQUESTED});
+    #
     say 'SAMPLE : ' . $sample->expt_sampleid;
   }
 }
