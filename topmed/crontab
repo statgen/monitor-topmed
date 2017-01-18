@@ -19,6 +19,8 @@
 17   01    *   *     *    find -L /net/topmed6/working/backups/incoming/topmed -name \*.cram -size -10k -exec ls -l {} \;
 18   01    *   *     *    find -L /net/topmed7/working/backups/incoming/topmed -name \*.cram -size -10k -exec ls -l {} \;
 19   01    *   *     *    find -L /net/topmed8/working/backups/incoming/topmed -name \*.cram -size -10k -exec ls -l {} \;
+20   01    *   *     *    find -L /net/topmed9/working/backups/incoming/topmed -name \*.cram -size -10k -exec ls -l {} \;
+21   01    *   *     *    find -L /net/topmed10/working/backups/incoming/topmed -name \*.cram -size -10k -exec ls -l {} \;
 #    Check that backup directories have been created
 10   07    7   *     *    /usr/cluster/monitor/bin/topmedoffsitebackup.pl check | mail -s Offsite_backups michigancsg@umich.edu
 #    Create web page sumary of status
@@ -38,19 +40,6 @@
 #   Update status fields so the monitor will show colored states
 07,27,37,57   *  *  *  *   /usr/cluster/monitor/bin/topmed_status.pl runstatus >> /working/topmed-output/topmed_status.log 2>&1
 #
-#   Process Emails from NCBI
-06    5    *   *     *    /usr/cluster/monitor/bin/topmedncbiemail.pl parse >> /working/topmed-output/topmed_monitor_ncbimail.log 2>&1
-16    5    *   *     *    /usr/cluster/monitor/bin/topmedncbiemail.pl summary >> /working/topmed-output/topmed_monitor_ncbimail.log 2>&1
-26    5    *   *     *    /usr/cluster/monitor/bin/topmedncbiemail.pl check >> /working/topmed-output/topmed_monitor_ncbimail.log 2>&1
-01   05    *   *     *    find /net/topmed/working/topmed-output/ncbimail/ -name \*.processed -mtime +4 -exec rm -f {} \; 2>&1 > /working/topmed-output/cronrm.log
-#
-#   Possibly send data to NCBI
-03    2,4,6,9,13,16,20,23 * * *    for center in `/usr/cluster/monitor/bin/topmedcmd.pl list centers`; do /usr/cluster/monitor/bin/topmed_monitor.pl -ce $center -suberr -max 45 sexpt >> /working/topmed-output/topmed_monitor_expt.log 2>&1; done
-13    2,4,6,9,13,16,20,23 * * *    for center in `/usr/cluster/monitor/bin/topmedcmd.pl list centers`; do /usr/cluster/monitor/bin/topmed_monitor.pl -ce $center -suberr -max 45 sorig >> /working/topmed-output/topmed_monitor_orig.log 2>&1; done
-#23    2,4,6,9,13,16,20,23 * * *    for center in `/usr/cluster/monitor/bin/topmedcmd.pl list centers`; do /usr/cluster/monitor/bin/topmed_monitor.pl -ce $center -suberr -max 45 sb37 >> /working/topmed-output/topmed_monitor_b37.log 2>&1; done
-#33    2,4,6,9,13,16,20,23 * * *    for center in `/usr/cluster/monitor/bin/topmedcmd.pl list centers`; do /usr/cluster/monitor/bin/topmed_monitor.pl -ce $center -suberr -max 45 sb38 >> /working/topmed-output/topmed_monitor_b38.log 2>&1; done
-#   Check NCBI for completed files
-57    1    *   *     *    /usr/cluster/monitor/bin/topmed_ncbiconf.pl -fetch -load updatedb >> /working/topmed-output/topmed_monitor_ncbi.log 2>&1
 #  Gather stats for today
 04    5    *   *     *    /usr/cluster/monitor/bin/topmed_updatestats.sh >> /working/topmed-output/topmed_monitor_ncbi.log 2>&1
 #  Update PHS values from NCBI
@@ -62,4 +51,19 @@
 #  Run daemon so we can use squeue anywhere
 23   06    *   *     *   /usr/bin/daemon --name=topmed_daemon --stop 2>/dev/null
 24   06    *   *     *   /usr/bin/daemon --command=/usr/cluster/monitor/bin/topmed_daemon.pl --chdir=/home/topmed --errlog=/working/topmed-output/topmed_daemon.log --name=topmed_daemon
-# 
+#
+######################### Dead entries since we no longer send data to NCBI #########################
+#   Process Emails from NCBI -- nolonger need this
+#06    5    *   *     *    /usr/cluster/monitor/bin/topmedncbiemail.pl parse >> /working/topmed-output/topmed_monitor_ncbimail.log 2>&1
+#16    5    *   *     *    /usr/cluster/monitor/bin/topmedncbiemail.pl summary >> /working/topmed-output/topmed_monitor_ncbimail.log 2>&1
+#26    5    *   *     *    /usr/cluster/monitor/bin/topmedncbiemail.pl check >> /working/topmed-output/topmed_monitor_ncbimail.log 2>&1
+#01   05    *   *     *    find /net/topmed/working/topmed-output/ncbimail/ -name \*.processed -mtime +4 -exec rm -f {} \; 2>&1 > /working/topmed-output/cronrm.log
+#
+#   Possibly send data to NCBI
+#03    2,4,6,9,13,16,20,23 * * *    for center in `/usr/cluster/monitor/bin/topmedcmd.pl list centers`; do /usr/cluster/monitor/bin/topmed_monitor.pl -ce $center -suberr -max 45 sexpt >> /working/topmed-output/topmed_monitor_expt.log 2>&1; done
+#13    2,4,6,9,13,16,20,23 * * *    for center in `/usr/cluster/monitor/bin/topmedcmd.pl list centers`; do /usr/cluster/monitor/bin/topmed_monitor.pl -ce $center -suberr -max 45 sorig >> /working/topmed-output/topmed_monitor_orig.log 2>&1; done
+#23    2,4,6,9,13,16,20,23 * * *    for center in `/usr/cluster/monitor/bin/topmedcmd.pl list centers`; do /usr/cluster/monitor/bin/topmed_monitor.pl -ce $center -suberr -max 45 sb37 >> /working/topmed-output/topmed_monitor_b37.log 2>&1; done
+#33    2,4,6,9,13,16,20,23 * * *    for center in `/usr/cluster/monitor/bin/topmedcmd.pl list centers`; do /usr/cluster/monitor/bin/topmed_monitor.pl -ce $center -suberr -max 45 sb38 >> /working/topmed-output/topmed_monitor_b38.log 2>&1; done
+#   Check NCBI for completed files
+#57    1    *   *     *    /usr/cluster/monitor/bin/topmed_ncbiconf.pl -fetch -load updatedb >> /working/topmed-output/topmed_monitor_ncbi.log 2>&1
+#
