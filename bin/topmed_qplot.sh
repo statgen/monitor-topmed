@@ -16,6 +16,7 @@ fixverifybamid=/usr/cluster/monitor/bin/nhlbi.1648.vbid.rewrite.awk
 mem=16G                         # Really should be 8G, increase to avoid too many at once
 markverb=qploted
 constraint=''                   # "--constraint eth-10g"
+constraint="--constraint eth-10g"       # Force to major nodes, not r63xx nodes
 qos=''
 slurmp=topmed
 realhost=''
@@ -41,10 +42,10 @@ if [ "$1" = "-submit" ]; then
     nodefile="--nodefile=$f"
   fi
   #   Can run anywhere. Low rate of access to cram, small output
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $qos $nodefile --workdir=$console -J $1-qplot --output=$console/$1-qplot.out $0 $*`)
+  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos $nodefile --workdir=$console -J $1-qplot --output=$console/$1-qplot.out $0 $*`)
   if [ "$?" != "0" ]; then
     echo "Failed to submit command to SLURM"
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $qos --workdir=$console -J $1-qplot --output=$console/$1-qplot.out $0 $*"
+    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos $nodefile --workdir=$console -J $1-qplot --output=$console/$1-qplot.out $0 $*"
     exit 1
   fi
   $topmedcmd mark $1 $markverb submitted
