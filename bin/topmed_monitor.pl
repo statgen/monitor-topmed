@@ -52,18 +52,16 @@ our %opts = (
     topmedncbiorig => "$topmedbin/topmed_ncbiorig.sh",
     topmedncbib37 => "$topmedbin/topmed_ncbib37.sh",
     topmedncbib38 => "$topmedbin/topmed_ncbib38.sh",
+    topmedgce38push => "$topmedbin/topmed_gcepush.sh",
+    topmedgce38pull => "$topmedbin/topmed_gcepull.sh",
+    topmedgce38post => "$topmedbin/topmed_gcepost.sh",
     topmedxml    => "$topmedbin/topmed_xml.pl",
     realm => '/usr/cluster/monitor/etc/.db_connections/topmed',
     centers_table => 'centers',
     runs_table => 'runs',
     studies_table => 'studies',
     bamfiles_table => 'bamfiles',
-    topdir  => '/net/topmed/incoming/topmed',
-    topdir2 => '/net/topmed2/incoming/topmed',
-    topdir3 => '/net/topmed3/incoming/topmed',
-    topdir4 => '/net/topmed4/incoming/topmed',
-    topdir5 => '/net/topmed5/incoming/topmed',
-    topdir6 => '/net/topmed6/incoming/topmed',
+    topdir => '/net/topmed/incoming/topmed',
     backupdir => '/working/backups/incoming/topmed',
     resultsdir => '/incoming/qc.results',    
     dryrun => 0,
@@ -80,7 +78,7 @@ Getopt::Long::GetOptions( \%opts,qw(
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$Script [options] arrive|verify|bai|qplot|cram|sexpt|sorig|sb37|sb38\n" .
+    warn "$Script [options] arrive|verify|bai|qplot|cram|sexpt|sorig|sb37|spush|spull|spost|sb38\n" .
         "Find runs which need some action and queue a request to do it.\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
@@ -450,6 +448,123 @@ if ($fcn eq 'sb37') {
 }
 
 #--------------------------------------------------------------
+#   Push data to Google Cloud for processing
+#--------------------------------------------------------------
+if ($fcn eq 'spush') {
+    #   Get all the known centers in the database
+    my $centersref = GetCenters();
+    foreach my $cid (keys %{$centersref}) {
+        my $centername = $centersref->{$cid};
+        my $runsref = GetRuns($cid) || next;
+        #   For each run, see if there are bamfiles for Google Cloud
+        foreach my $runid (keys %{$runsref}) {
+            my $dirname = $runsref->{$runid};
+            #   Get list of all bams known at NCBI and that have not been sent
+            my $sql = "SELECT * FROM $opts{bamfiles_table} " .
+                "WHERE runid='$runid'";
+            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
+            my $sth = DoSQL($sql);
+            my $rowsofdata = $sth->rows();
+            if (! $rowsofdata) { next; }
+            for (my $i=1; $i<=$rowsofdata; $i++) {
+                my $href = $sth->fetchrow_hashref;
+
+                #   Only send data if cram was done
+                if ($href->{state_cram} != $COMPLETED) { next; }
+                if ($opts{suberr} && $href->{state_gce38push} >= $FAILED) {
+                    $href->{state_gce38push} = $REQUESTED;
+                }
+                if ($href->{state_gce38push} != $NOTSET &&
+                    $href->{state_gce38push} != $REQUESTED) { next; }
+
+                #   Send the CRAM to Google
+                BatchSubmit("$opts{topmedgce38push} -submit $href->{bamid}");
+            }
+        }
+    }
+    ShowSummary($fcn);
+    exit;
+}
+
+#--------------------------------------------------------------
+#   Pull processed data from Google Cloud
+#--------------------------------------------------------------
+if ($fcn eq 'spull') {
+    #   Get all the known centers in the database
+    my $centersref = GetCenters();
+    foreach my $cid (keys %{$centersref}) {
+        my $centername = $centersref->{$cid};
+        my $runsref = GetRuns($cid) || next;
+        #   For each run, see if there are bamfiles for Google Cloud
+        foreach my $runid (keys %{$runsref}) {
+            my $dirname = $runsref->{$runid};
+            #   Get list of all bams known at NCBI and that have not been sent
+            my $sql = "SELECT * FROM $opts{bamfiles_table} " .
+                "WHERE runid='$runid'";
+            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
+            my $sth = DoSQL($sql);
+            my $rowsofdata = $sth->rows();
+            if (! $rowsofdata) { next; }
+            for (my $i=1; $i<=$rowsofdata; $i++) {
+                my $href = $sth->fetchrow_hashref;
+
+                #   Only get data if remap was done
+                if ($href->{state_gce38push} != $COMPLETED) { next; }
+                if ($opts{suberr} && $href->{state_gce38pull} >= $FAILED) {
+                    $href->{state_gce38pull} = $REQUESTED;
+                }
+                if ($href->{state_gce38pull} != $NOTSET &&
+                    $href->{state_gce38pull} != $REQUESTED) { next; }
+
+                #   Send the CRAM to Google
+                BatchSubmit("$opts{topmedgce38pull} -submit $href->{bamid}");
+            }
+        }
+    }
+    ShowSummary($fcn);
+    exit;
+}
+
+#--------------------------------------------------------------
+#   Post process data we fetched from Google Cloud
+#--------------------------------------------------------------
+if ($fcn eq 'spost') {
+    #   Get all the known centers in the database
+    my $centersref = GetCenters();
+    foreach my $cid (keys %{$centersref}) {
+        my $centername = $centersref->{$cid};
+        my $runsref = GetRuns($cid) || next;
+        #   For each run, see if there are bamfiles for Google Cloud
+        foreach my $runid (keys %{$runsref}) {
+            my $dirname = $runsref->{$runid};
+            #   Get list of all bams known at NCBI and that have not been sent
+            my $sql = "SELECT * FROM $opts{bamfiles_table} " .
+                "WHERE runid='$runid'";
+            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
+            my $sth = DoSQL($sql);
+            my $rowsofdata = $sth->rows();
+            if (! $rowsofdata) { next; }
+            for (my $i=1; $i<=$rowsofdata; $i++) {
+                my $href = $sth->fetchrow_hashref;
+
+                #   Only post process data that we already fetched
+                if ($href->{state_gce38pull} != $COMPLETED) { next; }
+                if ($opts{suberr} && $href->{state_gce38post} >= $FAILED) {
+                    $href->{state_gce38post} = $REQUESTED;
+                }
+                if ($href->{state_gce38post} != $NOTSET &&
+                    $href->{state_gce38post} != $REQUESTED) { next; }
+
+                #   Send the CRAM to Google
+                BatchSubmit("$opts{topmedgce38post} -submit $href->{bamid}");
+            }
+        }
+    }
+    ShowSummary($fcn);
+    exit;
+}
+
+#--------------------------------------------------------------
 #   Get a list of remapped primary BAMs to be sent to NCBI
 #--------------------------------------------------------------
 if ($fcn eq 'sb38') {
@@ -496,161 +611,6 @@ if ($fcn eq 'sb38') {
         }
     }
     ShowSummary($fcn);
-    exit;
-}
-
-#--------------------------------------------------------------
-#   Check all the BAMs and see if the files match what the DB says
-#--------------------------------------------------------------
-if ($fcn eq 'redo-check') {
-    $_ = "#" . '-' x 70;
-    print "$_\n#    Found these inconsistencies between the database and file system\n" .
-         "#    BEWARE OF FALSE ERRORS  when jobs are being processed\n$_\n";
-    #   Get all the known centers in the database
-    my $centersref = GetCenters();
-    foreach my $cid (keys %{$centersref}) {
-        my $centername = $centersref->{$cid};
-        print "Checking center=$centername\n";
-        my $runsref = GetRuns($cid) || next;
-        #   For each run, see if there are bamfiles to run qplot on
-        foreach my $runid (keys %{$runsref}) {
-            my $dirname = $runsref->{$runid};
-            #   Get list of all bams that have not yet arrived properly
-            my $sql = "SELECT * FROM " . $opts{bamfiles_table} .
-                " WHERE runid='$runid'";
-            my $sth = DoSQL($sql);
-            my $rowsofdata = $sth->rows();
-
-            #   Check if the directory even exists anymore
-            my $bd = $opts{topdir} . "/$centername/$dirname";
-            if (! -d $bd) {
-                print "$runid $dirname no longer exists\n";
-                if ($rowsofdata) {      # There is stuff in database
-                    print "We have bamfiles in database for $runid ($dirname)\n";
-                    print "DELETE FROM $opts{bamfiles_table} WHERE runid=$runid;\n";
-                }
-                print "DELETE FROM $opts{runs_table} WHERE runid=$runid;\n";
-                next;
-            }
-
-            if (! $rowsofdata) { next; }
-            for (my $i=1; $i<=$rowsofdata; $i++) {
-                my $href = $sth->fetchrow_hashref;
-                #   datearrived means the BAM exists
-                my $f = $opts{topdir} . "/$centername/$dirname/" . $href->{bamname};
-                if (defined($href->{datearrived}) &&
-                    ($href->{datearrived} =~ /^d+/) &&
-                    ($href->{datearrived} > 10) &&
-                    (! -f $f)) {
-                    print "$href->{bamid} $href->{bamname} arrived: File '$f' does not exist\n";
-                    next;
-                }
-                #   Watch for files that are world writable
-                my @stats = stat($f);
-                my $mode = sprintf('%04o', $stats[2] & 07777);  # Normal looking UNIX permissions
-                my $worldpermissions = substr($mode,3,1);
-                if ($worldpermissions eq '6' || $worldpermissions eq '7') {
-                    print "chmod 0640 $f    # Was $mode\n"; 
-                }
-                #   Make sure file size is correct
-                if (! $href->{bamsize}) {
-                    print "$href->{bamid} bamsize not set\n";
-                    if ($stats[7]) {
-                        print "UPDATE $opts{bamfiles_table} SET bamsize=$stats[7] WHERE bamid=$href->{bamid};\n";
-                    }
-                }
-
-                #   See if the nwdid file exists
-                my $bf = basename($href->{bamname}, '.bam');
-                $bf = $opts{resultsdir} . "/$centername/$dirname/$bf.nwdid";
-                if (! -f $bf) {
-                    print "$href->{bamid} $href->{bamname} arrive: File '$bf' does not exist\n";
-                }
-
-                #   dateverify cannot be checked in any easy manner
-
-                #   datebackup means the backup file should exist with the nwdid
-                if (! defined($href->{nwdid})) { $href->{nwdid} = ''; }
-                if ($href->{nwdid} !~ /^NWD/) {
-                    print "$href->{bamid} $href->{bamname} backup: NWDID is not set\n";
-                }
-                if (defined($href->{datebackup}) &&
-                    ($href->{datebackup} =~ /^\d+/) &&
-                    ($href->{datebackup} > 10)) {
-                    my $bamf = "/$centername/$dirname/" . $href->{bamname};
-                    my $bamprefix = FindPrefix($bamf);
-                    if (! $bamprefix) {
-                        print "$href->{bamid} $href->{bamname} backup: File '$bamf' does not exist\n";
-                    }
-                    else {
-                        $bf = $opts{backupdir} . "/$centername/$dirname/" .
-                            $href->{nwdid} . '.src.cram';
-                        my $prefix = FindPrefix($bf);
-                        if (! $prefix) {
-                            print "$href->{bamid} $href->{bamname} backup: Unable to find BAM file '$bf'\n";
-                        }
-                        else {                          # Poor way to figure out where backup should be
-                            my $backdir = '';
-                            if ($prefix eq $opts{topdir})  { $backdir = $opts{topdir2}; }
-                            if ($prefix eq $opts{topdir2}) { $backdir = $opts{topdir}; }
-                            if (! $backdir) {
-                                print "$href->{bamid} $href->{bamname} backup: Unable to figure out " .
-                                    "where BAM backup file '$bf' should be\n";
-                            }
-                            else {
-                                $bf = $backdir . '/' . $bf;     # Real backup path
-                                if (! -f $bf) {
-                                    print "$href->{bamid} $href->{bamname} backup: " .
-                                        "Unable to find backup file '$bf'\n";
-                                }
-                            }
-                        }
-                    }
-                }
-                #   datebai means the BAI file exists
-                $bf = $f . '.bai';
-                if (defined($href->{datebai}) &&
-                    ($href->{datebai} =~ /^d+/) &&
-                    ($href->{datebai} > 10) &&
-                    (! -f $bf)) {
-                    print "$href->{bamid} $href->{bamname} bai: File '$bf' does not exist\n";
-                }
-                #   If the bai file exists, then datebai should be a date
-                if (! defined($href->{datebai})) { $href->{datebai} = 0; }
-                if (-f $bf && $href->{datebai} < 10) {
-                    print "$href->{datebai} $href->{bamname} bai: ".
-                        "File '$bf' exists, but state=$href->{datebai}\n";
-                    print "UPDATE $opts{bamfiles_table} SET datebai=" .
-                        (-($href->{datebai})) . " WHERE bamid=$href->{bamid};\n";
-                }
-                #   dateqplot means the qplot and verifybamid results exist
-                $bf = basename($href->{bamname}, '.bam');
-                foreach my $suff ('qp.R', 'vb.selfSM') {
-                    my $bff = $opts{resultsdir} . "/$centername/$dirname/$bf.$suff";
-                    if (defined($href->{dateqplot}) &&
-                        ($href->{dateqplot} =~ /^d+/) &&
-                        ($href->{dateqplot} > 10) &&
-                        (! -f $bff)) {
-                        print "$href->{bamid} $href->{bamname} bai: File '$bff' does not exist\n";
-                    }
-                    #   If the qplot files exist, then dateqplot should be a date
-                    if (-f $bff && $href->{dateqplot} < 10) {
-                        print "$href->{bamid} $href->{bamname} qplot: " .
-                            "File '$bff' exists, but state=$href->{dateqplot}\n";
-                        print "UPDATE $opts{bamfiles_table} SET dateqplot=" . (-($href->{dateqplot})) .
-                            " WHERE bamid=$href->{bamid};\n";
-                    }
-                    #   If the qplot files are zero length, then qplot failed
-                    if (-z $bff) {
-                        print "$href->{bamid} $href->{bamname} qplot: " .
-                            "File '$bff' is zero length\n";
-                        print "UPDATE $opts{bamfiles_table} SET dateqplot=-1" .
-                            " WHERE bamid=$href->{bamid};\n";
-                    }
-                }
-           }
-        }
-    }
     exit;
 }
 
