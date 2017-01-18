@@ -68,12 +68,11 @@ Readonly::Scalar our $SLASH      => q{/};
 Readonly::Scalar our $TIMEZONE   => q{America/Detroit};
 
 Readonly::Hash our %GOOGLE_BUCKETS => (
-  incoming => 'gs://topmed-incoming',
-  fastqs   => 'gs://topmed-fastqs',
-  crams    => 'gs://topmed-crams',
-  recabs   => 'gs://topmed-recabs',
-  backups  => 'gs://topmed-backup-%s',
-  logs     => 'gs://topmed-logs',
+  incoming => 'gs://topmed-incoming/',
+  fastqs   => 'gs://topmed-fastqs/',
+  crams    => 'gs://topmed-crams/',
+  recabs   => 'gs://topmed-recabs/',
+  logs     => 'gs://topmed-logs/',
 );
 
 1;
