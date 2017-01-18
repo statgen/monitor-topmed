@@ -35,6 +35,9 @@ my %STEPS = (                       # List of steps we collect data for
     expt => 1,
     orig => 1,
     b37 => 1,
+    gcepush => 1,
+    gcepull => 1,
+    gcepost => 1,
     b38 => 1,
 );
 my $NOTSET    = 0;            # Not set
@@ -161,7 +164,7 @@ sub Summary {
         "loadedb38bamcount=$b38sum," .
         "errorigcount=$errorigcount," .
         "errb37count=$errb37count," .
-        "errb38count=$errb38count" .
+        "errb38count=$errb38count," .
         "errckorigcount=$errckorigcount," .
         "errckb37count=$errckb37count," .
         "errckb38count=$errckb38count" .
@@ -177,9 +180,9 @@ sub Summary {
 sub CountError {
     my ($col, $err) = @_;
     my $sql = "SELECT count(*) FROM $opts{bamfiles_table} WHERE $col=$err";
-    $sth = DoSQL($sql);
-    $rowsofdata = $sth->rows();
-    if ($rowsofdata <= 0 0) { retunr 0; }
+    my $sth = DoSQL($sql);
+    my $rowsofdata = $sth->rows();
+    if ($rowsofdata <= 0) { return 0; }
     my $href = $sth->fetchrow_hashref;
     return $href->{'count(*)'};
 }

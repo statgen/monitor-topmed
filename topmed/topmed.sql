@@ -124,7 +124,7 @@ my $COMPLETED = 20;           # Task completed successfully
 my $CANCELLED = 89;           # Task cancelled
 my $FAILEDCHECKSUM = 98;      # Task failed, because checksum at NCBI bad
 my $FAILED    = 99;           # Task failed
-*/ 
+*/
   state_arrive   INT DEFAULT 0,
   state_md5ver   INT DEFAULT 0,
   state_backup   INT DEFAULT 0,
@@ -278,6 +278,15 @@ CREATE TABLE stepstats (
   count_b37         INT DEFAULT 0,
   avetime_b37       INT DEFAULT 0,
   ncbicount_b37     INT DEFAULT 0,
+  count_gcepush     INT DEFAULT 0,
+  avetime_gcepush   INT DEFAULT 0,
+  ncbicount_gcepush INT DEFAULT 0,
+  count_gcepull     INT DEFAULT 0,
+  avetime_gcepull   INT DEFAULT 0,
+  ncbicount_gcepull INT DEFAULT 0,
+  count_gcepost     INT DEFAULT 0,
+  avetime_gcepost   INT DEFAULT 0,
+  ncbicount_gcepost INT DEFAULT 0,
   count_b38         INT DEFAULT 0,
   avetime_b38       INT DEFAULT 0,
   ncbicount_b38     INT DEFAULT 0,
