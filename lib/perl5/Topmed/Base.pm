@@ -17,7 +17,9 @@ our @IMPORT_MODULES = (
 );
 
 our %IMPORT_BUNDLES = (
-
+  files => [
+    'File::Path' => [qw(make_path remove_tree)],
+  ],
 );
 
 1;
