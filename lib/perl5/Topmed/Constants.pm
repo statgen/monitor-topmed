@@ -41,6 +41,15 @@ our @EXPORT_OK = (
     $MAX_DELAY
     $TIMEZONE
     %GOOGLE_BUCKETS
+    $NOTSET
+    $REQUESTED
+    $SUBMITTED
+    $STARTED
+    $DELIVERED
+    $COMPLETED
+    $CANCELLED
+    $FAILEDCHECKSUM
+    $FAILED
     )
 );
 
@@ -49,6 +58,19 @@ our %EXPORT_TAGS = (
   google => [
     qw(
       %GOOGLE_BUCKETS
+      )
+  ],
+  states => [
+    qw(
+      $NOTSET
+      $REQUESTED
+      $SUBMITTED
+      $STARTED
+      $DELIVERED
+      $COMPLETED
+      $CANCELLED
+      $FAILEDCHECKSUM
+      $FAILED
       )
   ],
 );
@@ -68,12 +90,21 @@ Readonly::Scalar our $SLASH      => q{/};
 Readonly::Scalar our $TIMEZONE   => q{America/Detroit};
 
 Readonly::Hash our %GOOGLE_BUCKETS => (
-  incoming => 'gs://topmed-incoming',
-  fastqs   => 'gs://topmed-fastqs',
-  crams    => 'gs://topmed-crams',
-  recabs   => 'gs://topmed-recabs',
-  backups  => 'gs://topmed-backup-%s',
-  logs     => 'gs://topmed-logs',
+  incoming => 'gs://topmed-incoming/',
+  fastqs   => 'gs://topmed-fastqs/',
+  crams    => 'gs://topmed-crams/',
+  recabs   => 'gs://topmed-recabs/',
+  logs     => 'gs://topmed-logs/',
 );
+
+Readonly::Scalar our $NOTSET         => 0;     # Not set
+Readonly::Scalar our $REQUESTED      => 1;     # Task requested
+Readonly::Scalar our $SUBMITTED      => 2;     # Task submitted to be run
+Readonly::Scalar our $STARTED        => 3;     # Task started
+Readonly::Scalar our $DELIVERED      => 19;    # Data delivered, but not confirmed
+Readonly::Scalar our $COMPLETED      => 20;    # Task completed successfully
+Readonly::Scalar our $CANCELLED      => 89;    # Task cancelled
+Readonly::Scalar our $FAILEDCHECKSUM => 98;    # Task failed, because checksum at NCBI bad
+Readonly::Scalar our $FAILED         => 99;    # Task failed
 
 1;

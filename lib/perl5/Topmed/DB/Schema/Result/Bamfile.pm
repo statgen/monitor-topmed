@@ -754,6 +754,7 @@ __PACKAGE__->has_many(
 use Class::Method::Modifiers;
 
 use Topmed::Base qw(files);
+use Topmed::Constants qw(:google);
 
 __PACKAGE__->belongs_to(
   run => 'Topmed::DB::Schema::Result::Run',
@@ -815,6 +816,10 @@ sub b38_mapped_path {
 
   make_path($outdir) unless -e $outdir;
   return $outdir;
+}
+
+sub gce_recab_uri {
+  return $GOOGLE_BUCKETS{recabs} . shift->expt_sampleid;
 }
 
 1;

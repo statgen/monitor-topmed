@@ -17,6 +17,8 @@ our @IMPORT_MODULES = (
 );
 
 our %IMPORT_BUNDLES = (
+  cmds => [
+    'IPC::System::Simple' => [qw(run capture EXIT_ANY $EXITVAL)],
   files => [
     'File::Path' => [qw(make_path remove_tree)],
   ],
