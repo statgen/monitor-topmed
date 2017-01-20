@@ -1369,6 +1369,27 @@ DISTRIBUTIONS
       Clone 0
       ExtUtils::MakeMaker 0
       perl 5.008001
+  IO-All-0.86
+    pathname: I/IN/INGY/IO-All-0.86.tar.gz
+    provides:
+      IO::All 0.86
+      IO::All::Base undef
+      IO::All::DBM undef
+      IO::All::Dir undef
+      IO::All::File undef
+      IO::All::Filesys undef
+      IO::All::Link undef
+      IO::All::MLDBM undef
+      IO::All::Pipe undef
+      IO::All::STDIO undef
+      IO::All::Socket undef
+      IO::All::String undef
+      IO::All::Temp undef
+    requirements:
+      Cwd 0
+      ExtUtils::MakeMaker 0
+      Scalar::Util 0
+      perl 5.008001
   IO-TieCombine-1.005
     pathname: R/RJ/RJBS/IO-TieCombine-1.005.tar.gz
     provides:
@@ -2460,6 +2481,18 @@ DISTRIBUTIONS
       base 0
       lib 0
       perl 5.008
+  YASF-0.004
+    pathname: R/RJ/RJRAY/YASF-0.004.tar.gz
+    provides:
+      YASF 0.004
+    requirements:
+      Carp 0
+      Exporter 0
+      ExtUtils::MakeMaker 0
+      overload 0
+      perl 5.008
+      strict 0
+      warnings 0
   autodie-2.29
     pathname: P/PJ/PJF/autodie-2.29.tar.gz
     provides:

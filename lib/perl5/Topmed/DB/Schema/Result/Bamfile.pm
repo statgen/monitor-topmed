@@ -753,7 +753,7 @@ __PACKAGE__->has_many(
 # You can replace this text with custom code or comments, and it will be preserved on regeneration
 use Class::Method::Modifiers;
 
-use Topmed::Base;
+use Topmed::Base qw(files);
 use Topmed::Constants qw(:google);
 
 __PACKAGE__->belongs_to(
@@ -807,12 +807,15 @@ sub b38_mapped_path {
   my $self = shift;
   my $path = YASF->new('/net/{host}/working/mapping/results/{center}/{pi}/hg38/{nwdid}');
 
-  return $path % {
+  my $outdir = $path % {
     host   => $self->host,
     center => $self->center,
     pi     => $self->piname,
     nwdid  => $self->expt_sampleid,
-  };
+ };
+
+  make_path($outdir) unless -e $outdir;
+  return $outdir;
 }
 
 sub gce_recab_uri {
