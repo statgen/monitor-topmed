@@ -16,10 +16,7 @@ for my $sample ($sample_rs->all) {
   capture([0..1], $cmd);
 
   unless ($EXITVAL) {
-    # TODO - set state_gce38pull to $REQUESTED
-    #
-    # $sample->update({state_gce38pull => $REQUESTED});
-    #
-    say 'SAMPLE : ' . $sample->expt_sampleid;
+    $sample->update({state_gce38pull => $REQUESTED});
+    say 'FETCH GCE SAMPLE : ' . $sample->expt_sampleid;
   }
 }
