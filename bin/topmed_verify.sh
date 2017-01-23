@@ -10,16 +10,17 @@ topmedpath=/usr/cluster/monitor/bin/topmedpath.pl
 topmedrename=/usr/cluster/monitor/bin/topmedrename.pl
 topmedflagstat=/usr/cluster/monitor/bin/topmed_flagstat.sh
 console=/net/topmed/working/topmed-output
-mem=8G                  # Artificially high so not too many on small nodes
+me=verify
+mem=2G
 markverb=md5verified
 slurmp=topmed
-qos=topmed-verify
+qos="--qos=topmed-$me"
 realhost=''
 
 if [ "$1" = "-submit" ]; then
   shift
   #   May I submit this job?
-  $topmedcmd permit test verify $1
+  $topmedcmd permit test $me $1
   if [ "$?" = "0" ]; then
     exit 4
   fi 
@@ -28,18 +29,18 @@ if [ "$1" = "-submit" ]; then
   h=`$topmedpath whathost $1 bam`
   if [ "$h" != "" ]; then
     realhost="--nodelist=$h"
-    qos="$h-verify"
+    qos="$h-$me"
   fi
 
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos $realhost -J $1-verify --output=$console/$1-verify.out $0 $*`)
+  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $qos $realhost -J $1-$me --output=$console/$1-$me.out $0 $*`)
   if [ "$?" != "0" ]; then
     echo "Failed to submit command to SLURM"
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos $realhost -J $1-verify --output=$console/$1-verify.out $0 $*"
+    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $qos $realhost -J $1-$me --output=$console/$1-$me.out $0 $*"
     exit 1
   fi
   $topmedcmd mark $1 $markverb submitted
   if [ "${l[0]}" = "Submitted" ]; then      # Job was submitted, save job details
-    echo `date` verify ${l[3]} $slurp $slurmqos $mem >> $console/$1.jobids
+    echo `date` $me ${l[3]} $slurp $slurmqos $mem >> $console/$1.jobids
   fi
   exit
 fi
@@ -86,7 +87,7 @@ $topmedcmd -persist set $bamid bamsize $sz
 
 #   Get the paired reads count for this file
 stime=`date +%s`
-echo "Calculate bamflagstat"
+echo "Calculate flagstat"
 $topmedflagstat $bamfile $bamid bamflagstat
 if [ "$?" != "0" ]; then
   $topmedcmd -persist mark $bamid $markverb failed
@@ -96,7 +97,7 @@ etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "Calculated bamflagstat in $etime seconds"
 
-chmod 0444 $bamfile
+chmod 0444 $bamfile     # This might fail, but that's OK
 
 #   If original file was cram, then some fields are the same for both cram and bam
 if [ "$extension" = "cram" ]; then
@@ -113,6 +114,12 @@ else
   fi
 fi
 
+#   If this was marked as donot_remap, force remapping flags so it looks right
+$topmedcmd set $bamid state_gce38push 20
+$topmedcmd set $bamid state_gce38pull 20
+$topmedcmd set $bamid state_gce38post 20
+$topmedcmd set $bamid state_b38 20
+
 $topmedcmd -persist mark $bamid $markverb completed
-echo `date` verify $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
+echo `date` $me $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
 exit
