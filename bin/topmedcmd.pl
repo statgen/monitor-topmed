@@ -770,7 +770,13 @@ sub List {
     }
     if ($fcn eq 'samples') {            # Show all samples for a run
         if (! $item) { die "$Script - Runname was not provided\n"; }
-        my $sth = ExecSQL("SELECT runid FROM $opts{runs_table} WHERE dirname='$item'", 0);
+        my $sth;
+        if ($item =~ /^\d+$/) {        # Maybe runid provided
+            $sth = ExecSQL("SELECT runid FROM $opts{runs_table} WHERE runid=$item", 0);
+        }
+        else {
+            $sth = ExecSQL("SELECT runid FROM $opts{runs_table} WHERE dirname='$item'", 0);
+        }
         my $rowsofdata = $sth->rows();
         if (! $rowsofdata) { die "$Script - Unknown run '$item'\n"; }
         my $href = $sth->fetchrow_hashref;
