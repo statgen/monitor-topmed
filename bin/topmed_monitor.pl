@@ -661,24 +661,6 @@ sub ShowSummary {
 }
 
 #==================================================================
-# Subroutine:
-#   FindPrefix - Return topmed prefix for a file
-#
-# Arguments:
-#   f = partial path to file in $opts{topmed*} directories
-#
-# Returns:
-#   prefix for file
-#==================================================================
-sub FindPrefix {
-    my ($f) = @_;
-    foreach my $pfx ('topdir','topdir2','topdir3', 'topdir4', 'topmed5', 'topmed6','topmed7', 'topmed8') {                    
-        if (-f "$opts{$pfx}/$f") { return $opts{$pfx}; }
-    }
-    return '';
-}
-
-#==================================================================
 #   Perldoc Documentation
 #==================================================================
 __END__
@@ -690,10 +672,10 @@ topmed_monitor.pl - Find runs that need some action
 =head1 SYNOPSIS
 
   topmed_monitor.pl verify
-  topmed_monitor.pl -run 20150604 verify   # Select only samples from one run
+  topmed_monitor.pl -run 20150604 qplot    # Select only samples from one run
   topmed_monitor.pl -center nygc verify    # Select only samples from a center
-  topmed_monitor.pl -maxjobs 5 sorig       # Only submit a few jobs
-  topmed_monitor.pl -datayear 2 sexpt      # Send only year 2 samples
+  topmed_monitor.pl -maxjobs 5 cram        # Only submit a few jobs
+  topmed_monitor.pl -datayear 2 bai        # Send only year 2 samples
 
 =head1 DESCRIPTION
 
