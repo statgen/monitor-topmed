@@ -112,6 +112,7 @@ CREATE TABLE bamfiles (
   checksum     VARCHAR(96) NOT NULL,
   expt_sampleid VARCHAR(24) DEFAULT 'UNKNOWN',  /* NWDID */
   nwdid_known  CHAR(1) DEFAULT 'N',
+  donot_remap  CHAR(4) DEFAULT '',     /* Build to not remap because original file build is ok */
 
 /* Fields to track state for each step */
 /*
@@ -131,17 +132,8 @@ my $FAILED    = 99;           # Task failed
   state_cram     INT DEFAULT 0,
   state_bai      INT DEFAULT 0,
   state_qplot    INT DEFAULT 0,
-  state_b37      INT DEFAULT 0,
-  state_b38      INT DEFAULT 0,
-
-  state_ncbiexpt INT DEFAULT 0,     /* Experiment defined at NCBI (X) */
-  state_ncbiorig INT DEFAULT 0,     /* Original input file as bam or cram (S) */
-  state_ncbib37  INT DEFAULT 0,     /* Remapped cram build 37 as cram (P) */
-  state_ncbib38  INT DEFAULT 0,     /* Remapped cram build 38 as cram (T) */
-  time_ncbiexpt  CHAR(19),          /* yyy-mm-ssThh:hh:ss when loaded */
-  time_ncbiorig  CHAR(19),
-  time_ncbib37   CHAR(19),
-  time_ncbib38   CHAR(19),
+  state_b37      INT DEFAULT 0,     /* File has been remapped to this build */
+  state_b38      INT DEFAULT 0,     /* File has been remapped to this build */
 
   state_gce38push  INT DEFAULT 0,   /* Handling b38 data in Google Cloud */
   state_gce38pull  INT DEFAULT 0,
@@ -161,6 +153,16 @@ select bamid,bamname from bamfiles where cramb37checksum='d41d8cd98f00b204e98009
 /* ####################################################
    Remove these some day 
    #################################################### */
+ 
+  state_ncbiexpt INT DEFAULT 0,     /* Experiment defined at NCBI (X) */
+  state_ncbiorig INT DEFAULT 0,     /* Original input file as bam or cram (S) */
+  state_ncbib37  INT DEFAULT 0,     /* Remapped cram build 37 as cram (P) */
+  state_ncbib38  INT DEFAULT 0,     /* Remapped cram build 38 as cram (T) */
+  time_ncbiexpt  CHAR(19),          /* yyy-mm-ssThh:hh:ss when loaded */
+  time_ncbiorig  CHAR(19),
+  time_ncbib37   CHAR(19),
+  time_ncbib38   CHAR(19),
+ 
   datearrived  VARCHAR(12),
   datemd5ver   VARCHAR(12),
   datebackup   VARCHAR(12),
@@ -304,6 +306,54 @@ CREATE TABLE stepstats (
   errckb38count      INT DEFAULT 0,      /* Count of tertiary bams at NCBI with checsum error */
   PRIMARY KEY  (yyyymmdd)
 );
+
+/* Lists all BAMs which failed QC -- subset of columns in bamfiles */
+DROP TABLE IF EXISTS bad_bamfiles;
+CREATE TABLE bad_bamfiles (
+  id           INT         NOT NULL AUTO_INCREMENT,
+  bamid        INT         NOT NULL,
+  expt_sampleid VARCHAR(24) NOT NULL,
+  runid        INT         NOT NULL,
+  dateinit     VARCHAR(12),
+  datayear     INT         NOT NULL,
+  build        VARCHAR(4),
+  bamname_orig VARCHAR(96) NOT NULL,
+  bamname      VARCHAR(96) NOT NULL,
+  cramname     VARCHAR(96) NOT NULL,
+  bamsize      VARCHAR(16) NOT NULL,
+  checksum     VARCHAR(96) NOT NULL,
+  cramchecksum VARCHAR(96) NOT NULL,
+  bamflagstat  BIGINT UNSIGNED,
+  cramflagstat BIGINT UNSIGNED,
+  nominal_length  INT,
+  nominal_sdev INT,
+  base_coord   INT,
+  library_name VARCHAR(96),
+  studyname    VARCHAR(96) NOT NULL,
+  piname       VARCHAR(96) NOT NULL,
+  phs          VARCHAR(12),
+  phs_consent_short_name VARCHAR(24),
+  phs_sra_sample_id VARCHAR(24),
+  phs_sra_data_details VARCHAR(255),
+  nwdid_known  CHAR(1),
+
+  state_arrive   INT,
+  state_md5ver   INT,
+  state_cram     INT,
+  state_bai      INT,
+  state_qplot    INT,
+
+  PRIMARY KEY  (id)
+);
+CREATE INDEX bad_index_bamid   ON bad_bamfiles(bamid);
+CREATE INDEX bad_index_runid   ON bad_bamfiles(runid);
+CREATE INDEX bad_index_nwdid   ON bad_bamfiles(expt_sampleid);
+
+
+
+
+
+
 
 
 /* ####################################################
