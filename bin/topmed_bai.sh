@@ -8,28 +8,31 @@ topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
 samtools=/usr/cluster/bin/samtools
 mem=4G
 console=/net/topmed/working/topmed-output
+me=bai
+markverb="${me}d"
+echo 
 slurmp=topmed
-qos=topmed-bai
+qos="--qos=topmed-$me"
 constraint="--constraint eth-10g"
 realhost=''
 
 if [ "$1" = "-submit" ]; then
   shift
   #   May I submit this job?
-  $topmedcmd permit test bai $1
+  $topmedcmd permit test $me $1
   if [ "$?" = "0" ]; then
     exit 4
   fi 
 
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos $constraint --workdir=$console -J $1-bai --output=$console/$1-bai.out $0 $*`)
+  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $qos $constraint --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $*`)
   if [ "$?" != "0" ]; then
     echo "Failed to submit command to SLURM"
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos $constraint --workdir=$console -J $1-bai --output=$console/$1-bai.out $0 $*"
+    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $qos $constraint --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $*"
     exit 1
   fi
-  $topmedcmd mark $1 baid submitted
+  $topmedcmd mark $1 $markverb submitted
   if [ "${l[0]}" = "Submitted" ]; then      # Job was submitted, save job details
-    echo `date` bai ${l[3]} $slurmp $slurmqos $mem >> $console/$1.jobids
+    echo `date` $me ${l[3]} $slurmp $slurmqos $mem >> $console/$1.jobids
   fi
   exit
 fi
@@ -48,7 +51,7 @@ bamfile=$2
 extension="${bamfile##*.}"
 
 #   Mark this as started
-$topmedcmd mark $bamid baid started
+$topmedcmd mark $bamid $markverb started
 d=`date +%Y/%m/%d`
 s=`hostname`
 echo "#========= $d host=$s $SLURM_JOB_ID $0 bamid=$bamid bamfile=$bamfile ========="
@@ -60,7 +63,7 @@ fi
 if [ -f $bai ]; then
   chmod 0444 $bai
   echo "Using existing index file '$bai'"
-  $topmedcmd -persist mark $bamid baid completed
+  $topmedcmd -persist mark $bamid $markverb completed
   exit 0
 fi
 
@@ -68,12 +71,12 @@ echo "Creating index file '$bai'"
 $samtools index $bamfile 2>&1
 if [ "$?" != "0" ]; then
   echo "Unable to create index file"
-  $topmedcmd -persist mark $bamid baid failed
+  $topmedcmd -persist mark $bamid $markverb failed
   exit 2
 fi
 etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "Created index '$bai' (at second $etime)"
-$topmedcmd -persist mark $bamid baid completed
-echo `date` bai $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
+$topmedcmd -persist mark $bamid $markverb completed
+echo `date` $me $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
 

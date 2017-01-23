@@ -13,8 +13,9 @@ gcbin=/net/mario/gotcloud/bin
 gcref=/net/mario/nodeDataMaster/local/ref/gotcloud.ref
 topoutdir=/net/topmed/incoming/qc.results
 fixverifybamid=/usr/cluster/monitor/bin/nhlbi.1648.vbid.rewrite.awk
+me=qplot
 mem=16G                         # Really should be 8G, increase to avoid too many at once
-markverb=qploted
+markverb="${me}ed"
 constraint=''                   # "--constraint eth-10g"
 constraint="--constraint eth-10g"       # Force to major nodes, not r63xx nodes
 qos=''
@@ -25,7 +26,7 @@ nodefile=''
 if [ "$1" = "-submit" ]; then
   shift
   #   May I submit this job?
-  $topmedcmd permit test qplot $1
+  $topmedcmd permit test $me $1
   if [ "$?" = "0" ]; then
     exit 4
   fi 
@@ -33,7 +34,7 @@ if [ "$1" = "-submit" ]; then
   # Run this on node where bam lives
   h=`$topmedpath whathost $1 bam`
   if [ "$h" != "" ]; then
-    qos="--qos=$h-qplot"
+    qos="--qos=$h-$me"
   fi
 
   # Maybe a list of nodes was specified to constrain where something runs?
@@ -42,10 +43,10 @@ if [ "$1" = "-submit" ]; then
     nodefile="--nodefile=$f"
   fi
   #   Can run anywhere. Low rate of access to cram, small output
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos $nodefile --workdir=$console -J $1-qplot --output=$console/$1-qplot.out $0 $*`)
+  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos $nodefile --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $*`)
   if [ "$?" != "0" ]; then
     echo "Failed to submit command to SLURM"
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos $nodefile --workdir=$console -J $1-qplot --output=$console/$1-qplot.out $0 $*"
+    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos $nodefile --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $*"
     exit 1
   fi
   $topmedcmd mark $1 $markverb submitted
@@ -57,7 +58,7 @@ fi
 
 if [ "$2" = "" ]; then
   me=`basename $0`
-  echo "Usage: $me [-submit [-mem nG]] bamid bamfile"
+  echo "Usage: $me [-submit] bamid bamfile"
   echo ""
   echo "Run qplot on a bam file and update database"
   exit 1
@@ -177,5 +178,5 @@ if [ "$?" != "0" ]; then
 fi
 
 $topmedcmd -persist mark $bamid $markverb completed
-  echo `date` qplot $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
+  echo `date` $me $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
 exit 0

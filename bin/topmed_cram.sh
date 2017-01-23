@@ -14,9 +14,10 @@ topmedflagstat=/usr/cluster/monitor/bin/topmed_flagstat.sh
 backupdir=/net/topmed/working/backups
 medir=`dirname $0`
 calcmd5=/usr/cluster/monitor/bin/topmed_calcmd5.sh
+me=cram
 mem=8G
 console=/net/topmed/working/topmed-output
-markverb=cramed
+markverb="${me}ed"
 squeezed=n
 constraint="--constraint eth-10g"
 qos=''
@@ -26,7 +27,7 @@ realhost=''
 if [ "$1" = "-submit" ]; then
   shift
   #   May I submit this job?
-  $topmedcmd permit test cram $1
+  $topmedcmd permit test $me $1
   if [ "$?" = "0" ]; then
     exit 4
   fi 
@@ -35,7 +36,7 @@ if [ "$1" = "-submit" ]; then
   h=`$topmedpath whathost $1 bam`
   if [ "$h" != "" ]; then
     realhost="--nodelist=$h"
-    qos="--qos=$h-cram"
+    qos="--qos=$h-$me"
   fi
 
   #   Get destination directory for backup files
@@ -55,15 +56,15 @@ if [ "$1" = "-submit" ]; then
   fi
 
   #  Submit this script to be run
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos --workdir=$console -J $1-cram --output=$console/$1-cram.out $0 $sq $*`)
+  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*`)
   if [ "$?" != "0" ]; then
     echo "Failed to submit command to SLURM"
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos --workdir=$console -J $1-cram --output=$console/$1-cram.out $0 $sq $*"
+    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*"
     exit 1
   fi
   $topmedcmd mark $1 $markverb submitted
   if [ "${l[0]}" = "Submitted" ]; then      # Job was submitted, save job details
-    echo `date` cram ${l[3]} $slurmp $slurmqos $mem >> $console/$1.jobids
+    echo `date` $me ${l[3]} $slurmp $slurmqos $mem >> $console/$1.jobids
   fi
   exit
 fi
@@ -176,7 +177,7 @@ if [ "$extension" = "cram" ]; then
   $topmedcmd -persist mark $bamid $markverb completed
   etime=`date +%s`
   etime=`expr $etime - $stime`
-  echo `date` cram $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
+  echo `date` $me $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
   echo "CRAM backup completed, created $backupdir/$newname"
   exit
 fi
@@ -278,4 +279,4 @@ etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "BAM to CRAM backup completed in $etime seconds, created $here/$newname"
 $topmedcmd -persist mark $bamid $markverb completed
-echo `date` cram $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
+echo `date` $me $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
