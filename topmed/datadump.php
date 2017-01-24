@@ -60,6 +60,10 @@ $dumpcols = array("expt_sampleid",
     "build",
     "bamflagstat",
     "cramflagstat",
+    "state_gce38push",
+    "state_gce38pull",
+    "state_gce38post",
+    "donot_remap",
     "bamsize"
 );
 $dumpstring = $dumppart1 . implode("\t",$dumpcols) . "\n";
