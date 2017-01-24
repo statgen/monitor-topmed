@@ -115,10 +115,13 @@ else
 fi
 
 #   If this was marked as donot_remap, force remapping flags so it looks right
-$topmedcmd set $bamid state_gce38push 20
-$topmedcmd set $bamid state_gce38pull 20
-$topmedcmd set $bamid state_gce38post 20
-$topmedcmd set $bamid state_b38 20
+remap=`$topmedcmd show $bamid donot_remap`
+if [ "$remap" != "" ]; then
+  $topmedcmd set $bamid state_gce38push 20
+  $topmedcmd set $bamid state_gce38pull 20
+  $topmedcmd set $bamid state_gce38post 20
+  $topmedcmd set $bamid state_b38 20
+fi
 
 $topmedcmd -persist mark $bamid $markverb completed
 echo `date` $me $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
