@@ -12,6 +12,8 @@ use Rex -base;
 use Rex::Commands::SCM;
 use Rex::Commands::Sync;
 
+umask 0002;
+
 my $install_dir = '/var/tmp/monitor';
 my $build_dir   = '/net/topmed/working/build/monitor-topmed';
 my $local_lib   = "$build_dir/local";
