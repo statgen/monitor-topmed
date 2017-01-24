@@ -13,12 +13,12 @@ use Rex::Commands::SCM;
 use Rex::Commands::Sync;
 
 my $install_dir = '/var/tmp/monitor';
-my $build_dir   = '/tmp/monitor';
+my $build_dir   = '/net/topmed/working/build/monitor-topmed';
 my $local_lib   = "$build_dir/local";
 my $cpanm       = "$local_lib/bin/cpanm";
 my $carton      = "$local_lib/bin/carton";
 
-set repository => "master", url => 'git@github.com:statgen/monitor.git', type => 'git';
+set repository => "master", url => 'https://github.com/statgen/monitor-topmed.git', type => 'git';
 
 task 'build', sub {
   checkout 'master', path => $build_dir;
