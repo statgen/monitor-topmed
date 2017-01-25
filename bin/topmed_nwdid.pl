@@ -1,4 +1,4 @@
-#!/usr/bin/perl -I/usr/cluster/lib/perl5/site_perl
+#!/usr/bin/perl
 ###################################################################
 #
 # Name: topmed_nwdid.pl
@@ -17,9 +17,14 @@
 use strict;
 use warnings;
 use FindBin qw($Bin $Script);
-use lib "$FindBin::Bin";
-use lib "$FindBin::Bin/../lib";
-use lib "$FindBin::Bin/../lib/perl5";
+use lib (
+  qq($FindBin::Bin),
+  qq($FindBin::Bin/../lib),
+  qq($FindBin::Bin/../lib/perl5),
+  qq($FindBin::Bin/../local/lib/perl5),
+  qq(/usr/cluster/topmed/lib/perl5),
+  qq(/usr/cluster/topmed/local/lib/perl5),
+);
 use Getopt::Long;
 use File::Basename;
 
@@ -31,7 +36,7 @@ our %opts = (
     lookuptable => '/net/topmed/incoming/study.reference/study.reference/lookup.table.tab',
     topdir => '/net/topmed/incoming/topmed',
     qcresults => '/net/topmed/incoming/qc.results',
-    topmedcmd => '/usr/cluster/monitor/bin/topmedcmd.pl',
+    topmedcmd => '/usr/cluster/topmed/bin/topmedcmd.pl',
     nominal_awk => $Bin . '/topmed_get_nominal.awk',
     verbose => 0,
 );

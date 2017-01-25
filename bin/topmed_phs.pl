@@ -1,4 +1,4 @@
-#!/usr/bin/perl -I/usr/cluster/lib/perl5/site_perl -I/usr/cluster/monitor/lib/perl5 -I /usr/cluster/monitor/bin
+#!/usr/bin/perl
 ###################################################################
 #
 # Name: topmed_phs.pl
@@ -16,9 +16,14 @@
 use strict;
 use warnings;
 use FindBin qw($Bin $Script);
-use lib "$FindBin::Bin";
-use lib "$FindBin::Bin/../lib";
-use lib "$FindBin::Bin/../lib/perl5";
+use lib (
+  qq($FindBin::Bin),
+  qq($FindBin::Bin/../lib),
+  qq($FindBin::Bin/../lib/perl5),
+  qq($FindBin::Bin/../local/lib/perl5),
+  qq(/usr/cluster/topmed/lib/perl5),
+  qq(/usr/cluster/topmed/local/lib/perl5),
+);
 use My_DB;
 use Getopt::Long;
 use XML::Simple;
@@ -41,7 +46,7 @@ my $FAILED    = 99;           # Task failed
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
 our %opts = (
-    realm => '/usr/cluster/monitor/etc/.db_connections/topmed',
+    realm => '/usr/cluster/topmed/etc/.db_connections/topmed',
     bamfiles_table => 'bamfiles',
     phsconfig => '/net/topmed/incoming/study.reference/study.reference/study.phs.numbers.tab',
     phsdir => '/net/topmed/incoming/study.reference/phs',
