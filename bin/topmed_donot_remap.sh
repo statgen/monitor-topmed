@@ -5,7 +5,7 @@
 #	Some centers provide CRAMs based a run that we like how it was done
 #   Use this script to mark all samples for that run so that it is not remapped
 #
-topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
+topmedcmd=/usr/cluster/topmed/bin/topmedcmd.pl
 col=donot_remap
 
 if [ "$2" = "" ]; then
