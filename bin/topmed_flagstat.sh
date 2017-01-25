@@ -10,9 +10,8 @@
 #      calculate the path based on the bamid
 #   If colname is provided, the flagstat value will be saved in this column of the database
 #   If outfile is provided the flagstat results will be copied to this file
-samtools=/usr/cluster/bin/samtools
-topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
-topmedpath=/usr/cluster/monitor/bin/topmedpath.pl
+. /usr/cluster/topmed/bin/topmed_actions.inc
+
 ref=/net/mario/gotcloud/gotcloud.ref/hs37d5.fa
 illuminaref=/net/topmed/incoming/study.reference/study.reference/illumina.hg19.fa
 me=`basename $0`
