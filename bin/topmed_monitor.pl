@@ -1,4 +1,4 @@
-#!/usr/bin/perl -I/usr/cluster/lib/perl5/site_perl -I/usr/cluster/monitor/lib/perl5 -I /usr/cluster/monitor/bin
+#!/usr/bin/perl
 ###################################################################
 #
 # Name: topmed_monitor.pl
@@ -18,9 +18,14 @@
 use strict;
 use warnings;
 use FindBin qw($Bin $Script);
-use lib "$FindBin::Bin";
-use lib "$FindBin::Bin/../lib";
-use lib "$FindBin::Bin/../lib/perl5";
+use lib (
+  qq($FindBin::Bin),
+  qq($FindBin::Bin/../lib),
+  qq($FindBin::Bin/../lib/perl5),
+  qq($FindBin::Bin/../local/lib/perl5),
+  qq(/usr/cluster/topmed/lib/perl5),
+  qq(/usr/cluster/topmed/local/lib/perl5),
+);
 use My_DB;
 use TopMed_Get;
 use Getopt::Long;
@@ -40,7 +45,7 @@ my $CANCELLED = 89;           # Task cancelled
 my $FAILEDCHECKSUM = 98;      # Task failed, because checksum at NCBI bad
 my $FAILED    = 99;           # Task failed
 
-my $topmedbin = '/usr/cluster/monitor/bin';
+my $topmedbin = '/usr/cluster/topmed/bin';
 our %opts = (
     topmedcmd => "$topmedbin/topmedcmd.pl",
     topmedarrive => "$topmedbin/topmed_arrive.sh",
@@ -56,7 +61,7 @@ our %opts = (
     topmedgce38pull => "$topmedbin/topmed_gcepull.sh",
     topmedgce38post => "$topmedbin/topmed_gcepost.sh",
     topmedxml    => "$topmedbin/topmed_xml.pl",
-    realm => '/usr/cluster/monitor/etc/.db_connections/topmed',
+    realm => '/usr/cluster/topmed/etc/.db_connections/topmed',
     centers_table => 'centers',
     runs_table => 'runs',
     studies_table => 'studies',
