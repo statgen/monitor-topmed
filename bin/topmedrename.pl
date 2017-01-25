@@ -1,4 +1,4 @@
-#!/usr/bin/perl -I/usr/cluster/lib/perl5/site_perl -I/usr/cluster/monitor/lib/perl5 -I /usr/cluster/monitor/bin
+#!/usr/bin/perl
 ###################################################################
 #
 # Name: topmedrename.pl bamid bamfilepath
@@ -16,9 +16,14 @@
 use strict;
 use warnings;
 use FindBin qw($Bin $Script);
-use lib "$FindBin::Bin";
-use lib "$FindBin::Bin/../lib";
-use lib "$FindBin::Bin/../lib/perl5";
+use lib (
+  qq($FindBin::Bin),
+  qq($FindBin::Bin/../lib),
+  qq($FindBin::Bin/../lib/perl5),
+  qq($FindBin::Bin/../local/lib/perl5),
+  qq(/usr/cluster/topmed/lib/perl5),
+  qq(/usr/cluster/topmed/local/lib/perl5),
+);
 use My_DB;
 use Getopt::Long;
 use File::Basename;
@@ -26,10 +31,10 @@ use File::Basename;
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
-my $topmedbin = '/usr/cluster/monitor/bin';
+my $topmedbin = '/usr/cluster/topmed/bin';
 our %opts = (
     topmedcmd => "$topmedbin/topmedcmd.pl",
-    realm => '/usr/cluster/monitor/etc/.db_connections/topmed',
+    realm => '/usr/cluster/topmed/etc/.db_connections/topmed',
     bamfiles_table => 'bamfiles',
     verbose => 0,
 );
