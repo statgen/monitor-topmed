@@ -95,6 +95,15 @@ if [ "$?" != "0" ]; then
   $topmedcmd -persist mark $bamid $markverb failed
   exit 3
 fi
+
+#   See if we have already done this
+f=$crampath/$nwdid/$nwdid.recab.cram
+if [ -f $f ]; then
+  echo "Surprise!  CRAM for $nwdid already exists ($f)"
+  $topmedcmd -persist mark $bamid $markverb failed
+  exit 3
+fi
+
 echo "$nwdid data will be copied to $crampath"
 
 echo "Checking if flagstat is as we expect"
