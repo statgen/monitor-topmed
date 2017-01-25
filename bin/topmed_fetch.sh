@@ -10,11 +10,11 @@
 #   That results in a list of files to fetch obtained from the Manifest.txt
 #   and an invocation of this script.
 #
-topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
-topmedaspera=/usr/cluster/monitor/bin/topmedaspera.pl
-topmednwd=/usr/cluster/monitor/bin/topmed_nwdid.pl
-topmedrename=/usr/cluster/monitor/bin/topmedrename.pl
-console=/net/topmed/working/topmed-output
+. /usr/cluster/topmed/bin/topmed_actions.inc
+topmedaspera=/usr/cluster/topmed/bin/topmedaspera.pl
+topmednwd=/usr/cluster/topmed/bin/topmed_nwdid.pl
+topmedrename=/usr/cluster/topmed/bin/topmedrename.pl
+
 mem=2G                  # Artificially high so not too many on small nodes
 markverb=arrived
 slurmp=topmed
