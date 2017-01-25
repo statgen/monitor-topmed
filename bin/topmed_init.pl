@@ -1,4 +1,4 @@
-#!/usr/bin/perl -I/usr/cluster/lib/perl5/site_perl -I/usr/cluster/monitor/lib/perl5 -I /usr/cluster/monitor/bin
+#!/usr/bin/perl
 ###################################################################
 #
 # Name:	topmed_init.pl
@@ -8,7 +8,7 @@
 #   and initialize the NHLBI TOPMED database
 #
 # ChangeLog:
-#   $Log: nhlbi_init.pl,v $
+#   $Log: topmed_init.pl,v $
 #
 # This is free software; you can redistribute it and/or modify it under the
 # terms of the GNU General Public License as published by the Free Software
@@ -17,9 +17,14 @@
 use strict;
 use warnings;
 use FindBin qw($Bin $Script);
-use lib "$FindBin::Bin";
-use lib "$FindBin::Bin/../lib";
-use lib "$FindBin::Bin/../lib/perl5";
+use lib (
+  qq($FindBin::Bin),
+  qq($FindBin::Bin/../lib),
+  qq($FindBin::Bin/../lib/perl5),
+  qq($FindBin::Bin/../local/lib/perl5),
+  qq(/usr/cluster/topmed/lib/perl5),
+  qq(/usr/cluster/topmed/local/lib/perl5),
+);
 use My_DB;
 use TopMed_Get;
 use Getopt::Long;
@@ -31,7 +36,7 @@ use File::Basename;
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
 our %opts = (
-    realm => '/usr/cluster/monitor/etc/.db_connections/topmed',
+    realm => '/usr/cluster/topmed/etc/.db_connections/topmed',
     centers_table => 'centers',
     runs_table => 'runs',
     bamfiles_table => 'bamfiles',
