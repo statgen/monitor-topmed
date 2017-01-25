@@ -4,15 +4,12 @@
 #
 #	Send the proper set of files to NCBI for the original/secondary files
 #
-samtools=/usr/cluster/bin/samtools
-topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
-topmedpath=/usr/cluster/monitor/bin/topmedpath.pl
+. /usr/cluster/topmed/bin/topmed_actions.inc
+
 ascpcmd="$topmedcmd send2ncbi"
-topmedxml=/usr/cluster/monitor/bin/topmed_xml.pl
-medir=`dirname $0`
-calcmd5=/usr/cluster/monitor/bin/topmed_calcmd5.sh
+topmedxml=/usr/cluster/topmed/bin/topmed_xml.pl
+
 mem=2G
-console=/net/topmed/working/topmed-output
 tmpconsole=/net/topmed/working/topmed-output
 topmeddir=/net/topmed/incoming/topmed
 build=37

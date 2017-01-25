@@ -4,16 +4,13 @@
 #
 #	Backup the original BAM as a CRAM file
 #
+. /usr/cluster/topmed/bin/topmed_actions.inc
+
 bindir=/usr/cluster/bin
-samtools=/usr/cluster/bin/samtools
 ref=/net/mario/gotcloud/gotcloud.ref/hs37d5.fa
 illuminaref=/net/topmed/incoming/study.reference/study.reference/illumina.hg19.fa
-topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
-topmedpath=/usr/cluster/monitor/bin/topmedpath.pl
-topmedflagstat=/usr/cluster/monitor/bin/topmed_flagstat.sh
 backupdir=/net/topmed/working/backups
-medir=`dirname $0`
-calcmd5=/usr/cluster/monitor/bin/topmed_calcmd5.sh
+
 me=cram
 mem=8G
 console=/net/topmed/working/topmed-output

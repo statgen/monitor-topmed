@@ -4,11 +4,11 @@
 #
 #	Send experiment XML for a bamid to NCBI
 #
-topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
+. /usr/cluster/topmed/bin/topmed_actions.inc
+topmedxml="/usr/cluster/topmed/bin/topmed_xml.pl"
 ascpcmd="$topmedcmd send2ncbi"
-topmedxml="/usr/cluster/monitor/bin/topmed_xml.pl"
+
 mem=2G
-console=/net/topmed/working/topmed-output
 markverb=sentexpt
 slurmp=topmed
 qos=topmed-ncbi

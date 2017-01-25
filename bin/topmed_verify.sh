@@ -5,11 +5,8 @@
 #	Verify the MD5 checksum for a BAM file
 #   Do not specify a QOS for verify so it runs before QPLOT
 #
-topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
-topmedpath=/usr/cluster/monitor/bin/topmedpath.pl
-topmedrename=/usr/cluster/monitor/bin/topmedrename.pl
-topmedflagstat=/usr/cluster/monitor/bin/topmed_flagstat.sh
-console=/net/topmed/working/topmed-output
+. /usr/cluster/topmed/bin/topmed_actions.inc
+
 me=verify
 mem=2G
 markverb=md5verified

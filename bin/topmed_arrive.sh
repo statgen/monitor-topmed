@@ -6,10 +6,7 @@
 #   This command almost certainly runs locally, however
 #   the batch -submit has been left in
 #
-topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
-topmednwd=/usr/cluster/monitor/bin/topmed_nwdid.pl
-topmedrename=/usr/cluster/monitor/bin/topmedrename.pl
-samtools=/usr/cluster/bin/samtools
+. /usr/cluster/topmed/bin/topmed_actions.inc
 
 #   We do not expect -submit to be used here
 if [ "$1" = "-submit" ]; then

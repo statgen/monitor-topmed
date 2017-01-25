@@ -4,13 +4,10 @@
 #
 #	Copy remapped CRAM for a sample from Google Cloud
 #
-bindir=/usr/cluster/bin
-topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
-topmedpath=/usr/cluster/monitor/bin/topmedpath.pl
-medir=`dirname $0`
+. /usr/cluster/topmed/bin/topmed_actions.inc
+
 me=gcepull
 mem=2G
-console=/net/topmed/working/topmed-output
 markverb="${me}ed"
 constraint="--constraint eth-10g"
 qos="--qos=topmed-$me"

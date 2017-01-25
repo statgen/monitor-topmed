@@ -4,15 +4,13 @@
 #
 #	Run QPLOT on a BAM file
 #
-topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
-topmedpath=/usr/cluster/monitor/bin/topmedpath.pl
-topmedqplot=/usr/cluster/monitor/bin/topmedqplot.pl
-samtools=/usr/cluster/bin/samtools
-console=/net/topmed/working/topmed-output
+. /usr/cluster/topmed/bin/topmed_actions.inc
+
 gcbin=/net/mario/gotcloud/bin
 gcref=/net/mario/nodeDataMaster/local/ref/gotcloud.ref
 topoutdir=/net/topmed/incoming/qc.results
-fixverifybamid=/usr/cluster/monitor/bin/nhlbi.1648.vbid.rewrite.awk
+fixverifybamid=/usr/cluster/topmed/bin/nhlbi.1648.vbid.rewrite.awk
+
 me=qplot
 mem=16G                         # Really should be 8G, increase to avoid too many at once
 markverb="${me}ed"

@@ -4,13 +4,11 @@
 #
 #	Create BAI index for a BAM file
 #
-topmedcmd=/usr/cluster/monitor/bin/topmedcmd.pl
-samtools=/usr/cluster/bin/samtools
+. /usr/cluster/topmed/bin/topmed_actions.inc
+
 mem=4G
-console=/net/topmed/working/topmed-output
 me=bai
 markverb="${me}d"
-echo 
 slurmp=topmed
 qos="--qos=topmed-$me"
 constraint="--constraint eth-10g"
