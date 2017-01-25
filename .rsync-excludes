@@ -1,0 +1,6 @@
+.git/
+.gitignore
+scripts/
+cpanfile*
+Rexfile
+local/cache
