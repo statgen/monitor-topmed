@@ -17,7 +17,7 @@ if [ "$1" = "" ]; then
 fi
 
 samtools=/usr/cluster/bin/samtools
-awkcalcend=/usr/cluster/monitor/bin/topmed_calc_cram_end.awk
+awkcalcend=/usr/cluster/topmed/bin/topmed_calc_cram_end.awk
 
 for n in 1 2 3 4 5 6 7 8 9; do
   offset=`$samtools view -H $1 | awk -f $awkcalcend`
