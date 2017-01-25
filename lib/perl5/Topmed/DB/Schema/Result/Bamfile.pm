@@ -205,6 +205,13 @@ __PACKAGE__->table("bamfiles");
   is_nullable: 1
   size: 1
 
+=head2 donot_remap
+
+  data_type: 'char'
+  default_value: (empty string)
+  is_nullable: 1
+  size: 4
+
 =head2 state_arrive
 
   data_type: 'integer'
@@ -595,6 +602,8 @@ __PACKAGE__->add_columns(
   },
   "nwdid_known",
   { data_type => "char", default_value => "N", is_nullable => 1, size => 1 },
+  "donot_remap",
+  { data_type => "char", default_value => "", is_nullable => 1, size => 4 },
   "state_arrive",
   { data_type => "integer", default_value => 0, is_nullable => 1 },
   "state_md5ver",
@@ -746,8 +755,8 @@ __PACKAGE__->has_many(
 );
 
 
-# Created by DBIx::Class::Schema::Loader v0.07046 @ 2017-01-09 15:30:58
-# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:RBRHsFMiyaQu9101A2sZ0w
+# Created by DBIx::Class::Schema::Loader v0.07046 @ 2017-01-25 10:12:38
+# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:jCFI8cp6FLCPPcbzOZSTJA
 
 
 # You can replace this text with custom code or comments, and it will be preserved on regeneration
