@@ -1,4 +1,4 @@
-#!/usr/bin/perl -I/usr/cluster/lib/perl5/site_perl -I/usr/cluster/monitor/lib/perl5 -I /usr/cluster/monitor/bin
+#!/usr/bin/perl
 ###################################################################
 #
 # Name: topmedaspera.pl
@@ -21,9 +21,14 @@
 use strict;
 use warnings;
 use FindBin qw($Bin $Script);
-use lib "$FindBin::Bin";
-use lib "$FindBin::Bin/../lib";
-use lib "$FindBin::Bin/../lib/perl5";
+use lib (
+  qq($FindBin::Bin),
+  qq($FindBin::Bin/../lib),
+  qq($FindBin::Bin/../lib/perl5),
+  qq($FindBin::Bin/../local/lib/perl5),
+  qq(/usr/cluster/topmed/lib/perl5),
+  qq(/usr/cluster/topmed/local/lib/perl5),
+);
 use Getopt::Long;
 use Cwd 'abs_path';
 use File::Basename;
@@ -41,8 +46,8 @@ our %opts = (
     logdir => "/net/topmed/working/topmed-output/aspera",
     keyfile => 'keyfile',                       # Name of keyfile in $asperadir
     hooksfile => '/tmp/ascp-shares.sh.hooks',   # File created by our ascpshares
-    ascpshares => '/usr/cluster/monitor/bin/ascp-shares.sh',
-    asperabroad => '/usr/cluster/monitor/bin/aspera.broad.sh',
+    ascpshares => '/usr/cluster/topmed/bin/ascp-shares.sh',
+    asperabroad => '/usr/cluster/topmed/bin/aspera.broad.sh',
     uwrmthost => 'aspera.gs.washington.edu',
     verbose => 0,
 );
