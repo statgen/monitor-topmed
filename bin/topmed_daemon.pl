@@ -1,4 +1,4 @@
-#!/usr/bin/perl -I/usr/cluster/lib/perl5/site_perl
+#!/usr/bin/perl
 ###################################################################
 #
 # Name: topmed_daemon.pl
@@ -40,9 +40,9 @@ my %opts = (
     port => 48109,
     fromips => '127.0.0.1 192.168.1.56 192.168.2.200 192.168.1.8',
     squeue_unused => '/usr/cluster/bin/squeue --format "%.9i %.10P %.12j %.8u %.2t %.10M %R"',
-    df => '/bin/df -h /net/topmed/incoming /net/topmed/working /net/topmed2/incoming /net/topmed2/working /net/topmed3/incoming /net/topmed3/working /net/topmed4/working /net/topmed4/incoming /net/topmed5/incoming /net/topmed5/working /net/topmed6/incoming /net/topmed6/working /net/topmed7/incoming /net/topmed7/working /net/topmed8/incoming /net/topmed8/working',
-    squeue => '/usr/cluster/monitor/bin/topmedcmd.pl squeue', 
-    errorcheck => '/usr/cluster/monitor/bin/topmed_monitor.pl check',
+    df => '/bin/df -h /net/topmed/incoming /net/topmed/working /net/topmed2/incoming /net/topmed2/working /net/topmed3/incoming /net/topmed3/working /net/topmed4/working /net/topmed4/incoming /net/topmed5/incoming /net/topmed5/working /net/topmed6/incoming /net/topmed6/working /net/topmed7/incoming /net/topmed7/working /net/topmed8/incoming /net/topmed8/working /net/topmed9/incoming /net/topmed10/working /net/topmed8/incoming /net/topmed10/working',
+    squeue => '/usr/cluster/topmed/bin/topmedcmd.pl squeue', 
+    errorcheck => '/usr/cluster/topmed/bin/topmed_monitor.pl check',
     shownode => '/usr/cluster/bin/scontrol show node',
 );
 $opts{mycommand} = "$0 "  . join(' ', @ARGV);    # To support restart
