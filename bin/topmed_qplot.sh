@@ -125,6 +125,21 @@ if [ "$rc" != "0" ]; then
   rm -f $basebam.*
   exit 4
 fi
+
+#   One last sanity check. Qplot can easily be fooled if samtools truncates
+#   when reading the bamfile (NFS surprise).
+#   This should fail if the TotalReads < bmflagstat value + 5000 
+bamflagstat=`$topmedpath show $bamid bamflagstat`   # Same for cram or bam
+n=`expr $bamflagstat + 5000`
+tr=`grep TotalReads $nwdid.src.qp.stats | awk '{ print $2 }'
+tr=`expr $tr \* 1000000`
+if [ "$tr" -le "$n" ]; then
+  echo "QPLOT data must have been truncated. TotalReads=$tr  Flagstat=$n"
+  $topmedcmd -persist mark $bamid $markverb failed
+  exit 3
+fi
+echo "Qplot output seems reasonable: TotalReads=$tr  Flagstat=$n"
+
 etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "QPLOT on '$bamfile' successful (at second $etime)"
