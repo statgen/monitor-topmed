@@ -65,7 +65,7 @@ if ($#ARGV < 0 || $opts{help}) {
     my $m = "$Script [options] [-persist]";
     warn "$m wherepath|where bamid|nwdid bam|backup|cram|qcresults|console|b37|b38\n" .
         "  or\n" .
-        "$m wherehost bamid|nwdid bam|backup|cram|qcresults|b37|b38\n" .
+        "$m whathost bamid|nwdid bam|backup|cram|qcresults|b37|b38\n" .
         "  or\n" .
         "$m wherefile bamid|nwdid bam|backup|cram|qcresults|b37|b38\n" .
         "  or\n" .
@@ -129,36 +129,49 @@ sub WherePath {
     #   BAM is in one of those $opts{netdir} trees where without a symlink
     if ($set eq 'bam') {
         my $bamhost = 'none';
-        my $bamfdir = abs_path("$opts{netdir}/$opts{incomingdir}/$centername/$rundir");
+        my $bamfdir = abs_path("$opts{netdir}/$opts{incomingdir}/$centername/$rundir") || '';
         print "$bamfdir\n";
         exit;
     }
  
     #   Find where the backup file lives
     if ($set eq 'backup' || $set eq 'cram') {
-        my $bakbamfdir = abs_path("$opts{netdir}/$opts{backupsdir}/$centername/$rundir");
+        my $bakbamfdir = abs_path("$opts{netdir}/$opts{backupsdir}/$centername/$rundir") || '';
         print "$bakbamfdir\n";
         exit;
     }
 
     #   Print where qc.results are 
     if ($set eq 'qcresults') {
-        my $qcdir = abs_path("$opts{netdir}/$opts{qcresultsdir}/$centername/$rundir");
+        my $qcdir = abs_path("$opts{netdir}/$opts{qcresultsdir}/$centername/$rundir") || '';
         print "$qcdir\n";                       # File might not really exist
         exit;
     }
  
     #   Print where SLURM console output can be found
     if ($set eq 'console') {
-        my $dir = abs_path("$opts{netdir}/$opts{consoledir}");
+        my $dir = abs_path("$opts{netdir}/$opts{consoledir}") || '';
         print "$dir\n";
         exit;
     }
 
-    if ($set =~ /b(?:37|38)/) {
-      my $meth = qq{${set}_mapped_path};
-      say $sample->$meth;
-      exit;
+    if ($set eq 'b37') {
+        die "$Script - Unable to provide path for b37 right now\n";
+        exit;
+    }
+
+    if ($set eq 'b38') {
+        my $host = 'topmed10';
+        if ($bamid % 2) { $host = 'topmed9'; }
+        my $dir = "/net/$host/working/mapping/results/$centername/$piname/h38/$nwdid";
+        mkdir $dir,0755 ||
+            die "$Script - Unable to create path for '$bamid' to '$dir': $!\n";
+        print $dir . "\n";
+        exit;
+        #   For the moment, this is broken. Remapped files are on topmed9 or 10
+        #my $meth = qq{${set}_mapped_path};
+        #say $sample->$meth;
+        exit;
     }
  
     die "$Script - Unknown Where option '$set'\n";
@@ -201,8 +214,7 @@ sub WhatHost {
     #   BAM is in one of those $opts{netdir} trees where without a symlink
     if ($set eq 'bam') {
         my $bamhost = 'none';
-        my $bamfdir = abs_path("$opts{netdir}/$opts{incomingdir}/$centername/$rundir");
-        if (! $bamfdir) { exit; }
+        my $bamfdir = abs_path("$opts{netdir}/$opts{incomingdir}/$centername/$rundir") || '';
         if ($bamfdir =~ /\/net\/([^\/]+)\//) { $bamhost = $1; }
         print "$bamhost\n";
         exit;
@@ -211,7 +223,7 @@ sub WhatHost {
     #   Find where the backup CRAM lives and show host
     if ($set eq 'backup' || $set eq 'cram') {
         my $backuphost = 'none';
-        my $bakbamfdir = abs_path("$opts{netdir}/$opts{backupsdir}/$centername/$rundir");
+        my $bakbamfdir = abs_path("$opts{netdir}/$opts{backupsdir}/$centername/$rundir") || '';
         if ($bakbamfdir =~ /\/net\/([^\/]+)\//) { $backuphost = $1; }
         print "$backuphost\n";
         exit;
@@ -220,7 +232,7 @@ sub WhatHost {
     #   Print where qc.results are and show host
     if ($set eq 'qcresults') {
         my $qchost = 'none';
-        my $qcdir = abs_path("$opts{netdir}/$opts{qcresultsdir}/$centername/$rundir");
+        my $qcdir = abs_path("$opts{netdir}/$opts{qcresultsdir}/$centername/$rundir") || '';
         if ($qcdir =~ /\/net\/([^\/]+)\//) { $qcdir = $1; }
         print "$qcdir\n";
         exit;
@@ -275,7 +287,7 @@ sub WhereFile {
 
     #   BAM is in one of those $opts{netdir} trees where without a symlink
     if ($set eq 'bam') {
-        my $bamfile = abs_path("$opts{netdir}/$opts{incomingdir}/$centername/$rundir");
+        my $bamfile = abs_path("$opts{netdir}/$opts{incomingdir}/$centername/$rundir") || '';
         if ($bamfile) { $bamfile .= '/' . $bamname; }
         print "$bamfile\n";
         exit;
@@ -283,7 +295,7 @@ sub WhereFile {
  
     #   Find where the backup CRAM lives
     if ($set eq 'backup' || $set eq 'cram') {
-        my $bakfile = abs_path("$opts{netdir}/$opts{backupsdir}/$centername/$rundir");
+        my $bakfile = abs_path("$opts{netdir}/$opts{backupsdir}/$centername/$rundir") || '';
         if ($bakfile) { $bakfile .= '/' . $cramname; }
         print "$bakfile\n";
         exit;
@@ -291,7 +303,7 @@ sub WhereFile {
 
     #   Print where qc.results we are interested are
     if ($set eq 'qcresults') {
-        my $qcdir = abs_path("$opts{netdir}/$opts{qcresultsdir}/$centername/$rundir");
+        my $qcdir = abs_path("$opts{netdir}/$opts{qcresultsdir}/$centername/$rundir") || '';
         $bamname =~ s/\.bam//;                   # Remove the extension
         $bamname =~ s/\.cram//;
         print "$qcdir/$bamname.vb.selfSM\n";
@@ -302,9 +314,9 @@ sub WhereFile {
     if ($set eq 'b37') {
         my %files = ();
         foreach ('', '2', '3', '4', '5', '6', '7', '8') {
-            my $p = abs_path("$opts{netdir}$_/$opts{wresults37dir}/$centername/$piname/$nwdid/bams/$nwdid.recal.cram");
+            my $p = abs_path("$opts{netdir}$_/$opts{wresults37dir}/$centername/$piname/$nwdid/bams/$nwdid.recal.cram") || '';
             if ($p) { $files{$p} = 1; next; }
-            $p = abs_path("$opts{netdir}$_/$opts{iresults37dir}/$centername/$piname/$nwdid/bams/$nwdid.recal.cram");
+            $p = abs_path("$opts{netdir}$_/$opts{iresults37dir}/$centername/$piname/$nwdid/bams/$nwdid.recal.cram") || '';
             if ($p) { $files{$p} = 1; next; }
         }
         my @found = keys %files;
@@ -320,7 +332,7 @@ sub WhereFile {
         die "$Script - b38 file paths are not really known yet\n";
         my %files = ();
         foreach ('', '2', '3', '4', '5', '6', '7', '8') {
-            my $p = abs_path("$opts{netdir}$_/$opts{results38dir}/$centername/$piname/$nwdid/bams/$nwdid.recal.cram");
+            my $p = abs_path("$opts{netdir}$_/$opts{results38dir}/$centername/$piname/$nwdid/bams/$nwdid.recal.cram") || '';
             if ($p) { $files{$p} = 1; next; }
         }
         my @found = keys %files;
