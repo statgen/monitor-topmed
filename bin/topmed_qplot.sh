@@ -83,6 +83,12 @@ if [ ! -f $bai ]; then
   exit 3
 fi
 
+nwdid=`$topmedcmd -persist show $bamid expt_sampleid`
+if [ "$nwdid" = "" ]; then
+  echo "Unable to find the NWDID for '$bamid'"
+  exit 6
+fi
+
 #   Create output directory and CD there
 outdir=`$topmedpath wherepath $bamid qcresults`
 if [ "$outdir" = "" ]; then
@@ -129,26 +135,20 @@ fi
 #   One last sanity check. Qplot can easily be fooled if samtools truncates
 #   when reading the bamfile (NFS surprise).
 #   This should fail if the TotalReads < bmflagstat value + 5000 
-bamflagstat=`$topmedpath show $bamid bamflagstat`   # Same for cram or bam
-n=`expr $bamflagstat + 5000`
-tr=`grep TotalReads $nwdid.src.qp.stats | awk '{ print $2 }'
-tr=`expr $tr \* 1000000`
-if [ "$tr" -le "$n" ]; then
-  echo "QPLOT data must have been truncated. TotalReads=$tr  Flagstat=$n"
+bamflagstat=`$topmedcmd show $bamid bamflagstat`   # Same for cram or bam
+tr=`grep TotalReads $nwdid.src.qp.stats | awk '{ print $2 }'`
+tr=`perl -E "print $tr*1000000"`    # Man is hard to do mutiply of float in shell !
+tr=`expr $tr + 5001`
+if [ "$tr" -lt "$bamflagstat" ]; then
+  echo "QPLOT data must have been truncated. TotalReads=$tr  Flagstat=$bamflagstat"
   $topmedcmd -persist mark $bamid $markverb failed
   exit 3
 fi
-echo "Qplot output seems reasonable: TotalReads=$tr  Flagstat=$n"
+echo "Qplot output seems reasonable: TotalReads=$tr  Flagstat=$bamflagstat"
 
 etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "QPLOT on '$bamfile' successful (at second $etime)"
-
-nwdid=`$topmedcmd -persist show $bamid expt_sampleid`
-if [ "$nwdid" = "" ]; then
-  echo "Unable to find the NWDID for '$bamid'"
-  exit 6
-fi
 
 #   Run verifybamid, output written to current working directory
 #   Notice the special case for a cram.  Very non-production looking
