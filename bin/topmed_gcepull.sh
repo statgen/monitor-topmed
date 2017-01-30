@@ -25,7 +25,7 @@ if [ "$1" = "-submit" ]; then
     exit 4
   fi 
 
-  # Run this on node where remapped cram lives
+  # Run this on node where remapped cram will live
   h=`$topmedpath whathost $1 b$build`
   if [ "$h" != "" ]; then
     realhost="--nodelist=$h"
@@ -109,7 +109,7 @@ echo "$nwdid data will be copied to $crampath"
 echo "Checking if flagstat is as we expect"
 $gsutil cp  $incominguri/$nwdid/$nwdid.recab.cram.flagstat $crampath
 if [ "$?" != "0" ]; then
-  echo "Failed to copy file to Google Cloud"
+  echo "Failed to copy flagstat from Google Cloud"
   $topmedcmd -persist mark $bamid $markverb failed
   exit 3
 fi
