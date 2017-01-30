@@ -201,11 +201,11 @@ sub ProcessGet {
                 if ($f !~ /daemon/) { $s .= "<b>Showing $f</b>" . `tail -6 $f`; }
             }
             #   Show more details for logs we are really interested in at the moment
-            foreach my $f (qw(
-                topmed_monitor_ncbi.log
-                )) {
-                  $s .= "<pre><b>More Details on $f</b>\n" . `tail -60 $f` . "</pre>$f\n";
-            }
+            #foreach my $f (qw(
+            #    topmed_monitor_ncbi.log
+            #    )) {
+            #      $s .= "<pre><b>More Details on $f</b>\n" . `tail -60 $f` . "</pre>$f\n";
+            #}
         }
         SendText($conn, $s);
         return;
