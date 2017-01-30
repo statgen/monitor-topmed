@@ -223,7 +223,7 @@ sub WhatHost {
     #   Find where the backup CRAM lives and show host
     if ($set eq 'backup' || $set eq 'cram') {
         my $backuphost = 'none';
-        my $bakbamfdir = abs_path("$opts{netdir}/$opts{backupsdir}/$centername/$rundir") || '';
+        my $bakbamfdir = abs_path("$opts{netdir}/$opts{backupsdir}/$centername/$rundir");
         if ($bakbamfdir =~ /\/net\/([^\/]+)\//) { $backuphost = $1; }
         print "$backuphost\n";
         exit;
@@ -238,9 +238,17 @@ sub WhatHost {
         exit;
     }
 
-    if ($set =~ /b(?:37|38)/) {
+    if ($set eq 'b37') {
       say $sample->host;
       exit;
+    }
+
+    if ($set eq 'b38') {
+        #   Remapped b38 files are on topmed9 or 10
+        my $host = 'topmed10';
+        if ($bamid % 2) { $host = 'topmed9'; }
+        print $host . "\n";
+        exit;
     }
 
     die "$Script - Unknown Where option '$set'\n";
@@ -313,7 +321,7 @@ sub WhereFile {
     #   Try to guess where the b37 remapped CRAM lives
     if ($set eq 'b37') {
         my %files = ();
-        foreach ('', '2', '3', '4', '5', '6', '7', '8') {
+        foreach ('', '2', '3', '4', '5', '6', '7', '8', '9', '10') {
             my $p = abs_path("$opts{netdir}$_/$opts{wresults37dir}/$centername/$piname/$nwdid/bams/$nwdid.recal.cram") || '';
             if ($p) { $files{$p} = 1; next; }
             $p = abs_path("$opts{netdir}$_/$opts{iresults37dir}/$centername/$piname/$nwdid/bams/$nwdid.recal.cram") || '';
