@@ -47,15 +47,8 @@ outfile="/tmp/$outfile.tmp"
 
 #   Get flagstat values for bam or cram
 echo "Calculating $colname for $amfile"
-a=`echo $amfile | grep .cram`
-if [ "$a" = "" ]; then
-  $samtools flagstat  $amfile > $outfile
-  rc=$?
-else
-  $samtools view  -u -T  $ref $amfile | $samtools flagstat  - >  $outfile
-  rc=$?
-fi
-if [ "$rc" != "0" ]; then
+$samtools flagstat  $amfile > $outfile
+if [ "$?" != "0" ]; then
   echo "$me - Command failed: $samtools flagstat $amfile. Results in $outfile"
   exit 2
 fi
