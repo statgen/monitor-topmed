@@ -49,6 +49,7 @@ our %opts = (
     qcresultsdir => 'incoming/qc.results',
     incomingdir => 'incoming/topmed',
     backupsdir => 'working/backups/incoming/topmed',
+    bcfsdir => 'working/candidate_variants',
     consoledir => 'working/topmed-output',
     wresults37dir => 'working/schelcj/results',
     iresults37dir => 'incoming/schelcj/results',
@@ -63,9 +64,9 @@ Getopt::Long::GetOptions( \%opts,qw(
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
     my $m = "$Script [options] [-persist]";
-    warn "$m wherepath|where bamid|nwdid bam|backup|cram|qcresults|console|b37|b38\n" .
+    warn "$m wherepath|where bamid|nwdid bam|backup|cram|qcresults|console|b37|b38|bcf\n" .
         "  or\n" .
-        "$m whathost bamid|nwdid bam|backup|cram|qcresults|b37|b38\n" .
+        "$m whathost bamid|nwdid bam|backup|cram|qcresults|b37|b38|bcf\n" .
         "  or\n" .
         "$m wherefile bamid|nwdid bam|backup|cram|qcresults|b37|b38\n" .
         "  or\n" .
@@ -150,7 +151,7 @@ sub WherePath {
  
     #   Print where SLURM console output can be found
     if ($set eq 'console') {
-        my $dir = abs_path("$opts{netdir}/$opts{consoledir}") || '';
+        my $dir = "$opts{netdir}/$opts{consoledir}";
         print "$dir\n";
         exit;
     }
@@ -165,12 +166,21 @@ sub WherePath {
         if ($bamid % 2) { $host = 'topmed9'; }
         my $dir = "/net/$host/working/mapping/results/$centername/$piname/h38/$nwdid";
         mkdir $dir,0755 ||
-            die "$Script - Unable to create path for '$bamid' to '$dir': $!\n";
+            die "$Script - Unable to create b38 path for '$bamid' to '$dir': $!\n";
         print $dir . "\n";
         exit;
         #   For the moment, this is broken. Remapped files are on topmed9 or 10
         #my $meth = qq{${set}_mapped_path};
         #say $sample->$meth;
+        exit;
+    }
+ 
+    if ($set eq 'bcf') {
+        my $host = 'topmed8';
+        my $dir = "/net/$host/$opts{bcfsdir}/$piname";
+        mkdir $dir,0755 ||
+            die "$Script - Unable to create bcf path for '$bamid' to '$dir': $!\n";
+        print $dir . "\n";
         exit;
     }
  
@@ -247,6 +257,12 @@ sub WhatHost {
         #   Remapped b38 files are on topmed9 or 10
         my $host = 'topmed10';
         if ($bamid % 2) { $host = 'topmed9'; }
+        print $host . "\n";
+        exit;
+    }
+
+    if ($set eq 'bcf') {
+        my $host = 'topmed8';
         print $host . "\n";
         exit;
     }
