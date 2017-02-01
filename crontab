@@ -37,6 +37,7 @@
 39    *    *   *     *    /usr/cluster/topmed/bin/topmed_monitor.pl bai    >> /working/topmed-output/topmed_monitor_bai.log 2>&1
 49    *    *   *     *    /usr/cluster/topmed/bin/topmed_monitor.pl qplot  >> /working/topmed-output/topmed_monitor_qplot.log 2>&1
 59    *    *   *     *    /usr/cluster/topmed/bin/topmed_monitor.pl cram >> /working/topmed-output/topmed_monitor_cram.log 2>&1
+15    1,7,13,19 * *  *    /usr/cluster/topmed/bin/topmed_monitor.pl -max 450  spull >> /working/topmed-output/topmed_monitor_gce.log 2>&1
 #   Update status fields so the monitor will show colored states
 07,27,37,57   *  *  *  *   /usr/cluster/topmed/bin/topmed_status.pl runstatus >> /working/topmed-output/topmed_status.log 2>&1
 #
