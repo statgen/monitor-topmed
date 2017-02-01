@@ -220,10 +220,16 @@ if ($fcn == 'showout') {                // Show output from a SLURM job
     if ($samplestate == 'I') { $s = 'bai'; }
     if ($samplestate == 'Q') { $s = 'qplot'; }
     if ($samplestate == 'C') { $s = 'cram'; }
-    $cmd = "/usr/cluster/monitor/bin/topmedpath.pl wherepath $bamid console $s";
-    $ss = rtrim(`$cmd`);
+    if ($samplestate == 's') { $s = 'gcepush'; }
+    if ($samplestate == 'r') { $s = 'gcepull'; }
+    if ($samplestate == 'Z') { $s = 'gcepost'; }
+    //$cmd = "/usr/cluster/topmed/bin/topmedpath.pl wherepath $bamid console $s";
+    //$ss = rtrim(`$cmd`);
+    // Hardcoded path cause mario won't play with topmedpath.pl
+    $ss = '/net/topmed/working/topmed-output';
     $a = $ss . '/' . $bamid . "-$s.out";
     print "<h4 align='center'>SLURM console log for '$s' BAMID=$bamid</h4>\n<pre>\n";
+    //print "CMD=$cmd\na=$a\n";
     if (! file_exists($a)) { print "No console file found for '$bamid' ($a)\n"; }
     else {
         $cmd = "cat $a";
@@ -268,21 +274,21 @@ if ($fcn == 'restartjobs') {
 
 if ($fcn == 'showqlocal') {
     print "<center>$SHOWSTATUS &nbsp;&nbsp;&nbsp;</center>\n";
-    $cmd = "/usr/cluster/monitor/bin/slurm_query.sh -squeue ignored ignored";
+    $cmd = "/usr/cluster/topmed/bin/slurm_query.sh -squeue ignored ignored";
     print `$cmd`;
     exit;
 }
 
 if ($fcn == 'df') {
     print "<center>$SHOWSTATUS &nbsp;&nbsp;&nbsp;</center>\n";
-    $cmd = "/usr/cluster/monitor/bin/slurm_query.sh -df ignored";
+    $cmd = "/usr/cluster/topmed/bin/slurm_query.sh -df ignored";
     print `$cmd`;
     exit;
 }
 
 if ($fcn == 'logs') {
     print "<center>$SHOWSTATUS &nbsp;&nbsp;&nbsp;</center>\n";
-    $cmd = "/usr/cluster/monitor/bin/slurm_query.sh -logs ignored";
+    $cmd = "/usr/cluster/topmed/bin/slurm_query.sh -logs ignored";
     print `$cmd`;
     exit;
 }
