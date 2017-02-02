@@ -33,13 +33,9 @@ if [ "$1" = "-submit" ]; then
   h=`$topmedpath whathost $1 bam`
   if [ "$h" != "" ]; then
     qos="--qos=$h-$me"
+    nodefile="--nodefile=$h"
   fi
 
-  # Maybe a list of nodes was specified to constrain where something runs?
-  f=/tmp/qplot.nodelist.txt
-  if [ -f $f ]; then
-    nodefile="--nodefile=$f"
-  fi
   #   Can run anywhere. Low rate of access to cram, small output
   l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos $nodefile --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $*`)
   if [ "$?" != "0" ]; then
