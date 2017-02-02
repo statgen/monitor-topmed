@@ -25,7 +25,8 @@ $STATUSLETTERS =  "<i><b>A</b>=File Arrived, <b>5</b>=MD5 Verified, <b>C</b>=BAM
     "<b>Z</b>=PostProcess GCE Build=38 data, <b>8</b>=Remapped Build=38, <b>X</b>=EXPT=>NCBI<br/>" .
     "<b>S</b>=Secondary BAM=>NCBI, <b>P=</b>B38=>Primary BAM=>NCBI, <b>T</b>=b38=>Tertiary BAM=>NCBI";
 
-$SHOWSTATUS = "STATUS: &nbsp;&nbsp;&nbsp;" .
+$SHOWSTATUS = "STATUS: " .
+    "<a onclick='javascript:window.location.reload()'><img src='refresh.png' alt='refresh'></a>&nbsp;&nbsp;" .
     "<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=showqlocal' " .
     "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=showqlocal\",680,720); " .
     "return false;'>Local Queue</a> &nbsp;&nbsp;&nbsp;" .
