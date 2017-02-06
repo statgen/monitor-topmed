@@ -162,16 +162,8 @@ sub WherePath {
     }
 
     if ($set eq 'b38') {
-        my $host = 'topmed10';
-        if ($bamid % 2) { $host = 'topmed9'; }
-        my $dir = "/net/$host/working/mapping/results/$centername/$piname/h38/$nwdid";
-        mkdir $dir,0755 ||
-            die "$Script - Unable to create b38 path for '$bamid' to '$dir': $!\n";
-        print $dir . "\n";
-        exit;
-        #   For the moment, this is broken. Remapped files are on topmed9 or 10
-        #my $meth = qq{${set}_mapped_path};
-        #say $sample->$meth;
+        my $meth = qq{${set}_mapped_path};
+        say $sample->$meth;
         exit;
     }
  
