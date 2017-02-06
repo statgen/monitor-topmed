@@ -814,10 +814,10 @@ sub b37_mapped_path {
 
 sub b38_mapped_path {
   my $self = shift;
-  my $path = YASF->new('/net/{host}/working/mapping/results/{center}/{pi}/hg38/{nwdid}');
+  my $path = YASF->new('/net/{host}/working/mapping/results/{center}/{pi}/b38/{nwdid}');
 
   my $outdir = $path % {
-    host   => $self->host,
+    host   => ($self->bamid % 2) ? 'topmed9' : 'topmed10',
     center => $self->center,
     pi     => $self->piname,
     nwdid  => $self->expt_sampleid,
