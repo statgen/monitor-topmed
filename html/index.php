@@ -22,8 +22,8 @@ include_once "edit.php";
 $qurl =  $_SERVER['SCRIPT_NAME'] . "?fcn=queue'";
 $STATUSLETTERS =  "<i><b>A</b>=File Arrived, <b>5</b>=MD5 Verified, <b>C</b>=BAM=>CRAM, <b>I</b>=BAI created<br/>" .
     "<b>Q</b>=qplot run, <b>7</b>=Remapped Build=37, <b>s</b>=Push Build=38 to GCE, <b>s</b>=Pull Build=38 from GCE,<br/>" .
-    "<b>Z</b>=PostProcess GCE Build=38 data, <b>8</b>=Remapped Build=38, <b>X</b>=EXPT=>NCBI<br/>" .
-    "<b>S</b>=Secondary BAM=>NCBI, <b>P=</b>B38=>Primary BAM=>NCBI, <b>T</b>=b38=>Tertiary BAM=>NCBI";
+    "<b>Z</b>=PostProcess GCE Build=38 data, <b>8</b>=Remapped Build=38, <b>B</b>=BCF created<br/>" .
+    "<b>X</b>=EXPT=>NCBI <b>S</b>=Secondary BAM=>NCBI, <b>P=</b>B38=>Primary BAM=>NCBI, <b>T</b>=b38=>Tertiary BAM=>NCBI";
 
 $SHOWSTATUS = "STATUS: " .
     "<a onclick='javascript:window.location.reload()'><img src='refresh.png' alt='refresh'></a>&nbsp;&nbsp;" .
@@ -67,6 +67,16 @@ $RUNNOTE = "<p><b>Note:</b><br>" .
     "<b>N</b> Not to be copied<br>" .
     "</p>\n";
 
+//  How to add a column to this program
+//      Define state_ flag in SQL
+//      Add sql column name => topmedcmd verb in $quickcols (order matters)
+//      Add sql column name => letter in $quickletter (order matters)
+//      Add topmedverb in $validfunctions
+//      Add name in $TOPMEDJOBNAMES
+//  Make changes in topmedcmd.pl
+//  Make changes to topmed_status.pl
+//  Make changes to topmed_monitor.pl
+//  Create QOS for this new type of action
 $quickcols = array(                     // Map of status column to topmedcmd verb
     'state_arrive'   => 'arrived',
     'state_md5ver'   => 'md5ver',
@@ -78,6 +88,7 @@ $quickcols = array(                     // Map of status column to topmedcmd ver
     'state_gce38pull'=> 'gce38pull',
     'state_gce38post'=> 'gce38post',
     'state_b38'      => 'mapping38',
+    'state_bcf'      => 'bcf',
     'state_ncbiexpt' => 'sendexpt',
     'state_ncbiorig' => 'sendorig',
     'state_ncbib37'  => 'sendb37',
@@ -94,12 +105,13 @@ $quickletter = array(                   // Map of status column to letter we see
     'state_gce38pull'=> 'r',
     'state_gce38post'=> 'Z',
     'state_b38'      => '8',
+    'state_bcf'      => 'B',
     'state_ncbiexpt' => 'X',
     'state_ncbiorig' => 'S',
     'state_ncbib37'  => 'P',
     'state_ncbib38'  => 'T'
 );
-$validfunctions = array('all', 'verify', 'bai', 'qplot', 'cram', 'sexpt', 'sorig', 'sb37', 'push38', 'pull38', 'post38', 'sb38');
+$validfunctions = array('all', 'verify', 'bai', 'qplot', 'cram', 'sexpt', 'sorig', 'sb37', 'push38', 'pull38', 'post38', 'sb38', 'bcf');
 $NOTSET = 0;                // Not set
 $REQUESTED = 1;             // Task requested
 $SUBMITTED = 2;             // Task submitted to be run
@@ -121,7 +133,7 @@ $state2str = array(         // Values here are class for SPAN tag
     $FAILED => 'failed'
 );
 
-$TOPMEDJOBNAMES = array('verify', 'bai', 'qplot', 'cram', 'expt', 'orig', 'b37', 'push38', 'pull38', 'post38', 'b38');
+$TOPMEDJOBNAMES = array('verify', 'bai', 'qplot', 'cram', 'expt', 'orig', 'b37', 'push38', 'pull38', 'post38', 'b38', 'bcf');
 
 //  These columns are state values to be converted to people readable strings
 //  See DateState() for possible values
