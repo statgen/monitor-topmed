@@ -246,11 +246,8 @@ sub WhatHost {
     }
 
     if ($set eq 'b38') {
-        #   Remapped b38 files are on topmed9 or 10
-        my $host = 'topmed10';
-        if ($bamid % 2) { $host = 'topmed9'; }
-        print $host . "\n";
-        exit;
+      say $sample->host;
+      exit;
     }
 
     if ($set eq 'bcf') {
