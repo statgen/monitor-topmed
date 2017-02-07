@@ -30,11 +30,13 @@ use My_DB;
 use TopMed_Get;
 use Getopt::Long;
 
+#   How to add a column to this program
+#       Add db column => 'letter'
+
 #   These represent states the run can be in. column name to letter
 my %attributes2letter = (
     'state_arrive'   => 'A',
     'state_md5ver'   => '5',
-    'state_backup'   => 'B',
     'state_bai'      => 'I',
     'state_qplot'    => 'Q',
     'state_cram'     => 'C',
@@ -44,6 +46,7 @@ my %attributes2letter = (
     'state_gce38pull'=> 'r',
     'state_gce38post'=> 'Z',
     'state_b38'      => '8',
+    'state_bcf'      => 'B',
     'state_ncbiorig' => 'S',
     'state_ncbib37'  => 'P',
     'state_ncbib38'  => 'T',
