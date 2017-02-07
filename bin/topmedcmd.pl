@@ -41,6 +41,9 @@ my $COMPLETED = 20;                 # Task completed successfully
 my $CANCELLED = 89;                 # Task cancelled
 my $FAILED    = 99;                 # Task failed
 
+#   How to add a column to this program
+#       Add verbname => db column name to %VALIDVERBS
+#       Add operation verb to %VALIDOPS
 my %VALIDVERBS = (                  # Valid verbs to database colum
     arrived     => 'state_arrive',
     md5verified => 'state_md5ver',
@@ -54,6 +57,7 @@ my %VALIDVERBS = (                  # Valid verbs to database colum
     gcepulled   => 'state_gce38pull',
     gceposted   => 'state_gce38post',
     mapped38    => 'state_b38',     
+    bcfed       => 'state_bcf',     
     sentorig    => 'state_ncbiorig',
     sentb37     => 'state_ncbib37',
     sentb38     => 'state_ncbib38', 
@@ -80,6 +84,7 @@ my %VALIDOPS = (                    # Used for permit
     sorig => 1,
     sb37 => 1,
     sb38 => 1,
+    sbcf => 1,
     push38 => 1,
     pull38 => 1,
     post38 => 1
@@ -112,9 +117,11 @@ Getopt::Long::GetOptions( \%opts,qw(
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
     my $m = "$Script [options] [-persist]";
-    my $verbs = join(',', sort keys %VALIDVERBS);
-    my $requests = join(',', sort keys %VALIDSTATUS);
-    warn "$m mark bamid|nwdid $verbs $requests\n" .
+    my $verbs = join(' ', sort keys %VALIDVERBS);
+    my $requests = join(' ', sort keys %VALIDSTATUS);
+    warn "$m mark bamid|nwdid action newstatus\n" .
+        "    Where action: $verbs\n" .
+        "    Where newstatus: $requests\n" .
         "  or\n" .
         "$m unmark bamid|nwdid [same list as mark]\n" .
         "  or\n" .
