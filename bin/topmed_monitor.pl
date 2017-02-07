@@ -60,6 +60,7 @@ our %opts = (
     topmedgce38push => "$topmedbin/topmed_gcepush.sh",
     topmedgce38pull => "$topmedbin/topmed_gcepull.sh",
     topmedgce38post => "$topmedbin/topmed_gcepost.sh",
+    topmedbcf  => "$topmedbin/topmed_bcf.sh",
     topmedxml    => "$topmedbin/topmed_xml.pl",
     realm => '/usr/cluster/topmed/etc/.db_connections/topmed',
     centers_table => 'centers',
@@ -83,7 +84,7 @@ Getopt::Long::GetOptions( \%opts,qw(
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$Script [options] arrive|verify|bai|qplot|cram|sexpt|sorig|sb37|spush|spull|spost|sb38\n" .
+    warn "$Script [options] arrive|verify|bai|qplot|cram|sexpt|sorig|sb37|spush|spull|spost|sb38|bcf\n" .
         "Find runs which need some action and queue a request to do it.\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
@@ -292,6 +293,7 @@ if ($fcn eq 'qplot') {
     ShowSummary($fcn);
     exit;
 }
+
 #--------------------------------------------------------------
 #   Create experiment XML and sent it to NCBI for this NWDID
 #--------------------------------------------------------------
@@ -512,14 +514,12 @@ if ($fcn eq 'spull') {
             if (! $rowsofdata) { next; }
             for (my $i=1; $i<=$rowsofdata; $i++) {
                 my $href = $sth->fetchrow_hashref;
-
-                #   Only get data if remap was done
+                #   Only get data if remap was done and requested
                 if ($href->{state_gce38push} != $COMPLETED) { next; }
                 if ($opts{suberr} && $href->{state_gce38pull} >= $FAILED) {
                     $href->{state_gce38pull} = $REQUESTED;
                 }
-                if ($href->{state_gce38pull} != $NOTSET &&
-                    $href->{state_gce38pull} != $REQUESTED) { next; }
+                if ($href->{state_gce38pull} != $REQUESTED) { next; }
 
                 #   Send the CRAM to Google
                 BatchSubmit("$opts{topmedgce38pull} -submit $href->{bamid}");
@@ -578,7 +578,7 @@ if ($fcn eq 'sb38') {
     foreach my $cid (keys %{$centersref}) {
         my $centername = $centersref->{$cid};
         my $runsref = GetRuns($cid) || next;
-        #   For each run, see if there are bamfiles to be delivered to NCBI
+        #   For each run, see if there are bamfiles to be published 
         foreach my $runid (keys %{$runsref}) {
             my $dirname = $runsref->{$runid};
             #   Get list of all bams known at NCBI and that have not been sent
@@ -612,6 +612,45 @@ if ($fcn eq 'sb38') {
                 if ($href->{state_ncbib38} != $NOTSET && $href->{state_ncbib38} != $REQUESTED) { next; }
                 #   Send the remapped CRAM to NCBI
                 BatchSubmit("$opts{topmedncbib38} -submit $href->{bamid}");
+            }
+        }
+    }
+    ShowSummary($fcn);
+    exit;
+}
+
+#--------------------------------------------------------------
+#   Create BCF file
+#--------------------------------------------------------------
+if ($fcn eq 'bcf') {
+    #   Get all the known centers in the database
+    my $centersref = GetCenters();
+    foreach my $cid (keys %{$centersref}) {
+        my $centername = $centersref->{$cid};
+        my $runsref = GetRuns($cid) || next;
+        #   For each run, see if there are files to create BCF for
+        foreach my $runid (keys %{$runsref}) {
+            my $dirname = $runsref->{$runid};
+            #   Get list of all bams that have not yet arrived properly
+            my $sql = "SELECT bamid,bamname,donot_remap,state_b38,state_bcf FROM " .
+                $opts{bamfiles_table} . " WHERE runid='$runid'";
+            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
+            my $sth = DoSQL($sql);
+            my $rowsofdata = $sth->rows();
+            if (! $rowsofdata) { next; }
+            for (my $i=1; $i<=$rowsofdata; $i++) {
+                my $href = $sth->fetchrow_hashref;
+                #   Only do BCF if this was remapped to build 38
+                if ($href->{state_b38} != $COMPLETED) { next; }
+
+#   This is probably wrong
+                #   Only do BCF if this was remapped to build 38    Hardcoded build!
+                if ($href->{donot_remap} ne '38') { next; }
+
+                if ($opts{suberr} && $href->{state_bcf} >= $FAILEDCHECKSUM) { $href->{state_bcf} = $REQUESTED; }
+                if ($href->{state_bcf} != $NOTSET && $href->{state_bcf} != $REQUESTED) { next; }
+                #   Run the command
+                BatchSubmit("$opts{topmedbcf} -submit $href->{bamid}");
             }
         }
     }
