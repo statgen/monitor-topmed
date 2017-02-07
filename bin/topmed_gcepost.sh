@@ -118,6 +118,7 @@ if [ $gce_checksum != "" ]; then        # File does exist in gcepost.  Check MD5
         exit 3
     fi
     echo "MD5 for local and GCE file match ($md5)"
+    $topmedcmd -persist set $bamid b38cramchecksum $md5
 fi
 
 #   Create crai for cram
@@ -158,6 +159,7 @@ etime=`expr $etime - $stime`
 echo "Post processing of remapped CRAM ($crampath) completed in $etime seconds"
 $topmedcmd -persist mark $bamid $markverb completed
 $topmedcmd -persist mark $bamid mapped$build completed
+$topmedcmd -persist mark $bamid bcfed completed
 $gsutil rm $incominguri/$nwdid/$cramfile.flagstat
 $gsutil rm $incominguri/$nwdid/$cramfile
 echo `date` $me $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
