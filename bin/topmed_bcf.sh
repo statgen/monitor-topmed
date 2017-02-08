@@ -1,21 +1,20 @@
 #!/bin/bash
 #
-#   topmed_gcepost.sh -submit| bamid
+#   topmed_bcf.sh -submit| bamid
 #
-#	Post-process a remapped CRAM after being pulled from Google Cloud
+#	Create BCF file for a remapped CRAM
 #
 . /usr/cluster/topmed/bin/topmed_actions.inc
 vt=/net/wonderland/home/lefaivej/bin/vt
+vtref=/net/topmed/working/mapping/gotcloud/ref/hg38/hs38DH.fa
 
-me=gcepost
+me=bcf
 mem=2G
 markverb="${me}ed"
 constraint="--constraint eth-10g"
 qos="--qos=topmed-$me"
 slurmp=topmed-working
 realhost=''
-gsutil='gsutil -o GSUtil:parallel_composite_upload_threshold=150M'
-incominguri='gs://topmed-recabs'
 build=38
 
 if [ "$1" = "-submit" ]; then
@@ -27,7 +26,7 @@ if [ "$1" = "-submit" ]; then
   fi 
 
   # Run this on node where remapped cram lives
-  #h=`$topmedpath whathost $1 b$build`
+  #h=`$topmedpath -fallback whathost $1 b$build`
   #if [ "$h" != "" ]; then
   #  realhost="--nodelist=$h"
   #  #qos="--qos=$h-$me"
@@ -51,7 +50,7 @@ if [ "$1" = "" ]; then
   me=`basename $0`
   echo "Usage: $me [-submit] bamid"
   echo ""
-  echo "Post-process a remapped CRAM after being pulled from Google Cloud"
+  echo "Create BCF file for a remapped CRAM"
   exit 1
 fi
 bamid=$1
@@ -60,9 +59,9 @@ d=`date +%Y/%m/%d`
 s=`hostname`
 p=`pwd`
 
-crampath=`$topmedpath wherepath $bamid b$build`
+crampath=`$topmedpath -fallback wherepath $bamid b$build`
 if [ "$crampath" = "" ]; then
-  echo "Unable to determine where remapped CRAM file should go for '$bamid'"
+  echo "Unable to determine where remapped CRAM file should be for '$bamid'"
   $topmedcmd -persist mark $bamid $markverb failed
   exit 2
 fi
@@ -88,49 +87,52 @@ if [ "$nwdid" = "" ]; then
   $topmedcmd -persist mark $bamid $markverb failed
   exit 2
 fi
-
-#   Start by looking for file in GCE.  If there, get the MD5 for it and compare with ours
-stime=`date +%s`
-cramfile=$nwdid.recab.cram
+cramfile=`$topmedpath -fallback wherefile $bamid b$build`
 if [ ! -f $cramfile ]; then
-  echo "Unable to find the remapped data for '$bamid' [$nwdid] cramfile=$cramfile"
-  pwd
+  echo "Unable to find remapped cram file '$cramfile'"
   $topmedcmd -persist mark $bamid $markverb failed
   exit 2
 fi
 
-#   Compare MD5 of file in GCE and local file. If this is rerun, the GCE file might not exist
-echo "Calculating MD5 for local file ($cramfile)"
-md5=(`md5sum $cramfile`)
-md5=${md5[0]}
-if [ "$md5" = "" ]; then
-  echo "Unable to calculate MD5 for remapped '$bamid' [$nwdid] cramfile=$cramfile"
+#   Create crai for cram if it does not exist
+crai="$cramfile.crai"
+if [ ! -f $crai ]; then
+  echo "Creating index file '$cramfile'"
+  $samtools index $cramfile 2>&1
+  if [ "$?" != "0" ]; then
+    echo "Unable to create index file for bamid '$bamid' [$nwdid]"
+    $topmedcmd -persist mark $bamid $markverb failed
+    exit 2
+  fi
+  echo "Created CRAI file for bamid '$bamid' [$nwdid]"
+fi
+
+#   Create the BCF file
+bcfdir=`$topmedpath wherepath $bamid bcf`
+mkdir -p $bcfdir
+if [ "$?" != "0" ]; then
+  echo "Unable to create BCF output directory for '$bamid' [$nwdid] - $bcfdir"
   $topmedcmd -persist mark $bamid $markverb failed
   exit 2
 fi
-$topmedcmd -persist set $bamid b38cramchecksum $md5
-echo "Set checksum for b$build file"
+bcffile=$bcfdir/$nwdid.bcf
 
-export BOTO_CONFIG=/net/topmed/working/shared/tpg_gsutil_config.txt
-gce_checksum="$(gsutil stat $incominguri/$nwdid/$cramfile |grep 'md5'|awk {'print $3'}|base64 -d|hexdump -ve '/1 "%02x"')"
-if [ "$gce_checksum" != "" ]; then        # File does exist in gcepost.  Check MD5
-    if [ "$md5" != "$gce_checksum" ]; then
-        echo "Local file ($cramfile) checksum ($md5) does not match $gce_checksum for bamid '$bamid' [$nwdid]"
-        $topmedcmd -persist mark $bamid $markverb failed
-        exit 3
-    fi
-    echo "MD5 for local and GCE file match ($md5)"
-else
-  echo ""
-  echo "Cannot actually verify the GCE checksum and the MD5 of the file. Assume it is OK"
+$vt discover -b $cramfile -s $nwdid -r $vtref -o $bcffile
+if [ "$?" != "0" ]; then
+  echo "Unable to run VT DISCOVER for bamid '$bamid' [$nwdid] on $cramfile creating $bcffile"
+  $topmedcmd -persist mark $bamid $markverb failed
+  exit 2
+fi
+bcftools index $bcffile
+if [ "$?" != "0" ]; then
+  echo "Unable to run BCFTOOLS for bamid '$bamid' [$nwdid] on $bcffile"
+  $topmedcmd -persist mark $bamid $markverb failed
+  exit 2
 fi
 
 etime=`date +%s`
 etime=`expr $etime - $stime`
-echo "Post processing of remapped CRAM ($crampath) completed in $etime seconds"
+echo "Created BCF file for remapped CRAM ($crampath) completed in $etime seconds"
 $topmedcmd -persist mark $bamid $markverb completed
-$topmedcmd -persist mark $bamid mapped$build completed
-$gsutil rm $incominguri/$nwdid/$cramfile.flagstat 
-$gsutil rm $incominguri/$nwdid/$cramfile
 echo `date` $me $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
 exit

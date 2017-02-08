@@ -107,11 +107,21 @@ if [ "$?" != "0" ]; then
 fi
 
 #   Tell the Google Cloud processes that a new file has shown up
-curl -f -i -u "csg:WV9kNT35udEE6B9Q" --insecure --data $nwdid https://104.198.71.226/api/unprocessed-samples
-if [ "$?" != "0" ]; then
-  echo "Failed to notify Google Cloud that new file arrived"
-  $topmedcmd -persist mark $bamid $markverb failed
-  exit 3
+tmp=/tmp/$$.curloutput
+curl -f -i -u "csg:WV9kNT35udEE6B9Q" --insecure --data $nwdid --output $tmp  https://104.198.71.226/api/unprocessed-samples
+rc=$?
+cat $tmp                                # So curl results are in log
+a=`grep 'Unprocessable Entity' $tmp`    # Look for errors that are not errors we care about
+rm $tmp
+if [ "$a" = "" ]; then
+  if [ "$rc" != "0" ]; then
+    echo "Failed to notify Google Cloud that new file arrived"
+    $topmedcmd -persist mark $bamid $markverb failed
+    exit 3
+  fi
+else
+  echo "I think an Unprocessable Entity means this file was just being sent by accident"
+  echo "If that is not the case, get the sample in GCE marked to be reprocessed and repush"
 fi
 
 etime=`date +%s`

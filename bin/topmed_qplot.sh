@@ -19,7 +19,7 @@ constraint="--constraint eth-10g"       # Force to major nodes, not r63xx nodes
 qos=''
 slurmp=topmed
 realhost=''
-nodefile=''
+nodelist=''
 
 if [ "$1" = "-submit" ]; then
   shift
@@ -33,14 +33,14 @@ if [ "$1" = "-submit" ]; then
   h=`$topmedpath whathost $1 bam`
   if [ "$h" != "" ]; then
     qos="--qos=$h-$me"
-    nodefile="--nodefile=$h"
+    nodelist="--nodelist=$h"
   fi
 
   #   Can run anywhere. Low rate of access to cram, small output
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos $nodefile --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $*`)
+  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos $nodelist --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $*`)
   if [ "$?" != "0" ]; then
     echo "Failed to submit command to SLURM"
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos $nodefile --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $*"
+    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos $nodelist --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $*"
     exit 1
   fi
   $topmedcmd mark $1 $markverb submitted

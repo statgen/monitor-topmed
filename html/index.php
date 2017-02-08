@@ -22,8 +22,8 @@ include_once "edit.php";
 $qurl =  $_SERVER['SCRIPT_NAME'] . "?fcn=queue'";
 $STATUSLETTERS =  "<i><b>A</b>=File Arrived, <b>5</b>=MD5 Verified, <b>C</b>=BAM=>CRAM, <b>I</b>=BAI created<br/>" .
     "<b>Q</b>=qplot run, <b>7</b>=Remapped Build=37, <b>s</b>=Push Build=38 to GCE, <b>s</b>=Pull Build=38 from GCE,<br/>" .
-    "<b>Z</b>=PostProcess GCE Build=38 data, <b>8</b>=Remapped Build=38, <b>X</b>=EXPT=>NCBI<br/>" .
-    "<b>S</b>=Secondary BAM=>NCBI, <b>P=</b>B38=>Primary BAM=>NCBI, <b>T</b>=b38=>Tertiary BAM=>NCBI";
+    "<b>Z</b>=PostProcess GCE Build=38 data, <b>8</b>=Remapped Build=38, <b>B</b>=BCF created<br/>" .
+    "<b>X</b>=EXPT=>NCBI <b>S</b>=Secondary BAM=>NCBI, <b>P=</b>B38=>Primary BAM=>NCBI, <b>T</b>=b38=>Tertiary BAM=>NCBI";
 
 $SHOWSTATUS = "STATUS: " .
     "<a onclick='javascript:window.location.reload()'><img src='refresh.png' alt='refresh'></a>&nbsp;&nbsp;" .
@@ -67,6 +67,16 @@ $RUNNOTE = "<p><b>Note:</b><br>" .
     "<b>N</b> Not to be copied<br>" .
     "</p>\n";
 
+//  How to add a column to this program
+//      Define state_ flag in SQL
+//      Add sql column name => topmedcmd verb in $quickcols (order matters)
+//      Add sql column name => letter in $quickletter (order matters)
+//      Add topmedverb in $validfunctions
+//      Add name in $TOPMEDJOBNAMES
+//  Make changes in topmedcmd.pl
+//  Make changes to topmed_status.pl
+//  Make changes to topmed_monitor.pl
+//  Create QOS for this new type of action
 $quickcols = array(                     // Map of status column to topmedcmd verb
     'state_arrive'   => 'arrived',
     'state_md5ver'   => 'md5ver',
@@ -78,6 +88,7 @@ $quickcols = array(                     // Map of status column to topmedcmd ver
     'state_gce38pull'=> 'gce38pull',
     'state_gce38post'=> 'gce38post',
     'state_b38'      => 'mapping38',
+    'state_bcf'      => 'bcf',
     'state_ncbiexpt' => 'sendexpt',
     'state_ncbiorig' => 'sendorig',
     'state_ncbib37'  => 'sendb37',
@@ -94,12 +105,13 @@ $quickletter = array(                   // Map of status column to letter we see
     'state_gce38pull'=> 'r',
     'state_gce38post'=> 'Z',
     'state_b38'      => '8',
+    'state_bcf'      => 'B',
     'state_ncbiexpt' => 'X',
     'state_ncbiorig' => 'S',
     'state_ncbib37'  => 'P',
     'state_ncbib38'  => 'T'
 );
-$validfunctions = array('all', 'verify', 'bai', 'qplot', 'cram', 'sexpt', 'sorig', 'sb37', 'push38', 'pull38', 'post38', 'sb38');
+$validfunctions = array('all', 'verify', 'bai', 'qplot', 'cram', 'sexpt', 'sorig', 'sb37', 'push38', 'pull38', 'post38', 'sb38', 'bcf');
 $NOTSET = 0;                // Not set
 $REQUESTED = 1;             // Task requested
 $SUBMITTED = 2;             // Task submitted to be run
@@ -121,7 +133,7 @@ $state2str = array(         // Values here are class for SPAN tag
     $FAILED => 'failed'
 );
 
-$TOPMEDJOBNAMES = array('verify', 'bai', 'qplot', 'cram', 'expt', 'orig', 'b37', 'push38', 'pull38', 'post38', 'b38');
+$TOPMEDJOBNAMES = array('verify', 'bai', 'qplot', 'cram', 'expt', 'orig', 'b37', 'push38', 'pull38', 'post38', 'b38', 'bcf');
 
 //  These columns are state values to be converted to people readable strings
 //  See DateState() for possible values
@@ -219,6 +231,7 @@ if ($fcn == 'showout') {                // Show output from a SLURM job
     $s='none';
     if ($samplestate == '5') { $s = 'verify'; }
     if ($samplestate == 'I') { $s = 'bai'; }
+    if ($samplestate == 'B') { $s = 'bcf'; }
     if ($samplestate == 'Q') { $s = 'qplot'; }
     if ($samplestate == 'C') { $s = 'cram'; }
     if ($samplestate == 's') { $s = 'gcepush'; }
@@ -644,7 +657,7 @@ function ViewBams($runid, $maxdirs, $iammgr) {
     $numrows = SQL_NumRows($result);
 
     //  Show details for each bam
-    $url = $HDR['home'] . "/index.php?center=$centername&amp;maxdir=50";
+    $url = $HDR['home'] . "/index.php?center=$centername&amp;maxdir=$maxdirs";
     $html .= "<h3 align='center'>$bamcount Files for '$runname' [$runid] in center " .
         "<a href='$url'>$center</a></h3>\n";
     $html .= "<p align='center'/>$SHOWSTATUS</p>\n";
@@ -914,7 +927,7 @@ function HandlePermit($op, $center, $run, $id) {
 #   Restart failed, running, or queued jobs
 ---------------------------------------------------------------*/
 function RestartJobs($h) {
-    global $LDB, $SHOWSTATUS, $CENTERS, $CENTERNAME2ID, $validfunctions;
+    global $LDB, $SHOWSTATUS, $CENTERS, $CENTERNAME2ID;
     $url = $_SERVER['PHP_SELF'] . "?fcn=restart";    
     $html = '';
 
@@ -961,9 +974,10 @@ function RestartJobs($h) {
         "<option value='bai'>bai</option>" .
         "<option value='qplot'>qplot</option>" .
         "<option value='cram'>cram</option>" .
-        "<option value='ncbiexpt'>expt</option>" .
-        "<option value='ncbiorig'>orig</option>" .
-        "<option value='ncbib37'>b37</option>" .
+        "<option value='gcepush'>push</option>" .
+        "<option value='gcepull'>pul</option>" .
+        "<option value='gcepost'>post</option>" .
+        "<option value='bcf'>bcf</option>" .
         "</select></td>" .
         "<td><font color='green'>&nbsp; </font></td>" .
         "<td>&nbsp;</td>" .
@@ -983,7 +997,7 @@ function RestartJobs($h) {
 #   Update database for groups of samples in state to new state
 ---------------------------------------------------------------*/
 function HandleRestartJobs($dirname, $samplestate, $op) {
-    global $validfunctions, $LDB;
+    global $LDB;
     if ($dirname == 'none' || $op == 'none') {
         return Emsg("Run or Operation was not specified, try again", 1);
     }

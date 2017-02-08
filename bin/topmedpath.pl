@@ -58,7 +58,7 @@ our %opts = (
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose 
+    help realm=s verbose fallback
     )) || die "$Script - Failed to parse options\n";
 
 #   Simple help if requested
@@ -135,7 +135,7 @@ sub WherePath {
         exit;
     }
  
-    #   Find where the backup file lives
+    #   Find where the cram file lives
     if ($set eq 'backup' || $set eq 'cram') {
         my $bakbamfdir = abs_path("$opts{netdir}/$opts{backupsdir}/$centername/$rundir") || '';
         print "$bakbamfdir\n";
@@ -162,16 +162,29 @@ sub WherePath {
     }
 
     if ($set eq 'b38') {
-        my $host = 'topmed10';
-        if ($bamid % 2) { $host = 'topmed9'; }
-        my $dir = "/net/$host/working/mapping/results/$centername/$piname/h38/$nwdid";
-        mkdir $dir,0755 ||
-            die "$Script - Unable to create b38 path for '$bamid' to '$dir': $!\n";
-        print $dir . "\n";
-        exit;
-        #   For the moment, this is broken. Remapped files are on topmed9 or 10
-        #my $meth = qq{${set}_mapped_path};
-        #say $sample->$meth;
+        my $meth = qq{${set}_mapped_path};
+        my $f = $sample->$meth . ".$nwdid.recab.cram";
+        if (! $opts{fallback}) {      # We want real path, even if it does not exist
+            say $sample->$meth;
+            exit;
+        }
+        #   Fallback specified. File exists, so give the remapped file path
+        if (-f $f) {
+            say $sample->$meth;
+            exit;
+        }      
+        
+        #   No file and fallback requested. If donot_remap is our build, provide path
+        #   to the original cram path.
+        #   Get this wrong and we are messing with the a source tree !
+        #   Note hardcoded build here.  Another chance to fail in the future
+        if ($sample->donot_remap ne '38') {
+            say $sample->$meth;
+            exit;
+        }      
+        #   Return path to the cram file (same as $set = 'cram')
+        my $bakbamfdir = abs_path("$opts{netdir}/$opts{backupsdir}/$centername/$rundir") || '';
+        say $bakbamfdir;
         exit;
     }
  
@@ -204,10 +217,11 @@ sub WhatHost {
     my $sample = $schema->resultset('Bamfile')->find($bamid);
 
     #   Get values of interest from the database
-    my $sth = ExecSQL("SELECT runid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
+    my $sth = ExecSQL("SELECT runid,expt_sampleid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
     my $href = $sth->fetchrow_hashref;
+    my $nwdid = $href->{expt_sampleid};
     my $runid = $href->{runid};
     $sth = ExecSQL("SELECT centerid,dirname FROM $opts{runs_table} WHERE runid=$runid");
     $rowsofdata = $sth->rows();
@@ -254,11 +268,34 @@ sub WhatHost {
     }
 
     if ($set eq 'b38') {
-        #   Remapped b38 files are on topmed9 or 10
-        my $host = 'topmed10';
-        if ($bamid % 2) { $host = 'topmed9'; }
-        print $host . "\n";
+        my $meth = qq{${set}_mapped_path};
+        my $f = $sample->$meth . ".$nwdid.recab.cram";
+        my $h = 'none';
+        if ($f =~ /\/net\/([^\/]+)\//) { $h = $1; }
+        if (! $opts{fallback}) {      # We want real path, even if it does not exist
+            say $h;
+            exit;
+        }
+        #   Fallback specified. File exists, so give the remapped host
+        if (-f $f) {
+            say $h;
+            exit;
+        }      
+        
+        #   No file and fallback requested. If donot_remap is our build, provide path
+        #   to the original cram path.
+        #   Get this wrong and we are messing with the a source tree !
+        #   Note hardcoded build here.  Another chance to fail in the future
+        if ($sample->donot_remap ne '38') {
+            say $h;
+            exit;
+        }      
+        #   Return path to the cram file (same as $set = 'cram')
+        my $cramdir = abs_path("$opts{netdir}/$opts{backupsdir}/$centername/$rundir") || '';
+        if ($cramdir =~ /\/net\/([^\/]+)\//) { $h = $1; }
+        say $h;
         exit;
+
     }
 
     if ($set eq 'bcf') {
@@ -286,6 +323,7 @@ sub WhereFile {
     if ((! defined($set) || ! $set)) { $set = 'unset'; }    # Default
 
     $bamid = GetBamid($bamid);
+    my $sample = $schema->resultset('Bamfile')->find($bamid);
 
     #   Get values of interest from the database
     my $sth = ExecSQL("SELECT runid,bamname,cramname,piname,expt_sampleid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
@@ -353,18 +391,39 @@ sub WhereFile {
 
     #   Try to guess where the b38 remapped CRAM lives
     if ($set eq 'b38') {
-        die "$Script - b38 file paths are not really known yet\n";
-        my %files = ();
-        foreach ('', '2', '3', '4', '5', '6', '7', '8') {
-            my $p = abs_path("$opts{netdir}$_/$opts{results38dir}/$centername/$piname/$nwdid/bams/$nwdid.recal.cram") || '';
-            if ($p) { $files{$p} = 1; next; }
+        my $meth = qq{${set}_mapped_path};
+        my $f = $sample->$meth . "/$nwdid.recab.cram";
+        if (! $opts{fallback}) {      # We want real path, even if it does not exist
+            say $f;
+            exit;
         }
-        my @found = keys %files;
-        if (! @found) { exit; }           # Nothing found
-        if ($#found == 0) { print $found[0]; exit; }
-        print "$Script - Found " . scalar(@found) . " files: \n";
-        foreach (@found) { print "   "; system("ls -l $_"); }
-        exit(1);
+        #   Fallback specified. File exists, so give the remapped file path
+        if (-f $f) {
+            say $f;
+            exit;
+        }      
+        
+        #   No file and fallback requested. If donot_remap is our build, provide path
+        #   to the original cram path.
+        #   Get this wrong and we are messing with the a source tree !
+        #   Note hardcoded build here.  Another chance to fail in the future
+        if ($sample->donot_remap ne '38') {
+            say $f;
+            exit;
+        }      
+        #   Return path to the cram file (same as $set = 'cram')
+        my $cramfile = abs_path("$opts{netdir}/$opts{backupsdir}/$centername/$rundir/$nwdid.src.cram") || '';
+        say $cramfile;
+        exit;
+    }
+ 
+    if ($set eq 'bcf') {
+        my $host = 'topmed8';
+        my $dir = "/net/$host/$opts{bcfsdir}/$piname";
+        mkdir $dir,0755 ||
+            die "$Script - Unable to create bcf path for '$bamid' to '$dir': $!\n";
+        print $dir . "\n";
+        exit;
     }
 
     die "$Script - Unknown Where option '$set'\n";
@@ -442,6 +501,14 @@ See B<perldoc DBIx::Connector> for details defining the database.
 =head1 OPTIONS
 
 =over 4
+
+=item B<-fallback>
+
+B<Fallback> means we want the file of interest to exist for the build.
+So, for example, if we specify B<-fallback> and wherepath, the call
+will return the remapped directory + NWD123456.recab.cram if it exists.
+If it does not it returns the cram directory + NWD123456.src.cram.
+This is all based on a hard-coded build value.
 
 =item B<-help>
 
