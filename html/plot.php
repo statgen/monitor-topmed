@@ -109,7 +109,7 @@ if ($fcn == 'plot') {
         "<font color='$COLORS[3]'>In Process</font> (submitted, running), or " .
         "<font color='$COLORS[4]'>Not Started</font> " .
         "</font></b></p>\n";
-    $legend = array('ncbib38', 'ncbib37', 'ncbiorig', 'ncbiexpt',
+    $legend = array('bcf', 'gce38post', 'gce38pull', 'gce38push',
         'b38', 'b37', 'cram', 'qplot', 'bai');    // Reversed
     $title = "Current Counts for Each Step [$totalbamcount Verified BAMs]";
     $plotdata = array();
@@ -151,7 +151,7 @@ if ($fcn == 'plot') {
     MakePlot($plotdata, $title, $legend, '', '', 'stackedbars', 'text-data-yx');
     $XMAX = $xtmp;
 
-    $legend = array('cram', 'qplot', 'bai', 'md5ver');
+    $legend = array('cram', 'qplot', 'bai', 'md5ver', 'bcf');
     $title = "Daily Count of Steps Completed";
     $plotdata = array(); 
     for ($i=0; $i<$numrows; $i++) {
@@ -163,6 +163,7 @@ if ($fcn == 'plot') {
         array_push($d, $row['count_qplot']);
         array_push($d, $row['count_bai']);
         array_push($d, $row['count_verify']);
+        array_push($d, $row['count_bcf']);
         array_push($plotdata, $d);
     }
     MakePlot($plotdata, $title, $legend);
@@ -178,9 +179,56 @@ if ($fcn == 'plot') {
         array_push($d, $row['avetime_qplot']);
         array_push($d, $row['avetime_bai']);
         array_push($d, $row['avetime_verify']);
+        array_push($d, $row['avetime_bcf']);
         array_push($plotdata, $d);
     }
     MakePlot($plotdata, $title, $legend, 'Seconds');
+
+    //-------------------------------------------------------------------
+    //  Details about steps sending data to NCBI
+    //-------------------------------------------------------------------
+    print "<h4>Google Cloud Activity</h4>\n";
+    $title = "Daily Count of Samples PUSHed to GCE";
+    $legend = array('push', 'pull', 'post');
+    $title = "Daily Count of Steps Completed";
+    $plotdata = array(); 
+    for ($i=0; $i<$numrows; $i++) {
+        $row = $sqldata[$i];
+        if ($row['yyyymmdd'] < $NCBIBAMDATE) { continue; }
+        $d = array();
+        array_push($d, substr($row['yyyymmdd'],5,5));
+        array_push($d, $row['count_gcepush']);
+        array_push($d, $row['count_gcepull']);
+        array_push($d, $row['count_gcepost']);
+        array_push($plotdata, $d);
+    }
+    MakePlot($plotdata, $title, $legend);
+
+    $title = "Ave Time for GCE-Related Steps";
+    $plotdata = array(); 
+    for ($i=0; $i<$numrows; $i++) {
+        $row = $sqldata[$i];
+        if ($row['yyyymmdd'] < $NCBIBAMDATE) { continue; }
+        $d = array();
+        array_push($d, substr($row['yyyymmdd'],5,5));
+        array_push($d, $row['avetime_gcepush']);
+        array_push($d, $row['avetime_gcepull']);
+        array_push($d, $row['avetime_gcepost']);
+        array_push($plotdata, $d);
+    }
+    MakePlot($plotdata, $title, $legend, 'Seconds', 'y');
+
+    print "<p align='right'><a href='$reshowurl'>Reshow Plots</a>\n";
+    print dofooter($HDR['footer']);
+    exit;
+}
+
+//  What was that?
+Emsg("Unknown directive '$fcn'.");
+Nice_Exit("How'd you do that?");
+exit;
+
+/*    DEAD CODE
 
     //-------------------------------------------------------------------
     //  Details about steps sending data to NCBI
@@ -236,15 +284,10 @@ if ($fcn == 'plot') {
     }
     MakePlot($plotdata, $title, $legend, '', 'y');
 
-    //-------------------------------------------------------------------
-    //  Show plots of errors
-    //-------------------------------------------------------------------
     print "<p><font size='-1'>" .
-        "Failure rates at NCBI for BAMs that are sent are surprisingly high. " .
-        "Here are the daily counts of errors. Once we figure out how to avoid " .
-        "these errors, this count should plunge to zero, we hope." .
+        "Failure rates sending and retrieving data from GCE." .
         "</font></p>\n";
-    $title = "Daily Count of Errors When Sending BAMs to NCBI";
+    $title = "Daily Count of Errors for GCE Data";
     $legend = array('orig', 'origchecksum', 'b37', 'b37checksum', 'b38', 'b38checksum');
     $plotdata = array(); 
     for ($i=0; $i<$numrows; $i++) {
@@ -262,16 +305,7 @@ if ($fcn == 'plot') {
     }
     MakePlot($plotdata, $title, $legend, '', 'y');
 
-
-    print "<p align='right'><a href='$reshowurl'>Reshow Plots</a>\n";
-    print dofooter($HDR['footer']);
-    exit;
-}
-
-//  What was that?
-Emsg("Unknown directive '$fcn'.");
-Nice_Exit("How'd you do that?");
-exit;
+*/
 
 /*---------------------------------------------------------------
 #   MakePlot($plotdata, $title, $legend, $ytitle, $ypoints, $type, $datatype)
