@@ -231,6 +231,7 @@ if ($fcn == 'showout') {                // Show output from a SLURM job
     $s='none';
     if ($samplestate == '5') { $s = 'verify'; }
     if ($samplestate == 'I') { $s = 'bai'; }
+    if ($samplestate == 'B') { $s = 'bcf'; }
     if ($samplestate == 'Q') { $s = 'qplot'; }
     if ($samplestate == 'C') { $s = 'cram'; }
     if ($samplestate == 's') { $s = 'gcepush'; }
@@ -656,7 +657,7 @@ function ViewBams($runid, $maxdirs, $iammgr) {
     $numrows = SQL_NumRows($result);
 
     //  Show details for each bam
-    $url = $HDR['home'] . "/index.php?center=$centername&amp;maxdir=50";
+    $url = $HDR['home'] . "/index.php?center=$centername&amp;maxdir=$maxdirs";
     $html .= "<h3 align='center'>$bamcount Files for '$runname' [$runid] in center " .
         "<a href='$url'>$center</a></h3>\n";
     $html .= "<p align='center'/>$SHOWSTATUS</p>\n";
@@ -926,7 +927,7 @@ function HandlePermit($op, $center, $run, $id) {
 #   Restart failed, running, or queued jobs
 ---------------------------------------------------------------*/
 function RestartJobs($h) {
-    global $LDB, $SHOWSTATUS, $CENTERS, $CENTERNAME2ID, $validfunctions;
+    global $LDB, $SHOWSTATUS, $CENTERS, $CENTERNAME2ID;
     $url = $_SERVER['PHP_SELF'] . "?fcn=restart";    
     $html = '';
 
@@ -973,9 +974,10 @@ function RestartJobs($h) {
         "<option value='bai'>bai</option>" .
         "<option value='qplot'>qplot</option>" .
         "<option value='cram'>cram</option>" .
-        "<option value='ncbiexpt'>expt</option>" .
-        "<option value='ncbiorig'>orig</option>" .
-        "<option value='ncbib37'>b37</option>" .
+        "<option value='gcepush'>push</option>" .
+        "<option value='gcepull'>pul</option>" .
+        "<option value='gcepost'>post</option>" .
+        "<option value='bcf'>bcf</option>" .
         "</select></td>" .
         "<td><font color='green'>&nbsp; </font></td>" .
         "<td>&nbsp;</td>" .
@@ -995,7 +997,7 @@ function RestartJobs($h) {
 #   Update database for groups of samples in state to new state
 ---------------------------------------------------------------*/
 function HandleRestartJobs($dirname, $samplestate, $op) {
-    global $validfunctions, $LDB;
+    global $LDB;
     if ($dirname == 'none' || $op == 'none') {
         return Emsg("Run or Operation was not specified, try again", 1);
     }
