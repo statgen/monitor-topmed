@@ -447,8 +447,8 @@ sub SQueue {
             $mosixrunning{$c[4]}++;    # Count of running jobs for this user
             next;
         }
-        if ($c[1] ne 'topmed') { next; }    # Not interested in anything but topmed
-        if ($c[4] ne 'topmed' && $c[4] ne 'schelcj') { $nottopmed++; next; }    # Not topmed user
+        if ($c[1] !~ /^topmed/) { next; }    # Not interested in anything but topmed
+        if ($c[4] ne 'topmed') { $nottopmed++; next; }    # Not topmed user
         $partitions{$c[1]} = 1;
         if ($c[5] eq 'PD') {        # Queued
             push @{$queued{$c[1]}{data}},$l;
