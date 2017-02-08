@@ -129,6 +129,12 @@ __PACKAGE__->table("bamfiles");
   extra: {unsigned => 1}
   is_nullable: 1
 
+=head2 datemapping_b38
+
+  data_type: 'varchar'
+  is_nullable: 1
+  size: 12
+
 =head2 studyname
 
   data_type: 'varchar'
@@ -321,6 +327,12 @@ __PACKAGE__->table("bamfiles");
   is_nullable: 1
 
 =head2 state_gce38post
+
+  data_type: 'integer'
+  default_value: 0
+  is_nullable: 1
+
+=head2 state_bcf
 
   data_type: 'integer'
   default_value: 0
@@ -563,6 +575,8 @@ __PACKAGE__->add_columns(
   { data_type => "bigint", extra => { unsigned => 1 }, is_nullable => 1 },
   "b38flagstat",
   { data_type => "bigint", extra => { unsigned => 1 }, is_nullable => 1 },
+  "datemapping_b38",
+  { data_type => "varchar", is_nullable => 1, size => 12 },
   "studyname",
   { data_type => "varchar", is_nullable => 0, size => 96 },
   "piname",
@@ -641,6 +655,8 @@ __PACKAGE__->add_columns(
   "state_gce38pull",
   { data_type => "integer", default_value => 0, is_nullable => 1 },
   "state_gce38post",
+  { data_type => "integer", default_value => 0, is_nullable => 1 },
+  "state_bcf",
   { data_type => "integer", default_value => 0, is_nullable => 1 },
   "datearrived",
   { data_type => "varchar", is_nullable => 1, size => 12 },
@@ -755,8 +771,8 @@ __PACKAGE__->has_many(
 );
 
 
-# Created by DBIx::Class::Schema::Loader v0.07046 @ 2017-01-25 10:12:38
-# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:jCFI8cp6FLCPPcbzOZSTJA
+# Created by DBIx::Class::Schema::Loader v0.07046 @ 2017-02-08 15:40:58
+# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:HAtKfAJIDPQr0m0ZGTt+ww
 
 
 # You can replace this text with custom code or comments, and it will be preserved on regeneration
