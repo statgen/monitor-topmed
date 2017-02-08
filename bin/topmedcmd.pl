@@ -31,6 +31,7 @@ use My_DB;
 use Getopt::Long;
 use Cwd qw(realpath abs_path);
 use YAML;
+use POSIX qw(strftime);
 
 my $NOTSET = 0;                     # Not set
 my $REQUESTED = 1;                  # Task requested
@@ -127,6 +128,8 @@ if ($#ARGV < 0 || $opts{help}) {
         "  or\n" .
         "$m set bamid|nwdid|dirname colname value\n" .
         "  or\n" .
+        "$m setdate bamid|nwdid colname file\n" .
+        "  or\n" .
         "$m show bamid|nwdid colname|run|center|yaml\n" .
         "  or\n" .
         "$m list centers\n" .
@@ -162,6 +165,7 @@ else  { PersistDBConnect($opts{realm}); }
 if ($fcn eq 'mark')      { Mark(@ARGV); exit; }
 if ($fcn eq 'unmark')    { UnMark(@ARGV); exit; }
 if ($fcn eq 'set')       { Set(@ARGV); exit; }
+if ($fcn eq 'setdate')   { SetDate(@ARGV); exit; }
 if ($fcn eq 'show')      { Show(@ARGV); exit; }
 if ($fcn eq 'list')      { List(@ARGV); exit; }
 if ($fcn eq 'export')    { Export(@ARGV); exit; }
@@ -749,6 +753,30 @@ sub Set {
 
 #==================================================================
 # Subroutine:
+#   SetDate($bamid, $col, $val)
+#
+#   Set a database column to the date for a file
+#==================================================================
+sub SetDate {
+    my ($bamid, $col, $val) = @_;
+    my ($sth, $rowsofdata, $href);
+
+    #   This is bamid or nwdid
+    $bamid = GetBamid($bamid);
+
+    #   Make sure this is a bam we know
+    $sth = ExecSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
+    $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
+
+    my @s = stat($val);
+    if (! @s) { die "$Script - '$val' is not a known filename\n"; }
+    my $datetime = strftime('%Y-%m-%d %H:%M:%S', localtime($s[10]));
+    ExecSQL("UPDATE $opts{bamfiles_table} SET $col='$datetime' WHERE bamid=$bamid");
+}
+
+#==================================================================
+# Subroutine:
 #   List($fcn, $item)
 #
 #   Generate a list of data from the database
@@ -987,11 +1015,23 @@ topmedcmd.pl - Update the database for NHLBI TopMed
   topmedcmd.pl showrun 20150604            # Show all NWDID for run
   topmedcmd.pl -bamid showrun 20150604     # Show all NWDID and bamid for run
  
+  topmedcmd.pl list centers                # Show all known centers
+  topmedcmd.pl list runs broad             # Show all runs for center broad
+  topmedcmd.pl list samples 2015dec02      # Show all samples for a run
+ 
+  topmedcmd.pl export                      # Dump the database in a form Chris wanted
+ 
+  topmedcmd.pl send2ncbi files             # Send files to NCBI
+ 
+  topmedcmd.pl whatbamid bamname           # Show bamid for a sample name
+ 
+  topmedcmd.pl whatnwdid bamid|nwdid       # Show details for a sample
+ 
   topmedcmd.pl permit add bai braod 2015oct18   # Stop bai job submissions for a run
-  topmedcmd.pl permit remove 12             # Remove a permit control
-  topmedcmd.pl permit test bai 4567         # Test if we should submit a bai job for one bam
+  topmedcmd.pl permit remove 12            # Remove a permit control
+  topmedcmd.pl permit test bai 4567        # Test if we should submit a bai job for one bam
 
-  topmedcmd.pl -maxlongjobs 35 squeue       # Show what is running
+  topmedcmd.pl -maxlongjobs 35 squeue      # Show what is running
 
 =head1 DESCRIPTION
 
@@ -1044,6 +1084,9 @@ Provided for developers to see additional information.
 Parameters to this program are grouped into several groups which are used
 to deal with specific sets of information in the monitor databases.
 
+B<export>
+Use this to create a CSV file of database columns for Chris.
+
 B<mark bamid|nwdid dirname  [verb] [state]>
 Use this to set the state for a particular BAM file.
 You may specify the bamid or the NWDID.
@@ -1079,6 +1122,9 @@ The option B<-with-bamid> will cause the bamid to be shown in the last case.
 B<unmark bamid|nwdid [verb]>
 Use this to reset the state for a particular BAM file to the default
 database value.
+
+B<whatbamid bamname>
+Use this to show the bamid for a sample using the name of the BAM or CRAM.
 
 B<whatnwdid bamid|nwdid>
 Use this to get some details for a particular bam.
