@@ -44,6 +44,7 @@ my %STEPS = (                       # List of steps we collect data for
     gcepull => 1,
     gcepost => 1,
     b38 => 1,
+    bcf => 1,
 );
 my $NOTSET    = 0;            # Not set
 my $REQUESTED = 1;            # Task requested
@@ -89,17 +90,115 @@ my $dbh = DBConnect($opts{realm});
 #   Execute the command provided
 #--------------------------------------------------------------
 if ($fcn eq 'jobid')    { Jobids(@ARGV); exit; }
-if ($fcn eq 'summary')  {
-    Summary(@ARGV, "$opts{outdir}/$opts{summaryfile}");
-    exit;
-}
+#if ($fcn eq 'summary')  { Summary(@ARGV, "$opts{outdir}/$opts{summaryfile}"); exit; }
 
 die "$Script  - Invalid function '$fcn'\n";
 exit;
 
 #==================================================================
 # Subroutine:
-#   Summary($yyyymmdd, $file)
+#   Jobids($yyyymmdd)
+#
+#   Read the jobids files for this particular day and sets
+#   stats for all the steps completed on that day
+#==================================================================
+sub Jobids {
+    my ($yyyymmdd) = @_;
+    my %mon2number = (
+        'Jan' => '01','Feb' => '02','Mar' => '03','Apr' => '04','May' => '05','Jun' => '06',
+        'Jul' => '07','Aug' => '08','Sep' => '09','Oct' => '10','Nov' => '11','Dec' => '12');
+    my $tmpfile = "/tmp/Jobids.$$";
+
+    if ($yyyymmdd eq 'today') {
+        $yyyymmdd = strftime('%Y/%m/%d', localtime);
+    }
+
+    if ($yyyymmdd !~ /^(20\d\d)\/(\d\d)\/(\d\d)$/) {
+        die "$Script Invalid date '$yyyymmdd' syntax. Try '$Script -help'\n";
+    }
+    my ($y, $m, $d) = ($1, $2, $3);
+    chdir($opts{outdir}) ||
+        die "$Script - Unable to CD to '$opts{outdir}: $!\n";
+
+    #   Get counts of bams and errors sending bams, but just once
+    my ($sql, $sth, $href, $rowsofdata);
+    $sql = "SELECT yyyymmdd FROM $opts{stats_table} WHERE yyyymmdd='$yyyymmdd'";
+    $sth = DoSQL($sql, 0);
+    $rowsofdata = $sth->rows();
+    if (! $rowsofdata) {
+        my ($bamcount, $errcount) = (0, 0);             # Today's counts
+        $sql = "SELECT count(*) FROM $opts{bamfiles_table} WHERE state_md5ver=$COMPLETED";
+        $sth = DoSQL($sql, 0);
+        $href = $sth->fetchrow_hashref;
+        if ($href->{'count(*)'}) { $bamcount = $href->{'count(*)'}; }
+        $sql = "SELECT count(*) FROM $opts{bamfiles_table} WHERE state_ncbiorig=$FAILED OR " .
+            "state_ncbib37=$FAILED OR state_ncbib38=$FAILED";
+        $sth = DoSQL($sql, 0);
+        $href = $sth->fetchrow_hashref;
+        if ($href->{'count(*)'}) { $errcount = $href->{'count(*)'}; }
+        #   INSERT this row
+        $sql = "INSERT INTO $opts{stats_table} " .
+            "(yyyymmdd,bamcount,errcount) VALUES ('$yyyymmdd',$bamcount,$errcount)";
+        $sth = DoSQL($sql);
+        print "Created record for '$yyyymmdd' [$bamcount,$errcount]\n";
+    }
+
+    #   Get all OK files from jobids files and extract dates we want
+    #   Lines could look like:
+    #     10164.jobids:Wed Jan 6 02:03:39 EST 2016 expt 17999839 ok secs
+    #     10164.jobids:DOW 01 06 12:12:12 EST 2016 sexpt 17999839 ok 1 secs
+    system("grep -w ok *.jobids> $tmpfile") &&
+        die "$Script - Unable to get a list of *.jobids\n";
+    open(IN, $tmpfile) ||
+        die "$Script - Unable to read file '$tmpfile'\n";
+    unlink($tmpfile);
+    my %data = ();                      # Hash of step->[count][times]
+    while (my $l = <IN>) {    
+        my @c = split(' ',$l);          # Break into columns
+        if ($#c == 9 && $c[9] eq 'secs') {    # Sometimes # secs missing
+            $c[10] = $c[9];
+            $c[9] = '1';
+        }
+        if ($c[1] =~ /\D/) {
+            if (exists($mon2number{$c[1]})) { $c[1] = $mon2number{$c[1]}; }
+            else { die "$Script - Unable to get month '$c[1]' in line:\n  $l"; }
+        }
+    
+        #   If this is the date we want, collect details for this step
+        if (! ($c[1] == $m && $c[2] == $d && $c[5] == $y)) { next; }
+
+        #   Correct step names from old/bad data
+        if ($c[6] eq 'sexpt') { $c[6] = 'expt'; }
+        if ($c[6] eq 'ncbiorig') { $c[6] = 'orig'; }
+        if ($c[6] eq 'redo') { next; }      # Mine jobs to fix things, ignore it
+        if (! exists($STEPS{$c[6]})) { die "$Script - unknown step '$c[6]' from line:\n  $l"; }
+        if (! exists($data{$c[6]})) { $data{$c[6]}{count} = 0; $data{$c[6]}{totaltime} = 0; }
+        $data{$c[6]}{count}++;
+        if (defined($c[9])) { $data{$c[6]}{totaltime} += $c[9]; }
+    }
+    close(IN);
+    if (! %data) { die "No data found for '$yyyymmdd'\n"; }
+    my @keys = sort keys %data;
+    if ($opts{verbose}) {
+        foreach my $s (@keys) {
+            print "    $s  $data{$s}{count} $data{$s}{totaltime} ave=" . int($data{$s}{totaltime}/$data{$s}{count}) . " secs\n";
+        }
+    }
+
+    $sql = "UPDATE $opts{stats_table} SET ";
+    foreach my $s (@keys) {
+        $sql .= "count_$s=$data{$s}{count},";
+        $sql .= "avetime_$s=" . int($data{$s}{totaltime}/$data{$s}{count}) . ',';
+    }
+    chop($sql);
+    $sql .= " WHERE yyyymmdd='$yyyymmdd'";
+    $sth = DoSQL($sql);
+    print "Updated data for '$yyyymmdd' [" . join(',', @keys) . "]\n";
+}
+
+#==================================================================
+# Subroutine:
+#   Summary($yyyymmdd, $file)   DEAD NOW
 #
 #   Read the NCBI summary file, identifying all BAMs loaded on a date
 #   The loadedbamcount column is the total loaded counts each day
@@ -178,7 +277,7 @@ sub Summary {
 
 #==================================================================
 # Subroutine:
-#   $count = CountError($col, $err)
+#   $count = CountError($col, $err)   DEAD CODE
 #
 #   Return the count of bams in a particular error
 #==================================================================
@@ -194,7 +293,7 @@ sub CountError {
 
 #==================================================================
 # Subroutine:
-#   SummaryHistory($file)
+#   SummaryHistory($file)  DEAD CODE
 #
 #   Read the NCBI summary file, identifying all BAMs loaded to a date
 #   and generate the loadedbamcount in stepstats for the past
@@ -246,106 +345,6 @@ sub SummaryHistory {
     foreach (@sqlupdates) {
         print "$_\n";
     }
-}
-
-#==================================================================
-# Subroutine:
-#   Jobids($yyyymmdd)
-#
-#   Read the jobids files for this particular day and sets
-#   stats for all the steps completed on that day
-#==================================================================
-sub Jobids {
-    my ($yyyymmdd) = @_;
-    my %mon2number = (
-        'Jan' => '01','Feb' => '02','Mar' => '03','Apr' => '04','May' => '05','Jun' => '06',
-        'Jul' => '07','Aug' => '08','Sep' => '09','Oct' => '10','Nov' => '11','Dec' => '12');
-    my $tmpfile = "/tmp/Jobids.$$";
-
-    if ($yyyymmdd eq 'today') {
-        $yyyymmdd = strftime('%Y/%m/%d', localtime);
-    }
-
-    if ($yyyymmdd !~ /^(20\d\d)\/(\d\d)\/(\d\d)$/) {
-        die "$Script Invalid date '$yyyymmdd' syntax. Try '$Script -help'\n";
-    }
-    my ($y, $m, $d) = ($1, $2, $3);
-    chdir($opts{outdir}) ||
-        die "$Script - Unable to CD to '$opts{outdir}: $!\n";
-
-    #   Get counts of bams and errors sending bams, but just once
-    my ($sql, $sth, $href, $rowsofdata);
-    $sql = "SELECT yyyymmdd FROM $opts{stats_table} WHERE yyyymmdd='$yyyymmdd'";
-    $sth = DoSQL($sql, 0);
-    $rowsofdata = $sth->rows();
-    if (! $rowsofdata) {
-        my ($bamcount, $errcount) = (0, 0);             # Today's counts
-        $sql = "SELECT count(*) FROM $opts{bamfiles_table} WHERE state_md5ver=$COMPLETED";
-        $sth = DoSQL($sql, 0);
-        $href = $sth->fetchrow_hashref;
-        if ($href->{'count(*)'}) { $bamcount = $href->{'count(*)'}; }
-        $sql = "SELECT count(*) FROM $opts{bamfiles_table} WHERE state_ncbiorig=$FAILED OR " .
-            "state_ncbib37=$FAILED OR state_ncbib38=$FAILED";
-        $sth = DoSQL($sql, 0);
-        $href = $sth->fetchrow_hashref;
-        if ($href->{'count(*)'}) { $errcount = $href->{'count(*)'}; }
-        #   INSERT this row
-        $sql = "INSERT INTO $opts{stats_table} " .
-            "(yyyymmdd,bamcount,errcount) VALUES ('$yyyymmdd',$bamcount,$errcount)";
-        $sth = DoSQL($sql);
-        print "Created record for '$yyyymmdd' [$bamcount,$errcount]\n";
-    }
-
-    #   Get all OK files from jobids files and extract dates we want
-    #   Lines could look like:
-    #     10164.jobids:Wed Jan 6 02:03:39 EST 2016 expt 17999839 ok secs
-    #     10164.jobids:DOW 01 06 12:12:12 EST 2016 sexpt 17999839 ok 1 secs
-    system("grep -w ok *.jobids> $tmpfile") &&
-        die "$Script - Unable to get a list of *.jobids\n";
-    open(IN, $tmpfile) ||
-        die "$Script - Unable to read file '$tmpfile'\n";
-    unlink($tmpfile);
-    my %data = ();                      # Hash of step->[count][times]
-    while (my $l = <IN>) {    
-        my @c = split(' ',$l);          # Break into columns
-        if ($#c == 9 && $c[9] eq 'secs') {    # Sometimes # secs missing
-            $c[10] = $c[9];
-            $c[9] = '1';
-        }
-        if ($c[1] =~ /\D/) {
-            if (exists($mon2number{$c[1]})) { $c[1] = $mon2number{$c[1]}; }
-            else { die "$Script - Unable to get month '$c[1]' in line:\n  $l"; }
-        }
-    
-        #   If this is the date we want, collect details for this step
-        if (! ($c[1] == $m && $c[2] == $d && $c[5] == $y)) { next; }
-
-        #   Correct step names from old/bad data
-        if ($c[6] eq 'sexpt') { $c[6] = 'expt'; }
-        if ($c[6] eq 'ncbiorig') { $c[6] = 'orig'; }
-        if (! exists($STEPS{$c[6]})) { die "$Script - unknown step '$c[6]' from line:\n  $l"; }
-        if (! exists($data{$c[6]})) { $data{$c[6]}{count} = 0; $data{$c[6]}{totaltime} = 0; }
-        $data{$c[6]}{count}++;
-        if (defined($c[9])) { $data{$c[6]}{totaltime} += $c[9]; }
-    }
-    close(IN);
-    if (! %data) { die "No data found for '$yyyymmdd'\n"; }
-    my @keys = sort keys %data;
-    if ($opts{verbose}) {
-        foreach my $s (@keys) {
-            print "    $s  $data{$s}{count} $data{$s}{totaltime} ave=" . int($data{$s}{totaltime}/$data{$s}{count}) . " secs\n";
-        }
-    }
-
-    $sql = "UPDATE $opts{stats_table} SET ";
-    foreach my $s (@keys) {
-        $sql .= "count_$s=$data{$s}{count},";
-        $sql .= "avetime_$s=" . int($data{$s}{totaltime}/$data{$s}{count}) . ',';
-    }
-    chop($sql);
-    $sql .= " WHERE yyyymmdd='$yyyymmdd'";
-    $sth = DoSQL($sql);
-    print "Updated data for '$yyyymmdd' [" . join(',', @keys) . "]\n";
 }
 
 #==================================================================
