@@ -25,5 +25,4 @@ range="$x3 $x2 $x1 $x0"
 
 for yyyymmdd in $range; do
   /usr/cluster/topmed/bin/topmedstats.pl jobid   $yyyymmdd
-  /usr/cluster/topmed/bin/topmedstats.pl summary $yyyymmdd
 done
