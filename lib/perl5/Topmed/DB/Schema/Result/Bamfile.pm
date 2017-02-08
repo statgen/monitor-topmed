@@ -131,9 +131,9 @@ __PACKAGE__->table("bamfiles");
 
 =head2 datemapping_b38
 
-  data_type: 'varchar'
+  data_type: 'datetime'
+  datetime_undef_if_invalid: 1
   is_nullable: 1
-  size: 12
 
 =head2 studyname
 
@@ -576,7 +576,11 @@ __PACKAGE__->add_columns(
   "b38flagstat",
   { data_type => "bigint", extra => { unsigned => 1 }, is_nullable => 1 },
   "datemapping_b38",
-  { data_type => "varchar", is_nullable => 1, size => 12 },
+  {
+    data_type => "datetime",
+    datetime_undef_if_invalid => 1,
+    is_nullable => 1,
+  },
   "studyname",
   { data_type => "varchar", is_nullable => 0, size => 96 },
   "piname",
@@ -771,8 +775,8 @@ __PACKAGE__->has_many(
 );
 
 
-# Created by DBIx::Class::Schema::Loader v0.07046 @ 2017-02-08 15:40:58
-# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:HAtKfAJIDPQr0m0ZGTt+ww
+# Created by DBIx::Class::Schema::Loader v0.07046 @ 2017-02-08 15:52:57
+# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:uauA/Idko0hdTLbFzUULgQ
 
 
 # You can replace this text with custom code or comments, and it will be preserved on regeneration
