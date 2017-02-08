@@ -78,7 +78,7 @@ our %opts = (
     jobsfailedsubmission => 0,
 );
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose topdir=s center=s runs=s maxjobs=i
+    help realm=s verbose topdir=s center=s runs=s maxjobs=i random
     dryrun suberr datayear=i
     )) || die "Failed to parse options\n";
 
@@ -102,7 +102,7 @@ my $nowdate = strftime('%Y/%m/%d %H:%M', localtime);
 if ($fcn eq 'arrive') {
     #   Get all the known centers in the database
     my $centersref = GetCenters();
-    foreach my $cid (keys %{$centersref}) {
+    CENTER: foreach my $cid (keys %{$centersref}) {
         my $centername = $centersref->{$cid};
         my $runsref = GetRuns($cid) || next;
         #   For each run, see if there are bamfiles that arrived
@@ -129,7 +129,7 @@ if ($fcn eq 'arrive') {
                 my $nowtime = time();
                 if ((time() - $stats[9]) < 3600) { next; }
                 #   Run the command
-                BatchSubmit("$opts{topmedarrive} $href->{bamid} $f");
+                if (! BatchSubmit("$opts{topmedarrive} $href->{bamid} $f")) { last CENTER; }
             }
         }
     }
@@ -143,13 +143,13 @@ if ($fcn eq 'arrive') {
 if ($fcn eq 'verify') {
     #   Get all the known centers in the database
     my $centersref = GetCenters();
-    foreach my $cid (keys %{$centersref}) {
+    CENTER: foreach my $cid (keys %{$centersref}) {
         my $centername = $centersref->{$cid};
         my $runsref = GetRuns($cid) || next;
         #   For each run, see if there are bamfiles to be verified
         foreach my $runid (keys %{$runsref}) {
             my $dirname = $runsref->{$runid};
-            #   Get list of all bams that have not yet arrived properly
+            #   Get list of all samples that need md5 run
             my $sql = "SELECT bamid,bamname,state_arrive,state_md5ver,checksum,bamsize FROM " .
                 $opts{bamfiles_table} . " WHERE runid='$runid'";
             if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
@@ -174,7 +174,7 @@ if ($fcn eq 'verify') {
                 if ($href->{state_md5ver} != $NOTSET && $href->{state_md5ver} != $REQUESTED) { next; }
 
                 #   Run the command
-                BatchSubmit("$opts{topmedverify} -submit $href->{bamid} $href->{checksum} $f");
+                if (! BatchSubmit("$opts{topmedverify} -submit $href->{bamid} $href->{checksum} $f")) { last CENTER; }
             }
         }
     }
@@ -188,13 +188,13 @@ if ($fcn eq 'verify') {
 if ($fcn eq 'bai') {
     #   Get all the known centers in the database
     my $centersref = GetCenters();
-    foreach my $cid (keys %{$centersref}) {
+    CENTER: foreach my $cid (keys %{$centersref}) {
         my $centername = $centersref->{$cid};
         my $runsref = GetRuns($cid) || next;
         #   For each run, see if there is a missing BAI file
         foreach my $runid (keys %{$runsref}) {
             my $dirname = $runsref->{$runid};
-            #   Get list of all bams that have not yet arrived properly
+            #   Get list of all samples that need bai run
             my $sql = "SELECT bamid,bamname,state_md5ver,state_bai FROM " .
                 $opts{bamfiles_table} . " WHERE runid='$runid'";
             if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
@@ -209,7 +209,7 @@ if ($fcn eq 'bai') {
                 if ($opts{suberr} && $href->{state_bai} >= $FAILEDCHECKSUM) { $href->{state_bai} = $REQUESTED; }
                 if ($href->{state_bai} != $NOTSET && $href->{state_bai} != $REQUESTED) { next; }
                 #   Run the command
-                BatchSubmit("$opts{topmedbai} -submit $href->{bamid} $f");
+                if (! BatchSubmit("$opts{topmedbai} -submit $href->{bamid} $f")) { last CENTER; }
             }
         }
     }
@@ -223,13 +223,13 @@ if ($fcn eq 'bai') {
 if ($fcn eq 'cram') {
     #   Get all the known centers in the database
     my $centersref = GetCenters();
-    foreach my $cid (keys %{$centersref}) {
+    CENTER: foreach my $cid (keys %{$centersref}) {
         my $centername = $centersref->{$cid};
         my $runsref = GetRuns($cid) || next;
         #   For each run, see if there are bamfiles to be backed up
         foreach my $runid (keys %{$runsref}) {
             my $dirname = $runsref->{$runid};
-            #   Get list of all bams that have not yet arrived properly
+            #   Get list of all samples that need cram run
             my $sql = "SELECT bamid,bamname,state_md5ver,state_cram,state_bai FROM " .
                 $opts{bamfiles_table} . " WHERE runid='$runid'";
             if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
@@ -245,7 +245,7 @@ if ($fcn eq 'cram') {
                 if ($opts{suberr} && $href->{state_cram} >= $FAILEDCHECKSUM) { $href->{state_cram} = $REQUESTED; }
                 if ($href->{state_cram} != $NOTSET && $href->{state_cram} != $REQUESTED) { next; }
                 #   Run the command
-                BatchSubmit("$opts{topmedcram} -submit $href->{bamid} $f");
+                if (! BatchSubmit("$opts{topmedcram} -submit $href->{bamid} $f")) { last CENTER; }
             }
         }
     }
@@ -259,13 +259,13 @@ if ($fcn eq 'cram') {
 if ($fcn eq 'qplot') {
     #   Get all the known centers in the database
     my $centersref = GetCenters();
-    foreach my $cid (keys %{$centersref}) {
+    CENTER: foreach my $cid (keys %{$centersref}) {
         my $centername = $centersref->{$cid};
         my $runsref = GetRuns($cid) || next;
         #   For each run, see if there are bamfiles to run qplot on
         foreach my $runid (keys %{$runsref}) {
             my $dirname = $runsref->{$runid};
-            #   Get list of all bams that have not yet arrived properly
+            #   Get list of all samples that need qplot run
             my $sql = "SELECT bamid,bamname,state_bai,state_qplot FROM " .
                 $opts{bamfiles_table} . " WHERE runid='$runid'";
             if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
@@ -286,7 +286,324 @@ if ($fcn eq 'qplot') {
                 if ($opts{suberr} && $href->{state_qplot} >= $FAILEDCHECKSUM) { $href->{state_qplot} = $REQUESTED; }
                 if ($href->{state_qplot} != $NOTSET && $href->{state_qplot} != $REQUESTED) { next; }
                 #   Run the command
-                BatchSubmit("$opts{topmedqplot} -submit $href->{bamid} $f");
+                if (! BatchSubmit("$opts{topmedqplot} -submit $href->{bamid} $f")) { last CENTER; }
+            }
+        }
+    }
+    ShowSummary($fcn);
+    exit;
+}
+
+#--------------------------------------------------------------
+#   Push data to Google Cloud for processing
+#--------------------------------------------------------------
+if ($fcn eq 'spush') {
+    #   Get all the known centers in the database
+    my $centersref = GetCenters();
+    CENTER: foreach my $cid (keys %{$centersref}) {
+        my $centername = $centersref->{$cid};
+        my $runsref = GetRuns($cid) || next;
+        #   For each run, see if there are bamfiles for Google Cloud
+        foreach my $runid (keys %{$runsref}) {
+            my $dirname = $runsref->{$runid};
+            #   Get list of all samples to send to GCE
+            my $sql = "SELECT * FROM $opts{bamfiles_table} " .
+                "WHERE runid='$runid'";
+            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
+            my $sth = DoSQL($sql);
+            my $rowsofdata = $sth->rows();
+            if (! $rowsofdata) { next; }
+            for (my $i=1; $i<=$rowsofdata; $i++) {
+                my $href = $sth->fetchrow_hashref;
+
+                #   Only send data if cram was done
+                if ($href->{state_cram} != $COMPLETED) { next; }
+                if ($opts{suberr} && $href->{state_gce38push} >= $FAILED) {
+                    $href->{state_gce38push} = $REQUESTED;
+                }
+                if ($href->{state_gce38push} != $NOTSET &&
+                    $href->{state_gce38push} != $REQUESTED) { next; }
+
+                #   Send the CRAM to Google
+                if (! BatchSubmit("$opts{topmedgce38push} -submit $href->{bamid}")) { last CENTER; }
+            }
+        }
+    }
+    ShowSummary($fcn);
+    exit;
+}
+
+#--------------------------------------------------------------
+#   Pull processed data from Google Cloud
+#--------------------------------------------------------------
+if ($fcn eq 'spull') {
+    #   Get all the known centers in the database
+    my $centersref = GetCenters();
+    CENTER: foreach my $cid (keys %{$centersref}) {
+        my $centername = $centersref->{$cid};
+        my $runsref = GetRuns($cid) || next;
+        #   For each run, see if there are bamfiles for Google Cloud
+        foreach my $runid (keys %{$runsref}) {
+            my $dirname = $runsref->{$runid};
+            #   Get list of all samples at fetch to local store
+            my $sql = "SELECT * FROM $opts{bamfiles_table} " .
+                "WHERE runid='$runid'";
+            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
+            my $sth = DoSQL($sql);
+            my $rowsofdata = $sth->rows();
+            if (! $rowsofdata) { next; }
+            for (my $i=1; $i<=$rowsofdata; $i++) {
+                my $href = $sth->fetchrow_hashref;
+                #   Only get data if remap was done and requested
+                if ($href->{state_gce38push} != $COMPLETED) { next; }
+                if ($opts{suberr} && $href->{state_gce38pull} >= $FAILED) {
+                    $href->{state_gce38pull} = $REQUESTED;
+                }
+                if ($href->{state_gce38pull} != $REQUESTED) { next; }
+
+                #   Send the CRAM to Google
+                if (! BatchSubmit("$opts{topmedgce38pull} -submit $href->{bamid}")) { last CENTER; }
+            }
+        }
+    }
+    ShowSummary($fcn);
+    exit;
+}
+
+#--------------------------------------------------------------
+#   Post process data we fetched from Google Cloud
+#--------------------------------------------------------------
+if ($fcn eq 'spost') {
+    #   Get all the known centers in the database
+    my $centersref = GetCenters();
+    CENTER: foreach my $cid (keys %{$centersref}) {
+        my $centername = $centersref->{$cid};
+        my $runsref = GetRuns($cid) || next;
+        #   For each run, see if there are bamfiles for Google Cloud
+        foreach my $runid (keys %{$runsref}) {
+            my $dirname = $runsref->{$runid};
+            #   Get list of all crams that have not been post processed
+            my $sql = "SELECT * FROM $opts{bamfiles_table} ";
+            if ($opts{random}) { $sql .= ' ORDER BY RAND()'; }
+            else {                  # Normal processing, filer by run etc
+                $sql .= " WHERE runid='$runid'";
+                if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
+            }
+            my $sth = DoSQL($sql);
+            my $rowsofdata = $sth->rows();
+            if (! $rowsofdata) { next; }
+            for (my $i=1; $i<=$rowsofdata; $i++) {
+                my $href = $sth->fetchrow_hashref;
+
+                #   Only post process data that we already fetched
+                if ($href->{state_gce38pull} != $COMPLETED) { next; }
+                if ($opts{suberr} && $href->{state_gce38post} >= $FAILED) {
+                    $href->{state_gce38post} = $REQUESTED;
+                }
+                if ($href->{state_gce38post} != $NOTSET &&
+                    $href->{state_gce38post} != $REQUESTED) { next; }
+
+                #   Send the CRAM to Google
+                if (! BatchSubmit("$opts{topmedgce38post} -submit $href->{bamid}")) { last CENTER; }
+            }
+        }
+    }
+    ShowSummary($fcn);
+    exit;
+}
+
+#--------------------------------------------------------------
+#   Create BCF file
+#--------------------------------------------------------------
+if ($fcn eq 'bcf') {
+    #   Get all the known centers in the database
+    my $centersref = GetCenters();
+    CENTER: foreach my $cid (keys %{$centersref}) {
+        my $centername = $centersref->{$cid};
+        my $runsref = GetRuns($cid) || next;
+        #   For each run, see if there are files to create BCF for
+        foreach my $runid (keys %{$runsref}) {
+            my $dirname = $runsref->{$runid};
+            #   Get list of all samples yet to run BCF
+            my $sql = "SELECT bamid,bamname,donot_remap,state_b38,state_bcf FROM $opts{bamfiles_table} ";
+            if ($opts{random}) { $sql .= ' ORDER BY RAND()'; }
+            else {                  # Normal processing, filer by run etc
+                $sql .= " WHERE runid='$runid'";
+                if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
+            }
+            my $sth = DoSQL($sql);
+            my $rowsofdata = $sth->rows();
+            if (! $rowsofdata) { next; }
+            for (my $i=1; $i<=$rowsofdata; $i++) {
+                my $href = $sth->fetchrow_hashref;
+                #   Only do BCF if this was remapped to build 38
+                if ($href->{state_b38} != $COMPLETED) { next; }
+
+#   This is probably wrong
+                #   Only do BCF if this was remapped to build 38    Hardcoded build!
+                if ($href->{donot_remap} ne '38') { next; }
+
+                if ($opts{suberr} && $href->{state_bcf} >= $FAILEDCHECKSUM) { $href->{state_bcf} = $REQUESTED; }
+                if ($href->{state_bcf} != $NOTSET && $href->{state_bcf} != $REQUESTED) { next; }
+                #   Run the command
+                if (! BatchSubmit("$opts{topmedbcf} -submit $href->{bamid}")) { last CENTER; }
+            }
+        }
+    }
+    ShowSummary($fcn);
+    exit;
+}
+
+die "Invalid request '$fcn'. Try '$Script --help'\n";
+
+#==================================================================
+# Subroutine:
+#   BatchSubmit - Run a command which submits the command to batch
+#
+# Arguments:
+#   cmd - command
+#
+# Returns:
+#   boolean if jobs may still be submitted
+#==================================================================
+sub BatchSubmit {
+    my ($cmd) = @_;
+    $opts{maxjobs}--;
+    if ($opts{maxjobs} < 0) { return 0; }
+    if ($opts{maxjobs} == 0 && $opts{verbose}) { print "Limit of jobs to be submitted has been reached\n"; }
+    if ($opts{dryrun}) { print "dryrun => $cmd\n"; return 1; }
+    my $rc = system("$cmd 2>&1");
+    $rc = $rc >> 8;
+    if ($rc == 0) {
+        $opts{jobcount}++;
+        if ($opts{verbose}) { print "submitted => $cmd\n"; }
+        return 1;
+    }
+    $opts{maxjobs}++;                   # Submit failed, keep trying
+    if ($rc == 4) { $opts{jobsnotpermitted}++; }
+    else { $opts{jobsfailedsubmission}++; }
+    return 1;
+}
+
+#==================================================================
+# Subroutine:
+#   ShowSummary - Print summary of jobs activity
+#
+# Arguments:
+#   type - type of job, verify, backup etc
+#==================================================================
+sub ShowSummary {
+    my ($type) = @_;
+
+    my $s = '';
+    if ($opts{jobcount})            { $s .= "$opts{jobcount} jobs submitted"; }
+    if ($opts{jobsnotpermitted})    { $s .=  "  $opts{jobsnotpermitted} job submissions not permitted"; }
+    if ($opts{jobsfailedsubmission}) { $s .=  "  $opts{jobsfailedsubmission} job submissions failed"; }
+    if (! $s) { return; }
+    print "$nowdate $type: $s\n";
+}
+
+#==================================================================
+# Dead code, but Tom still wants it.  Get it out of my way here.
+#==================================================================
+#--------------------------------------------------------------
+#   Get a list of remapped primary BAMs to be sent to NCBI
+#--------------------------------------------------------------
+if ($fcn eq 'sb38') {
+    #   Get all the known centers in the database
+    my $centersref = GetCenters();
+    foreach my $cid (keys %{$centersref}) {
+        my $centername = $centersref->{$cid};
+        my $runsref = GetRuns($cid) || next;
+        #   For each run, see if there are bamfiles to be published 
+        foreach my $runid (keys %{$runsref}) {
+            my $dirname = $runsref->{$runid};
+            #   Get list of all bams known at NCBI and that have not been sent
+            my $sql = "SELECT * FROM $opts{bamfiles_table} " .
+                "WHERE runid='$runid' AND nwdid_known='Y'";
+            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
+            my $sth = DoSQL($sql);
+            my $rowsofdata = $sth->rows();
+            if (! $rowsofdata) { next; }
+            for (my $i=1; $i<=$rowsofdata; $i++) {
+                my $href = $sth->fetchrow_hashref;
+
+                #   Only send the remapped b38 file for this year's data
+                if ($href->{datayear} ne '2') { next; }
+
+                #   Only send the remapped file if the experiment was accepted at NCBI
+                if ($href->{state_ncbiexpt} != $COMPLETED) { next; }
+
+                #   Check important fields for this BAM are possibly correct
+                my $skip = '';
+                foreach my $col (qw(cramname expt_sampleid)) {
+                    if (exists($href->{$col}) && $href->{$col}) { next; }
+                    if ($opts{verbose}) { print "  No value for '$col'\n"; }
+                    $skip .= "$col ";
+                }
+                if ($skip) {
+                    print "  BAM '$href->{bamname}' [$href->{bamid}] is ignored because of incomplete data for: $skip\n";
+                    next;
+                }
+                if ($opts{suberr} && $href->{state_ncbib38} >= $FAILEDCHECKSUM) { $href->{state_ncbib38} = $REQUESTED; }
+                if ($href->{state_ncbib38} != $NOTSET && $href->{state_ncbib38} != $REQUESTED) { next; }
+                #   Send the remapped CRAM to NCBI
+                BatchSubmit("$opts{topmedncbib38} -submit $href->{bamid}");
+            }
+        }
+    }
+    ShowSummary($fcn);
+    exit;
+}
+
+#--------------------------------------------------------------
+#   Get a list of remapped primary BAMs to be sent to NCBI
+#--------------------------------------------------------------
+if ($fcn eq 'sb37') {
+    #   Get all the known centers in the database
+    my $centersref = GetCenters();
+    foreach my $cid (keys %{$centersref}) {
+        my $centername = $centersref->{$cid};
+        my $runsref = GetRuns($cid) || next;
+        #   For each run, see if there are bamfiles to be delivered to NCBI
+        foreach my $runid (keys %{$runsref}) {
+            my $dirname = $runsref->{$runid};
+            #   Get list of all bams known at NCBI and that have not been sent
+            my $sql = "SELECT * FROM $opts{bamfiles_table} " .
+                "WHERE runid='$runid' AND nwdid_known='Y'";
+            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
+            my $sth = DoSQL($sql);
+            my $rowsofdata = $sth->rows();
+            if (! $rowsofdata) { next; }
+            for (my $i=1; $i<=$rowsofdata; $i++) {
+                my $href = $sth->fetchrow_hashref;
+
+                #   Only send the remapped b37 file for this year's data
+                if ($href->{datayear} ne '1') {
+                    if ($opts{verbose}) {
+                        print "  BAM '$href->{bamname}' [$href->{bamid}] ignored because it is not year 1\n";
+                    }
+                    next;
+                }
+
+                #   Only send the remapped file if the experiment was accepted at NCBI
+                if ($href->{state_ncbiexpt} != $COMPLETED) { next; }
+
+                #   Check important fields for this BAM are possibly correct
+                my $skip = '';
+                foreach my $col (qw(cramname expt_sampleid)) {
+                    if (exists($href->{$col}) && $href->{$col}) { next; }
+                    if ($opts{verbose}) { print "  No value for '$col'\n"; }
+                    $skip .= "$col ";
+                }
+                if ($skip) {
+                    print "  BAM '$href->{bamname}' [$href->{bamid}] is ignored because of incomplete data for: $skip\n";
+                    next;
+                }
+                if ($opts{suberr} && $href->{state_ncbib37} >= $FAILEDCHECKSUM) { $href->{state_ncbib37} = $REQUESTED; }
+                if ($href->{state_ncbib37} != $NOTSET && $href->{state_ncbib37} != $REQUESTED) { next; }
+                #   Send the remapped CRAM to NCBI
+                BatchSubmit("$opts{topmedncbib37} -submit $href->{bamid}");
             }
         }
     }
@@ -399,311 +716,6 @@ if ($fcn eq 'sorig') {
     exit;
 }
 
-#--------------------------------------------------------------
-#   Get a list of remapped primary BAMs to be sent to NCBI
-#--------------------------------------------------------------
-if ($fcn eq 'sb37') {
-    #   Get all the known centers in the database
-    my $centersref = GetCenters();
-    foreach my $cid (keys %{$centersref}) {
-        my $centername = $centersref->{$cid};
-        my $runsref = GetRuns($cid) || next;
-        #   For each run, see if there are bamfiles to be delivered to NCBI
-        foreach my $runid (keys %{$runsref}) {
-            my $dirname = $runsref->{$runid};
-            #   Get list of all bams known at NCBI and that have not been sent
-            my $sql = "SELECT * FROM $opts{bamfiles_table} " .
-                "WHERE runid='$runid' AND nwdid_known='Y'";
-            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
-            my $sth = DoSQL($sql);
-            my $rowsofdata = $sth->rows();
-            if (! $rowsofdata) { next; }
-            for (my $i=1; $i<=$rowsofdata; $i++) {
-                my $href = $sth->fetchrow_hashref;
-
-                #   Only send the remapped b37 file for this year's data
-                if ($href->{datayear} ne '1') {
-                    if ($opts{verbose}) {
-                        print "  BAM '$href->{bamname}' [$href->{bamid}] ignored because it is not year 1\n";
-                    }
-                    next;
-                }
-
-                #   Only send the remapped file if the experiment was accepted at NCBI
-                if ($href->{state_ncbiexpt} != $COMPLETED) { next; }
-
-                #   Check important fields for this BAM are possibly correct
-                my $skip = '';
-                foreach my $col (qw(cramname expt_sampleid)) {
-                    if (exists($href->{$col}) && $href->{$col}) { next; }
-                    if ($opts{verbose}) { print "  No value for '$col'\n"; }
-                    $skip .= "$col ";
-                }
-                if ($skip) {
-                    print "  BAM '$href->{bamname}' [$href->{bamid}] is ignored because of incomplete data for: $skip\n";
-                    next;
-                }
-                if ($opts{suberr} && $href->{state_ncbib37} >= $FAILEDCHECKSUM) { $href->{state_ncbib37} = $REQUESTED; }
-                if ($href->{state_ncbib37} != $NOTSET && $href->{state_ncbib37} != $REQUESTED) { next; }
-                #   Send the remapped CRAM to NCBI
-                BatchSubmit("$opts{topmedncbib37} -submit $href->{bamid}");
-            }
-        }
-    }
-    ShowSummary($fcn);
-    exit;
-}
-
-#--------------------------------------------------------------
-#   Push data to Google Cloud for processing
-#--------------------------------------------------------------
-if ($fcn eq 'spush') {
-    #   Get all the known centers in the database
-    my $centersref = GetCenters();
-    foreach my $cid (keys %{$centersref}) {
-        my $centername = $centersref->{$cid};
-        my $runsref = GetRuns($cid) || next;
-        #   For each run, see if there are bamfiles for Google Cloud
-        foreach my $runid (keys %{$runsref}) {
-            my $dirname = $runsref->{$runid};
-            #   Get list of all bams known at NCBI and that have not been sent
-            my $sql = "SELECT * FROM $opts{bamfiles_table} " .
-                "WHERE runid='$runid'";
-            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
-            my $sth = DoSQL($sql);
-            my $rowsofdata = $sth->rows();
-            if (! $rowsofdata) { next; }
-            for (my $i=1; $i<=$rowsofdata; $i++) {
-                my $href = $sth->fetchrow_hashref;
-
-                #   Only send data if cram was done
-                if ($href->{state_cram} != $COMPLETED) { next; }
-                if ($opts{suberr} && $href->{state_gce38push} >= $FAILED) {
-                    $href->{state_gce38push} = $REQUESTED;
-                }
-                if ($href->{state_gce38push} != $NOTSET &&
-                    $href->{state_gce38push} != $REQUESTED) { next; }
-
-                #   Send the CRAM to Google
-                BatchSubmit("$opts{topmedgce38push} -submit $href->{bamid}");
-            }
-        }
-    }
-    ShowSummary($fcn);
-    exit;
-}
-
-#--------------------------------------------------------------
-#   Pull processed data from Google Cloud
-#--------------------------------------------------------------
-if ($fcn eq 'spull') {
-    #   Get all the known centers in the database
-    my $centersref = GetCenters();
-    foreach my $cid (keys %{$centersref}) {
-        my $centername = $centersref->{$cid};
-        my $runsref = GetRuns($cid) || next;
-        #   For each run, see if there are bamfiles for Google Cloud
-        foreach my $runid (keys %{$runsref}) {
-            my $dirname = $runsref->{$runid};
-            #   Get list of all bams known at NCBI and that have not been sent
-            my $sql = "SELECT * FROM $opts{bamfiles_table} " .
-                "WHERE runid='$runid'";
-            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
-            my $sth = DoSQL($sql);
-            my $rowsofdata = $sth->rows();
-            if (! $rowsofdata) { next; }
-            for (my $i=1; $i<=$rowsofdata; $i++) {
-                my $href = $sth->fetchrow_hashref;
-                #   Only get data if remap was done and requested
-                if ($href->{state_gce38push} != $COMPLETED) { next; }
-                if ($opts{suberr} && $href->{state_gce38pull} >= $FAILED) {
-                    $href->{state_gce38pull} = $REQUESTED;
-                }
-                if ($href->{state_gce38pull} != $REQUESTED) { next; }
-
-                #   Send the CRAM to Google
-                BatchSubmit("$opts{topmedgce38pull} -submit $href->{bamid}");
-            }
-        }
-    }
-    ShowSummary($fcn);
-    exit;
-}
-
-#--------------------------------------------------------------
-#   Post process data we fetched from Google Cloud
-#--------------------------------------------------------------
-if ($fcn eq 'spost') {
-    #   Get all the known centers in the database
-    my $centersref = GetCenters();
-    foreach my $cid (keys %{$centersref}) {
-        my $centername = $centersref->{$cid};
-        my $runsref = GetRuns($cid) || next;
-        #   For each run, see if there are bamfiles for Google Cloud
-        foreach my $runid (keys %{$runsref}) {
-            my $dirname = $runsref->{$runid};
-            #   Get list of all bams known at NCBI and that have not been sent
-            my $sql = "SELECT * FROM $opts{bamfiles_table} " .
-                "WHERE runid='$runid'";
-            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
-            my $sth = DoSQL($sql);
-            my $rowsofdata = $sth->rows();
-            if (! $rowsofdata) { next; }
-            for (my $i=1; $i<=$rowsofdata; $i++) {
-                my $href = $sth->fetchrow_hashref;
-
-                #   Only post process data that we already fetched
-                if ($href->{state_gce38pull} != $COMPLETED) { next; }
-                if ($opts{suberr} && $href->{state_gce38post} >= $FAILED) {
-                    $href->{state_gce38post} = $REQUESTED;
-                }
-                if ($href->{state_gce38post} != $NOTSET &&
-                    $href->{state_gce38post} != $REQUESTED) { next; }
-
-                #   Send the CRAM to Google
-                BatchSubmit("$opts{topmedgce38post} -submit $href->{bamid}");
-            }
-        }
-    }
-    ShowSummary($fcn);
-    exit;
-}
-
-#--------------------------------------------------------------
-#   Get a list of remapped primary BAMs to be sent to NCBI
-#--------------------------------------------------------------
-if ($fcn eq 'sb38') {
-    #   Get all the known centers in the database
-    my $centersref = GetCenters();
-    foreach my $cid (keys %{$centersref}) {
-        my $centername = $centersref->{$cid};
-        my $runsref = GetRuns($cid) || next;
-        #   For each run, see if there are bamfiles to be published 
-        foreach my $runid (keys %{$runsref}) {
-            my $dirname = $runsref->{$runid};
-            #   Get list of all bams known at NCBI and that have not been sent
-            my $sql = "SELECT * FROM $opts{bamfiles_table} " .
-                "WHERE runid='$runid' AND nwdid_known='Y'";
-            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
-            my $sth = DoSQL($sql);
-            my $rowsofdata = $sth->rows();
-            if (! $rowsofdata) { next; }
-            for (my $i=1; $i<=$rowsofdata; $i++) {
-                my $href = $sth->fetchrow_hashref;
-
-                #   Only send the remapped b38 file for this year's data
-                if ($href->{datayear} ne '2') { next; }
-
-                #   Only send the remapped file if the experiment was accepted at NCBI
-                if ($href->{state_ncbiexpt} != $COMPLETED) { next; }
-
-                #   Check important fields for this BAM are possibly correct
-                my $skip = '';
-                foreach my $col (qw(cramname expt_sampleid)) {
-                    if (exists($href->{$col}) && $href->{$col}) { next; }
-                    if ($opts{verbose}) { print "  No value for '$col'\n"; }
-                    $skip .= "$col ";
-                }
-                if ($skip) {
-                    print "  BAM '$href->{bamname}' [$href->{bamid}] is ignored because of incomplete data for: $skip\n";
-                    next;
-                }
-                if ($opts{suberr} && $href->{state_ncbib38} >= $FAILEDCHECKSUM) { $href->{state_ncbib38} = $REQUESTED; }
-                if ($href->{state_ncbib38} != $NOTSET && $href->{state_ncbib38} != $REQUESTED) { next; }
-                #   Send the remapped CRAM to NCBI
-                BatchSubmit("$opts{topmedncbib38} -submit $href->{bamid}");
-            }
-        }
-    }
-    ShowSummary($fcn);
-    exit;
-}
-
-#--------------------------------------------------------------
-#   Create BCF file
-#--------------------------------------------------------------
-if ($fcn eq 'bcf') {
-    #   Get all the known centers in the database
-    my $centersref = GetCenters();
-    foreach my $cid (keys %{$centersref}) {
-        my $centername = $centersref->{$cid};
-        my $runsref = GetRuns($cid) || next;
-        #   For each run, see if there are files to create BCF for
-        foreach my $runid (keys %{$runsref}) {
-            my $dirname = $runsref->{$runid};
-            #   Get list of all bams that have not yet arrived properly
-            my $sql = "SELECT bamid,bamname,donot_remap,state_b38,state_bcf FROM " .
-                $opts{bamfiles_table} . " WHERE runid='$runid'";
-            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
-            my $sth = DoSQL($sql);
-            my $rowsofdata = $sth->rows();
-            if (! $rowsofdata) { next; }
-            for (my $i=1; $i<=$rowsofdata; $i++) {
-                my $href = $sth->fetchrow_hashref;
-                #   Only do BCF if this was remapped to build 38
-                if ($href->{state_b38} != $COMPLETED) { next; }
-
-#   This is probably wrong
-                #   Only do BCF if this was remapped to build 38    Hardcoded build!
-                if ($href->{donot_remap} ne '38') { next; }
-
-                if ($opts{suberr} && $href->{state_bcf} >= $FAILEDCHECKSUM) { $href->{state_bcf} = $REQUESTED; }
-                if ($href->{state_bcf} != $NOTSET && $href->{state_bcf} != $REQUESTED) { next; }
-                #   Run the command
-                BatchSubmit("$opts{topmedbcf} -submit $href->{bamid}");
-            }
-        }
-    }
-    ShowSummary($fcn);
-    exit;
-}
-
-die "Invalid request '$fcn'. Try '$Script --help'\n";
-
-#==================================================================
-# Subroutine:
-#   BatchSubmit - Run a command which submits the command to batch
-#
-# Arguments:
-#   cmd - command
-#==================================================================
-sub BatchSubmit {
-    my ($cmd) = @_;
-    $opts{maxjobs}--;
-    if ($opts{maxjobs} < 0) { return; }
-    if ($opts{maxjobs} == 0 && $opts{verbose}) { print "Limit of jobs to be submitted has been reached\n"; }
-    if ($opts{dryrun}) { print "dryrun => $cmd\n"; return; }
-    my $rc = system("$cmd 2>&1");
-    $rc = $rc >> 8;
-    if ($rc == 0) {
-        $opts{jobcount}++;
-        if ($opts{verbose}) { print "submitted => $cmd\n"; }
-        return;
-    }
-    $opts{maxjobs}++;                   # Submit failed, keep trying
-    if ($rc == 4) { $opts{jobsnotpermitted}++; }
-    else { $opts{jobsfailedsubmission}++; }
-    return;
-}
-
-#==================================================================
-# Subroutine:
-#   ShowSummary - Print summary of jobs activity
-#
-# Arguments:
-#   type - type of job, verify, backup etc
-#==================================================================
-sub ShowSummary {
-    my ($type) = @_;
-
-    my $s = '';
-    if ($opts{jobcount})            { $s .= "$opts{jobcount} jobs submitted"; }
-    if ($opts{jobsnotpermitted})    { $s .=  "  $opts{jobsnotpermitted} job submissions not permitted"; }
-    if ($opts{jobsfailedsubmission}) { $s .=  "  $opts{jobsfailedsubmission} job submissions failed"; }
-    if (! $s) { return; }
-    print "$nowdate $type: $s\n";
-}
-
 #==================================================================
 #   Perldoc Documentation
 #==================================================================
@@ -720,6 +732,7 @@ topmed_monitor.pl - Find runs that need some action
   topmed_monitor.pl -center nygc verify    # Select only samples from a center
   topmed_monitor.pl -maxjobs 5 cram        # Only submit a few jobs
   topmed_monitor.pl -datayear 2 bai        # Send only year 2 samples
+  topmed_monitor.pl -random bcf            # Randomly find samples for bcf
 
 =head1 DESCRIPTION
 
@@ -758,6 +771,13 @@ Generates this output.
 
 Do not submit more than N jobs for this invocation.
 The default for B<-maxjobs> is B<100>.
+
+=item B<-random>
+
+Randomly select data to be processed. This may not be used with B<-center> or B<-runs>. 
+This is intended for cases where a large set of data is to be selected
+and we want it to run over a wide set of hosts.
+In practice this is only useful for B<spush>, B<spull>, B<spost>, and B<bcf> (at least so far).
 
 =item B<-realm NAME>
 
