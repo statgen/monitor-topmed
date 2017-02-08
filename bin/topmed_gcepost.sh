@@ -125,6 +125,9 @@ else
   echo "Cannot actually verify the GCE checksum and the MD5 of the file. Assume it is OK"
 fi
 
+#   Save date of file in database
+$topmedcmd setdate $bamid datemapping_b38 $cramfile
+
 etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "Post processing of remapped CRAM ($crampath) completed in $etime seconds"
