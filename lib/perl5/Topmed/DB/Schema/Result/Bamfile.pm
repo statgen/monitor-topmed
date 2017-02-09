@@ -811,6 +811,10 @@ sub center {
   return shift->run->center->centername;
 }
 
+sub nwdid {
+  return shift->expt_sampleid;
+}
+
 sub host {
   my $self = shift;
   my $ptn  = YASF->new('/net/topmed/working/backups/incoming/topmed/{center}/{run}/{nwdid}.src.cram');
@@ -849,6 +853,27 @@ sub b38_mapped_path {
 
 sub gce_recab_uri {
   return $GOOGLE_BUCKETS{recabs} . shift->expt_sampleid;
+}
+
+sub incoming_path {
+  my ($self) = @_;
+
+  # Original BAM path:
+  # /<prefix>/<host>/<project_incoming_dir>/<center>/<run_dir>/<filename>
+  my $bam = File::Spec->join('/net/topmed/incoming', $self->center, $self->run->dirname, $self->bamname);
+
+  # Backed up/squeezed path:
+  # /<prefix>/<host>/<project_backup_dir>/<project_incoming_dir>/<center>/<run_dir>/<sample_id>.src.cram
+  my $cram = File::Spec->join('/net/topmed/working/backups/incoming/topmed', $self->center, $self->run->dirname, $self->nwdid . '.src.cram');
+
+  return $bam if -e $bam;
+  return $cram if -e $cram;
+  return;
+}
+
+sub recab_path {
+  my ($self) = @_;
+  return File::Spec->join($self->b38_mapped_path, $self->nwdid . '.recab.cram');
 }
 
 1;
