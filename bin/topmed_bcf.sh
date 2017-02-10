@@ -26,11 +26,11 @@ if [ "$1" = "-submit" ]; then
   fi 
 
   # Run this on node where remapped cram lives
-  #h=`$topmedpath -fallback whathost $1 b$build`
-  #if [ "$h" != "" ]; then
-  #  realhost="--nodelist=$h"
-  #  #qos="--qos=$h-$me"
-  #fi
+  h=`$topmedpath -fallback whathost $1 b$build`
+  if [ "$h" != "" ]; then
+    realhost="--nodelist=$h"
+    #qos="--qos=$h-$me"
+  fi
 
   #  Submit this script to be run
   l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*`)
@@ -60,7 +60,7 @@ s=`hostname`
 p=`pwd`
 stime=`date +%s`
 
-crampath=`$topmedpath -fallback wherepath $bamid b$build`
+crampath=`$topmedpath wherepath $bamid b$build`
 if [ "$crampath" = "" ]; then
   echo "Unable to determine where remapped CRAM file should be for '$bamid'"
   $topmedcmd -persist mark $bamid $markverb failed
@@ -88,7 +88,7 @@ if [ "$nwdid" = "" ]; then
   $topmedcmd -persist mark $bamid $markverb failed
   exit 2
 fi
-cramfile=`$topmedpath -fallback wherefile $bamid b$build`
+cramfile=`$topmedpath wherefile $bamid b$build`
 if [ ! -f $cramfile ]; then
   echo "Unable to find remapped cram file '$cramfile'"
   $topmedcmd -persist mark $bamid $markverb failed
