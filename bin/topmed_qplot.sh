@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-#   topmed_qplot.sh [-submit [-mem NG]] bamid bamfile
+#   topmed_qplot.sh [-submit [-mem NG]] bamid
 #
 #	Run QPLOT on a BAM file
 #
@@ -52,13 +52,13 @@ fi
 
 if [ "$2" = "" ]; then
   me=`basename $0`
-  echo "Usage: $me [-submit] bamid bamfile"
+  echo "Usage: $me [-submit] bamid"
   echo ""
   echo "Run qplot on a bam file and update database"
   exit 1
 fi
 bamid=$1
-bamfile=$2
+bamfile=`$topmedpath wherefile $bamid bam`
 
 #   Is this a cram or bam
 extension="${bamfile##*.}"

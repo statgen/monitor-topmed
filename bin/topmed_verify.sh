@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-#   topmed_verify.sh -submit bamid checksum bamfile
+#   topmed_verify.sh -submit bamid
 #
 #	Verify the MD5 checksum for a BAM file
 #   Do not specify a QOS for verify so it runs before QPLOT
@@ -42,16 +42,16 @@ if [ "$1" = "-submit" ]; then
   exit
 fi
 
-if [ "$3" = "" ]; then
+if [ "$1" = "" ]; then
   me=`basename $0`
-  echo "Usage: $me [-submit] bamid checksum bamfile"
+  echo "Usage: $me [-submit] bamid"
   echo ""
   echo "Verify checksum for a bam file and update database"
   exit 1
 fi
 bamid=$1
-checksum=$2
-bamfile=$3
+checksum=`$topmedcmd show $bamid checksum`
+bamfile=`$topmedpath wherefile $bamid bam`
 
 #   Is this a cram or bam
 extension="${bamfile##*.}"

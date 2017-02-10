@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-#   topmed_bai.sh -submit bamid bamfile
+#   topmed_bai.sh -submit bamid
 #
 #	Create BAI index for a BAM file
 #
@@ -35,15 +35,15 @@ if [ "$1" = "-submit" ]; then
   exit
 fi
 
-if [ "$2" = "" ]; then
+if [ "$1" = "" ]; then
   me=`basename $0`
-  echo "Usage: $me [-submit] bamid bamfile"
+  echo "Usage: $me [-submit] bamid"
   echo ""
   echo "Create index for a cram/bam file and update database"
   exit 1
 fi
 bamid=$1
-bamfile=$2
+bamfile=`$topmedpath wherefile $bamid bam`
 
 #   Is this a cram or bam
 extension="${bamfile##*.}"

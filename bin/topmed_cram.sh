@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-#   topmed_cram.sh -submit|-squeezed bamid bamfile
+#   topmed_cram.sh -submit|-squeezed bamid
 #
 #	Backup the original BAM as a CRAM file
 #
@@ -72,15 +72,15 @@ if [ "$1" = "-squeezed" ]; then
   shift
 fi
 
-if [ "$2" = "" ]; then
+if [ "$1" = "" ]; then
   me=`basename $0`
-  echo "Usage: $me [-submit|-squeezed] bamid bamfile"
+  echo "Usage: $me [-submit|-squeezed] bamid"
   echo ""
   echo "Convert original BAM to a CRAM file and update database"
   exit 1
 fi
 bamid=$1
-bamfile=$2
+bamfile=`$topmedpath wherefile $bamid bam`
 
 #   Is this a cram or bam
 extension="${bamfile##*.}"
