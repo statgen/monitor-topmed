@@ -112,7 +112,7 @@ our %opts = (
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose maxlongjobs=i persist with-bamid|bamid
+    help realm=s verbose maxlongjobs=i persist with-id|bamid
     )) || die "$Script - Failed to parse options\n";
 
 #   Simple help if requested
@@ -134,7 +134,7 @@ if ($#ARGV < 0 || $opts{help}) {
         "  or\n" .
         "$m list centers\n" .
         "$m list runs centername\n" .
-        "$m [-with-bamid] list samples runname\n" .
+        "$m [-with-id] list samples runname\n" .
         "  or\n" .
         "$m export\n" .
         "  or\n" .
@@ -556,40 +556,94 @@ sub SQueue {
     #   Get summary of IO data for key nodes
     my @iostatinfo = ();
     if (opendir(my $dh, "$opts{netdir}/$opts{consoledir}")) {
-        @iostatinfo = grep { /iostat.topmed\d*.txt/ } readdir($dh);
+        @iostatinfo = sort sorthost grep { /iostat.topmed\d*.txt/ } readdir($dh);
         closedir $dh;
-        print "I/O Load          Incoming MB/s   Working MB/s\n" .
-            "         IOWait   reads  writes   reads  writes    Time\n";
-        foreach my $f (sort @iostatinfo) {
-            if (open(IN,"$opts{netdir}/$opts{consoledir}/$f")) {
-                #   Linux 3.13.0-85-generic (topmed5) 	07/21/2016 	_x86_64_	(120 CPU)
+        my $in;
+        my $prefix = ' ' x 12;
+        my $date = $prefix;
+        my $hdr = 0;
+        my $iohdr = '   %user %iowait  %idle';
+        my $iodata = '';
+        print "    I/O activity for /incoming and /working filesystems per host\n";
+        foreach my $f (@iostatinfo) {
+            my $host = $prefix;
+            if (open($in,"$opts{netdir}/$opts{consoledir}/$f")) {
+                if ($f =~ /(topmed\d*)/) { $host = sprintf('%-12s', $1); }
+                #   Linux 4.2.0-42-generic (topmed) 	02/10/2017 	_x86_64_	(120 CPU)
                 #
-                #   07/21/2016 09:54:01 AM
                 #   avg-cpu:  %user   %nice %system %iowait  %steal   %idle
-                #          32.50    0.00    2.17    2.95    0.00   62.38
+                #              0.35    0.00    1.66    0.55    0.00   97.44
                 #
                 #   Device:            tps    MB_read/s    MB_wrtn/s    MB_read    MB_wrtn
-                #   md20           3288.32        78.27        18.02  498062274  114686675
-                #   md21           3196.36        91.78         1.36  584041063    8643316                my ($datestamp, 
-                $_ = <IN>;                  # blank
-                $_ = <IN>;                  # Device etc
-                my ($date, $tod) = split(' ', <IN>);    # Get date and time
-                $_ = <IN>;                  # avg-cpu etc
-                my ($user, $nice, $system, $iowait) = split(' ', <IN>);     # Get iowait
-                $_ = <IN>;                  # blank
-                $_ = <IN>;                  # Device etc
-                my ($dev1, $tps1, $MB_reads1, $MB_writes1) = split(' ', <IN>);
-                my ($dev2, $tps2, $MB_reads2, $MB_writes2) = split(' ', <IN>);
-                close(IN);
-                if ($f =~ /(topmed\d*)\./ && defined($iowait)) {
-                    printf("%-7s %6s%% %7s %7s %7s %7s  %s\n",
-                        $1, $iowait, $MB_reads1, $MB_writes1, $MB_reads2, $MB_writes2, $tod);
+                #   md20              0.40         0.00         0.01          0          0
+                #   md21           7782.60       213.60        13.17       1068         65
+                while (<$in>) {
+                    if (/Linux.+(\d\d\/\d\d\/20\d\d)/) { $date = sprintf('%-12s', $1); next; }
+                    if (/Device/ && (! $hdr)) {
+                        print $date . ReFormatDeviceData($_) . $iohdr . "\n";
+                        $hdr++;
+                        next;
+                    }
+                    if (/avg-cpu/) {
+                        $_ = <$in>;             # Get actual numbers
+                        $iodata = ReFormatIOData($_);
+                        next;
+                    }
+                    if (/md2\d/) {
+                        print $host . ReFormatDeviceData($_) . $iodata ."\n";
+                        $host = $prefix;
+                        $iodata = '';
+                        next;
+                    }
                 }
+                close($in);
             }
         }
         print "\n";
     }
     return;
+}
+
+#==================================================================
+# Subroutine:
+#   sorthost    Used to sort topmed hosts in numnerical order
+#
+#   Return reformatted device data
+#==================================================================
+sub sorthost {
+    my $cmp1 = 0;
+    my $cmp2 = 0;
+    if ($a =~ /topmed(\d+)/) { $cmp1 = sprintf('%02d',$1); }
+    if ($b =~ /topmed(\d+)/) { $cmp2 = sprintf('%02d',$1); }
+    return ($cmp1 <=> $cmp2);
+}
+
+#==================================================================
+# Subroutine:
+#   ReFormatIOData($str)
+#
+#   Return reformatted device data
+#==================================================================
+sub ReFormatIOData {
+    my ($str) = @_;
+    my @c = split(' ', $str);
+    return sprintf('   %5s %7s %6s', $c[0], $c[3], $c[5]);
+}
+
+#==================================================================
+# Subroutine:
+#   ReFormatDeviceData($str)
+#
+#   Return reformatted device data
+#==================================================================
+sub ReFormatDeviceData {
+    my ($str) = @_;
+    my @c = split(' ', $str);
+    if ($c[0] eq 'md20') { $c[0] = '/incoming'; }
+    else {
+        if ($c[0] eq 'md21') { $c[0] = '/working'; }
+    }
+    return sprintf('%-9s %10s %10s', $c[0], $c[2], $c[3]);
 }
 
 #==================================================================
@@ -785,12 +839,16 @@ sub SetDate {
 sub List {
     my ($fcn, $item) = @_;
     if (! $fcn) { die "$Script - List operator was not provided\n"; }
+    my $s;
+
     if ($fcn eq 'centers') {            # Show all centers
-        my $sth = ExecSQL("SELECT centername FROM $opts{centers_table}");
+        my $sth = ExecSQL("SELECT centerid,centername FROM $opts{centers_table}");
         my $rowsofdata = $sth->rows();
         for (my $i=1; $i<=$rowsofdata; $i++) {
             my $href = $sth->fetchrow_hashref;
-            print $href->{centername} . "\n";
+            $s = $href->{centername};
+            if ($opts{'with-id'}) { $s .= ' ' . $href->{centerid}; }
+            print $s . "\n";
         }
         return;
     }
@@ -801,11 +859,13 @@ sub List {
         if (! $rowsofdata) { die "$Script - Unknown centername '$item'\n"; }
         my $href = $sth->fetchrow_hashref;
         my $centerid = $href->{centerid};
-        $sth = ExecSQL("SELECT dirname FROM $opts{runs_table} WHERE centerid=$centerid");
+        $sth = ExecSQL("SELECT runid,dirname FROM $opts{runs_table} WHERE centerid=$centerid");
         $rowsofdata = $sth->rows();
         for (my $i=1; $i<=$rowsofdata; $i++) {
             my $href = $sth->fetchrow_hashref;
-            print $href->{dirname} . "\n";
+            $s = $href->{dirname};
+            if ($opts{'with-id'}) { $s .= ' ' . $href->{runid}; }
+            print $s . "\n";
         }
         return;
     }
@@ -824,11 +884,10 @@ sub List {
         my $runid = $href->{runid};
         $sth = ExecSQL("SELECT bamid,expt_sampleid FROM $opts{bamfiles_table} WHERE runid=$runid");
         $rowsofdata = $sth->rows();
-        my $s;
         for (my $i=1; $i<=$rowsofdata; $i++) {
             $href = $sth->fetchrow_hashref;
             $s = $href->{expt_sampleid};
-            if ($opts{'with-bamid'}) { $s .= ' ' . $href->{bamid}; }
+            if ($opts{'with-id'}) { $s .= ' ' . $href->{bamid}; }
             print $s . "\n";
         }
         return;
@@ -1045,9 +1104,9 @@ Functions wherefile, wherepath and whathost were moved into topmedpath.pl.
 
 =over 4
 
-=item B<-bamid  -with-bamid>
+=item B<-bamid  -with-id>
 
-Include the bamid for the output from showrun.
+Include the bamid or runid for the output from shown.
 
 =item B<-help>
 
