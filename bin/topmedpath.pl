@@ -58,7 +58,7 @@ our %opts = (
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose fallback
+    help realm=s verbose
     )) || die "$Script - Failed to parse options\n";
 
 #   Simple help if requested
@@ -164,27 +164,7 @@ sub WherePath {
     if ($set eq 'b38') {
         my $meth = qq{${set}_mapped_path};
         my $f = $sample->$meth . ".$nwdid.recab.cram";
-        if (! $opts{fallback}) {      # We want real path, even if it does not exist
-            say $sample->$meth;
-            exit;
-        }
-        #   Fallback specified. File exists, so give the remapped file path
-        if (-f $f) {
-            say $sample->$meth;
-            exit;
-        }      
-        
-        #   No file and fallback requested. If donot_remap is our build, provide path
-        #   to the original cram path.
-        #   Get this wrong and we are messing with the a source tree !
-        #   Note hardcoded build here.  Another chance to fail in the future
-        if ($sample->donot_remap ne '38') {
-            say $sample->$meth;
-            exit;
-        }      
-        #   Return path to the cram file (same as $set = 'cram')
-        my $bakbamfdir = abs_path("$opts{netdir}/$opts{backupsdir}/$centername/$rundir") || '';
-        say $bakbamfdir;
+        say $sample->$meth;
         exit;
     }
  
@@ -272,30 +252,8 @@ sub WhatHost {
         my $f = $sample->$meth . ".$nwdid.recab.cram";
         my $h = 'none';
         if ($f =~ /\/net\/([^\/]+)\//) { $h = $1; }
-        if (! $opts{fallback}) {      # We want real path, even if it does not exist
-            say $h;
-            exit;
-        }
-        #   Fallback specified. File exists, so give the remapped host
-        if (-f $f) {
-            say $h;
-            exit;
-        }      
-        
-        #   No file and fallback requested. If donot_remap is our build, provide path
-        #   to the original cram path.
-        #   Get this wrong and we are messing with the a source tree !
-        #   Note hardcoded build here.  Another chance to fail in the future
-        if ($sample->donot_remap ne '38') {
-            say $h;
-            exit;
-        }      
-        #   Return path to the cram file (same as $set = 'cram')
-        my $cramdir = abs_path("$opts{netdir}/$opts{backupsdir}/$centername/$rundir") || '';
-        if ($cramdir =~ /\/net\/([^\/]+)\//) { $h = $1; }
         say $h;
         exit;
-
     }
 
     if ($set eq 'bcf') {
@@ -393,27 +351,7 @@ sub WhereFile {
     if ($set eq 'b38') {
         my $meth = qq{${set}_mapped_path};
         my $f = $sample->$meth . "/$nwdid.recab.cram";
-        if (! $opts{fallback}) {      # We want real path, even if it does not exist
-            say $f;
-            exit;
-        }
-        #   Fallback specified. File exists, so give the remapped file path
-        if (-f $f) {
-            say $f;
-            exit;
-        }      
-        
-        #   No file and fallback requested. If donot_remap is our build, provide path
-        #   to the original cram path.
-        #   Get this wrong and we are messing with the a source tree !
-        #   Note hardcoded build here.  Another chance to fail in the future
-        if ($sample->donot_remap ne '38') {
-            say $f;
-            exit;
-        }      
-        #   Return path to the cram file (same as $set = 'cram')
-        my $cramfile = abs_path("$opts{netdir}/$opts{backupsdir}/$centername/$rundir/$nwdid.src.cram") || '';
-        say $cramfile;
+        say $f;
         exit;
     }
  
@@ -501,14 +439,6 @@ See B<perldoc DBIx::Connector> for details defining the database.
 =head1 OPTIONS
 
 =over 4
-
-=item B<-fallback>
-
-B<Fallback> means we want the file of interest to exist for the build.
-So, for example, if we specify B<-fallback> and wherepath, the call
-will return the remapped directory + NWD123456.recab.cram if it exists.
-If it does not it returns the cram directory + NWD123456.src.cram.
-This is all based on a hard-coded build value.
 
 =item B<-help>
 
