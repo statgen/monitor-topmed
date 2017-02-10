@@ -974,9 +974,9 @@ function RestartJobs($h) {
         "<option value='bai'>bai</option>" .
         "<option value='qplot'>qplot</option>" .
         "<option value='cram'>cram</option>" .
-        "<option value='gcepush'>push</option>" .
-        "<option value='gcepull'>pul</option>" .
-        "<option value='gcepost'>post</option>" .
+        "<option value='gce38push'>push</option>" .
+        "<option value='gce38pull'>pull</option>" .
+        "<option value='gce38post'>post</option>" .
         "<option value='bcf'>bcf</option>" .
         "</select></td>" .
         "<td><font color='green'>&nbsp; </font></td>" .
