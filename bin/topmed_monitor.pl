@@ -100,38 +100,26 @@ my $nowdate = strftime('%Y/%m/%d %H:%M', localtime);
 #   Get a list of BAMs we have not noticed they arrived yet
 #--------------------------------------------------------------
 if ($fcn eq 'arrive') {
-    #   Get all the known centers in the database
-    my $centersref = GetCenters();
-    CENTER: foreach my $cid (keys %{$centersref}) {
-        my $centername = $centersref->{$cid};
-        my $runsref = GetRuns($cid) || next;
-        #   For each run, see if there are bamfiles that arrived
-        foreach my $runid (keys %{$runsref}) {
-            my $dirname = $runsref->{$runid};
-            #   Get list of all bams that have not yet arrived properly
-            my $sql = "SELECT bamid,bamname,state_arrive FROM $opts{bamfiles_table} " .
-                "WHERE runid='$runid'";
-            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
-            my $sth = DoSQL($sql);
-            my $rowsofdata = $sth->rows();
-            if (! $rowsofdata) { next; }
-            for (my $i=1; $i<=$rowsofdata; $i++) {
-                my $href = $sth->fetchrow_hashref;
-                my $f = $opts{topdir} . "/$centername/$dirname/" .
-                    $href->{bamname};
-                my @stats = stat($f);
-                if (! @stats) { next; }
-                #   See if we should mark this as arrived
-                #   All BAMs must start with NWD. Only skip this if the BAM name
-                #   is NWD and it is marked as completed
-                if ($href->{bamname} =~ /^NWD/ && $href->{state_arrive} == $COMPLETED) { next; }
-                #   If the mtime on the file is very recent, it might still be coming
-                my $nowtime = time();
-                if ((time() - $stats[9]) < 3600) { next; }
-                #   Run the command
-                if (! BatchSubmit("$opts{topmedarrive} $href->{bamid} $f")) { last CENTER; }
-            }
-        }
+    #   Get list of all samples yet to process
+    my $sql = "SELECT bamid,bamname,state_arrive FROM $opts{bamfiles_table}";
+    $sql = BuildSQL($sql);
+    my $sth = DoSQL($sql);
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { next; }
+    for (my $i=1; $i<=$rowsofdata; $i++) {
+        my $href = $sth->fetchrow_hashref;
+        my $f = GetBamName($href->{bamid});
+        my @stats = stat($f);
+        if (! @stats) { next; }
+        #   See if we should mark this as arrived
+        #   All BAMs must start with NWD. Only skip this if the BAM name
+        #   is NWD and it is marked as completed
+        if ($href->{bamname} =~ /^NWD/ && $href->{state_arrive} == $COMPLETED) { next; }
+            #   If the mtime on the file is very recent, it might still be coming
+            my $nowtime = time();
+            if ((time() - $stats[9]) < 3600) { next; }
+            #   Run the command
+            if (! BatchSubmit("$opts{topmedarrive} $href->{bamid}")) { last; }
     }
     ShowSummary('BAMs arrived');
     exit;
@@ -141,42 +129,20 @@ if ($fcn eq 'arrive') {
 #   Get a list of BAMs that have not been verified
 #--------------------------------------------------------------
 if ($fcn eq 'verify') {
-    #   Get all the known centers in the database
-    my $centersref = GetCenters();
-    CENTER: foreach my $cid (keys %{$centersref}) {
-        my $centername = $centersref->{$cid};
-        my $runsref = GetRuns($cid) || next;
-        #   For each run, see if there are bamfiles to be verified
-        foreach my $runid (keys %{$runsref}) {
-            my $dirname = $runsref->{$runid};
-            #   Get list of all samples that need md5 run
-            my $sql = "SELECT bamid,bamname,state_arrive,state_md5ver,checksum,bamsize FROM " .
-                $opts{bamfiles_table} . " WHERE runid='$runid'";
-            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
-            my $sth = DoSQL($sql);
-            my $rowsofdata = $sth->rows();
-            if (! $rowsofdata) { next; }
-            for (my $i=1; $i<=$rowsofdata; $i++) {
-                my $href = $sth->fetchrow_hashref;
-                my $f = $opts{topdir} . "/$centername/$dirname/" . $href->{bamname};
-                #   If needed, update bamsize
-                if (! $href->{bamsize}) {
-                    my @stats = stat($f);
-                    if ($stats[7]) {
-                        $sql = "UPDATE $opts{bamfiles_table} SET bamsize=$stats[7] " .
-                            "WHERE bamid=$href->{bamid}";
-                        my $sth2 = DoSQL($sql);
-                    }
-                }
-                #   Only do verify if file has arrived and ready to be run
-                if ($href->{state_arrive} != $COMPLETED) { next; }
-                if ($opts{suberr} && $href->{state_md5ver} >= $FAILEDCHECKSUM) { $href->{state_md5ver} = $REQUESTED; }
-                if ($href->{state_md5ver} != $NOTSET && $href->{state_md5ver} != $REQUESTED) { next; }
-
-                #   Run the command
-                if (! BatchSubmit("$opts{topmedverify} -submit $href->{bamid} $href->{checksum} $f")) { last CENTER; }
-            }
-        }
+    #   Get list of all samples yet to process
+    my $sql = "SELECT bamid,bamname,bamsize,state_arrive,state_md5ver FROM $opts{bamfiles_table}";
+    $sql = BuildSQL($sql);
+    my $sth = DoSQL($sql);
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { next; }
+    for (my $i=1; $i<=$rowsofdata; $i++) {
+        my $href = $sth->fetchrow_hashref;
+        #   Only do verify if file has arrived and ready to be run
+        if ($href->{state_arrive} != $COMPLETED) { next; }
+        if ($opts{suberr} && $href->{state_md5ver} >= $FAILEDCHECKSUM) { $href->{state_md5ver} = $REQUESTED; }
+        if ($href->{state_md5ver} != $NOTSET && $href->{state_md5ver} != $REQUESTED) { next; }
+        #   Run the command
+        if (! BatchSubmit("$opts{topmedverify} -submit $href->{bamid} $href->{checksum}")) { last; }
     }
     ShowSummary($fcn);
     exit;
@@ -186,32 +152,20 @@ if ($fcn eq 'verify') {
 #   Get a list of BAMs that have no BAI file
 #--------------------------------------------------------------
 if ($fcn eq 'bai') {
-    #   Get all the known centers in the database
-    my $centersref = GetCenters();
-    CENTER: foreach my $cid (keys %{$centersref}) {
-        my $centername = $centersref->{$cid};
-        my $runsref = GetRuns($cid) || next;
-        #   For each run, see if there is a missing BAI file
-        foreach my $runid (keys %{$runsref}) {
-            my $dirname = $runsref->{$runid};
-            #   Get list of all samples that need bai run
-            my $sql = "SELECT bamid,bamname,state_md5ver,state_bai FROM " .
-                $opts{bamfiles_table} . " WHERE runid='$runid'";
-            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
-            my $sth = DoSQL($sql);
-            my $rowsofdata = $sth->rows();
-            if (! $rowsofdata) { next; }
-            for (my $i=1; $i<=$rowsofdata; $i++) {
-                my $href = $sth->fetchrow_hashref;
-                my $f = $opts{topdir} . "/$centername/$dirname/" . $href->{bamname};
-                #   Only do bai if file has been verified
-                if ($href->{state_md5ver} != $COMPLETED) { next; }
-                if ($opts{suberr} && $href->{state_bai} >= $FAILEDCHECKSUM) { $href->{state_bai} = $REQUESTED; }
-                if ($href->{state_bai} != $NOTSET && $href->{state_bai} != $REQUESTED) { next; }
-                #   Run the command
-                if (! BatchSubmit("$opts{topmedbai} -submit $href->{bamid} $f")) { last CENTER; }
-            }
-        }
+    #   Get list of all samples yet to process
+    my $sql = "SELECT bamid,state_md5ver,state_bai FROM $opts{bamfiles_table}";
+    $sql = BuildSQL($sql);
+    my $sth = DoSQL($sql);
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { next; }
+    for (my $i=1; $i<=$rowsofdata; $i++) {
+        my $href = $sth->fetchrow_hashref;
+    #   Only do bai if file has been verified
+        if ($href->{state_md5ver} != $COMPLETED) { next; }
+        if ($opts{suberr} && $href->{state_bai} >= $FAILEDCHECKSUM) { $href->{state_bai} = $REQUESTED; }
+        if ($href->{state_bai} != $NOTSET && $href->{state_bai} != $REQUESTED) { next; }
+        #   Create the index
+        if (! BatchSubmit("$opts{topmedbai} -submit $href->{bamid}")) { last; }
     }
     ShowSummary($fcn);
     exit;
@@ -221,33 +175,20 @@ if ($fcn eq 'bai') {
 #   Get a list of BAMs that have not been converted to CRAMs
 #--------------------------------------------------------------
 if ($fcn eq 'cram') {
-    #   Get all the known centers in the database
-    my $centersref = GetCenters();
-    CENTER: foreach my $cid (keys %{$centersref}) {
-        my $centername = $centersref->{$cid};
-        my $runsref = GetRuns($cid) || next;
-        #   For each run, see if there are bamfiles to be backed up
-        foreach my $runid (keys %{$runsref}) {
-            my $dirname = $runsref->{$runid};
-            #   Get list of all samples that need cram run
-            my $sql = "SELECT bamid,bamname,state_md5ver,state_cram,state_bai FROM " .
-                $opts{bamfiles_table} . " WHERE runid='$runid'";
-            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
-            my $sth = DoSQL($sql);
-            my $rowsofdata = $sth->rows();
-            if (! $rowsofdata) { next; }
-            for (my $i=1; $i<=$rowsofdata; $i++) {
-                my $href = $sth->fetchrow_hashref;
-                my $f = $opts{topdir} . "/$centername/$dirname/" . $href->{bamname};
-                #   Only create cram if file has been verified
-                if ($href->{state_md5ver} != $COMPLETED) { next; }
-                if ($href->{state_bai} != $COMPLETED) { next; }
-                if ($opts{suberr} && $href->{state_cram} >= $FAILEDCHECKSUM) { $href->{state_cram} = $REQUESTED; }
-                if ($href->{state_cram} != $NOTSET && $href->{state_cram} != $REQUESTED) { next; }
-                #   Run the command
-                if (! BatchSubmit("$opts{topmedcram} -submit $href->{bamid} $f")) { last CENTER; }
-            }
-        }
+    #   Get list of all samples yet to process
+    my $sql = "SELECT bamid,state_md5ver,state_cram FROM $opts{bamfiles_table}";
+    $sql = BuildSQL($sql);
+    my $sth = DoSQL($sql);
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { next; }
+    for (my $i=1; $i<=$rowsofdata; $i++) {
+        my $href = $sth->fetchrow_hashref;
+        #   Only create cram if file has been verified
+        if ($href->{state_md5ver} != $COMPLETED) { next; }
+        if ($opts{suberr} && $href->{state_cram} >= $FAILEDCHECKSUM) { $href->{state_cram} = $REQUESTED; }
+        if ($href->{state_cram} != $NOTSET && $href->{state_cram} != $REQUESTED) { next; }
+        #   Run the command
+        if (! BatchSubmit("$opts{topmedcram} -submit $href->{bamid}")) { last; }
     }
     ShowSummary($fcn);
     exit;
@@ -257,38 +198,22 @@ if ($fcn eq 'cram') {
 #   Run QPLOT on BAMs
 #--------------------------------------------------------------
 if ($fcn eq 'qplot') {
-    #   Get all the known centers in the database
-    my $centersref = GetCenters();
-    CENTER: foreach my $cid (keys %{$centersref}) {
-        my $centername = $centersref->{$cid};
-        my $runsref = GetRuns($cid) || next;
-        #   For each run, see if there are bamfiles to run qplot on
-        foreach my $runid (keys %{$runsref}) {
-            my $dirname = $runsref->{$runid};
-            #   Get list of all samples that need qplot run
-            my $sql = "SELECT bamid,bamname,state_bai,state_qplot FROM " .
-                $opts{bamfiles_table} . " WHERE runid='$runid'";
-            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
-            my $sth = DoSQL($sql);
-            my $rowsofdata = $sth->rows();
-            if (! $rowsofdata) { next; }
-            for (my $i=1; $i<=$rowsofdata; $i++) {
-                my $href = $sth->fetchrow_hashref;
-                my $f = $opts{topdir} . "/$centername/$dirname/" . $href->{bamname};
-                if (! -f $f) { next; }      # If BAM not there, do not submit
-                #   Only do qplot if BAI finished
-                if ($href->{state_bai} != $COMPLETED) { next; }
-                #   Only do qplot if cram has been created
-                ####if ($href->{state_cram} != $COMPLETED) { next; }
-                $f = $opts{topdir} . "/$centername/$dirname/" . $href->{bamname};
-                if (! -f $f) { next; }      # If BAM not there, do not submit
-
-                if ($opts{suberr} && $href->{state_qplot} >= $FAILEDCHECKSUM) { $href->{state_qplot} = $REQUESTED; }
-                if ($href->{state_qplot} != $NOTSET && $href->{state_qplot} != $REQUESTED) { next; }
-                #   Run the command
-                if (! BatchSubmit("$opts{topmedqplot} -submit $href->{bamid} $f")) { last CENTER; }
-            }
-        }
+    #   Get list of all samples yet to process
+    my $sql = "SELECT bamid,state_bai,state_qplot FROM $opts{bamfiles_table}";
+    $sql = BuildSQL($sql);
+    my $sth = DoSQL($sql);
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { next; }
+    for (my $i=1; $i<=$rowsofdata; $i++) {
+        my $href = $sth->fetchrow_hashref;
+        #my $f = GetBamName($href->{bamid});         # WHY ??
+        #if (! -f $f) { next; }      # If BAM not there, do not submit
+        #   Only do qplot if BAI finished
+        if ($href->{state_bai} != $COMPLETED) { next; }
+        if ($opts{suberr} && $href->{state_qplot} >= $FAILEDCHECKSUM) { $href->{state_qplot} = $REQUESTED; }
+        if ($href->{state_qplot} != $NOTSET && $href->{state_qplot} != $REQUESTED) { next; }
+        #   Run the command
+        if (! BatchSubmit("$opts{topmedqplot} -submit $href->{bamid}")) { last; }
     }
     ShowSummary($fcn);
     exit;
@@ -298,36 +223,23 @@ if ($fcn eq 'qplot') {
 #   Push data to Google Cloud for processing
 #--------------------------------------------------------------
 if ($fcn eq 'spush') {
-    #   Get all the known centers in the database
-    my $centersref = GetCenters();
-    CENTER: foreach my $cid (keys %{$centersref}) {
-        my $centername = $centersref->{$cid};
-        my $runsref = GetRuns($cid) || next;
-        #   For each run, see if there are bamfiles for Google Cloud
-        foreach my $runid (keys %{$runsref}) {
-            my $dirname = $runsref->{$runid};
-            #   Get list of all samples to send to GCE
-            my $sql = "SELECT * FROM $opts{bamfiles_table} " .
-                "WHERE runid='$runid'";
-            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
-            my $sth = DoSQL($sql);
-            my $rowsofdata = $sth->rows();
-            if (! $rowsofdata) { next; }
-            for (my $i=1; $i<=$rowsofdata; $i++) {
-                my $href = $sth->fetchrow_hashref;
-
-                #   Only send data if cram was done
-                if ($href->{state_cram} != $COMPLETED) { next; }
-                if ($opts{suberr} && $href->{state_gce38push} >= $FAILED) {
-                    $href->{state_gce38push} = $REQUESTED;
-                }
-                if ($href->{state_gce38push} != $NOTSET &&
-                    $href->{state_gce38push} != $REQUESTED) { next; }
-
-                #   Send the CRAM to Google
-                if (! BatchSubmit("$opts{topmedgce38push} -submit $href->{bamid}")) { last CENTER; }
-            }
+    #   Get list of all samples yet to process
+    my $sql = "SELECT bamid,state_cram,state_gce38push FROM $opts{bamfiles_table}";
+    $sql = BuildSQL($sql);
+    my $sth = DoSQL($sql);
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { next; }
+    for (my $i=1; $i<=$rowsofdata; $i++) {
+        my $href = $sth->fetchrow_hashref;
+        #   Only send data if cram was done
+        if ($href->{state_cram} != $COMPLETED) { next; }
+        if ($opts{suberr} && $href->{state_gce38push} >= $FAILED) {
+            $href->{state_gce38push} = $REQUESTED;
         }
+        if ($href->{state_gce38push} != $NOTSET &&
+            $href->{state_gce38push} != $REQUESTED) { next; }
+        #   Send the CRAM to Google
+        if (! BatchSubmit("$opts{topmedgce38push} -submit $href->{bamid}")) { last ; }
     }
     ShowSummary($fcn);
     exit;
@@ -337,34 +249,22 @@ if ($fcn eq 'spush') {
 #   Pull processed data from Google Cloud
 #--------------------------------------------------------------
 if ($fcn eq 'spull') {
-    #   Get all the known centers in the database
-    my $centersref = GetCenters();
-    CENTER: foreach my $cid (keys %{$centersref}) {
-        my $centername = $centersref->{$cid};
-        my $runsref = GetRuns($cid) || next;
-        #   For each run, see if there are bamfiles for Google Cloud
-        foreach my $runid (keys %{$runsref}) {
-            my $dirname = $runsref->{$runid};
-            #   Get list of all samples at fetch to local store
-            my $sql = "SELECT * FROM $opts{bamfiles_table} " .
-                "WHERE runid='$runid'";
-            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
-            my $sth = DoSQL($sql);
-            my $rowsofdata = $sth->rows();
-            if (! $rowsofdata) { next; }
-            for (my $i=1; $i<=$rowsofdata; $i++) {
-                my $href = $sth->fetchrow_hashref;
-                #   Only get data if remap was done and requested
-                if ($href->{state_gce38push} != $COMPLETED) { next; }
-                if ($opts{suberr} && $href->{state_gce38pull} >= $FAILED) {
-                    $href->{state_gce38pull} = $REQUESTED;
-                }
-                if ($href->{state_gce38pull} != $REQUESTED) { next; }
-
-                #   Send the CRAM to Google
-                if (! BatchSubmit("$opts{topmedgce38pull} -submit $href->{bamid}")) { last CENTER; }
-            }
+    #   Get list of all samples yet to process
+    my $sql = "SELECT bamid,state_gce38push,state_gce38pull FROM $opts{bamfiles_table}";
+    $sql = BuildSQL($sql);
+    my $sth = DoSQL($sql);
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { next; }
+    for (my $i=1; $i<=$rowsofdata; $i++) {
+        my $href = $sth->fetchrow_hashref;
+        #   Only get data if remap was done and requested
+        if ($href->{state_gce38push} != $COMPLETED) { next; }
+        if ($opts{suberr} && $href->{state_gce38pull} >= $FAILED) {
+            $href->{state_gce38pull} = $REQUESTED;
         }
+        if ($href->{state_gce38pull} != $REQUESTED) { next; }
+        #   Get CRAM from Google
+        if (! BatchSubmit("$opts{topmedgce38pull} -submit $href->{bamid}")) { last; }
     }
     ShowSummary($fcn);
     exit;
@@ -374,39 +274,23 @@ if ($fcn eq 'spull') {
 #   Post process data we fetched from Google Cloud
 #--------------------------------------------------------------
 if ($fcn eq 'spost') {
-    #   Get all the known centers in the database
-    my $centersref = GetCenters();
-    CENTER: foreach my $cid (keys %{$centersref}) {
-        my $centername = $centersref->{$cid};
-        my $runsref = GetRuns($cid) || next;
-        #   For each run, see if there are bamfiles for Google Cloud
-        foreach my $runid (keys %{$runsref}) {
-            my $dirname = $runsref->{$runid};
-            #   Get list of all crams that have not been post processed
-            my $sql = "SELECT * FROM $opts{bamfiles_table} ";
-            if ($opts{random}) { $sql .= ' ORDER BY RAND()'; }
-            else {                  # Normal processing, filer by run etc
-                $sql .= " WHERE runid='$runid'";
-                if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
-            }
-            my $sth = DoSQL($sql);
-            my $rowsofdata = $sth->rows();
-            if (! $rowsofdata) { next; }
-            for (my $i=1; $i<=$rowsofdata; $i++) {
-                my $href = $sth->fetchrow_hashref;
-
-                #   Only post process data that we already fetched
-                if ($href->{state_gce38pull} != $COMPLETED) { next; }
-                if ($opts{suberr} && $href->{state_gce38post} >= $FAILED) {
-                    $href->{state_gce38post} = $REQUESTED;
-                }
-                if ($href->{state_gce38post} != $NOTSET &&
-                    $href->{state_gce38post} != $REQUESTED) { next; }
-
-                #   Send the CRAM to Google
-                if (! BatchSubmit("$opts{topmedgce38post} -submit $href->{bamid}")) { last CENTER; }
-            }
+    #   Get list of all samples yet to process
+    my $sql = "SELECT bamid,state_gce38pull,state_gce38post FROM $opts{bamfiles_table}";
+    $sql = BuildSQL($sql);
+    my $sth = DoSQL($sql);
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { next; }
+    for (my $i=1; $i<=$rowsofdata; $i++) {
+        my $href = $sth->fetchrow_hashref;
+        #   Only post process data that we already fetched
+        if ($href->{state_gce38pull} != $COMPLETED) { next; }
+        if ($opts{suberr} && $href->{state_gce38post} >= $FAILED) {
+            $href->{state_gce38post} = $REQUESTED;
         }
+        if ($href->{state_gce38post} != $NOTSET &&
+            $href->{state_gce38post} != $REQUESTED) { next; }
+        #   Send the CRAM to Google
+        if (! BatchSubmit("$opts{topmedgce38post} -submit $href->{bamid}")) { last; }
     }
     ShowSummary($fcn);
     exit;
@@ -416,39 +300,19 @@ if ($fcn eq 'spost') {
 #   Create BCF file
 #--------------------------------------------------------------
 if ($fcn eq 'bcf') {
-    #   Get all the known centers in the database
-    my $centersref = GetCenters();
-    CENTER: foreach my $cid (keys %{$centersref}) {
-        my $centername = $centersref->{$cid};
-        my $runsref = GetRuns($cid) || next;
-        #   For each run, see if there are files to create BCF for
-        foreach my $runid (keys %{$runsref}) {
-            my $dirname = $runsref->{$runid};
-            #   Get list of all samples yet to run BCF
-            my $sql = "SELECT bamid,bamname,donot_remap,state_b38,state_bcf FROM $opts{bamfiles_table} ";
-            if ($opts{random}) { $sql .= ' ORDER BY RAND()'; }
-            else {                  # Normal processing, filer by run etc
-                $sql .= " WHERE runid='$runid'";
-                if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
-            }
-            my $sth = DoSQL($sql);
-            my $rowsofdata = $sth->rows();
-            if (! $rowsofdata) { next; }
-            for (my $i=1; $i<=$rowsofdata; $i++) {
-                my $href = $sth->fetchrow_hashref;
-                #   Only do BCF if this was remapped to build 38
-                if ($href->{state_b38} != $COMPLETED) { next; }
-
-#   This is probably wrong
-                #   Only do BCF if this was remapped to build 38    Hardcoded build!
-                if ($href->{donot_remap} ne '38') { next; }
-
-                if ($opts{suberr} && $href->{state_bcf} >= $FAILEDCHECKSUM) { $href->{state_bcf} = $REQUESTED; }
-                if ($href->{state_bcf} != $NOTSET && $href->{state_bcf} != $REQUESTED) { next; }
-                #   Run the command
-                if (! BatchSubmit("$opts{topmedbcf} -submit $href->{bamid}")) { last CENTER; }
-            }
-        }
+    #   Get list of all samples yet to process
+    my $sql = "SELECT bamid,state_b38,state_bcf FROM $opts{bamfiles_table}";
+    $sql = BuildSQL($sql);
+    my $sth = DoSQL($sql);
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { next; }
+    for (my $i=1; $i<=$rowsofdata; $i++) {
+        my $href = $sth->fetchrow_hashref;
+        if ($href->{state_b38} != $COMPLETED) { next; }
+        if ($opts{suberr} && $href->{state_bcf} >= $FAILEDCHECKSUM) { $href->{state_bcf} = $REQUESTED; }
+        if ($href->{state_bcf} != $NOTSET && $href->{state_bcf} != $REQUESTED) { next; }
+        #   Run the command
+        if (! BatchSubmit("$opts{topmedbcf} -submit $href->{bamid}")) { last; }
     }
     ShowSummary($fcn);
     exit;
@@ -501,6 +365,83 @@ sub ShowSummary {
     if ($opts{jobsfailedsubmission}) { $s .=  "  $opts{jobsfailedsubmission} job submissions failed"; }
     if (! $s) { return; }
     print "$nowdate $type: $s\n";
+}
+
+
+#==================================================================
+# Subroutine:
+#   GetBamName - Returns path to original bamname
+#   Much of this was cribbed from topmedpath.pl
+#   Should all be replaced with DBIc code
+#
+# Arguments:
+#   bamid
+#
+# Returns
+#   Path to file
+#==================================================================
+sub GetBamName {
+    my ($bamid) = @_;
+    $bamid = GetBamid($bamid);
+    my $sth = ExecSQL("SELECT runid,bamname FROM $opts{bamfiles_table} WHERE bamid=$bamid");
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
+    my $href = $sth->fetchrow_hashref;
+    my $bamname = $href->{bamname};
+    my $runid = $href->{runid};
+    $sth = ExecSQL("SELECT centerid,dirname FROM $opts{runs_table} WHERE runid=$runid");
+    $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { die "$Script - BAM '$bamid' run '$runid' is unknown\n"; }
+    $href = $sth->fetchrow_hashref;
+    my $rundir = $href->{dirname};
+    my $centerid = $href->{centerid};
+    $sth = ExecSQL("SELECT centername FROM $opts{centers_table} WHERE centerid=$centerid");
+    $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { die "$Script - BAM '$bamid' center '$centerid' is unknown\n"; }
+    $href = $sth->fetchrow_hashref;
+    my $centername = $href->{centername};
+
+    my $bamfile = abs_path("$opts{netdir}/$opts{incomingdir}/$centername/$rundir") || '';
+    if ($bamfile) { $bamfile .= '/' . $bamname; }
+    return $bamfile;
+}
+
+#==================================================================
+# Subroutine:
+#   BuildSQL - Complete SQL statement based on options
+#
+# Arguments:
+#   sql - initial sql
+#   where - optional WHERE clause, without WHERE
+#
+# Returns
+#   Completed SQL statement
+#==================================================================
+sub BuildSQL {
+    my ($sql, $where) = @_;
+    my $s = $sql;
+
+    #   For a specific center
+    if ($opts{center}) {
+        $s = $sql . " as b JOIN $opts{runs_table} AS r on b.runid=r.runid " .
+            "JOIN $opts{centers_table} AS c on r.centerid=c.centerid " .
+            "WHERE c.centername='$opts{center}'";
+    }
+    #   For a specific run (overrides center)
+    if ($opts{runs}) {
+        $s = $sql . " as b JOIN $opts{runs_table} AS r on b.runid=r.runid " .
+            "WHERE r.dirname='$opts{runs}'";
+    }
+
+    #   Add in caller's WHERE
+    if ($where) { $s .= " AND $where"; }
+
+    #   Add support for datayear
+    if ($opts{datayear}) { $s .= " AND datayear=$opts{datayear}"; }
+
+    #   Support randomization
+    if ($opts{random}) { $s .= ' ORDER BY RAND()'; }
+    return $s;
 }
 
 #==================================================================
