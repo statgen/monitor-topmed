@@ -5,6 +5,10 @@
 #	Some centers provide CRAMs based a run that we like how it was done
 #   Use this script to mark all samples for that run so that it is not remapped
 #
+
+echo "This is dead code until someone changes their mind again :-("
+exit 99
+
 topmedcmd=/usr/cluster/topmed/bin/topmedcmd.pl
 col=donot_remap
 
