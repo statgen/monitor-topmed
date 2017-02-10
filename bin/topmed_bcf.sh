@@ -58,6 +58,7 @@ bamid=$1
 d=`date +%Y/%m/%d`
 s=`hostname`
 p=`pwd`
+stime=`date +%s`
 
 crampath=`$topmedpath -fallback wherepath $bamid b$build`
 if [ "$crampath" = "" ]; then
