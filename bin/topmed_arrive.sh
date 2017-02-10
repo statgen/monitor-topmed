@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-#   topmed_arrive.sh -submit bamid bamfile
+#   topmed_arrive.sh -submit bamid
 #
 #	Note a BAM file has arrived. Extract header information
 #   This command almost certainly runs locally, however
@@ -14,15 +14,15 @@ if [ "$1" = "-submit" ]; then
   echo "Ignoring option -submit"
 fi
 
-if [ "$2" = "" ]; then
+if [ "$1" = "" ]; then
   me=`basename $0`
-  echo "Usage: $me   bamid bamfile"
+  echo "Usage: $me   bamid"
   echo ""
   echo "Mark a bam as arrived and extract details from the header"
   exit 1
 fi
 bamid=$1
-bamfile=$2
+bamfile=`$topmedpath wherefile $bamid bam`
 
 #   Mark this as started
 $topmedcmd mark $bamid arrived started || exit $?
