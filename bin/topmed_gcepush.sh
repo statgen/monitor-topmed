@@ -25,9 +25,19 @@ if [ "$1" = "-submit" ]; then
     exit 4
   fi 
 
-  # Run this on node where cram lives
+  # Run this on node where cram lives, unless it is csgspare and then make up something
   h=`$topmedpath whathost $1 cram`
   if [ "$h" != "" ]; then
+    if [ "$h" = "csgspare" ]; then
+      n=`perl -e "{ print $1%7 }"`
+      h="topmed$n"
+      if [ "$h" = "topmed0" ]; then
+        h=topmed2
+      fi
+      if [ "$h" = "topmed1" ]; then
+        h=topmed4
+      fi
+    fi
     realhost="--nodelist=$h"
     #qos="--qos=$h-$me"
   fi
