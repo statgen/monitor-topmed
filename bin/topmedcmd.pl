@@ -781,6 +781,9 @@ sub Set {
     my ($bamid, $col, $val) = @_;
     my ($sth, $rowsofdata, $href);
 
+    if (! defined($val)) { $val = ''; }
+    if ($val ne 'NULL') { $val = "'$val'"; }    # Use quotes unless this is NULL
+
     #   This could be a run name
     $sth = ExecSQL("SELECT runid FROM $opts{runs_table} WHERE dirname='$bamid'", 0);
     $rowsofdata = $sth->rows();
@@ -789,7 +792,7 @@ sub Set {
             die "$Script - Eeek, there are $rowsofdata runs named '$bamid'\n";
         }
         $href = $sth->fetchrow_hashref;
-        ExecSQL("UPDATE $opts{runs_table} SET $col='$val' WHERE runid='$href->{runid}'");
+        ExecSQL("UPDATE $opts{runs_table} SET $col=$val WHERE runid='$href->{runid}'");
         return;
     }
 
@@ -802,7 +805,7 @@ sub Set {
     if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
 
     if ($col eq 'nwdid') { $col = 'expt_sampleid'; }
-    ExecSQL("UPDATE $opts{bamfiles_table} SET $col='$val' WHERE bamid=$bamid");
+    ExecSQL("UPDATE $opts{bamfiles_table} SET $col=$val WHERE bamid=$bamid");
 }
 
 #==================================================================
