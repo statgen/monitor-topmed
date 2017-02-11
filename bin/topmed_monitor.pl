@@ -84,7 +84,7 @@ Getopt::Long::GetOptions( \%opts,qw(
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$Script [options] arrive|verify|bai|qplot|cram|sexpt|sorig|sb37|spush|spull|spost|sb38|bcf\n" .
+    warn "$Script [options] arrive|verify|bai|qplot|cram|spush|spull|spost|bcf\n" .
         "Find runs which need some action and queue a request to do it.\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
@@ -118,7 +118,6 @@ if ($fcn eq 'arrive') {
             #   If the mtime on the file is very recent, it might still be coming
             my $nowtime = time();
             if ((time() - $stats[9]) < 3600) { next; }
-            #   Run the command
             if (! BatchSubmit("$opts{topmedarrive} $href->{bamid}")) { last; }
     }
     ShowSummary('BAMs arrived');
@@ -139,9 +138,10 @@ if ($fcn eq 'verify') {
         my $href = $sth->fetchrow_hashref;
         #   Only do verify if file has arrived and ready to be run
         if ($href->{state_arrive} != $COMPLETED) { next; }
-        if ($opts{suberr} && $href->{state_md5ver} >= $FAILEDCHECKSUM) { $href->{state_md5ver} = $REQUESTED; }
+        if ($opts{suberr} && $href->{state_md5ver} >= $FAILEDCHECKSUM) {
+            $href->{state_md5ver} = $REQUESTED;
+        }
         if ($href->{state_md5ver} != $NOTSET && $href->{state_md5ver} != $REQUESTED) { next; }
-        #   Run the command
         if (! BatchSubmit("$opts{topmedverify} -submit $href->{bamid} $href->{checksum}")) { last; }
     }
     ShowSummary($fcn);
@@ -162,9 +162,10 @@ if ($fcn eq 'bai') {
         my $href = $sth->fetchrow_hashref;
     #   Only do bai if file has been verified
         if ($href->{state_md5ver} != $COMPLETED) { next; }
-        if ($opts{suberr} && $href->{state_bai} >= $FAILEDCHECKSUM) { $href->{state_bai} = $REQUESTED; }
+        if ($opts{suberr} && $href->{state_bai} >= $FAILEDCHECKSUM) {
+            $href->{state_bai} = $REQUESTED;
+        }
         if ($href->{state_bai} != $NOTSET && $href->{state_bai} != $REQUESTED) { next; }
-        #   Create the index
         if (! BatchSubmit("$opts{topmedbai} -submit $href->{bamid}")) { last; }
     }
     ShowSummary($fcn);
@@ -185,9 +186,10 @@ if ($fcn eq 'cram') {
         my $href = $sth->fetchrow_hashref;
         #   Only create cram if file has been verified
         if ($href->{state_md5ver} != $COMPLETED) { next; }
-        if ($opts{suberr} && $href->{state_cram} >= $FAILEDCHECKSUM) { $href->{state_cram} = $REQUESTED; }
+        if ($opts{suberr} && $href->{state_cram} >= $FAILEDCHECKSUM) {
+            $href->{state_cram} = $REQUESTED;
+        }
         if ($href->{state_cram} != $NOTSET && $href->{state_cram} != $REQUESTED) { next; }
-        #   Run the command
         if (! BatchSubmit("$opts{topmedcram} -submit $href->{bamid}")) { last; }
     }
     ShowSummary($fcn);
@@ -206,13 +208,12 @@ if ($fcn eq 'qplot') {
     if (! $rowsofdata) { next; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
-        #my $f = GetBamName($href->{bamid});         # WHY ??
-        #if (! -f $f) { next; }      # If BAM not there, do not submit
         #   Only do qplot if BAI finished
         if ($href->{state_bai} != $COMPLETED) { next; }
-        if ($opts{suberr} && $href->{state_qplot} >= $FAILEDCHECKSUM) { $href->{state_qplot} = $REQUESTED; }
+        if ($opts{suberr} && $href->{state_qplot} >= $FAILEDCHECKSUM) {
+            $href->{state_qplot} = $REQUESTED;
+        }
         if ($href->{state_qplot} != $NOTSET && $href->{state_qplot} != $REQUESTED) { next; }
-        #   Run the command
         if (! BatchSubmit("$opts{topmedqplot} -submit $href->{bamid}")) { last; }
     }
     ShowSummary($fcn);
@@ -238,7 +239,6 @@ if ($fcn eq 'spush') {
         }
         if ($href->{state_gce38push} != $NOTSET &&
             $href->{state_gce38push} != $REQUESTED) { next; }
-        #   Send the CRAM to Google
         if (! BatchSubmit("$opts{topmedgce38push} -submit $href->{bamid}")) { last ; }
     }
     ShowSummary($fcn);
@@ -263,7 +263,6 @@ if ($fcn eq 'spull') {
             $href->{state_gce38pull} = $REQUESTED;
         }
         if ($href->{state_gce38pull} != $REQUESTED) { next; }
-        #   Get CRAM from Google
         if (! BatchSubmit("$opts{topmedgce38pull} -submit $href->{bamid}")) { last; }
     }
     ShowSummary($fcn);
@@ -289,7 +288,6 @@ if ($fcn eq 'spost') {
         }
         if ($href->{state_gce38post} != $NOTSET &&
             $href->{state_gce38post} != $REQUESTED) { next; }
-        #   Send the CRAM to Google
         if (! BatchSubmit("$opts{topmedgce38post} -submit $href->{bamid}")) { last; }
     }
     ShowSummary($fcn);
@@ -308,10 +306,12 @@ if ($fcn eq 'bcf') {
     if (! $rowsofdata) { next; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
+        if (! $href->{state_b38}) { next; }
         if ($href->{state_b38} != $COMPLETED) { next; }
-        if ($opts{suberr} && $href->{state_bcf} >= $FAILEDCHECKSUM) { $href->{state_bcf} = $REQUESTED; }
+        if ($opts{suberr} && $href->{state_bcf} >= $FAILEDCHECKSUM) {
+            $href->{state_bcf} = $REQUESTED;
+        }
         if ($href->{state_bcf} != $NOTSET && $href->{state_bcf} != $REQUESTED) { next; }
-        #   Run the command
         if (! BatchSubmit("$opts{topmedbcf} -submit $href->{bamid}")) { last; }
     }
     ShowSummary($fcn);
@@ -750,7 +750,7 @@ Provided for developers to see additional information.
 
 =over 4
 
-=item B<arrive | verify | bai | qplot | cram | sexpt | sorig | sb37 | sb38>
+=item B<arrive | verify | bai | qplot | cram | spush | spull | spost | bcf>
 
 Directs this program to look for runs that have not been through the process name
 you provided and to queue a request they be verified.
