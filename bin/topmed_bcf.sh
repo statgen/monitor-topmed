@@ -26,7 +26,7 @@ if [ "$1" = "-submit" ]; then
   fi 
 
   # Run this on node where remapped cram lives
-  h=`$topmedpath -fallback whathost $1 b$build`
+  h=`$topmedpath whathost $1 b$build`
   if [ "$h" != "" ]; then
     realhost="--nodelist=$h"
     #qos="--qos=$h-$me"
