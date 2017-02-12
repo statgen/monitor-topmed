@@ -50,7 +50,7 @@ if [ "$1" = "-submit" ]; then
   exit
 fi
 
-if [ "$2" = "" ]; then
+if [ "$1" = "" ]; then
   me=`basename $0`
   echo "Usage: $me [-submit] bamid"
   echo ""
