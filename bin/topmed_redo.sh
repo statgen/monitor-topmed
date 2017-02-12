@@ -21,7 +21,7 @@ if [ "$1" = "-submit" ]; then
   shift
 
   # Run this on node where remapped cram lives
-  h=`$topmedpath -fallback whathost $1 b$build`
+  h=`$topmedpath whathost $1 b$build`
   if [ "$h" != "" ]; then
     realhost="--nodelist=$h"
     #qos="--qos=$h-$me"
@@ -62,7 +62,7 @@ echo "#========= '$d' host=$s $SLURM_JOB_ID $0 bamid=$bamid ========="
 #   Mark this as started
 #$topmedcmd mark $bamid $markverb started
 
-cramfile=`$topmedpath -fallback wherefile $bamid b$build`
+cramfile=`$topmedpath wherefile $bamid b$build`
 if [ "$?" != "0" ]; then
   echo "Unable to get path to CRAM file '$bamid'"
   #$topmedcmd -persist mark $bamid $markverb failed
