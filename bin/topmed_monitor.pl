@@ -29,6 +29,7 @@ use lib (
 use My_DB;
 use TopMed_Get;
 use Getopt::Long;
+use Cwd qw(realpath abs_path);
 
 use POSIX qw(strftime tmpnam);
 
@@ -62,6 +63,8 @@ our %opts = (
     topmedgce38post => "$topmedbin/topmed_gcepost.sh",
     topmedbcf  => "$topmedbin/topmed_bcf.sh",
     topmedxml    => "$topmedbin/topmed_xml.pl",
+    netdir => '/net/topmed',
+    incomingdir => 'incoming/topmed',
     realm => '/usr/cluster/topmed/etc/.db_connections/topmed',
     centers_table => 'centers',
     runs_table => 'runs',
@@ -129,7 +132,7 @@ if ($fcn eq 'arrive') {
 #--------------------------------------------------------------
 if ($fcn eq 'verify') {
     #   Get list of all samples yet to process
-    my $sql = "SELECT bamid,bamname,bamsize,state_arrive,state_md5ver FROM $opts{bamfiles_table}";
+    my $sql = "SELECT bamid,bamname,state_arrive,state_md5ver,checksum FROM $opts{bamfiles_table}";
     $sql = BuildSQL($sql);
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
@@ -367,6 +370,44 @@ sub ShowSummary {
     print "$nowdate $type: $s\n";
 }
 
+#==================================================================
+# Subroutine:
+#   GetBamid($bamid)
+#
+#   Return bamid for bamid or expt_sampleid
+#==================================================================
+sub GetBamid {
+    my ($bamid) = @_;
+    my ($sth, $rowsofdata, $href);
+    if ($bamid =~ /^\d+$/) { return $bamid; }
+
+    if ($bamid =~ /^NWD/){
+        $sth = ExecSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE expt_sampleid='$bamid'");
+        $rowsofdata = $sth->rows();
+        if ($rowsofdata) {
+            $href = $sth->fetchrow_hashref;
+            return $href->{bamid};
+        }
+    }
+    if ($bamid !~ /^\d+$/){
+        die "$Script - Invalid bamid or NWDID ($bamid). Try '$Script -help'\n";
+    }
+    return $bamid;
+}
+
+#==================================================================
+# Subroutine:
+#   ExecSQL($sql, $die)
+#
+#   Execute SQL.  Keep trying if connection lost.
+#
+#   Returns handle for SQL
+#==================================================================
+sub ExecSQL {
+    my ($sql, $die) = @_;
+    if ($opts{persist}) { return PersistDoSQL($opts{realm}, $sql); }
+    return DoSQL($sql, $die);
+}
 
 #==================================================================
 # Subroutine:
