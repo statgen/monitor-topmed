@@ -7,6 +7,7 @@
 #   the batch -submit has been left in
 #
 . /usr/cluster/topmed/bin/topmed_actions.inc
+topmednwd=/usr/cluster/topmed/bin/topmed_nwdid.pl
 
 #   We do not expect -submit to be used here
 if [ "$1" = "-submit" ]; then
