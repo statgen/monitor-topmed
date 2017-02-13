@@ -2,7 +2,7 @@
 ###################################################################
 #
 # Name: topmed_monitor.pl
-#
+#GetRuns
 # Description:
 #   Use this program to automatically request actions on data
 #   from NHLBI TopMed centers.
@@ -27,7 +27,6 @@ use lib (
   qq(/usr/cluster/topmed/local/lib/perl5),
 );
 use My_DB;
-use TopMed_Get;
 use Getopt::Long;
 use Cwd qw(realpath abs_path);
 
@@ -96,34 +95,40 @@ if ($#ARGV < 0 || $opts{help}) {
 my $fcn = shift(@ARGV);
 
 my $dbh = DBConnect($opts{realm});
-
 my $nowdate = strftime('%Y/%m/%d %H:%M', localtime);
 
 #--------------------------------------------------------------
-#   Get a list of BAMs we have not noticed they arrived yet
+#   Get a list of BAMs that have arrived, but not processed yet
 #--------------------------------------------------------------
 if ($fcn eq 'arrive') {
-    #   Get list of all samples yet to process
-    my $sql = "SELECT bamid,bamname,state_arrive FROM $opts{bamfiles_table}";
-    $sql = BuildSQL($sql);
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { next; }
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        my $f = GetBamName($href->{bamid});
-        my @stats = stat($f);
-        if (! @stats) { next; }
-        #   See if we should mark this as arrived
-        #   All BAMs must start with NWD. Only skip this if the BAM name
-        #   is NWD and it is marked as completed
-        if ($href->{bamname} =~ /^NWD/ && $href->{state_arrive} == $COMPLETED) { next; }
+    my $runsref = GetUnArrivedRuns() || next;
+    #   For each unarrived run, see if there are bamfiles that arrived
+    foreach my $runid (keys %{$runsref}) {
+        #   Get list of all bams
+        my $sql = "SELECT r.dirname,b.bamname,c.centername,b.bamid,b.expt_sampleid,b.state_arrive " .
+            "FROM $opts{bamfiles_table} AS b " .
+            "JOIN $opts{runs_table} AS r ON b.runid=r.runid " .
+            "JOIN $opts{centers_table} AS c ON r.centerid = c.centerid " .
+            "WHERE r.runid=$runid AND r.arrived!='Y'";
+        my $sth = DoSQL($sql);
+        my $rowsofdata = $sth->rows() || next;
+        for (my $i=1; $i<=$rowsofdata; $i++) {
+            my $href = $sth->fetchrow_hashref;
+            #   Build path to sample manually
+            my $f = $opts{topdir} . "/$href->{centername}/$href->{dirname}/" . $href->{bamname};
+            my @stats = stat($f);
+            if (! @stats) { next; }     # No real data
+            #   See if we should mark this as arrived
+            #   All BAMs must start with NWD. Only skip this if the BAM name
+            #   is NWD and it is marked as completed
+            if ($href->{bamname} =~ /^NWD/ && $href->{state_arrive} == $COMPLETED) { next; }
             #   If the mtime on the file is very recent, it might still be coming
-            my $nowtime = time();
-            if ((time() - $stats[9]) < 3600) { next; }
-            if (! BatchSubmit("$opts{topmedarrive} $href->{bamid}")) { last; }
+            if ((time() - $stats[9]) < 3600) { next; }  # Catch it next time
+            #   Run the command
+            BatchSubmit("$opts{topmedarrive} $href->{bamid}");  # Note, not run in SLURM
+        }
     }
-    ShowSummary('BAMs arrived');
+    ShowSummary('Samples arrived');
     exit;
 }
 
@@ -483,6 +488,36 @@ sub BuildSQL {
     #   Support randomization
     if ($opts{random}) { $s .= ' ORDER BY RAND()'; }
     return $s;
+}
+
+#==================================================================
+# Subroutine:
+#   GetUnArrivedRuns - Get list of all runs that have not arrived.
+#       Uses $opts{runs}
+#
+# Returns:
+#   Reference to hash of run ids to run dirnames
+#==================================================================
+sub GetUnArrivedRuns {
+    my %run2dir = ();
+
+    my $sql = "SELECT runid,dirname FROM $opts{runs_table}";
+    my $where = " WHERE arrived!='Y'";
+    #   Maybe want some runs
+    if ($opts{runs}) {
+        $opts{runs} =~ s/,/ /g;
+        my @r = split(' ', $opts{runs});
+        $where .= ' AND dirname in (' . join(',',@r) . ')';
+    }
+    $sql .= $where;
+    my $sth = DoSQL($sql);
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { die "$Script - Run does not exist   $where\n"; }
+    for (my $i=1; $i<=$rowsofdata; $i++) {
+        my $href = $sth->fetchrow_hashref;
+        $run2dir{$href->{runid}} = $href->{dirname};
+    }
+    return \%run2dir;
 }
 
 #==================================================================
