@@ -360,7 +360,7 @@ sub WhereFile {
         my $dir = "/net/$host/$opts{bcfsdir}/$piname";
         mkdir $dir,0755 ||
             die "$Script - Unable to create bcf path for '$bamid' to '$dir': $!\n";
-        print $dir . "\n";
+        print $dir . "/$nwdid.bcf\n";
         exit;
     }
 
