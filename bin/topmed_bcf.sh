@@ -7,6 +7,7 @@
 . /usr/cluster/topmed/bin/topmed_actions.inc
 vt=/net/wonderland/home/lefaivej/bin/vt
 vtref=/net/topmed/working/mapping/gotcloud/ref/hg38/hs38DH.fa
+bcftools=/usr/cluster/bin/bcftools
 
 me=bcf
 mem=2G
@@ -124,7 +125,7 @@ if [ "$?" != "0" ]; then
   $topmedcmd -persist mark $bamid $markverb failed
   exit 2
 fi
-bcftools index $bcffile
+$bcftools index $bcffile
 if [ "$?" != "0" ]; then
   echo "Unable to run BCFTOOLS for bamid '$bamid' [$nwdid] on $bcffile"
   $topmedcmd -persist mark $bamid $markverb failed
