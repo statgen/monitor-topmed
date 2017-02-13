@@ -635,7 +635,7 @@ function ViewRunDetail($runid) {
 ---------------------------------------------------------------*/
 function ViewBams($runid, $maxdirs, $iammgr) {
     global $LDB, $HDR, $CENTERS, $CENTERID2NAME, $CENTERNAME2ID, $FILES, $BAMNOTE, $SHOWSTATUS;
-    $hdrcols  = array('bamname', 'QUIKSTAT', 'bamsize', 'piname', 'ncbierr');
+    $hdrcols  = array('bamname', 'QUIKSTAT', 'bamsize', 'piname');
     $html = '';
     $maxdirs = 0;                   // For now, show all BAMs
 
@@ -1099,7 +1099,7 @@ function DateState($t) {
     global $state2str;
     $state = 'notset';
     if (in_array($t, $state2str)) { $state = $state2str[$t]; }
-    $state = $state2str[$t];
+    if (array_key_exists($t, $state2str)) { $state = $state2str[$t]; }
     return $state;
 }
 
