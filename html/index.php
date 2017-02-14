@@ -634,7 +634,7 @@ function ViewRunDetail($runid) {
 #   Show list of BAM files for a particular run
 ---------------------------------------------------------------*/
 function ViewBams($runid, $maxdirs, $iammgr) {
-    global $LDB, $HDR, $CENTERS, $CENTERID2NAME, $CENTERNAME2ID, $FILES, $BAMNOTE, $SHOWSTATUS;
+    global $LDB, $HDR, $CENTERS, $CENTERID2NAME, $CENTERNAME2ID, $BAMNOTE, $SHOWSTATUS;
     $hdrcols  = array('bamname', 'QUIKSTAT', 'bamsize', 'piname');
     $html = '';
     $maxdirs = 0;                   // For now, show all BAMs

@@ -210,7 +210,7 @@ sub Mark {
     }
     if ($state eq 'completed') {
         ExecSQL("UPDATE $opts{bamfiles_table} SET $col=$COMPLETED WHERE bamid=$bamid");
-        if ($col eq 'state_arrive') {       # hack for Chris until new code in place
+        if ($col eq 'state_arrive') {       # Used by Kevin for tracking samples
             ExecSQL("UPDATE $opts{bamfiles_table} SET datearrived='" . time() . "' WHERE bamid=$bamid");
         }
         if ($col eq 'state_md5ver') {       # hack for Chris until new code in place
