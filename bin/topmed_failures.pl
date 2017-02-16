@@ -201,7 +201,7 @@ sub Find_Failure {
         }
         #   Look through log file for SLURMID printed by script
         my @words = split(' ', $_);
-        if ($words[0] !~ /^#==/) { next; }
+        if ((! @words) || $words[0] !~ /^#==/) { next; }
         $slurmid = $words[3];
         last;
     }
