@@ -24,7 +24,7 @@ nodelist=''
 if [ "$1" = "-submit" ]; then
   shift
   #   May I submit this job?
-  $topmedcmd permit test $me $1
+  $topmedpermit permit test $me $1
   if [ "$?" = "0" ]; then
     exit 4
   fi 

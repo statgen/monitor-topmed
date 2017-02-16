@@ -2,6 +2,7 @@
 #	Define variables that all TOPMED action scripts need defined
 #
 topmedcmd=/usr/cluster/topmed/bin/topmedcmd.pl
+topmedpermit=/usr/cluster/topmed/bin/topmedpermit.pl
 topmedpath=/usr/cluster/topmed/bin/topmedpath.pl
 topmedrename=/usr/cluster/topmed/bin/topmedrename.pl
 topmedflagstat=/usr/cluster/topmed/bin/topmed_flagstat.sh

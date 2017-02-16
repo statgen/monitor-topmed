@@ -84,9 +84,9 @@ $quickcols = array(                     // Map of status column to topmedcmd ver
     'state_qplot'    => 'qplot',
     'state_cram'     => 'cramed',
     'state_b37'      => 'mapping37',
-    'state_gce38push'=> 'gce38push',
-    'state_gce38pull'=> 'gce38pull',
-    'state_gce38post'=> 'gce38post',
+    'state_gce38push'=> 'gcepush',
+    'state_gce38pull'=> 'gcepull',
+    'state_gce38post'=> 'gcepost',
     'state_b38'      => 'mapping38',
     'state_bcf'      => 'bcf',
     'state_ncbiexpt' => 'sendexpt',
@@ -111,7 +111,7 @@ $quickletter = array(                   // Map of status column to letter we see
     'state_ncbib37'  => 'P',
     'state_ncbib38'  => 'T'
 );
-$validfunctions = array('all', 'verify', 'bai', 'qplot', 'cram', 'sexpt', 'sorig', 'sb37', 'push38', 'pull38', 'post38', 'sb38', 'bcf');
+$validfunctions = array('all', 'verify', 'bai', 'qplot', 'cram', 'gcepush', 'gcepull', 'gcepost', 'bcf');
 $NOTSET = 0;                // Not set
 $REQUESTED = 1;             // Task requested
 $SUBMITTED = 2;             // Task submitted to be run
@@ -237,8 +237,6 @@ if ($fcn == 'showout') {                // Show output from a SLURM job
     if ($samplestate == 's') { $s = 'gcepush'; }
     if ($samplestate == 'r') { $s = 'gcepull'; }
     if ($samplestate == 'Z') { $s = 'gcepost'; }
-    //$cmd = "/usr/cluster/topmed/bin/topmedpath.pl wherepath $bamid console $s";
-    //$ss = rtrim(`$cmd`);
     // Hardcoded path cause mario won't play with topmedpath.pl
     $ss = '/net/topmed/working/topmed-output';
     $a = $ss . '/' . $bamid . "-$s.out";
@@ -906,7 +904,7 @@ function HandlePermit($op, $center, $run, $id) {
 
     //  Delete a permission
     if ($op == 'del') {
-        $cmd = escapeshellcmd($LDB['bindir'] . "/topmedcmd.pl permit remove $id");
+        $cmd = escapeshellcmd("/usr/cluster/topmed/bin/topmedpermit.pl permit remove $id");
         $s = `$cmd 2>&1`;
         return "<pre>$s</pre>\n";
         //return "<pre>cmd=$cmd\n$s</pre>\n";
@@ -916,10 +914,9 @@ function HandlePermit($op, $center, $run, $id) {
     if (! in_array($op, $validfunctions)) {
         return Emsg("Invalid operation '$op' - How'd you do that?", 1);
     }
-    $cmd = escapeshellcmd($LDB['bindir'] . "/topmedcmd.pl permit add $op $center $run");
+    $cmd = escapeshellcmd("/usr/cluster/topmed/bin/topmedpermit.pl permit add $op $center $run");
     $s = `$cmd 2>&1`;
     return "<pre>$s</pre>\n";
-    //return "<pre>cmd=$cmd\n$s</pre>\n";
 }
 
 /*---------------------------------------------------------------
