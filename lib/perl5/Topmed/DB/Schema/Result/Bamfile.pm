@@ -836,12 +836,38 @@ sub b37_mapped_path {
   };
 }
 
+#   The path returned here is more convoluted than we want
+#   because we started allocating b38 files on 9 and 10
+#   and then after allocating a large number of samples
+#   realized we needed more space.
+#   Hence we must support two schemes to determine the path.
 sub b38_mapped_path {
   my $self = shift;
-  my $path = YASF->new('/net/{host}/working/mapping/results/{center}/{pi}/b38/{nwdid}');
-
+  my @host_partialpath = (
+    [ qw/topmed10 topmed9 topmed6  topmed7  topmed9  topmed10/ ],
+    [ qw/working  working incoming incoming incoming incoming/ ]
+  );
+  # First determine the old path and if that directory works, use it
+  my $mod = $self->bamid % 2;
+  my $path = YASF->new('/net/{host}/{part}/mapping/results/{center}/{pi}/b38/{nwdid}');
   my $outdir = $path % {
-    host   => ($self->bamid % 2) ? 'topmed9' : 'topmed10',
+    host   => $host_partialpath[0][$mod],
+    part => $host_partialpath[1][$mod],
+    center => $self->center,
+    pi     => $self->piname,
+    nwdid  => $self->expt_sampleid,
+ };
+ if ( -e $outdir) {                 # If file exists, return path
+    if ( -e "$outdir/" . $self->bamid . ".recab.cram") { return $outdir; }
+    rmdir $outdir;                  # No file, remove, re-allocate path for sample
+}
+
+  # Path does not exist, allocate using the new scheme
+  $mod = $self->bamid % 6;
+  $path = YASF->new('/net/{host}/{part}/mapping/results/{center}/{pi}/b38/{nwdid}');
+  $outdir = $path % {
+    host   => $host_partialpath[0][$mod],
+    part => $host_partialpath[1][$mod],
     center => $self->center,
     pi     => $self->piname,
     nwdid  => $self->expt_sampleid,
