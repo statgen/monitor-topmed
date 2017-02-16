@@ -73,23 +73,6 @@ my %VALIDSTATUS = (                 # Valid status for the verbs
    cancelled => $CANCELLED,
    failed    =>  $FAILED, 
 );
-my %VALIDOPS = (                    # Used for permit
-    all => 1,
-    verify => 1,
-    backup => 1,
-    bai => 1,
-    qplot => 1,
-    cram => 1,
-    nwdid => 1,
-    sexpt => 1,
-    sorig => 1,
-    sb37 => 1,
-    sb38 => 1,
-    sbcf => 1,
-    push38 => 1,
-    pull38 => 1,
-    post38 => 1
-);
 
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
@@ -173,12 +156,6 @@ if ($fcn eq 'send2ncbi') { Send2NCBI(@ARGV); exit; }
 if ($fcn eq 'squeue')    { SQueue(@ARGV); exit; }
 if ($fcn eq 'whatbamid') { WhatBAMID(@ARGV); exit; }
 if ($fcn eq 'whatnwdid') { WhatNWDID(@ARGV); exit; }
-if ($fcn eq 'permit')    { Permit(@ARGV); exit; }
-
-#   These were move into another program
-if ($fcn eq 'where' || $fcn eq 'wherepath' || $fcn eq 'whathost' || $fcn eq 'wherefile') {
-    die "$Script - '$fcn' has moved to topmedpath.pl\n";
-}
 
 die "$Script  - Invalid function '$fcn'\n";
 exit;
@@ -676,103 +653,6 @@ sub ReFormatPartitionData {
 
 #==================================================================
 # Subroutine:
-#   Permit ($fcn, $op, $center, $run)
-#
-#   Controls a database of enabled or disabled operations for a center/run
-#
-#   Permit ('test', $op, $bamid)
-#
-#   Returns a boolean if an operation for a center/run is allowed
-#==================================================================
-sub Permit {
-    my ($fcn) = @_;
-    my ($sql, $sth, $href, $rowsofdata);
-    shift(@_);
-
-    #   Test is some operation is allowed
-    #   topmedcmd.pl permit test bai 4955
-    if ($fcn eq 'test') {
-        my ($op, $bamid) = @_;
-
-        #   Get runid and centerid for this bam
-        my ($centerid, $runid) = GetBamidInfo($bamid);
-
-        #   This is a small table, read it all
-        $sth = ExecSQL("SELECT runid,centerid,operation FROM $opts{permissions_table}");
-        $rowsofdata = $sth->rows();
-        if (! $rowsofdata) { exit(1); }                 # Table empty, permitted
-        for (my $i=1; $i<=$rowsofdata; $i++) {
-            $href = $sth->fetchrow_hashref;
-            if ($centerid eq $href->{centerid} || $href->{centerid} eq '0') {
-                if ($runid eq $href->{runid} || $href->{runid} eq '0') {
-                    if ($op eq $href->{operation} || $href->{operation} eq 'all') {
-                        exit;                           # Operation not permitted
-                    }
-                }
-            }
-        }
-        exit(1);                                    # TRUE, permitted  
-    }
-
-    #   Enable a permission by deleting a database entry
-    #   e.g. topmedcmd.pl permit remove id
-    if ($fcn eq 'remove') {
-        my ($id) = @_;
-        $sql = "SELECT * FROM $opts{permissions_table} WHERE id=$id";
-        $sth = ExecSQL($sql);
-        $rowsofdata = $sth->rows();
-        if (! $rowsofdata) { die "Permission '$id' does not exist\n"; }
-        $href = $sth->fetchrow_hashref;
-        my $s = "$href->{centername} / $href->{dirname} / $href->{operation}";
-        $sql = "DELETE FROM $opts{permissions_table} WHERE id='$id'";
-        $sth = ExecSQL($sql);
-        if (! $sth) { die "Failed to remove permission '$fcn' for 'id=$id $s'\nSQL=$sql"; }
-        print "Deleted permission control for '$s'\n";
-        exit;
-    }
-
-    if ($fcn ne 'add') { die "Unknown function '$fcn'\n"; }
-
-    #   Disable a permission by adding to the database entry
-    #   e.g. # topmedcmd.pl permit add [bai [broad [2015sep18]]]
-    my ($op, $center, $run) = @_;
-    if (! $op)       { $op = 'all'; }           # Set defaults
-    if (! $center)   { $center = 'all'; }
-    if (! $run)      { $run = 'all'; }
-    my ($centerid, $runid) = (0, 0);
-
-    if (! exists($VALIDOPS{$op})) { die "Operation '$op' is not known\n"; }
-
-    #   Verify op and run and center setting runid and centerid
-    if ($center ne 'all') {
-        $sql = "SELECT centerid FROM $opts{centers_table} WHERE centername='$center'";
-        $sth = ExecSQL($sql);
-        $rowsofdata = $sth->rows();
-        if (! $rowsofdata) { die "Center '$center' is not known\n"; }
-        $href = $sth->fetchrow_hashref;
-        $centerid = $href->{centerid};
-    }
-
-    if ($run ne 'all') {
-        $sql = "SELECT runid FROM $opts{runs_table} WHERE dirname='$run'";
-        $sth = ExecSQL($sql);
-        $rowsofdata = $sth->rows();
-        if (! $rowsofdata) { die "Run '$run' is not known\n"; }
-        $href = $sth->fetchrow_hashref;
-        $runid = $href->{runid};
-    }
-
-    $sql = "INSERT INTO $opts{permissions_table} " .
-        "(centername,dirname,centerid,runid,operation) " .
-        "VALUES ('$center', '$run', $centerid, $runid, '$op')";
-    $sth = ExecSQL($sql);
-    if (! $sth) { die "Failed to add permission '$fcn' for '$op'\nSQL=$sql"; }
-    print "Added permission '$center / $runid / $op'\n";
-    exit;
-}
-
-#==================================================================
-# Subroutine:
 #   Set($bamid, $col, $val)
 #
 #   Set a database column
@@ -1089,10 +969,6 @@ topmedcmd.pl - Update the database for NHLBI TopMed
  
   topmedcmd.pl whatnwdid bamid|nwdid       # Show details for a sample
  
-  topmedcmd.pl permit add bai braod 2015oct18   # Stop bai job submissions for a run
-  topmedcmd.pl permit remove 12            # Remove a permit control
-  topmedcmd.pl permit test bai 4567        # Test if we should submit a bai job for one bam
-
   topmedcmd.pl -maxlongjobs 35 squeue      # Show what is running
 
 =head1 DESCRIPTION
@@ -1155,15 +1031,6 @@ You may specify the bamid or the NWDID.
 Mark will set a date for the process (e.g. arrived sets state_arrive)
 and unmark will set that entry to NULL.
 The list of verbs and states can be seen by B<perldoc topmedcmd.pl>.
-
-B<permit enable/disable operation center run>
-Use this to control the database which allows one enable or disable topmed operations
-(e.g. backup, verify etc) for a center or run.
-Use B<all> for all centers or all runs or all operations.
-
-B<permit test operation bamid>
-Use this to test if an operation (e.g. backup, verify etc) may be submitted 
-for a particular bam.
 
 B<set bamid|nwdid|dirname columnname value>
 Use this to set the value for a column for a particular BAM file
