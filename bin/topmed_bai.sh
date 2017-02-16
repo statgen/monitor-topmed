@@ -9,7 +9,7 @@
 mem=4G
 me=bai
 markverb="${me}d"
-slurmp=topmed
+slurmp=topmed-working
 qos="--qos=topmed-$me"
 constraint="--constraint eth-10g"
 realhost=''
@@ -22,10 +22,20 @@ if [ "$1" = "-submit" ]; then
     exit 4
   fi 
 
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $qos $constraint --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $*`)
+  # Keep this off 9 and 10
+  n=`expr $1 % 5`
+  if [ "$n" = "0" ]; then
+    n='5';
+  fi
+  if [ "$n" = "1" ]; then
+    n='';
+  fi
+  nodelist="--nodelist=topmed$n"
+
+  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $qos $constraint $nodelist  --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $*`)
   if [ "$?" != "0" ]; then
     echo "Failed to submit command to SLURM"
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $qos $constraint --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $*"
+    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $qos $nodelist $constraint --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $*"
     exit 1
   fi
   $topmedcmd mark $1 $markverb submitted

@@ -17,7 +17,7 @@ markverb="${me}ed"
 constraint=''                   # "--constraint eth-10g"
 constraint="--constraint eth-10g"       # Force to major nodes, not r63xx nodes
 qos=''
-slurmp=topmed
+slurmp=topmed-working
 realhost=''
 nodelist=''
 

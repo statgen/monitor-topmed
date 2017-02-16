@@ -10,7 +10,7 @@
 me=verify
 mem=2G
 markverb=md5verified
-slurmp=topmed
+slurmp=topmed-working
 qos="--qos=topmed-$me"
 realhost=''
 

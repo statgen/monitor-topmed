@@ -18,7 +18,7 @@ markverb="${me}ed"
 squeezed=n
 constraint="--constraint eth-10g"
 qos=''
-slurmp=topmed
+slurmp=topmed-working
 realhost=''
 
 if [ "$1" = "-submit" ]; then
