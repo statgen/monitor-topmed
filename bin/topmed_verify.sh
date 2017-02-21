@@ -26,7 +26,7 @@ if [ "$1" = "-submit" ]; then
   h=`$topmedpath whathost $1 bam`
   if [ "$h" != "" ]; then
     realhost="--nodelist=$h"
-    qos="--qos=$h-$me"
+    #qos="--qos=$h-$me"
   fi
 
   l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $qos $realhost -J $1-$me --output=$console/$1-$me.out $0 $*`)
