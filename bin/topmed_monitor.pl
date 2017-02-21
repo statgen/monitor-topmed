@@ -86,7 +86,7 @@ Getopt::Long::GetOptions( \%opts,qw(
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$Script [options] arrive|verify|bai|qplot|cram|spush|spull|spost|bcf\n" .
+    warn "$Script [options] arrive|verify|bai|qplot|cram|push|pull|post|bcf\n" .
         "Find runs which need some action and queue a request to do it.\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
@@ -231,7 +231,7 @@ if ($fcn eq 'qplot') {
 #--------------------------------------------------------------
 #   Push data to Google Cloud for processing
 #--------------------------------------------------------------
-if ($fcn eq 'spush') {
+if ($fcn eq 'push') {
     #   Get list of all samples yet to process
     my $sql = "SELECT bamid,state_cram,state_gce38push FROM $opts{bamfiles_table}";
     $sql = BuildSQL($sql);
@@ -256,7 +256,7 @@ if ($fcn eq 'spush') {
 #--------------------------------------------------------------
 #   Pull processed data from Google Cloud
 #--------------------------------------------------------------
-if ($fcn eq 'spull') {
+if ($fcn eq 'pull') {
     #   Get list of all samples yet to process
     my $sql = "SELECT bamid,state_gce38push,state_gce38pull FROM $opts{bamfiles_table}";
     $sql = BuildSQL($sql);
@@ -280,7 +280,7 @@ if ($fcn eq 'spull') {
 #--------------------------------------------------------------
 #   Post process data we fetched from Google Cloud
 #--------------------------------------------------------------
-if ($fcn eq 'spost') {
+if ($fcn eq 'post') {
     #   Get list of all samples yet to process
     my $sql = "SELECT bamid,state_gce38pull,state_gce38post FROM $opts{bamfiles_table}";
     $sql = BuildSQL($sql);
@@ -794,7 +794,7 @@ The default for B<-maxjobs> is B<100>.
 Randomly select data to be processed. This may not be used with B<-center> or B<-runs>. 
 This is intended for cases where a large set of data is to be selected
 and we want it to run over a wide set of hosts.
-In practice this is only useful for B<spush>, B<spull>, B<spost>, and B<bcf> (at least so far).
+In practice this is only useful for B<push>, B<pull>, B<post>, and B<bcf> (at least so far).
 
 =item B<-realm NAME>
 
@@ -826,7 +826,7 @@ Provided for developers to see additional information.
 
 =over 4
 
-=item B<arrive | verify | bai | qplot | cram | spush | spull | spost | bcf>
+=item B<arrive | verify | bai | qplot | cram | push | pull | post | bcf>
 
 Directs this program to look for runs that have not been through the process name
 you provided and to queue a request they be verified.
