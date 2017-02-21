@@ -858,8 +858,11 @@ sub b38_mapped_path {
     nwdid  => $self->expt_sampleid,
  };
  if ( -e $outdir) {                 # If file exists, return path
-    if ( -e "$outdir/" . $self->bamid . ".recab.cram") { return $outdir; }
-    rmdir $outdir;                  # No file, remove, re-allocate path for sample
+    my $f = "$outdir/" . $self->expt_sampleid . ".recab.cram";
+    if ( -e $f ) { return $outdir; }
+    #   No file, remove possible flagstat and directory. Re-allocate path for sample
+    if (-e "$f.flagstat") { unlink("$f.flagstat"); }
+    rmdir $outdir;
 }
 
   # Path does not exist, allocate using the new scheme
