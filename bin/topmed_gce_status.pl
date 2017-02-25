@@ -267,7 +267,8 @@ sub VerifyState {
             substr(join(' ',@rmfailed),0,50) . " ...\n";
         if ($opts{verbose}) {
             foreach my $nwd (@rmfailed) {
-                print $nwd . "    gsutil rm -rf gs://topmed-recabs/$nwd/\n";
+                print $nwd . "   ls -l `/usr/cluster/topmedpath.pl wherefile $nwd b38`" .
+                    " && gsutil rm -rf gs://topmed-recabs/$nwd/\n";
             }   
             print "\n ";
         }
