@@ -308,25 +308,38 @@ sub WhereFile {
     #   BAM is in one of those $opts{netdir} trees where without a symlink
     if ($set eq 'bam') {
         my $bamfile = abs_path("$opts{netdir}/$opts{incomingdir}/$centername/$rundir") || '';
-        if ($bamfile) { $bamfile .= '/' . $bamname; }
-        print "$bamfile\n";
+        if ($bamfile) {
+            print $bamfile . "/$bamname\n";
+        }
+        else {
+            warn "WhereFile: abs_path($opts{netdir}/$opts{incomingdir}/$centername/$rundir) failed\n";
+        }
         exit;
     }
  
     #   Find where the backup CRAM lives
     if ($set eq 'backup' || $set eq 'cram') {
         my $bakfile = abs_path("$opts{netdir}/$opts{backupsdir}/$centername/$rundir") || '';
-        if ($bakfile) { $bakfile .= '/' . $cramname; }
-        print "$bakfile\n";
+        if ($bakfile) {
+            print $bakfile . "/$cramname\n";
+        }
+        else {
+            warn "WhereFile: abs_path($opts{netdir}/$opts{backupsdir}/$centername/$rundir) failed\n";
+        }
         exit;
     }
 
     #   Print where qc.results we are interested are
     if ($set eq 'qcresults') {
         my $qcdir = abs_path("$opts{netdir}/$opts{qcresultsdir}/$centername/$rundir") || '';
-        $bamname =~ s/\.bam//;                   # Remove the extension
-        $bamname =~ s/\.cram//;
-        print "$qcdir/$bamname.vb.selfSM\n";
+        if ($qcdir) { 
+            $bamname =~ s/\.bam//;                   # Remove the extension
+            $bamname =~ s/\.cram//;
+            print "$qcdir/$bamname.vb.selfSM\n";
+        }
+        else {
+            warn "WhereFile: abs_path($opts{netdir}/$opts{qcresultsdir}/$centername/$rundir) failed\n";
+        }
         exit;
     }
 
