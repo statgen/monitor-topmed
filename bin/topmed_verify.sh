@@ -31,6 +31,7 @@ if [ "$1" = "-submit" ]; then
 
   l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $qos $realhost -J $1-$me --output=$console/$1-$me.out $0 $*`)
   if [ "$?" != "0" ]; then
+    $topmedcmd mark $1 $markverb failed
     echo "Failed to submit command to SLURM"
     echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $qos $realhost -J $1-$me --output=$console/$1-$me.out $0 $*"
     exit 1

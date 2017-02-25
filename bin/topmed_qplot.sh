@@ -39,6 +39,7 @@ if [ "$1" = "-submit" ]; then
   #   Can run anywhere. Low rate of access to cram, small output
   l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos $nodelist --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $*`)
   if [ "$?" != "0" ]; then
+    $topmedcmd mark $1 $markverb failed
     echo "Failed to submit command to SLURM"
     echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos $nodelist --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $*"
     exit 1
