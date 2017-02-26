@@ -45,9 +45,9 @@ if [ "$1" = "-submit" ]; then
   #  Submit this script to be run
   l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $cores $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*`)
   if [ "$?" != "0" ]; then
-    echo "Failed to submit command to SLURM"
+    echo "Failed to submit command to SLURM - $l" > $console/$1-$me.out
     $topmedcmd mark $1 $markverb failed
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $cores $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*"
+    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $cores $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*" >> $console/$1-$me.out
     exit 1
   fi
   $topmedcmd mark $1 $markverb submitted
@@ -122,8 +122,8 @@ tmperr=/tmp/$$.curlstderr
 tmpout=/tmp/$$.curloutput
 curl -f -i -u "csg:WV9kNT35udEE6B9Q" --insecure --data $nwdid --stderr $tmperr --output $tmpout  https://104.198.71.226/api/unprocessed-samples
 rc=$?
-cat $tmperr                             # So curl results are in log
-a=`grep 'Unprocessable Entity' $tmp`    # Look for errors that are not errors we care about
+cat $tmpout $tmperr                         # So curl results are in log
+a=`grep 'Unprocessable Entity' $tmperr`     # Ignore errors we do not care about
 rm $tmperr $tmpout
 if [ "$a" = "" ]; then
   if [ "$rc" != "0" ]; then
