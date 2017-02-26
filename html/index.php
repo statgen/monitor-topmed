@@ -178,7 +178,7 @@ if ($iammgr) {
 else {
     $s = '';
 }
-print "<p class='intro'>The <a href='http://www.nhlbi.nih.gov/'>NHLBI</a> provides " .
+$infotext = "<p class='intro'>The <a href='http://www.nhlbi.nih.gov/'>NHLBI</a> provides " .
     "science-based, plain-language information related to heart, lung " .
     "and blood diseases and conditions and sleep disorders.\n" .
     "Details about this data tracking are available from Tom Blackwell " .
@@ -207,16 +207,19 @@ if ($fcn == 'queue') {              // This cannot work until statgen can run sq
     exit;
 }
 if ($fcn == 'runs') {
+    print $infotext;
     print ViewRuns($center, $maxdir, $iammgr);        
     print dofooter($HDR['footer']);
     exit;
 }
 if ($fcn == 'rundetail') {
+    print $infotext;
     print ViewRunDetail($runid);
     print dofooter($HDR['footer']);
     exit;
 }
 if ($fcn == 'bams') {
+    print $infotext;
     print ViewBams($runid, $maxdir, $iammgr);
     print "<br/><br/><center>" . GetChooseLines() . "<br/>$SHOWSTATUS</center>\n";
     print dofooter($HDR['footer']);
