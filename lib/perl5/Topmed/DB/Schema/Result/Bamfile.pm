@@ -847,7 +847,7 @@ sub b38_mapped_path {
     [ qw/topmed10 topmed9 topmed6  topmed7  topmed9  topmed10/ ],
     [ qw/working  working incoming incoming incoming incoming/ ]
   );
-  # First determine the old path and if that directory works, use it
+  # First determine the old path and if that directory exists, use it
   my $mod = $self->bamid % 2;
   my $path = YASF->new('/net/{host}/{part}/mapping/results/{center}/{pi}/b38/{nwdid}');
   my $outdir = $path % {
@@ -857,13 +857,7 @@ sub b38_mapped_path {
     pi     => $self->piname,
     nwdid  => $self->expt_sampleid,
  };
- if ( -e $outdir) {                 # If file exists, return path
-    my $f = "$outdir/" . $self->expt_sampleid . ".recab.cram";
-    if ( -e $f ) { return $outdir; }
-    #   No file, remove possible flagstat and directory. Re-allocate path for sample
-    if (-e "$f.flagstat") { unlink("$f.flagstat"); }
-    rmdir $outdir;
-}
+ if ( -e $outdir) { return $outdir; }       # If path exists, use that path
 
   # Path does not exist, allocate using the new scheme
   $mod = $self->bamid % 6;
@@ -875,9 +869,7 @@ sub b38_mapped_path {
     pi     => $self->piname,
     nwdid  => $self->expt_sampleid,
  };
-
-  make_path($outdir) unless -e $outdir;
-  return $outdir;
+ return $outdir;            # Caller must make directory if he wants it
 }
 
 sub gce_recab_uri {
