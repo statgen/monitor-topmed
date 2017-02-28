@@ -532,6 +532,7 @@ sub CacheGSData {
         if ($1 eq 'NWD000') { next; }
         $gcedata{$1} = $l;
         print $out "$1 $l\n";           # Save data in cache file
+        $count++;
     }
     close($in);
     close($out);
