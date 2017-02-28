@@ -127,6 +127,8 @@ n=`grep 'paired in sequencing' $crampath/$nwdid.recab.cram.flagstat | awk '{prin
 if [ "$n" != "$cramflagstat" ]; then
   echo "Flagstat '$n' did not match cramflagstat '$cramflagstat' for bamid '$bamid' nwdid $nwdid"
   $topmedcmd -persist mark $bamid $markverb failed
+  # Renaming the flagstat file stops pull from happening again
+  $gsutil mv $incominguri/$nwdid/$nwdid.recab.cram.flagstat $incominguri/$nwdid/$nwdid.recab.cram.flagstat.nomatch
   exit 3
 fi
 
