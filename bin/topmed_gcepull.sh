@@ -73,6 +73,13 @@ echo "#========= '$d' host=$s $SLURM_JOB_ID $0 bamid=$bamid cramfile=$cramfile p
 #   Mark this as started
 $topmedcmd mark $bamid $markverb started
 
+mkdir -p $crampath
+if [ "$?" != "0" ]; then
+  echo "Unable to create '$crampath' for remapped CRAM for '$bamid'"
+  $topmedcmd -persist mark $bamid $markverb failed
+  exit 2
+fi
+
 #======================================================================
 #   Copy remapped CRAM from Google Cloud
 #======================================================================
@@ -118,7 +125,7 @@ fi
 #   Get number of interest from flagstat file and check it
 n=`grep 'paired in sequencing' $crampath/$nwdid.recab.cram.flagstat | awk '{print $1}'`
 if [ "$n" != "$cramflagstat" ]; then
-  echo "Flagstat '$n' did not match cramflagstat '$cramflagstat' for bamid '$bamid'"
+  echo "Flagstat '$n' did not match cramflagstat '$cramflagstat' for bamid '$bamid' nwdid $nwdid"
   $topmedcmd -persist mark $bamid $markverb failed
   exit 3
 fi
