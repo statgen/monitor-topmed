@@ -166,7 +166,11 @@ if ($iammgr) {
         " &nbsp;&nbsp;&nbsp; <a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=restart' " .
         "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=restart\",680,720); " .
         "return false;'>Restart Jobs</a>" .
-        " &nbsp;&nbsp;&nbsp; <a href='$s'>DataDump</a>";
+        " &nbsp;&nbsp;&nbsp; <a href='$s'>DataDump</a>" .
+        " &nbsp;&nbsp;&nbsp; <a href='http://nhlbi.sph.umich.edu/report/monitor.php' " .
+        "onclick='javascript:popup2(\"http://nhlbi.sph.umich.edu/report/monitor.php\",680,720); " .
+        "return false;'>ReMapping</a>";
+        
 }
 print doheader($HDR['title'], 1);
 
