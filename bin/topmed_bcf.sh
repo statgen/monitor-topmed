@@ -11,7 +11,7 @@ bcftools=/usr/cluster/bin/bcftools
 bam=/usr/cluster/bin/bam
 
 me=bcf
-mem=2G
+mem=6G
 markverb="${me}ed"
 constraint="--constraint eth-10g"
 qos="--qos=topmed-$me"
