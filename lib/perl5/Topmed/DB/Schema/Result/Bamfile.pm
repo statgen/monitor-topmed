@@ -815,6 +815,10 @@ sub nwdid {
   return shift->expt_sampleid;
 }
 
+sub runname {
+  return shift->run->dirname;
+}
+
 sub host {
   my $self = shift;
   my $ptn  = YASF->new('/net/topmed/working/backups/incoming/topmed/{center}/{run}/{nwdid}.src.cram');
@@ -892,7 +896,12 @@ sub incoming_path {
   return;
 }
 
-sub recab_path {
+sub b37_remapped_path {
+  my ($self) = @_;
+  return File::Spec->join($self->b37_mapped_path, 'bams', $self->nwdid . '.recal.cram');
+}
+
+sub b38_remapped_path {
   my ($self) = @_;
   return File::Spec->join($self->b38_mapped_path, $self->nwdid . '.recab.cram');
 }

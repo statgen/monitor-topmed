@@ -6,6 +6,7 @@ requires 'Import::Base';
 requires 'IPC::System::Simple';
 requires 'YASF';
 requires 'IO::All';
+requires 'Class::CSV';
 
 requires 'Class::Method::Modifiers';
 
