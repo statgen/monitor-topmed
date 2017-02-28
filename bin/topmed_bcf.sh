@@ -5,9 +5,10 @@
 #	Create BCF file for a remapped CRAM
 #
 . /usr/cluster/topmed/bin/topmed_actions.inc
-vt=/net/wonderland/home/lefaivej/bin/vt
+vt=/usr/cluster/software/trusty/topmed-year1-freeze3a/master/vt/vt
 vtref=/net/topmed/working/mapping/gotcloud/ref/hg38/hs38DH.fa
 bcftools=/usr/cluster/bin/bcftools
+bam=/usr/cluster/bin/bam
 
 me=bcf
 mem=2G
@@ -26,12 +27,12 @@ if [ "$1" = "-submit" ]; then
     exit 4
   fi 
 
-  # Run this on node where remapped cram lives
-  h=`$topmedpath whathost $1 b$build`
-  if [ "$h" != "" ]; then
-    realhost="--nodelist=$h"
-    #qos="--qos=$h-$me"
-  fi
+  # Run this on node where remapped cram lives     Let this run anywhere
+  #h=`$topmedpath whathost $1 b$build`
+  #if [ "$h" != "" ]; then
+  #  realhost="--nodelist=$h"
+  #  #qos="--qos=$h-$me"
+  #fi
 
   #  Submit this script to be run
   l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*`)
@@ -120,7 +121,8 @@ if [ "$?" != "0" ]; then
 fi
 bcffile=$bcfdir/$nwdid.bcf
 
-$vt discover -b $cramfile -s $nwdid -r $vtref -o $bcffile
+set -o pipefail
+$samtools view -uh $cramfile | $bam clipOverlap --poolSize 100000000 --in -.ubam --out -.ubam | $vt discover2 -z -q 20 -b + -r $vtref -s $nwdid -o $bcffile
 if [ "$?" != "0" ]; then
   echo "Unable to run VT DISCOVER for bamid '$bamid' [$nwdid] on $cramfile creating $bcffile"
   $topmedcmd -persist mark $bamid $markverb failed
