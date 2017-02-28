@@ -896,7 +896,12 @@ sub incoming_path {
   return;
 }
 
-sub recab_path {
+sub b37_remapped_path {
+  my ($self) = @_;
+  return File::Spec->join($self->b37_mapped_path, 'bams', $self->nwdid . '.recal.cram');
+}
+
+sub b38_remapped_path {
   my ($self) = @_;
   return File::Spec->join($self->b38_mapped_path, $self->nwdid . '.recab.cram');
 }

@@ -31,6 +31,8 @@ sub completed_for_build {
   return $self->search(
     {
       $state_col_map->{$params{build}} => $COMPLETED,
+    }, {
+      order_by => 'expt_sampleid',
     }
   );
 }

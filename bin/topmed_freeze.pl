@@ -1,5 +1,7 @@
 #!/usr/bin/env perl
 
+# TODO - add to freezes table and read from there instead
+#
 use FindBin;
 use lib (qq($FindBin::Bin/../lib/perl5), qq($FindBin::Bin/../local/lib/perl5));
 
@@ -21,37 +23,31 @@ unless ($build =~ /^b37|b38$/) {
   exit 1;
 }
 
-if ($output ne $DASH and not -w $output) {
-  say 'Invalid output file';
-  exit 1;
-}
-
-my $headers = [qw(nwdid pi center run cram)];
-my %csv_params = (fields => $headers);
-
-if ($output eq $DASH) {
-  $csv_params{filehandle} = io->stdout->tie;
-} else {
-  $csv_params{filename} = $output;
-}
-
-my $csv     = Class::CSV->new(%csv_params);
 my $schema  = Topmed::DB->new();
 my $samples = $schema->resultset('Bamfile')->completed_for_build(build => $build);
+my $headers = [qw(nwdid pi center run cram)];
+my $csv     = Class::CSV->new(fields => $headers);
 
 $csv->add_line({map {$_ => $_} @{$headers}});
 
 for my $sample ($samples->all) {
-  my $meth = qq(${build}_mapped_path);
+  my $path_meth = qq(${build}_remapped_path);
+
   $csv->add_line(
     {
       nwdid  => $sample->nwdid,
       pi     => $sample->piname,
       center => $sample->center,
       run    => $sample->runname,
-      cram   => $sample->$meth,
+      cram   => $sample->$path_meth,
     }
   );
+}
+
+if ($output eq $DASH) {
+  $csv->print();
+} else {
+  $csv->string > io($output);
 }
 
 __END__
