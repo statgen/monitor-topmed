@@ -5,7 +5,6 @@
 #	Post-process a remapped CRAM after being pulled from Google Cloud
 #
 . /usr/cluster/topmed/bin/topmed_actions.inc
-vt=/net/wonderland/home/lefaivej/bin/vt
 
 me=gcepost
 mem=2G
@@ -27,11 +26,11 @@ if [ "$1" = "-submit" ]; then
   fi 
 
   # Run this on node where remapped cram lives
-  h=`$topmedpath whathost $1 b$build`
-  if [ "$h" != "" ]; then
-    realhost="--nodelist=$h"
-    #qos="--qos=$h-$me"
-  fi
+  #h=`$topmedpath whathost $1 b$build`
+  #if [ "$h" != "" ]; then
+  #  realhost="--nodelist=$h"
+  #  #qos="--qos=$h-$me"
+  #fi
 
   #  Submit this script to be run
   l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*`)
