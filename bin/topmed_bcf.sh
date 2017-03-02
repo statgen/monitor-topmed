@@ -11,7 +11,7 @@ bcftools=/usr/cluster/bin/bcftools
 bam=/usr/cluster/bin/bam
 
 me=bcf
-mem=6G
+mem=8G
 markverb="${me}ed"
 constraint="--constraint eth-10g"
 qos="--qos=topmed-$me"
@@ -24,6 +24,7 @@ if [ "$1" = "-submit" ]; then
   #   May I submit this job?
   $topmedpermit permit test $me $1
   if [ "$?" = "0" ]; then
+    echo "$me $1 not permitted" | tee $console/$1-$me.out
     exit 4
   fi 
 

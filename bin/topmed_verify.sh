@@ -19,6 +19,7 @@ if [ "$1" = "-submit" ]; then
   #   May I submit this job?
   $topmedpermit permit test $me $1
   if [ "$?" = "0" ]; then
+    echo "$me $1 not permitted" | tee $console/$1-$me.out
     exit 4
   fi 
 
