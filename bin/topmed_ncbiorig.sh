@@ -17,17 +17,17 @@ version=secondary
 markverb=sentorig
 jobname=orig
 slurmp=topmed
-qos=topmed-ncbi
+qos=topmed-bai
 realhost=''
 realhost="--nodelist=topmed"       # Force to machine with external interface
 
 if [ "$1" = "-submit" ]; then
   shift
   #   May I submit this job?
-  $topmedcmd permit test sorig $1
-  if [ "$?" = "0" ]; then
-    exit 4
-  fi 
+  #$topmedcmd permit test sorig $1
+  #if [ "$?" = "0" ]; then
+  #  exit 4
+  #fi 
 
   #  Submit this script to be run
   l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos $realhost --workdir=$console -J $1-$jobname --output=$console/$1-$jobname.out $0 $*`)

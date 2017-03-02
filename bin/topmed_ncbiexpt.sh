@@ -11,17 +11,17 @@ ascpcmd="$topmedcmd send2ncbi"
 mem=2G
 markverb=sentexpt
 slurmp=topmed
-qos=topmed-ncbi
+qos=topmed-bai
 realhost=''
 realhost="--nodelist=topmed"       # Force to machine with external interface
 
 if [ "$1" = "-submit" ]; then
   shift
   #   May I submit this job?
-  $topmedcmd permit test sexpt $1
-  if [ "$?" = "0" ]; then
-    exit 4
-  fi 
+  #$topmedcmd permit test sexpt $1
+  #if [ "$?" = "0" ]; then
+  #  exit 4
+  #fi 
 
   #  Submit this script to be run
   l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos $realhost --workdir=$console -J $1-expt --output=$console/$1-sexpt.out $0 $*`)
