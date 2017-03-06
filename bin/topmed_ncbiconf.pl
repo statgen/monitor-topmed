@@ -365,15 +365,6 @@ sub CheckSummary {
     LookFor($sql, 'b37', 'recal.37.cram recal.37.bam recal.cram recal.bam', \%stats);
     print SummarizeStats(\%stats) . "\n";
 
-    #   Check status for each b38 BAM/CRAM that we sent
-    print "$nowdate Checking for remapped build 38 files:   "; 
-    %stats = ();
-    $sql = "SELECT bamid,bamname,expt_sampleid,cramchecksum,checksum from $opts{bamfiles_table} " .
-        "WHERE state_ncbib38=$DELIVERED";
-    #   Last three of extensions are from my bugs
-    LookFor($sql, 'b38', 'recal.38.cram', \%stats);
-    print SummarizeStats(\%stats) . "\n";
-
     return;
 }
 
@@ -383,7 +374,7 @@ sub CheckSummary {
 #
 # Arguments:
 #   initialsql - SQL select in bamfiles for entries of interest
-#   type - expt orig b37 b38
+#   type - expt orig b37
 #   extensions - string of file extensions to the nwdid
 #   statsref - hash reference to array to collect stats in
 #
@@ -611,7 +602,6 @@ sub GetStateCol {
     if ($str =~ /recal.bam/)  { $statecol = 'state_ncbib37'; }    # My bug
     if ($str =~ /recal.cram/) { $statecol = 'state_ncbib37'; }    # My bug
     if ($str =~ /remap.37/)   { $statecol = 'state_ncbib37'; }
-    if ($str =~ /remap.38/)   { $statecol = 'state_ncbib38'; }
     if ($str =~ /secondary/)  { $statecol = 'state_ncbiorig'; }
     if ($str =~ /src.bam/)    { $statecol = 'state_ncbiorig'; }
     if ($str =~ /src.cram/)   { $statecol = 'state_ncbiorig'; }
