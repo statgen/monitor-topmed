@@ -28,12 +28,12 @@ if [ "$1" = "-submit" ]; then
     exit 4
   fi 
 
-  # Run this on node where remapped cram lives     Let this run anywhere
-  #h=`$topmedpath whathost $1 b$build`
-  #if [ "$h" != "" ]; then
-  #  realhost="--nodelist=$h"
-  #  #qos="--qos=$h-$me"
-  #fi
+  # Run this on node where remapped cram lives
+  h=`$topmedpath whathost $1 b$build`
+  if [ "$h" != "" ]; then
+    realhost="--nodelist=$h"
+    #qos="--qos=$h-$me"
+  fi
 
   #  Submit this script to be run
   l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*`)
