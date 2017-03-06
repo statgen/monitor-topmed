@@ -10,11 +10,11 @@ me=gcepull
 mem=2G
 markverb="${me}ed"
 constraint="--constraint eth-10g"
-cores="--cpus-per-task=2"         # Cores here should be same as gsutil
+cores="--cpus-per-task=1"         # Cores here should be same as gsutil
 qos="--qos=topmed-$me"
 slurmp=topmed-working
 realhost=''
-gsutil='gsutil -o GSUtil:parallel_composite_upload_threshold=150M -o GSUtil:parallel_process_count=2'
+gsutil='gsutil -o GSUtil:parallel_composite_upload_threshold=150M -o GSUtil:parallel_process_count=1'
 incominguri='gs://topmed-recabs'
 build=38
 
