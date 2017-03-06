@@ -331,7 +331,7 @@ if ($fcn eq 'bcf') {
 #--------------------------------------------------------------
 if ($fcn eq 'sexpt') {
     #   Get list of all samples yet to process
-    my $sql = "SELECT * FROM $opts{bamfiles_table}";
+    my $sql = "SELECT * FROM $opts{bamfiles_table} WHERE datayear=1";
     $sql = BuildSQL($sql);
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
@@ -372,7 +372,7 @@ if ($fcn eq 'sexpt') {
 #--------------------------------------------------------------
 if ($fcn eq 'sorig') {
     #   Get list of all samples yet to process
-    my $sql = "SELECT * FROM $opts{bamfiles_table}";
+    my $sql = "SELECT * FROM $opts{bamfiles_table} WHERE datayear=1 AND state_ncbiexpt=$COMPLETED";
     $sql = BuildSQL($sql);
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
@@ -396,6 +396,37 @@ if ($fcn eq 'sorig') {
         if ($href->{state_ncbiorig} != $NOTSET && $href->{state_ncbiorig} != $REQUESTED) { next; }
         #   Send the secondary BAM to NCBI
         BatchSubmit("$opts{topmedncbiorig} -submit $href->{bamid}");
+    }
+    ShowSummary($fcn);
+    exit;
+}
+
+#--------------------------------------------------------------
+#   Get a list of remapped primary BAMs to be sent to NCBI
+#--------------------------------------------------------------
+if ($fcn eq 'sb37') {
+    #   Get list of all samples yet to process
+    my $sql = "SELECT * FROM $opts{bamfiles_table} WHERE datayear=1 AND state_ncbiorig=$COMPLETED";
+    $sql = BuildSQL($sql);
+    my $sth = DoSQL($sql);
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { next; }
+    for (my $i=1; $i<=$rowsofdata; $i++) {
+        my $href = $sth->fetchrow_hashref;
+        my $skip = '';
+        foreach my $col (qw(checksum expt_sampleid)) {
+            if (exists($href->{$col}) && $href->{$col}) { next; }
+            if ($opts{verbose}) { print "  No value for '$col'\n"; }
+            $skip .= "$col ";
+        }
+        if ($skip) {
+            print "  BAM '$href->{bamname}' [$href->{bamid}] is ignored because of incomplete data for: $skip\n";
+            next;
+        }
+        if ($opts{suberr} && $href->{state_ncbib37} >= $FAILEDCHECKSUM) { $href->{state_ncbib37} = $REQUESTED; }
+        if ($href->{state_ncbib37} != $NOTSET && $href->{state_ncbib37} != $REQUESTED) { next; }
+        #   Send the remapped CRAM to NCBI
+        BatchSubmit("$opts{topmedncbib37} -submit $href->{bamid}");
     }
     ShowSummary($fcn);
     exit;
@@ -452,31 +483,6 @@ sub ShowSummary {
 
 #==================================================================
 # Subroutine:
-#   GetBamid($bamid)
-#
-#   Return bamid for bamid or expt_sampleid
-#==================================================================
-sub GetBamid {
-    my ($bamid) = @_;
-    my ($sth, $rowsofdata, $href);
-    if ($bamid =~ /^\d+$/) { return $bamid; }
-
-    if ($bamid =~ /^NWD/){
-        $sth = ExecSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE expt_sampleid='$bamid'");
-        $rowsofdata = $sth->rows();
-        if ($rowsofdata) {
-            $href = $sth->fetchrow_hashref;
-            return $href->{bamid};
-        }
-    }
-    if ($bamid !~ /^\d+$/){
-        die "$Script - Invalid bamid or NWDID ($bamid). Try '$Script -help'\n";
-    }
-    return $bamid;
-}
-
-#==================================================================
-# Subroutine:
 #   ExecSQL($sql, $die)
 #
 #   Execute SQL.  Keep trying if connection lost.
@@ -487,44 +493,6 @@ sub ExecSQL {
     my ($sql, $die) = @_;
     if ($opts{persist}) { return PersistDoSQL($opts{realm}, $sql); }
     return DoSQL($sql, $die);
-}
-
-#==================================================================
-# Subroutine:
-#   GetBamName - Returns path to original bamname
-#   Much of this was cribbed from topmedpath.pl
-#   Should all be replaced with DBIc code
-#
-# Arguments:
-#   bamid
-#
-# Returns
-#   Path to file
-#==================================================================
-sub GetBamName {
-    my ($bamid) = @_;
-    $bamid = GetBamid($bamid);
-    my $sth = ExecSQL("SELECT runid,bamname FROM $opts{bamfiles_table} WHERE bamid=$bamid");
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
-    my $href = $sth->fetchrow_hashref;
-    my $bamname = $href->{bamname};
-    my $runid = $href->{runid};
-    $sth = ExecSQL("SELECT centerid,dirname FROM $opts{runs_table} WHERE runid=$runid");
-    $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "$Script - BAM '$bamid' run '$runid' is unknown\n"; }
-    $href = $sth->fetchrow_hashref;
-    my $rundir = $href->{dirname};
-    my $centerid = $href->{centerid};
-    $sth = ExecSQL("SELECT centername FROM $opts{centers_table} WHERE centerid=$centerid");
-    $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "$Script - BAM '$bamid' center '$centerid' is unknown\n"; }
-    $href = $sth->fetchrow_hashref;
-    my $centername = $href->{centername};
-
-    my $bamfile = abs_path("$opts{netdir}/$opts{incomingdir}/$centername/$rundir") || '';
-    if ($bamfile) { $bamfile .= '/' . $bamname; }
-    return $bamfile;
 }
 
 #==================================================================
@@ -593,114 +561,6 @@ sub GetUnArrivedRuns {
         $run2dir{$href->{runid}} = $href->{dirname};
     }
     return \%run2dir;
-}
-
-#==================================================================
-# Almost dead code, but Tom still wants it.  Get it out of my way here.
-#==================================================================
-#--------------------------------------------------------------
-#   Get a list of remapped primary BAMs to be sent to NCBI
-#--------------------------------------------------------------
-if ($fcn eq 'sb38') {
-    #   Get all the known centers in the database
-    my $centersref = GetCenters();
-    foreach my $cid (keys %{$centersref}) {
-        my $centername = $centersref->{$cid};
-        my $runsref = GetRuns($cid) || next;
-        #   For each run, see if there are bamfiles to be published 
-        foreach my $runid (keys %{$runsref}) {
-            my $dirname = $runsref->{$runid};
-            #   Get list of all bams known at NCBI and that have not been sent
-            my $sql = "SELECT * FROM $opts{bamfiles_table} " .
-                "WHERE runid='$runid' AND nwdid_known='Y'";
-            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
-            my $sth = DoSQL($sql);
-            my $rowsofdata = $sth->rows();
-            if (! $rowsofdata) { next; }
-            for (my $i=1; $i<=$rowsofdata; $i++) {
-                my $href = $sth->fetchrow_hashref;
-
-                #   Only send the remapped b38 file for this year's data
-                if ($href->{datayear} ne '2') { next; }
-
-                #   Only send the remapped file if the experiment was accepted at NCBI
-                if ($href->{state_ncbiexpt} != $COMPLETED) { next; }
-
-                #   Check important fields for this BAM are possibly correct
-                my $skip = '';
-                foreach my $col (qw(cramname expt_sampleid)) {
-                    if (exists($href->{$col}) && $href->{$col}) { next; }
-                    if ($opts{verbose}) { print "  No value for '$col'\n"; }
-                    $skip .= "$col ";
-                }
-                if ($skip) {
-                    print "  BAM '$href->{bamname}' [$href->{bamid}] is ignored because of incomplete data for: $skip\n";
-                    next;
-                }
-                if ($opts{suberr} && $href->{state_ncbib38} >= $FAILEDCHECKSUM) { $href->{state_ncbib38} = $REQUESTED; }
-                if ($href->{state_ncbib38} != $NOTSET && $href->{state_ncbib38} != $REQUESTED) { next; }
-                #   Send the remapped CRAM to NCBI
-                BatchSubmit("$opts{topmedncbib38} -submit $href->{bamid}");
-            }
-        }
-    }
-    ShowSummary($fcn);
-    exit;
-}
-
-#--------------------------------------------------------------
-#   Get a list of remapped primary BAMs to be sent to NCBI
-#--------------------------------------------------------------
-if ($fcn eq 'sb37') {
-    #   Get all the known centers in the database
-    my $centersref = GetCenters();
-    foreach my $cid (keys %{$centersref}) {
-        my $centername = $centersref->{$cid};
-        my $runsref = GetRuns($cid) || next;
-        #   For each run, see if there are bamfiles to be delivered to NCBI
-        foreach my $runid (keys %{$runsref}) {
-            my $dirname = $runsref->{$runid};
-            #   Get list of all bams known at NCBI and that have not been sent
-            my $sql = "SELECT * FROM $opts{bamfiles_table} " .
-                "WHERE runid='$runid' AND nwdid_known='Y'";
-            if ($opts{datayear}) { $sql .= " AND datayear=$opts{datayear}"; }
-            my $sth = DoSQL($sql);
-            my $rowsofdata = $sth->rows();
-            if (! $rowsofdata) { next; }
-            for (my $i=1; $i<=$rowsofdata; $i++) {
-                my $href = $sth->fetchrow_hashref;
-
-                #   Only send the remapped b37 file for this year's data
-                if ($href->{datayear} ne '1') {
-                    if ($opts{verbose}) {
-                        print "  BAM '$href->{bamname}' [$href->{bamid}] ignored because it is not year 1\n";
-                    }
-                    next;
-                }
-
-                #   Only send the remapped file if the experiment was accepted at NCBI
-                if ($href->{state_ncbiexpt} != $COMPLETED) { next; }
-
-                #   Check important fields for this BAM are possibly correct
-                my $skip = '';
-                foreach my $col (qw(cramname expt_sampleid)) {
-                    if (exists($href->{$col}) && $href->{$col}) { next; }
-                    if ($opts{verbose}) { print "  No value for '$col'\n"; }
-                    $skip .= "$col ";
-                }
-                if ($skip) {
-                    print "  BAM '$href->{bamname}' [$href->{bamid}] is ignored because of incomplete data for: $skip\n";
-                    next;
-                }
-                if ($opts{suberr} && $href->{state_ncbib37} >= $FAILEDCHECKSUM) { $href->{state_ncbib37} = $REQUESTED; }
-                if ($href->{state_ncbib37} != $NOTSET && $href->{state_ncbib37} != $REQUESTED) { next; }
-                #   Send the remapped CRAM to NCBI
-                BatchSubmit("$opts{topmedncbib37} -submit $href->{bamid}");
-            }
-        }
-    }
-    ShowSummary($fcn);
-    exit;
 }
 
 #==================================================================
