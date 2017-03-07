@@ -11,12 +11,12 @@ bcftools=/usr/cluster/bin/bcftools
 bam=/usr/cluster/bin/bam
 
 me=bcf
-mem=8G
+mem=12G
 markverb="${me}ed"
 constraint="--constraint eth-10g"
 qos="--qos=topmed-$me"
 slurmp=topmed-working
-realhost=''
+slurmp=topmed               # temporary hack for now
 build=38
 
 if [ "$1" = "-submit" ]; then
@@ -28,12 +28,15 @@ if [ "$1" = "-submit" ]; then
     exit 4
   fi 
 
-  # Run this on node where remapped cram lives
+  # Run this on node where remapped cram lives 
   h=`$topmedpath whathost $1 b$build`
   if [ "$h" != "" ]; then
     realhost="--nodelist=$h"
     #qos="--qos=$h-$me"
   fi
+
+#realhost=''                 # I/O bound, run anywhere
+#constraint=""
 
   #  Submit this script to be run
   l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*`)
