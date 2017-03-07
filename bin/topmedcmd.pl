@@ -89,7 +89,7 @@ our %opts = (
     ascpcmd => "/usr/cluster/bin/ascp -i ".
         "/net/topmed/incoming/study.reference/send2ncbi/topmed-2-ncbi.pri -l 800M -k 1",
     ascpdest => 'asp-um-sph@gap-submit.ncbi.nlm.nih.gov:protected',
-    squeuecmd => "/usr/cluster/bin/squeue -o '%.10i %.18P %.15q %.18j %.8u %.2t %.10M %.6D %R'",
+    squeuecmd => "/usr/cluster/bin/squeue -o '%.9i %.15P %.15q %.14j %.8u %.2t %.8M %.6D %R %.9n'",    
     maxlongjobs => 10,
     verbose => 0,
 );
@@ -412,6 +412,7 @@ sub Send2NCBI {
 #
 #   Print summary of topmed-related jobs
 #==================================================================
+#squeuecmd => "/usr/cluster/bin/squeue -o '%.10i %.18P %.15q %.18j %.8u %.2t %.10M %.9n'",
 sub SQueue {
     #my ($bamid, $set) = @_;
     my $cmd = $opts{squeuecmd} . '| grep topmed';
@@ -421,7 +422,7 @@ sub SQueue {
     my %running = ();
     my %mosixrunning = ();          # Counts of jobs by nomosix users
     my %queued = ();
-    my $nottopmed = 0;              # Count of jobs not from my user
+    my %nottopmed = ();             # Not my user list
     foreach my $l (split('\n', `$cmd`)) {
         my @c = split(' ', $l);
         if ($c[1] eq 'nomosix' && $c[8] =~ /topmed/) {    # nomosix on topmed node
@@ -429,7 +430,10 @@ sub SQueue {
             next;
         }
         if ($c[1] !~ /^topmed/) { next; }    # Not interested in anything but topmed
-        if ($c[4] ne 'topmed') { $nottopmed++; next; }    # Not topmed user
+        if ($c[4] ne 'topmed') {        # Save partition and not topmed user
+            $nottopmed{$c[1]}{$c[4]} = 1;
+            next;
+        }
         $partitions{$c[1]} = 1;
         if ($c[5] eq 'PD') {        # Queued
             push @{$queued{$c[1]}{data}},$l;
@@ -451,7 +455,10 @@ sub SQueue {
     foreach my $p (sort keys %partitions) {
         if (! defined($queued{$p}{count}))  { $queued{$p}{count} = 0; }
         if (! defined($running{$p}{count})) { $running{$p}{count} = 0; }
-        printf("  %-18s %3d running / %3d queued / %3d not user topmed \n", $p, $running{$p}{count}, $queued{$p}{count}, $nottopmed); 
+        my $s = join(' ',sort keys %{$nottopmed{$p}});
+        my $k = scalar(keys %{$nottopmed{$p}});
+        printf("  %-18s %3d running / %3d queued / %3d foreign user: $s \n",
+            $p, $running{$p}{count}, $queued{$p}{count}, $k);
     }
     print "\n";
 
@@ -464,7 +471,8 @@ sub SQueue {
         if (! defined($qos{$q}{queued}))   { $qos{$q}{queued} = 0; }
         my $qq = $q;                    # Patch normal to be something meaningful?
         if ($q eq 'normal') { $qq = 'default_qos'; }
-        printf("  %-18s %3d running / %3d queued   %s\n", $qq, $qos{$q}{running}, $qos{$q}{queued}, $s); 
+        printf("  %-18s %3d running / %3d queued   %s\n",
+            $qq, $qos{$q}{running}, $qos{$q}{queued}, $s); 
     }
     print "\n";
 
@@ -631,7 +639,7 @@ sub ReFormatDeviceData {
 #==================================================================
 sub ReFormatPartitionData {
     my ($str) = @_;
-    my $fmt = '    %-10s %-9s %-15s %-12s %s  %s';
+    my $fmt = '    %-9s %-9s %-12s %-10s %-9s %s  %s';
     my @c = split(' ', $str);
     my $nwdid = '?';
     my $dir = '?';
@@ -648,7 +656,7 @@ sub ReFormatPartitionData {
             }
         }
     }
-    return sprintf($fmt, $c[0], $nwdid, $c[2], $c[3], $c[6], $dir)  . "\n";
+    return sprintf($fmt, $c[0], $nwdid, $c[2], $c[3], $c[8], $c[6], $dir)  . "\n";
 }
 
 #==================================================================
