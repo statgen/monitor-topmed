@@ -23,7 +23,7 @@ $qurl =  $_SERVER['SCRIPT_NAME'] . "?fcn=queue'";
 $STATUSLETTERS =  "<i><b>A</b>=File Arrived, <b>5</b>=MD5 Verified, <b>C</b>=BAM=>CRAM, <b>I</b>=BAI created<br/>" .
     "<b>Q</b>=qplot run, <b>7</b>=Remapped Build=37, <b>s</b>=Push Build=38 to GCE, <b>s</b>=Pull Build=38 from GCE,<br/>" .
     "<b>Z</b>=PostProcess GCE Build=38 data, <b>8</b>=Remapped Build=38, <b>B</b>=BCF created<br/>" .
-    "<b>X</b>=EXPT=>NCBI <b>S</b>=Secondary BAM=>NCBI, <b>P=</b>B38=>Primary BAM=>NCBI, <b>T</b>=b38=>Tertiary BAM=>NCBI";
+    "<b>X</b>=EXPT=>NCBI <b>S</b>=Orig BAM/CRAM=>NCBI, <b>P</b>=</b>B37=>NCBI, <b>T</b>=B38=>NCBI";
 
 $SHOWSTATUS = "STATUS: " .
     "<a onclick='javascript:window.location.reload()'><img src='refresh.png' alt='refresh'></a>&nbsp;&nbsp;" .
