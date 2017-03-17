@@ -148,9 +148,10 @@ if ($fcn =~ /^show/) {
         if ($k !~ /^job_/) { next; }
         my $kmsg = $k;
         $kmsg =~ s/_/ /g;
-        print "  $kmsg = $opts{$k}\n";
+        print "  $kmsg = $opts{$k}";
     }
-    exit;    
+    print "\n";
+    exit;
 }
 
 die "Invalid request '$fcn'. Try '$Script --help'\n";
