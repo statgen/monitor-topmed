@@ -10,7 +10,7 @@ ascpcmd="$topmedcmd send2ncbi"
 
 mem=2G
 markverb=sentexpt
-slurmp=topmed
+slurmp=topmed-working
 qos=topmed-bai
 realhost=''
 realhost="--nodelist=topmed"       # Force to machine with external interface
