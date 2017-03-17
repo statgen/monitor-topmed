@@ -16,10 +16,9 @@ version=remap
 markverb=sentb$build
 jobname=b$build
 xmlonly=N
-slurmp=topmed
-qos=topmed-ncbi
+slurmp=topmed-working
+qos=topmed-bai
 realhost=''
-realhost="--nodelist=topmed"       # Force to machine with external interface
 
 if [ "$1" = "-xmlonly" ]; then shift; xmlonly=Y; fi    # Force just XML to be sent to NCBI
 if [ "$1" = "-submit" ]; then
