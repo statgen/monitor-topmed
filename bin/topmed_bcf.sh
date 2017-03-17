@@ -16,7 +16,6 @@ markverb="${me}ed"
 constraint="--constraint eth-10g"
 qos="--qos=topmed-$me"
 slurmp=topmed-working
-slurmp=topmed               # temporary hack for now
 build=38
 
 if [ "$1" = "-submit" ]; then
@@ -35,8 +34,9 @@ if [ "$1" = "-submit" ]; then
     #qos="--qos=$h-$me"
   fi
 
-#realhost=''                 # I/O bound, run anywhere
-#constraint=""
+slurmp=topmed               # temporary hack for now, I/O bound, run anywhere
+realhost=''
+constraint=''
 
   #  Submit this script to be run
   l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*`)
