@@ -16,7 +16,7 @@ build=37
 version=secondary
 markverb=sentorig
 jobname=orig
-slurmp=topmed
+slurmp=topmed-working
 qos=topmed-bai
 realhost=''
 realhost="--nodelist=topmed"       # Force to machine with external interface
@@ -93,18 +93,13 @@ here=`pwd`
 
 #   Figure out what file to send. Either a BAM or a CRAM
 sendcram='N'
-offsite=`$topmedcmd show $bamid offsite`    # Original file is offsite or local
 datayear=`$topmedcmd show $bamid datayear`  # What year data is this
-if [ "$offsite" = "D" ]; then
+if [ "$center" = "broad" -a "$datayear" != '1' ]; then
   sendcram='Y'
-else
-  if [ "$center" = "broad" -a "$datayear" != '1' ]; then
-    sendcram='Y'
-  fi
 fi
 
 if [ "$sendcram" = "Y" ]; then
-  l=(`$topmedpath wherefile $bamid backup`)        # Get backupdir and backupfile and host
+  l=(`$topmedpath wherefile $bamid cram`)        # Get backupdir and backupfile and host
   sendfile="${l[0]}"
   sf=$nwdid.src.cram
   ln -sf $sendfile $sf
@@ -124,10 +119,19 @@ if [ "$sendcram" = "Y" ]; then
     fi
   fi
 else
-  l=(`$topmedpath wherefile $bamid bam`)       # Get pathofbam for bam
-  sendfile=$nwdid.src.bam
-  ln -sf ${l[0]} $sendfile
-  checksum=`$topmedcmd -persist show $bamid checksum`
+  sendfile=`$topmedpath wherefile $bamid bam`
+  if [ ! -f "$sendfile" ]; then
+      sendcram=Y                        # No BAM, send CRAM
+      echo "Attempting to send the CRAM, rather than the missing BAM"
+      sendfile=`$topmedpath wherefile $bamid cram`
+      ln -sf $sendfile $nwdid.src.cram
+      checksum=`$topmedcmd -persist show $bamid cramchecksum`
+      sendfile=$nwdid.src.cram
+  else
+    ln -sf $sendfile $nwdid.src.bam     # BAM file exists, send it
+    sendfile=$nwdid.src.bam
+    checksum=`$topmedcmd -persist show $bamid checksum`
+  fi
 fi
 
 if [ "$checksum" = "" ]; then
@@ -137,7 +141,7 @@ if [ "$checksum" = "" ]; then
 fi
 
 if [ ! -f "$sendfile" ]; then
-  echo "Original BAM for bamid '$bamid' ($sendfile) not found"
+  echo "Original file for bamid '$bamid' ($sendfile) not found"
   $topmedcmd -persist mark $bamid $markverb failed
   exit 2
 fi
