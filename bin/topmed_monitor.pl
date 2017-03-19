@@ -406,7 +406,7 @@ if ($fcn eq 'sorig') {
 #--------------------------------------------------------------
 if ($fcn eq 'sb37') {
     #   Get list of all samples yet to process
-    my $sql = "SELECT * FROM $opts{bamfiles_table} WHERE datayear=1 AND state_ncbiorig=$COMPLETED";
+    my $sql = "SELECT * FROM $opts{bamfiles_table} WHERE datayear=1 AND state_ncbiexpt=$COMPLETED";
     $sql = BuildSQL($sql);
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
