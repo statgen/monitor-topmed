@@ -24,10 +24,10 @@ if [ "$1" = "-xmlonly" ]; then shift; xmlonly=Y; fi    # Force just XML to be se
 if [ "$1" = "-submit" ]; then
   shift
   #   May I submit this job?
-  $topmedcmd permit test sb37 $1
-  if [ "$?" = "0" ]; then
-    exit 4
-  fi 
+  #$topmedcmd permit test sb37 $1
+  #if [ "$?" = "0" ]; then
+  # exit 4
+  #fi 
 
   #  Submit this script to be run
   l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos $realhost --workdir=$console -J $1-$jobname --output=$console/$1-$jobname.out $0 $*`)
@@ -98,7 +98,7 @@ if [ "$sendfile" = '' ]; then
   $topmedcmd -persist mark $bamid $markverb failed
   exit 2
 fi
-checksum=`$topmedcmd show $bamid b{$build}cramchecksum`
+checksum=`$topmedcmd show $bamid b${build}cramchecksum`
 if [ "$checksum" = "" ]; then
   echo "Calculating MD5 for CRAM"
   stime=`date +%s`
@@ -108,12 +108,12 @@ if [ "$checksum" = "" ]; then
     $topmedcmd -persist mark $bamid $markverb failed
     exit 3
   fi
-  $topmedcmd set $bamid b{$build}cramchecksum $checksum
+  $topmedcmd set $bamid b${build}cramchecksum $checksum
   etime=`date +%s`
   etime=`expr $etime - $stime`
   echo "MD5 calculated for CRAM in $etime seconds"
 else
-  echo "Obtained b{$build}cramchecksum for bamid $bamid from database ($checksum)"
+  echo "Obtained b${build}cramchecksum for bamid $bamid from database ($checksum)"
 fi
 
 d=`date +%Y/%m/%d`
