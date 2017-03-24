@@ -2502,6 +2502,16 @@ DISTRIBUTIONS
       base 0
       lib 0
       perl 5.008
+  YAML-Syck-1.29
+    pathname: T/TO/TODDR/YAML-Syck-1.29.tar.gz
+    provides:
+      JSON::Syck 1.29
+      YAML::Dumper::Syck undef
+      YAML::Loader::Syck undef
+      YAML::Syck 1.29
+    requirements:
+      ExtUtils::MakeMaker 6.59
+      perl 5.006
   YASF-0.004
     pathname: R/RJ/RJRAY/YASF-0.004.tar.gz
     provides:

@@ -10,6 +10,7 @@ our @IMPORT_MODULES = (
     IO::All
     YASF
     Path::Class
+    YAML::Syck
   ),
   'autodie' => [qw(:all)],
   'English' => [qw(-no_match_vars)],

@@ -66,3 +66,7 @@ task 'install', sub {
 
   run "rsync -a --exclude-from=.rsync-excludes $build_dir/ $install_dir/";
 };
+
+task 'schema', sub {
+  run "$ENV{PWD}/scripts/schema.pl";
+};

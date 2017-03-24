@@ -95,7 +95,10 @@ Readonly::Hash our %GOOGLE_BUCKETS => (
   crams    => 'gs://topmed-crams/',
   recabs   => 'gs://topmed-recabs/',
   logs     => 'gs://topmed-logs/',
+  bcf      => 'gs://topmed-bcf/',
 );
+
+Readonly::Scalar our $GOOGLE_PIPELINE_RUN_CMD => q{gcloud alpha genomics operations};
 
 Readonly::Scalar our $NOTSET         => 0;     # Not set
 Readonly::Scalar our $REQUESTED      => 1;     # Task requested
