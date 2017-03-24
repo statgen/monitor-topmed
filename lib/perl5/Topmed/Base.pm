@@ -12,9 +12,10 @@ our @IMPORT_MODULES = (
     Path::Class
     YAML::Syck
   ),
-  'autodie' => [qw(:all)],
-  'English' => [qw(-no_match_vars)],
-  'Cwd'     => [qw(abs_path)],
+  'autodie'      => [qw(:all)],
+  'English'      => [qw(-no_match_vars)],
+  'Cwd'          => [qw(abs_path)],
+  'Getopt::Long' => [qw(HelpMessage)],
 );
 
 our %IMPORT_BUNDLES = (

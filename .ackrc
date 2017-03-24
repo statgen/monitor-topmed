@@ -1,0 +1,2 @@
+--ignore-dir=local/
+--ignore-file=is:cpanm

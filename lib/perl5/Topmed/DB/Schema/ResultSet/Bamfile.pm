@@ -40,8 +40,9 @@ sub completed_for_build {
 sub find_gce_bcf_samples {
   return shift->search(
     {
-      state_gce38_push => $COMPLETED,
-      state_gce38bcf   => $NOTSET,
+      state_md5ver    => $COMPLETED,
+      state_gce38push => $COMPLETED,
+      state_gce38bcf  => $NOTSET,
     },
     {
       order_by => 'RAND()',

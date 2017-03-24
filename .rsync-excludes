@@ -4,3 +4,4 @@ scripts/
 cpanfile*
 Rexfile
 local/cache
+.ackrc
