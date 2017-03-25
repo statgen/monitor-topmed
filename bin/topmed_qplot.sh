@@ -135,6 +135,11 @@ fi
 #   This should fail if the TotalReads < bmflagstat value + 5000 
 bamflagstat=`$topmedcmd show $bamid bamflagstat`   # Same for cram or bam
 tr=`grep TotalReads $nwdid.src.qp.stats | awk '{ print $2 }'`
+if [ "$tr" = "" ]; then
+  echo "QPLOT data $nwdid.src.qp.stats not found or TotalReads not found"
+  $topmedcmd -persist mark $bamid $markverb failed
+  exit 3
+fi
 tr=`perl -E "print $tr*1000000"`    # Man is hard to do mutiply of float in shell !
 tr=`expr $tr + 5001`
 if [ "$tr" -lt "$bamflagstat" ]; then
