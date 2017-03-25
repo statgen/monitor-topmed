@@ -34,7 +34,6 @@ use POSIX qw(strftime tmpnam);
 
 my %STEPS = (                       # List of steps we collect data for
     verify => 1,
-    bai => 1,
     qplot => 1,
     cram => 1,
     expt => 1,

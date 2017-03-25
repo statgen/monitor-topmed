@@ -38,7 +38,6 @@ my %VALIDOPS = (                    # Used for permit
     all => 1,
     verify => 1,
     backup => 1,
-    bai => 1,
     qplot => 1,
     cram => 1,
     nwdid => 1,
@@ -73,7 +72,7 @@ sub Permit {
     shift(@_);
 
     #   Test is some operation is allowed
-    #   topmedcmd.pl permit test bai 4955
+    #   topmedcmd.pl permit test qlpot 4955
     if ($fcn eq 'test') {
         my ($op, $bamid) = @_;
 
@@ -117,7 +116,7 @@ sub Permit {
     if ($fcn ne 'add') { die "Unknown function '$fcn'\n"; }
 
     #   Disable a permission by adding to the database entry
-    #   e.g. # topmedcmd.pl permit add [bai [broad [2015sep18]]]
+    #   e.g. # topmedcmd.pl permit add [qplot [broad [2015sep18]]]
     my ($op, $center, $run) = @_;
     if (! $op)       { $op = 'all'; }           # Set defaults
     if (! $center)   { $center = 'all'; }
@@ -241,9 +240,9 @@ topmedpermit.pl - Determine if an action is allowed
 
 =head1 SYNOPSIS
 
-  topmedpermit.pl permit add bai braod 2015oct18   # Stop bai job submissions for a run
+  topmedpermit.pl permit add qplot braod 2015oct18   # Stop qplot job submissions for a run
   topmedpermit.pl permit remove 12            # Remove a permit control
-  topmedpermit.pl permit test bai 4567        # Test if we should submit a bai job for one bam
+  topmedpermit.pl permit test cram 4567        # Test if we should submit a cram job for one bam
 
 =head1 OPTIONS
 

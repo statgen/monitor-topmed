@@ -49,7 +49,6 @@ my %VALIDVERBS = (                  # Valid verbs to database colum
     arrived     => 'state_arrive',
     md5verified => 'state_md5ver',
     backedup    => 'state_backup',  
-    baid        => 'state_bai',
     qploted     => 'state_qplot',
     cramed      => 'state_cram',   
     sentexpt    => 'state_ncbiexpt',
