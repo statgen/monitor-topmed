@@ -17,7 +17,7 @@ markverb=sentb$build
 jobname=b$build
 xmlonly=N
 slurmp=topmed-working
-qos=topmed-bai
+qos=topmed-redo
 realhost=''
 
 if [ "$1" = "-xmlonly" ]; then shift; xmlonly=Y; fi    # Force just XML to be sent to NCBI
