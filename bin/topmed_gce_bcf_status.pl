@@ -34,7 +34,7 @@ for my $part (@parts) {
       next;
     }
 
-    if (exists $status->{erorr}) {
+    if (exists $status->{error}) {
       say $sample->expt_sampleid . ' : FAILED' if $verbose;
       $sample->update({state_gce38bcf => $FAILED}) unless $dryrun;
       next;
