@@ -1866,6 +1866,20 @@ DISTRIBUTIONS
       XSLoader 0
       strict 0
       warnings 0
+  Parallel-ForkManager-1.19
+    pathname: Y/YA/YANICK/Parallel-ForkManager-1.19.tar.gz
+    provides:
+      Parallel::ForkManager 1.19
+    requirements:
+      Carp 0
+      ExtUtils::MakeMaker 0
+      File::Path 0
+      File::Spec 0
+      File::Temp 0
+      POSIX 0
+      Storable 0
+      perl 5.006
+      strict 0
   Params-Util-1.07
     pathname: A/AD/ADAMK/Params-Util-1.07.tar.gz
     provides:

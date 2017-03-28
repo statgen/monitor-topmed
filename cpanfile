@@ -8,6 +8,7 @@ requires 'YASF';
 requires 'IO::All';
 requires 'Class::CSV';
 requires 'YAML::Syck';
+requires 'Parallel::ForkManager';
 
 requires 'Class::Method::Modifiers';
 
