@@ -12,10 +12,9 @@ topoutdir=/net/topmed/incoming/qc.results
 fixverifybamid=/usr/cluster/topmed/bin/nhlbi.1648.vbid.rewrite.awk
 
 me=qplot
-mem=16G                         # Really should be 8G, increase to avoid too many at once
+mem=16G                             # Should be 8G, avoid too many at once on one host
 markverb="${me}ed"
-constraint=''                   # "--constraint eth-10g"
-constraint="--constraint eth-10g"       # Force to major nodes, not r63xx nodes
+constraint="--constraint eth-10g"   # Force to major nodes, not r63xx nodes
 qos=''
 slurmp=topmed-working
 realhost=''
@@ -37,7 +36,7 @@ if [ "$1" = "-submit" ]; then
     nodelist="--nodelist=$h"
   fi
 
-  #   Can run anywhere. Low rate of access to cram, small output
+  #   Low rate of access to cram, small output
   l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos $nodelist --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $*`)
   if [ "$?" != "0" ]; then
     $topmedcmd mark $1 $markverb failed
@@ -75,12 +74,6 @@ bai=$bamfile.bai
 if [ "$extension" = "cram" ]; then
   bai=$bamfile.crai
 fi
-if [ ! -f $bai ]; then
-  echo "Index '$bai' does not exist"
-  $topmedcmd -persist mark $bamid $markverb failed
-  exit 3
-fi
-
 nwdid=`$topmedcmd -persist show $bamid expt_sampleid`
 if [ "$nwdid" = "" ]; then
   echo "Unable to find the NWDID for '$bamid'"
@@ -102,6 +95,19 @@ if [ "$?" != "0" ]; then
   exit 3
 fi
 echo "Files will be created in $outdir"
+
+#   If necessary, create the index file
+if [ -f $bai ]; then
+  echo "Using existing index file '$bai'"
+else
+  echo "Creating index file '$bai'"
+  $samtools index $bamfile 2>&1
+  if [ "$?" != "0" ]; then
+    echo "Unable to create index file for '$bamfile' in '$outdir'"
+    $topmedcmd -persist mark $bamid $markverb failed
+    exit 2
+  fi
+fi
 
 #   Run qplot, output written to current working directory
 basebam=`basename $bamfile .$extension`
@@ -135,6 +141,11 @@ fi
 #   This should fail if the TotalReads < bmflagstat value + 5000 
 bamflagstat=`$topmedcmd show $bamid bamflagstat`   # Same for cram or bam
 tr=`grep TotalReads $nwdid.src.qp.stats | awk '{ print $2 }'`
+if [ "$tr" = "" ]; then
+  echo "QPLOT data $nwdid.src.qp.stats not found or TotalReads not found"
+  $topmedcmd -persist mark $bamid $markverb failed
+  exit 3
+fi
 tr=`perl -E "print $tr*1000000"`    # Man is hard to do mutiply of float in shell !
 tr=`expr $tr + 5001`
 if [ "$tr" -lt "$bamflagstat" ]; then

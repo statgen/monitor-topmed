@@ -20,26 +20,26 @@ include_once "edit.php";
 //print "<!-- _POST=\n"; print_r($_POST); print " -->\n";
 
 $qurl =  $_SERVER['SCRIPT_NAME'] . "?fcn=queue'";
-$STATUSLETTERS =  "<i><b>A</b>=File Arrived, <b>5</b>=MD5 Verified, <b>C</b>=BAM=>CRAM, <b>I</b>=BAI created<br/>" .
-    "<b>Q</b>=qplot run, <b>7</b>=Remapped Build=37, <b>s</b>=Push Build=38 to GCE, <b>s</b>=Pull Build=38 from GCE,<br/>" .
+$STATUSLETTERS =  "<i><b>A</b>=File Arrived, <b>5</b>=MD5 Verified, <b>C</b>=BAM=>CRAM, <b>Q</b>=qplot run<br/>" .
+    "<b>7</b>=Remapped Build=37, <b>s</b>=Push Build=38 to GCE, <b>s</b>=Pull Build=38 from GCE,<br/>" .
     "<b>Z</b>=PostProcess GCE Build=38 data, <b>8</b>=Remapped Build=38, <b>B</b>=BCF created<br/>" .
     "<b>X</b>=EXPT=>NCBI <b>S</b>=Orig BAM/CRAM=>NCBI, <b>P</b>=</b>B37=>NCBI, <b>T</b>=B38=>NCBI";
 
 $SHOWSTATUS = "STATUS: " .
-    "<a onclick='javascript:window.location.reload()'><img src='refresh.png' alt='refresh'></a>&nbsp;&nbsp;" .
+    "<a onclick='javascript:window.location.reload()'><img src='refresh.png' alt='refresh'></a> &nbsp;" .
     "<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=showqlocal' " .
     "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=showqlocal\",680,720); " .
-    "return false;'>Local Queue</a> &nbsp;&nbsp;&nbsp;" .
+    "return false;'>Local_Queue</a> &nbsp;" .
     "<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=df' " .
     "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=df\",680,720); " .
-    "return false;'>Disk Usage</a> &nbsp;&nbsp;&nbsp;";
+    "return false;'>Disk_Usage</a> &nbsp;";
 
 $SHOWSTATUS .= "<a href='/monitor/topmed/plot.php' target='plots'> " .
-    " Plots</a> &nbsp;&nbsp;&nbsp;";
+    " Plots</a> &nbsp;";
 
 $SHOWSTATUS .="<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=logs' " .
     "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=logs\",680,720); " .
-    "return false;'>Tail Logs</a>";
+    "return false;'>Tail_Logs</a> &nbsp;";
 
 $BAMNOTE = "<p><b>Note:</b><br>" .
     "<i>Colors:</i> " .
@@ -80,7 +80,6 @@ $RUNNOTE = "<p><b>Note:</b><br>" .
 $quickcols = array(                     // Map of status column to topmedcmd verb
     'state_arrive'   => 'arrived',
     'state_md5ver'   => 'md5ver',
-    'state_bai'      => 'bai',
     'state_qplot'    => 'qplot',
     'state_cram'     => 'cramed',
     'state_b37'      => 'mapping37',
@@ -97,7 +96,6 @@ $quickcols = array(                     // Map of status column to topmedcmd ver
 $quickletter = array(                   // Map of status column to letter we see
     'state_arrive'   => 'A',
     'state_md5ver'   => '5',
-    'state_bai'      => 'I',
     'state_qplot'    => 'Q',
     'state_cram'     => 'C',
     'state_b37'      => '7',
@@ -111,7 +109,7 @@ $quickletter = array(                   // Map of status column to letter we see
     'state_ncbib37'  => 'P',
     'state_ncbib38'  => 'T'
 );
-$validfunctions = array('all', 'verify', 'bai', 'qplot', 'cram', 'gcepush', 'gcepull', 'gcepost', 'bcf');
+$validfunctions = array('all', 'verify', 'qplot', 'cram', 'gcepush', 'gcepull', 'gcepost', 'bcf');
 $NOTSET = 0;                // Not set
 $REQUESTED = 1;             // Task requested
 $SUBMITTED = 2;             // Task submitted to be run
@@ -133,7 +131,7 @@ $state2str = array(         // Values here are class for SPAN tag
     $FAILED => 'failed'
 );
 
-$TOPMEDJOBNAMES = array('verify', 'bai', 'qplot', 'cram', 'expt', 'orig', 'b37', 'push38', 'pull38', 'post38', 'b38', 'bcf');
+$TOPMEDJOBNAMES = array('verify', 'qplot', 'cram', 'expt', 'orig', 'b37', 'push38', 'pull38', 'post38', 'b38', 'bcf');
 
 //  These columns are state values to be converted to people readable strings
 //  See DateState() for possible values
@@ -160,16 +158,16 @@ if (in_array($_SERVER['REMOTE_USER'], $REQMGRS)) { $iammgr = 1; }
 //  If a manager, allow them to control job submission
 if ($iammgr) {
     $s = str_replace("index", "datadump", $_SERVER['SCRIPT_NAME']);
-    $SHOWSTATUS .= " &nbsp;&nbsp;&nbsp; <a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=control' " .
+    $SHOWSTATUS .= "<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=control' " .
         "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=control\",680,720); " .
-        "return false;'>Control Jobs</a>" .
-        " &nbsp;&nbsp;&nbsp; <a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=restart' " .
+        "return false;'>Control_Jobs</a> &nbsp;" .
+        "<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=restart' " .
         "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=restart\",680,720); " .
-        "return false;'>Restart Jobs</a>" .
-        " &nbsp;&nbsp;&nbsp; <a href='$s'>DataDump</a>" .
-        " &nbsp;&nbsp;&nbsp; <a href='http://nhlbi.sph.umich.edu/report/monitor.php' " .
+        "return false;'>Restart_Jobs</a> &nbsp;" .
+        "<a href='$s'>DataDump</a> &nbsp;" .
+        "<a href='http://nhlbi.sph.umich.edu/report/monitor.php' " .
         "onclick='javascript:popup2(\"http://nhlbi.sph.umich.edu/report/monitor.php\",680,720); " .
-        "return false;'>ReMapping</a>";
+        "return false;'>ReMapping</a> &nbsp;";
         
 }
 print doheader($HDR['title'], 1);
@@ -237,7 +235,6 @@ if ($fcn == 'bamdetail') {
 if ($fcn == 'showout') {                // Show output from a SLURM job
     $s='none';
     if ($samplestate == '5') { $s = 'verify'; }
-    if ($samplestate == 'I') { $s = 'bai'; }
     if ($samplestate == 'B') { $s = 'bcf'; }
     if ($samplestate == 'Q') { $s = 'qplot'; }
     if ($samplestate == 'C') { $s = 'cram'; }
@@ -503,10 +500,11 @@ function ViewRuns($center, $maxdirs, $iammgr) {
     $centers2show = array();                // Get list of centers for this query
     $yearstart = 2;
     $yearstop = 0;
-    if ($center == 'year1' || $center == 'year2') {
+    if ($center == 'year1' || $center == 'year2' || $center == 'year3') {
         $centers2show = $CENTERS;
         if ($center == 'year1') { $yearstart = 1; }
         if ($center == 'year2') { $yearstart = 2; $yearstop = 1; }
+        if ($center == 'year3') { $yearstart = 3; $yearstop = 2; }
     }
     else { array_push($centers2show, $center); }
 
@@ -975,7 +973,6 @@ function RestartJobs($h) {
         "<option value='none'>none</option>" .
         "<option value='arrive'>arrive</option>" .
         "<option value='md5ver'>verify</option>" .
-        "<option value='bai'>bai</option>" .
         "<option value='qplot'>qplot</option>" .
         "<option value='cram'>cram</option>" .
         "<option value='gce38push'>push</option>" .
@@ -1035,11 +1032,13 @@ function GetChooseLines() {
 
      $html = "Choose: " .
         "&nbsp;&nbsp;<a href='" . $_SERVER['SCRIPT_NAME'] .
+        "?center=year3&amp;maxdir=$maxdir'>Year 3</a>&nbsp;&nbsp;\n" .
+        "<a href='" . $_SERVER['SCRIPT_NAME'] .
         "?center=year2&amp;maxdir=$maxdir'>Year 2</a>&nbsp;&nbsp;\n" .
-        "&nbsp;&nbsp;<a href='" . $_SERVER['SCRIPT_NAME'] .
+        "<a href='" . $_SERVER['SCRIPT_NAME'] .
         "?center=year1&amp;maxdir=$maxdir'>Year 1</a>&nbsp;&nbsp;\n";
     foreach ($CENTERS as $c) {
-        $html .= "&nbsp;&nbsp;<a href='" . $_SERVER['SCRIPT_NAME'] .
+        $html .= "<a href='" . $_SERVER['SCRIPT_NAME'] .
             "?center=$c&amp;maxdir=$maxdir'>" . strtoupper($c) . "</a>&nbsp;&nbsp;\n";
     }
     return $html;

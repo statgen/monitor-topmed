@@ -56,7 +56,6 @@ my $STARTED   = 3;                      # Task started
 my $FAILED    = 99;                     # Task failed
 my %col2name = (
     md5ver => 'verify',
-    bai => 'bai',
     qplot => 'qplot',
     cram => 'cram',
     ncbiexpt => 'sexpt',
@@ -81,13 +80,11 @@ $statecolsstarted = substr($statecolsstarted,0, length($statecolsstarted)-4);
 my %col2logname = (
     md5ver => 'verify',
     backup => 'backup',
-    bai => 'bai',
     qplot => 'qplot',
 );
 my %col2verb = (                    # Mark job as failed with topmedcmd.pl
     md5ver => 'md5verified',
     backup => 'backedup',
-    bai => 'baid',
     qplot => 'qploted',
 );
 my @colnames = keys %col2logname;   # Used in *_Failure functions

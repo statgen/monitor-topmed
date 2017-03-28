@@ -49,7 +49,6 @@ my %VALIDVERBS = (                  # Valid verbs to database colum
     arrived     => 'state_arrive',
     md5verified => 'state_md5ver',
     backedup    => 'state_backup',  
-    baid        => 'state_bai',
     qploted     => 'state_qplot',
     cramed      => 'state_cram',   
     sentexpt    => 'state_ncbiexpt',
@@ -348,19 +347,20 @@ sub WhatNWDID {
     }
 
     #   Reconstruct partial path to BAM
-    my $sth = ExecSQL("SELECT runid,bamid,datayear FROM $opts{bamfiles_table} WHERE expt_sampleid='$nwdid'");
+    my $sth = ExecSQL("SELECT runid,bamid,piname,datayear FROM $opts{bamfiles_table} WHERE expt_sampleid='$nwdid'");
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - NWDID '$nwdid' is unknown\n"; }
     my $href = $sth->fetchrow_hashref;
     my $bamid = $href->{bamid};
     my $datayear = $href->{datayear};
+    my $piname = $href->{piname};
     $sth = ExecSQL("SELECT centerid,dirname FROM $opts{runs_table} WHERE runid=$href->{runid}");
     $href = $sth->fetchrow_hashref;
     my $run = $href->{dirname};
     $sth = ExecSQL("SELECT centername FROM $opts{centers_table} WHERE centerid=$href->{centerid}");
     $href = $sth->fetchrow_hashref;
     my $center = uc($href->{centername});
-    print "$nwdid/$bamid can be found in run $run for center $center year $datayear\n";
+    print "$nwdid/$bamid can be found in run $run PI $piname for center $center year $datayear\n";
 }
 
 #==================================================================

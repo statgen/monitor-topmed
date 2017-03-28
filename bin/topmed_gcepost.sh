@@ -15,6 +15,7 @@ slurmp=topmed-working
 realhost=''
 gsutil='gsutil -o GSUtil:parallel_composite_upload_threshold=150M'
 incominguri='gs://topmed-recabs'
+bcfuri='gs://topmed-bcf'
 build=38
 
 if [ "$1" = "-submit" ]; then
@@ -123,18 +124,39 @@ if [ "$gce_checksum" != "" ]; then        # File does exist in gcepost.  Check M
     echo "MD5 for local and GCE file match ($md5)"
 else
   echo ""
-  echo "Cannot actually verify the GCE checksum and the MD5 of the file. Assume it is OK"
+  echo "Cannot verify the GCE checksum because file not there. Assume it is OK"
 fi
 
 #   Save date of file in database
 $topmedcmd setdate $bamid datemapping_b38 $cramfile
+
+#   Clean up data in GCE.  Move remapped data to bcf
+bcf_checksum="$(gsutil stat $bcfuri/$nwdid/$cramfile |grep 'md5'|awk {'print $3'}|base64 -d|hexdump -ve '/1 "%02x"')"
+if [ "$bcf_checksum" != "" ]; then        # File does exist in BCF, move data there
+  $gsutil mv $incominguri/$nwdid/$cramfile.flagstat  $bcfuri/$nwdid/$cramfile.flagstat
+  $gsutil mv $incominguri/$nwdid/$cramfile           $bcfuri/$nwdid/$cramfile
+  if [ "$?" != "0" ]; then
+    echo "Unable to move $incominguri/$nwdid/$cramfile $bcfuri/$nwdid/$cramfile"
+    $topmedcmd -persist mark $bamid $markverb failed
+    exit 3
+   fi
+   echo "Moved $incominguri/$nwdid to $bcfuri/$nwdid"
+else                                        # File already exists in BCF, maybe already same
+  if [ "$md5" != "$bcf_checksum" ]; then
+    echo "$cramfile already exists in BCF and is different"
+    $topmedcmd -persist mark $bamid $markverb failed
+    exit 3
+  fi
+  # File already existed in BCF, but is same as in incoming
+    echo "MD5 for local and GCE file match ($md5)"
+    echo "No need to move move $incominguri/$nwdid to $bcfuri/$nwdid"
+fi
+$gsutil rm -f $incominguri/$nwdid    # Remove any left over cruft
 
 etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "Post processing of remapped CRAM ($crampath) completed in $etime seconds"
 $topmedcmd -persist mark $bamid $markverb completed
 $topmedcmd -persist mark $bamid mapped$build completed
-$gsutil rm $incominguri/$nwdid/$cramfile.flagstat 
-$gsutil rm $incominguri/$nwdid/$cramfile
 echo `date` $me $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
 exit

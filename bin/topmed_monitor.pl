@@ -28,8 +28,9 @@ use lib (
 );
 use My_DB;
 use Getopt::Long;
-use Cwd qw(realpath abs_path);
 
+use Cwd qw(realpath abs_path);
+use Fcntl ':flock';
 use POSIX qw(strftime tmpnam);
 
 #--------------------------------------------------------------
@@ -51,7 +52,6 @@ our %opts = (
     topmedarrive => "$topmedbin/topmed_arrive.sh",
     topmedverify => "$topmedbin/topmed_verify.sh",
     topmedcram   => "$topmedbin/topmed_cram.sh",
-    topmedbai    => "$topmedbin/topmed_bai.sh",
     topmedqplot  => "$topmedbin/topmed_qplot.sh",
     topmedexpt  => "$topmedbin/topmed_ncbiexpt.sh",
     topmedncbiorig => "$topmedbin/topmed_ncbiorig.sh",
@@ -86,7 +86,7 @@ Getopt::Long::GetOptions( \%opts,qw(
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$Script [options] arrive|verify|bai|qplot|cram|push|pull|post|bcf\n" .
+    warn "$Script [options] arrive|verify|qplot|cram|push|pull|post|bcf\n" .
         "Find runs which need some action and queue a request to do it.\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
@@ -132,6 +132,14 @@ if ($fcn eq 'arrive') {
     exit;
 }
 
+#==================================================================
+#   Make sure only one of this subcommand is running
+#   This lock is released when the program ends by whatever means
+#==================================================================
+my $f = "/run/lock/topmed.$fcn.lock";
+open(my $fh, '>' . $f) || die "Unable to create file '$f': $!\n";
+if (! flock($fh, LOCK_EX|LOCK_NB)) { die "Stopping - another instance of '$Script($fcn)' is running\n"; }
+
 #--------------------------------------------------------------
 #   Get a list of BAMs that have not been verified
 #--------------------------------------------------------------
@@ -151,30 +159,6 @@ if ($fcn eq 'verify') {
         }
         if ($href->{state_md5ver} != $NOTSET && $href->{state_md5ver} != $REQUESTED) { next; }
         if (! BatchSubmit("$opts{topmedverify} -submit $href->{bamid} $href->{checksum}")) { last; }
-    }
-    ShowSummary($fcn);
-    exit;
-}
-
-#--------------------------------------------------------------
-#   Get a list of BAMs that have no BAI file
-#--------------------------------------------------------------
-if ($fcn eq 'bai') {
-    #   Get list of all samples yet to process
-    my $sql = "SELECT bamid,state_md5ver,state_bai FROM $opts{bamfiles_table}";
-    $sql = BuildSQL($sql);
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { next; }
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-    #   Only do bai if file has been verified
-        if ($href->{state_md5ver} != $COMPLETED) { next; }
-        if ($opts{suberr} && $href->{state_bai} >= $FAILEDCHECKSUM) {
-            $href->{state_bai} = $REQUESTED;
-        }
-        if ($href->{state_bai} != $NOTSET && $href->{state_bai} != $REQUESTED) { next; }
-        if (! BatchSubmit("$opts{topmedbai} -submit $href->{bamid}")) { last; }
     }
     ShowSummary($fcn);
     exit;
@@ -209,15 +193,15 @@ if ($fcn eq 'cram') {
 #--------------------------------------------------------------
 if ($fcn eq 'qplot') {
     #   Get list of all samples yet to process
-    my $sql = "SELECT bamid,state_bai,state_qplot FROM $opts{bamfiles_table}";
+    my $sql = "SELECT bamid,state_md5ver,state_qplot FROM $opts{bamfiles_table}";
     $sql = BuildSQL($sql);
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { next; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
-        #   Only do qplot if BAI finished
-        if ($href->{state_bai} != $COMPLETED) { next; }
+        #   Only do qplot if verify finished
+        if ($href->{state_md5ver} != $COMPLETED) { next; }
         if ($opts{suberr} && $href->{state_qplot} >= $FAILEDCHECKSUM) {
             $href->{state_qplot} = $REQUESTED;
         }
@@ -578,7 +562,7 @@ topmed_monitor.pl - Find runs that need some action
   topmed_monitor.pl -run 20150604 qplot    # Select only samples from one run
   topmed_monitor.pl -center nygc verify    # Select only samples from a center
   topmed_monitor.pl -maxjobs 5 cram        # Only submit a few jobs
-  topmed_monitor.pl -datayear 2 bai        # Send only year 2 samples
+  topmed_monitor.pl -datayear 2 qplot      # Do qplot on year 2 samples
   topmed_monitor.pl -random bcf            # Randomly find samples for bcf
 
 =head1 DESCRIPTION
@@ -656,7 +640,7 @@ Provided for developers to see additional information.
 
 =over 4
 
-=item B<arrive | verify | bai | qplot | cram | push | pull | post | bcf>
+=item B<arrive | verify | qplot | cram | push | pull | post | bcf>
 
 Directs this program to look for runs that have not been through the process name
 you provided and to queue a request they be verified.

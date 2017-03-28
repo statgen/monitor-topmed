@@ -42,7 +42,7 @@ our %opts = (
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help bai noprompt backupdir=s findnwdid manifest=s verbose 
+    help noprompt backupdir=s findnwdid manifest=s verbose 
     )) || die "$Script - Failed to parse options\n";
 
 #   Simple help if requested
@@ -269,8 +269,6 @@ topmed_replacebam.pl - Replace a bam/cram incoming file
 
   topmed_replacebam.pl -manifest Manifest.txt NWD508042 NWD508042.macrogen.bam
   topmed_replacebam.pl -manifest Manifest.txt -findnwdid xx NWD508042.macrogen.bam
-
-  topmed_replacebam.pl -bai -manifest Manifest.txt -findnwdid xx NWD508042.macrogen.bam
 
   #    CD to where new replacement files are
   #    Create a place for files to be backed up
