@@ -54,8 +54,10 @@ sub check_gce_bcf_status {
   return shift->search(
     {
       state_gce38push => $COMPLETED,
+      state_gce38pull => $NOTSET,
       state_gce38bcf  => $SUBMITTED,
       gce38bcf_opid   => {-not => undef},
+      expt_sampleid   => {-not => undef},
     },
     {
         order_by => 'RAND()',
