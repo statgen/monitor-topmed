@@ -1,12 +1,12 @@
 use utf8;
-package Topmed::DB::Schema::Result::State;
+package Topmed::DB::Schema::Result::Action;
 
 # Created by DBIx::Class::Schema::Loader
 # DO NOT MODIFY THE FIRST PART OF THIS FILE
 
 =head1 NAME
 
-Topmed::DB::Schema::Result::State
+Topmed::DB::Schema::Result::Action
 
 =cut
 
@@ -27,17 +27,18 @@ use base 'DBIx::Class::Core';
 
 __PACKAGE__->load_components("InflateColumn::DateTime");
 
-=head1 TABLE: C<states>
+=head1 TABLE: C<actions>
 
 =cut
 
-__PACKAGE__->table("states");
+__PACKAGE__->table("actions");
 
 =head1 ACCESSORS
 
 =head2 id
 
   data_type: 'integer'
+  is_auto_increment: 1
   is_nullable: 0
 
 =head2 name
@@ -50,7 +51,7 @@ __PACKAGE__->table("states");
 
 __PACKAGE__->add_columns(
   "id",
-  { data_type => "integer", is_nullable => 0 },
+  { data_type => "integer", is_auto_increment => 1, is_nullable => 0 },
   "name",
   { data_type => "varchar", is_nullable => 0, size => 45 },
 );
@@ -67,34 +68,6 @@ __PACKAGE__->add_columns(
 
 __PACKAGE__->set_primary_key("id");
 
-=head1 UNIQUE CONSTRAINTS
-
-=head2 C<index4>
-
-=over 4
-
-=item * L</id>
-
-=item * L</name>
-
-=back
-
-=cut
-
-__PACKAGE__->add_unique_constraint("index4", ["id", "name"]);
-
-=head2 C<name_UNIQUE>
-
-=over 4
-
-=item * L</name>
-
-=back
-
-=cut
-
-__PACKAGE__->add_unique_constraint("name_UNIQUE", ["name"]);
-
 =head1 RELATIONS
 
 =head2 bamfiles_actions
@@ -108,13 +81,13 @@ Related object: L<Topmed::DB::Schema::Result::BamfilesAction>
 __PACKAGE__->has_many(
   "bamfiles_actions",
   "Topmed::DB::Schema::Result::BamfilesAction",
-  { "foreign.state_id" => "self.id" },
+  { "foreign.action_id" => "self.id" },
   { cascade_copy => 0, cascade_delete => 0 },
 );
 
 
 # Created by DBIx::Class::Schema::Loader v0.07046 @ 2017-03-30 09:45:26
-# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:5aWZlp4463gerGNTUUOqew
+# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:Ic4imWNfhOrfNmjYuR53cQ
 
 
 # You can replace this text with custom code or comments, and it will be preserved on regeneration
