@@ -200,9 +200,8 @@ __PACKAGE__->table("bamfiles");
 =head2 expt_sampleid
 
   data_type: 'varchar'
-  default_value: 'UNKNOWN'
   is_nullable: 1
-  size: 96
+  size: 24
 
 =head2 nwdid_known
 
@@ -337,6 +336,30 @@ __PACKAGE__->table("bamfiles");
   data_type: 'integer'
   default_value: 0
   is_nullable: 1
+
+=head2 state_gce38bcf_push
+
+  data_type: 'integer'
+  default_value: 0
+  is_nullable: 1
+
+=head2 state_gce38bcf_pull
+
+  data_type: 'integer'
+  default_value: 0
+  is_nullable: 1
+
+=head2 state_gce38bcf
+
+  data_type: 'integer'
+  default_value: 0
+  is_nullable: 1
+
+=head2 gce38bcf_opid
+
+  data_type: 'varchar'
+  is_nullable: 1
+  size: 255
 
 =head2 datearrived
 
@@ -612,12 +635,7 @@ __PACKAGE__->add_columns(
     size => 96,
   },
   "expt_sampleid",
-  {
-    data_type => "varchar",
-    default_value => "UNKNOWN",
-    is_nullable => 1,
-    size => 96,
-  },
+  { data_type => "varchar", is_nullable => 1, size => 24 },
   "nwdid_known",
   { data_type => "char", default_value => "N", is_nullable => 1, size => 1 },
   "donot_remap",
@@ -662,6 +680,14 @@ __PACKAGE__->add_columns(
   { data_type => "integer", default_value => 0, is_nullable => 1 },
   "state_bcf",
   { data_type => "integer", default_value => 0, is_nullable => 1 },
+  "state_gce38bcf_push",
+  { data_type => "integer", default_value => 0, is_nullable => 1 },
+  "state_gce38bcf_pull",
+  { data_type => "integer", default_value => 0, is_nullable => 1 },
+  "state_gce38bcf",
+  { data_type => "integer", default_value => 0, is_nullable => 1 },
+  "gce38bcf_opid",
+  { data_type => "varchar", is_nullable => 1, size => 255 },
   "datearrived",
   { data_type => "varchar", is_nullable => 1, size => 12 },
   "datemd5ver",
@@ -742,7 +768,36 @@ __PACKAGE__->add_columns(
 
 __PACKAGE__->set_primary_key("bamid");
 
+=head1 UNIQUE CONSTRAINTS
+
+=head2 C<expt_sampleid>
+
+=over 4
+
+=item * L</expt_sampleid>
+
+=back
+
+=cut
+
+__PACKAGE__->add_unique_constraint("expt_sampleid", ["expt_sampleid"]);
+
 =head1 RELATIONS
+
+=head2 bamfiles_actions
+
+Type: has_many
+
+Related object: L<Topmed::DB::Schema::Result::BamfilesAction>
+
+=cut
+
+__PACKAGE__->has_many(
+  "bamfiles_actions",
+  "Topmed::DB::Schema::Result::BamfilesAction",
+  { "foreign.bam_id" => "self.bamid" },
+  { cascade_copy => 0, cascade_delete => 0 },
+);
 
 =head2 freezes
 
@@ -775,8 +830,8 @@ __PACKAGE__->has_many(
 );
 
 
-# Created by DBIx::Class::Schema::Loader v0.07046 @ 2017-02-08 15:52:57
-# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:uauA/Idko0hdTLbFzUULgQ
+# Created by DBIx::Class::Schema::Loader v0.07046 @ 2017-03-30 09:45:26
+# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:ZcDeH+MvY5x0y0TBSScvYg
 
 
 # You can replace this text with custom code or comments, and it will be preserved on regeneration
