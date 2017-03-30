@@ -13,7 +13,7 @@ make_schema_at(
   'Topmed::DB::Schema', {
     debug          => 1,
     dump_directory => qq($Bin/../lib/perl5),
-    constraint     => qr/^(?!summary_passing_genome|adam|bad_bamfiles|user_whitelist|stepstats|permissions|requestfiles|studies)(.*)$/,
+    constraint     => qr/^(?!summary_passing_genome|adam|bad_bamfiles|user_whitelist|stepstats|permissions|requestfiles|study)(.*)$/,
     components     => [qw(InflateColumn::DateTime)],
   },
   [qq{dbi:mysql:database=$realm->{DATABASE};$realm->{SERVER}}, $realm->{USER}, $realm->{PASS}]
