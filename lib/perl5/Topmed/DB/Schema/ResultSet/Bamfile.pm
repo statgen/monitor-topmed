@@ -37,4 +37,30 @@ sub completed_for_build {
   );
 }
 
+sub find_gce_bcf_samples {
+  return shift->search(
+    {
+      state_md5ver    => $COMPLETED,
+      state_gce38push => $COMPLETED,
+      state_gce38bcf  => $NOTSET,
+    }, {
+      order_by => 'RAND()',
+    }
+  );
+}
+
+sub check_gce_bcf_status {
+  return shift->search(
+    {
+      state_gce38bcf_push => $COMPLETED,
+      state_gce38bcf_pull => $NOTSET,
+      state_gce38bcf      => $SUBMITTED,
+      gce38bcf_opid       => {-not => undef},
+      expt_sampleid       => {-not => undef},
+    }, {
+      order_by => 'RAND()',
+    }
+  );
+}
+
 1;

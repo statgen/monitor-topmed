@@ -1866,6 +1866,20 @@ DISTRIBUTIONS
       XSLoader 0
       strict 0
       warnings 0
+  Parallel-ForkManager-1.19
+    pathname: Y/YA/YANICK/Parallel-ForkManager-1.19.tar.gz
+    provides:
+      Parallel::ForkManager 1.19
+    requirements:
+      Carp 0
+      ExtUtils::MakeMaker 0
+      File::Path 0
+      File::Spec 0
+      File::Temp 0
+      POSIX 0
+      Storable 0
+      perl 5.006
+      strict 0
   Params-Util-1.07
     pathname: A/AD/ADAMK/Params-Util-1.07.tar.gz
     provides:
@@ -2502,6 +2516,16 @@ DISTRIBUTIONS
       base 0
       lib 0
       perl 5.008
+  YAML-Syck-1.29
+    pathname: T/TO/TODDR/YAML-Syck-1.29.tar.gz
+    provides:
+      JSON::Syck 1.29
+      YAML::Dumper::Syck undef
+      YAML::Loader::Syck undef
+      YAML::Syck 1.29
+    requirements:
+      ExtUtils::MakeMaker 6.59
+      perl 5.006
   YASF-0.004
     pathname: R/RJ/RJRAY/YASF-0.004.tar.gz
     provides:

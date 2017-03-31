@@ -41,6 +41,8 @@ our @EXPORT_OK = (
     $MAX_DELAY
     $TIMEZONE
     %GOOGLE_BUCKETS
+    $GOOGLE_PIPELINE_CMD
+    $GOOGLE_OPERATION_CMD
     $NOTSET
     $REQUESTED
     $SUBMITTED
@@ -58,6 +60,8 @@ our %EXPORT_TAGS = (
   google => [
     qw(
       %GOOGLE_BUCKETS
+      $GOOGLE_PIPELINE_CMD
+      $GOOGLE_OPERATION_CMD
       )
   ],
   states => [
@@ -95,7 +99,11 @@ Readonly::Hash our %GOOGLE_BUCKETS => (
   crams    => 'gs://topmed-crams/',
   recabs   => 'gs://topmed-recabs/',
   logs     => 'gs://topmed-logs/',
+  bcf      => 'gs://topmed-bcf/',
 );
+
+Readonly::Scalar our $GOOGLE_PIPELINE_CMD  => q{gcloud alpha genomics pipelines};
+Readonly::Scalar our $GOOGLE_OPERATION_CMD => q{gcloud alpha genomics operations};
 
 Readonly::Scalar our $NOTSET         => 0;     # Not set
 Readonly::Scalar our $REQUESTED      => 1;     # Task requested

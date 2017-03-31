@@ -11,9 +11,11 @@ our @IMPORT_MODULES = (
     YASF
     Path::Class
   ),
-  'autodie' => [qw(:all)],
-  'English' => [qw(-no_match_vars)],
-  'Cwd'     => [qw(abs_path)],
+  'autodie'      => [qw(:all)],
+  'English'      => [qw(-no_match_vars)],
+  'Cwd'          => [qw(abs_path)],
+  'Getopt::Long' => [qw(HelpMessage)],
+  'YAML::Syck'   => [qw()],
 );
 
 our %IMPORT_BUNDLES = (
