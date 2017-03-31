@@ -4,32 +4,33 @@ use Rex -base;
 use Rex::Commands::SCM;
 use Rex::Commands::Sync;
 
-set 'install_dir' => '/var/tmp/monitor';
-set 'build_dir'   => '/net/topmed/working/build/monitor-topmed';
+set 'install_dir'=> $ENV{PWD},
+set 'build_dir'  => $ENV{PWD},
+set 'umask'      => "0022";
 
 set repository => "master", url => 'https://github.com/statgen/monitor-topmed.git', type => 'git';
-
-environment 'dev' => sub {
-  set 'install_dir'=> $ENV{PWD},
-  set 'build_dir'  => $ENV{PWD},
-};
 
 environment 'test' => sub {
   set 'install_dir' => '/var/tmp/monitor-topmed',
   set 'build_dir'   => '/tmp/monitor-topmed',
 };
 
-unless (environment eq 'dev') {
-  umask 0002;
+environment 'prod' => sub {
+  set 'install_dir' => '/var/tmp/monitor';
+  set 'build_dir'   => '/net/topmed/working/build/monitor-topmed';
+};
+
+if (environment eq 'prod') {
+  set 'umask' => "0002";
 }
 
 task 'build', sub {
+  my $umask       = get 'umask';
   my $install_dir = get 'install_dir';
   my $build_dir   = get 'build_dir';
   my $local_lib   = "$build_dir/local";
   my $cpanm       = "$local_lib/bin/cpanm";
   my $carton      = "$local_lib/bin/carton";
-  my $umask       = umask;
 
   unless (environment eq 'dev') {
     checkout 'master', path => $build_dir;
@@ -65,4 +66,8 @@ task 'install', sub {
   my $build_dir   = get 'build_dir';
 
   run "rsync -a --exclude-from=.rsync-excludes $build_dir/ $install_dir/";
+};
+
+task 'schema', sub {
+  run "$ENV{PWD}/scripts/schema.pl";
 };
