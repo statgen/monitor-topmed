@@ -845,16 +845,6 @@ __PACKAGE__->belongs_to(
   {'foreign.runid' => 'self.runid'}
 );
 
-__PACKAGE__->belongs_to(
-  study => 'Topmed::DB::Schema::Result::Study',
-  {'foreign.studyid' => 'self.studyid'}
-);
-
-__PACKAGE__->belongs_to(
-  mapping => 'Topmed::DB::Schema::Result::Mapping',
-  {'foreign.bam_id' => 'self.bamid'}
-);
-
 around 'piname' => sub {
   my $orig = shift;
   my $self = shift;
