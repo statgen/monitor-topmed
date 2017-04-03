@@ -92,12 +92,11 @@ $quickcols = array(                     // Map of status column to topmedcmd ver
     'state_bcf'      => 'bcf',
     'state_ncbiexpt' => 'sendexpt',
     'state_ncbiorig' => 'sendorig',
-    'state_ncbib37'  => 'sendb37',
-    'state_ncbib38'  => 'sendb38'
+    'state_ncbib37'  => 'sendb37'
 );
 $quickletter = array(                   // Map of status column to letter we see
     'state_arrive'   => 'A',
-    'state_verify    => '5',
+    'state_verify'   => '5',
     'state_qplot'    => 'Q',
     'state_cram'     => 'C',
     'state_b37'      => '7',
@@ -110,8 +109,7 @@ $quickletter = array(                   // Map of status column to letter we see
     'state_bcf'      => 'B',
     'state_ncbiexpt' => 'X',
     'state_ncbiorig' => 'S',
-    'state_ncbib37'  => 'P',
-    'state_ncbib38'  => 'T'
+    'state_ncbib37'  => 'P'
 );
 $validfunctions = array('all', 'verify', 'qplot', 'cram',
     'gcepush', 'gcepull', 'gcepost', 'gcebcfpush', 'gcebcfpush');
