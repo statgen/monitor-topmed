@@ -47,7 +47,7 @@ my $FAILED    = 99;                 # Task failed
 #       Add operation verb to %VALIDOPS
 my %VALIDVERBS = (                  # Valid verbs to database colum
     arrived     => 'state_arrive',
-    md5verified => 'state_md5ver',
+    md5verified => 'state_verify',
     backedup    => 'state_backup',  
     qploted     => 'state_qplot',
     cramed      => 'state_cram',   
@@ -189,7 +189,7 @@ sub Mark {
         if ($col eq 'state_arrive') {       # Used by Kevin for tracking samples
             ExecSQL("UPDATE $opts{bamfiles_table} SET datearrived='" . time() . "' WHERE bamid=$bamid");
         }
-        if ($col eq 'state_md5ver') {       # hack for Chris until new code in place
+        if ($col eq 'state_verify') {       # hack for Chris until new code in place
             ExecSQL("UPDATE $opts{bamfiles_table} SET datemd5ver='" . time() . "' WHERE bamid=$bamid");
         }
         if ($col eq 'state_b37') {          # hack for Chris until new code in place
@@ -210,7 +210,7 @@ sub Mark {
         if ($col eq 'state_arrive') {       # hack for Chris until new code in place
             ExecSQL("UPDATE $opts{bamfiles_table} SET datearrived='-1' WHERE bamid=$bamid");
         }
-        if ($col eq 'state_md5ver') {       # hack for Chris until new code in place
+        if ($col eq 'state_verify') {       # hack for Chris until new code in place
             ExecSQL("UPDATE $opts{bamfiles_table} SET datemd5ver='-1' WHERE bamid=$bamid");
         }
         if ($col eq 'state_b37') {          # hack for Chris until new code in place
@@ -293,7 +293,7 @@ sub Export {
             for (my $i=1; $i<=$rowsofdata; $i++) {
                 my $href = $sth->fetchrow_hashref;
                 #   See if this has been verified
-                if ($href->{state_md5ver} != $COMPLETED) { next; }
+                if ($href->{state_verify} != $COMPLETED) { next; }
                 #   Show data for this CRAM
                 my $f = "$opts{netdir}/$opts{backupsdir}/$centername/$dirname/" .
                     $href->{cramname};
