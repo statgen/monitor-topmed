@@ -79,7 +79,7 @@ $RUNNOTE = "<p><b>Note:</b><br>" .
 //  Create QOS for this new type of action
 $quickcols = array(                     // Map of status column to topmedcmd verb
     'state_arrive'   => 'arrived',
-    'state_md5ver'   => 'md5ver',
+    'state_verify'   => 'verify',
     'state_qplot'    => 'qplot',
     'state_cram'     => 'cramed',
     'state_b37'      => 'mapping37',
@@ -87,6 +87,8 @@ $quickcols = array(                     // Map of status column to topmedcmd ver
     'state_gce38pull'=> 'gcepull',
     'state_gce38post'=> 'gcepost',
     'state_b38'      => 'mapping38',
+    'state_gce38bcf_push'=> 'gcebcfpush',
+    'state_gce38bcf_pull'=> 'gcebcfpull',
     'state_bcf'      => 'bcf',
     'state_ncbiexpt' => 'sendexpt',
     'state_ncbiorig' => 'sendorig',
@@ -95,7 +97,7 @@ $quickcols = array(                     // Map of status column to topmedcmd ver
 );
 $quickletter = array(                   // Map of status column to letter we see
     'state_arrive'   => 'A',
-    'state_md5ver'   => '5',
+    'state_verify    => '5',
     'state_qplot'    => 'Q',
     'state_cram'     => 'C',
     'state_b37'      => '7',
@@ -103,13 +105,16 @@ $quickletter = array(                   // Map of status column to letter we see
     'state_gce38pull'=> 'r',
     'state_gce38post'=> 'Z',
     'state_b38'      => '8',
+    'state_gce38bcf_push'=> 'x',
+    'state_gce38bcf_pull'=> 'y',
     'state_bcf'      => 'B',
     'state_ncbiexpt' => 'X',
     'state_ncbiorig' => 'S',
     'state_ncbib37'  => 'P',
     'state_ncbib38'  => 'T'
 );
-$validfunctions = array('all', 'verify', 'qplot', 'cram', 'gcepush', 'gcepull', 'gcepost', 'bcf');
+$validfunctions = array('all', 'verify', 'qplot', 'cram',
+    'gcepush', 'gcepull', 'gcepost', 'gcebcfpush', 'gcebcfpush');
 $NOTSET = 0;                // Not set
 $REQUESTED = 1;             // Task requested
 $SUBMITTED = 2;             // Task submitted to be run
@@ -131,7 +136,8 @@ $state2str = array(         // Values here are class for SPAN tag
     $FAILED => 'failed'
 );
 
-$TOPMEDJOBNAMES = array('verify', 'qplot', 'cram', 'expt', 'orig', 'b37', 'push38', 'pull38', 'post38', 'b38', 'bcf');
+$TOPMEDJOBNAMES = array('verify', 'qplot', 'cram', 'expt', 'orig', 'b37',
+    'push38', 'pull38', 'post38', 'b38', 'pushbcf38', 'pullbcf38', 'bcf');
 
 //  These columns are state values to be converted to people readable strings
 //  See DateState() for possible values
@@ -972,7 +978,7 @@ function RestartJobs($h) {
     $html .= "<td><select name='op'>" .
         "<option value='none'>none</option>" .
         "<option value='arrive'>arrive</option>" .
-        "<option value='md5ver'>verify</option>" .
+        "<option value='verify'>verify</option>" .
         "<option value='qplot'>qplot</option>" .
         "<option value='cram'>cram</option>" .
         "<option value='gce38push'>push</option>" .
