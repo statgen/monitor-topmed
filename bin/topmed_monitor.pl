@@ -60,6 +60,8 @@ our %opts = (
     topmedgce38push => "$topmedbin/topmed_gcepush.sh",
     topmedgce38pull => "$topmedbin/topmed_gcepull.sh",
     topmedgce38post => "$topmedbin/topmed_gcepost.sh",
+    topmedgce38bcfpush => "$topmedbin/topmed_gcebcfpush.sh",
+    topmedgce38bcfpull => "$topmedbin/topmed_gcebcfpull.sh",
     topmedbcf  => "$topmedbin/topmed_bcf.sh",
     topmedxml    => "$topmedbin/topmed_xml.pl",
     netdir => '/net/topmed',
@@ -86,7 +88,7 @@ Getopt::Long::GetOptions( \%opts,qw(
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$Script [options] arrive|verify|qplot|cram|push|pull|post|bcf\n" .
+    warn "$Script [options] arrive|verify|qplot|cram|push|pull|post|pushbcf|pullbcf\n" .
         "Find runs which need some action and queue a request to do it.\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
@@ -145,7 +147,7 @@ if (! flock($fh, LOCK_EX|LOCK_NB)) { die "Stopping - another instance of '$Scrip
 #--------------------------------------------------------------
 if ($fcn eq 'verify') {
     #   Get list of all samples yet to process
-    my $sql = "SELECT bamid,bamname,state_arrive,state_md5ver,checksum FROM $opts{bamfiles_table}";
+    my $sql = "SELECT bamid,bamname,state_arrive,state_verify,checksum FROM $opts{bamfiles_table}";
     $sql = BuildSQL($sql);
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
@@ -154,10 +156,10 @@ if ($fcn eq 'verify') {
         my $href = $sth->fetchrow_hashref;
         #   Only do verify if file has arrived and ready to be run
         if ($href->{state_arrive} != $COMPLETED) { next; }
-        if ($opts{suberr} && $href->{state_md5ver} >= $FAILEDCHECKSUM) {
-            $href->{state_md5ver} = $REQUESTED;
+        if ($opts{suberr} && $href->{state_verify} >= $FAILEDCHECKSUM) {
+            $href->{state_verify} = $REQUESTED;
         }
-        if ($href->{state_md5ver} != $NOTSET && $href->{state_md5ver} != $REQUESTED) { next; }
+        if ($href->{state_verify} != $NOTSET && $href->{state_verify} != $REQUESTED) { next; }
         if (! BatchSubmit("$opts{topmedverify} -submit $href->{bamid} $href->{checksum}")) { last; }
     }
     ShowSummary($fcn);
@@ -169,7 +171,7 @@ if ($fcn eq 'verify') {
 #--------------------------------------------------------------
 if ($fcn eq 'cram') {
     #   Get list of all samples yet to process
-    my $sql = "SELECT bamid,state_md5ver,state_cram FROM $opts{bamfiles_table}";
+    my $sql = "SELECT bamid,state_verify,state_cram FROM $opts{bamfiles_table}";
     $sql = BuildSQL($sql);
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
@@ -177,7 +179,7 @@ if ($fcn eq 'cram') {
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         #   Only create cram if file has been verified
-        if ($href->{state_md5ver} != $COMPLETED) { next; }
+        if ($href->{state_verify} != $COMPLETED) { next; }
         if ($opts{suberr} && $href->{state_cram} >= $FAILEDCHECKSUM) {
             $href->{state_cram} = $REQUESTED;
         }
@@ -193,7 +195,7 @@ if ($fcn eq 'cram') {
 #--------------------------------------------------------------
 if ($fcn eq 'qplot') {
     #   Get list of all samples yet to process
-    my $sql = "SELECT bamid,state_md5ver,state_qplot FROM $opts{bamfiles_table}";
+    my $sql = "SELECT bamid,state_verify,state_qplot FROM $opts{bamfiles_table}";
     $sql = BuildSQL($sql);
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
@@ -201,7 +203,7 @@ if ($fcn eq 'qplot') {
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         #   Only do qplot if verify finished
-        if ($href->{state_md5ver} != $COMPLETED) { next; }
+        if ($href->{state_verify} != $COMPLETED) { next; }
         if ($opts{suberr} && $href->{state_qplot} >= $FAILEDCHECKSUM) {
             $href->{state_qplot} = $REQUESTED;
         }
@@ -287,7 +289,58 @@ if ($fcn eq 'post') {
 }
 
 #--------------------------------------------------------------
-#   Create BCF file
+#   Push BCF data to Google Cloud for processing.  Maybe never used?
+#--------------------------------------------------------------
+if ($fcn eq 'pushbcf') {
+    #   Get list of all samples yet to process
+    my $sql = "SELECT bamid,state_cram,state_gce38bcf_push FROM $opts{bamfiles_table}";
+    $sql = BuildSQL($sql);
+    my $sth = DoSQL($sql);
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { next; }
+    for (my $i=1; $i<=$rowsofdata; $i++) {
+        my $href = $sth->fetchrow_hashref;
+        #   Only send data if cram was done
+        if ($href->{state_cram} != $COMPLETED) { next; }
+        if ($opts{suberr} && $href->{state_gce38push} >= $FAILED) {
+            $href->{state_gce38bcf_push} = $REQUESTED;
+        }
+        if ($href->{state_gce38bcf_push} != $NOTSET &&
+            $href->{state_gce38bcf_push} != $REQUESTED) { next; }
+        if (! BatchSubmit("$opts{topmedgce38bcfpush} -submit $href->{bamid} b38")) { last ; }
+    }
+    ShowSummary($fcn);
+    exit;
+}
+
+#--------------------------------------------------------------
+#   Pull BCF processed data from Google Cloud
+#--------------------------------------------------------------
+if ($fcn eq 'pullbcf') {
+    #   Get list of all samples yet to process
+    my $sql = "SELECT bamid,state_gce38bcf_push,state_gce38bcf_pull FROM $opts{bamfiles_table}";
+    $sql = BuildSQL($sql);
+    my $sth = DoSQL($sql);
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { next; }
+    for (my $i=1; $i<=$rowsofdata; $i++) {
+        my $href = $sth->fetchrow_hashref;
+        #   Only get data if bcf was done and requested
+        if ($href->{state_gce38bcf_push} != $COMPLETED) { next; }
+        if ($href->{state_gce38bcf_pull} != $COMPLETED) { next; }
+        if ($opts{suberr} && $href->{state_gce38bcf_pull} >= $FAILED) {
+            $href->{state_gce38bcf_pull} = $REQUESTED;
+        }
+        if ($href->{state_gce38pull} != $REQUESTED) { next; }
+        if (! BatchSubmit("$opts{state_gce38bcf_pull} -submit $href->{bamid} b38")) { last; }
+    }
+    ShowSummary($fcn);
+    exit;
+}
+
+
+#--------------------------------------------------------------
+#   Create BCF file - create bcf file locally. Never used?
 #--------------------------------------------------------------
 if ($fcn eq 'bcf') {
     #   Get list of all samples yet to process
@@ -608,7 +661,7 @@ The default for B<-maxjobs> is B<100>.
 Randomly select data to be processed. This may not be used with B<-center> or B<-runs>. 
 This is intended for cases where a large set of data is to be selected
 and we want it to run over a wide set of hosts.
-In practice this is only useful for B<push>, B<pull>, B<post>, and B<bcf> (at least so far).
+In practice this is only useful for B<push>, B<pull>, B<post>, B<pushbcf> and B<pullbcf>.
 
 =item B<-realm NAME>
 
@@ -640,7 +693,7 @@ Provided for developers to see additional information.
 
 =over 4
 
-=item B<arrive | verify | qplot | cram | push | pull | post | bcf>
+=item B<arrive | verify | qplot | cram | push | pull | post | pushbcf, pullbcf>
 
 Directs this program to look for runs that have not been through the process name
 you provided and to queue a request they be verified.
