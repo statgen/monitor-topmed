@@ -138,9 +138,10 @@ fi
 
 #   One last sanity check. Qplot can easily be fooled if samtools truncates
 #   when reading the bamfile (NFS surprise).
-#   This should fail if the TotalReads < bmflagstat value + 5000 
+#   This should fail if the TotalReads < bmflagstat value + 5000
+statsfile=
 bamflagstat=`$topmedcmd show $bamid bamflagstat`   # Same for cram or bam
-tr=`grep TotalReads $nwdid.src.qp.stats | awk '{ print $2 }'`
+tr=`grep TotalReads $basebam.qp.stats | awk '{ print $2 }'`
 if [ "$tr" = "" ]; then
   echo "QPLOT data $nwdid.src.qp.stats not found or TotalReads not found"
   $topmedcmd -persist mark $bamid $markverb failed
