@@ -20,6 +20,13 @@ slurmp=topmed-working
 qos=topmed-redo
 realhost=''
 
+#   Do not allow this to play with anything except year one data
+year=`$topmedcmd show $bamid datayear`
+if [ "$year" != "1" ]; then
+  echo "$* must be year ONE data"
+  exit 4
+fi
+
 if [ "$1" = "-xmlonly" ]; then shift; xmlonly=Y; fi    # Force just XML to be sent to NCBI
 if [ "$1" = "-submit" ]; then
   shift
