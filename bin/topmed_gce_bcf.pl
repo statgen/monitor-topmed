@@ -25,6 +25,7 @@ for my $sample ($samples->slice(0, ($limit - 1))) {
   my $gs_uri   = $GOOGLE_BUCKETS{bcf} . $nwdid;
   my $cram_uri = $gs_uri . $SLASH . $nwdid . '.recab.cram';
   my $bcf_uri  = $gs_uri . $SLASH . $nwdid . '.bcf';
+  my $csi_uri  = qq{${bcf_uri}.csi};
   my $pipeline = qq{$FindBin::Bin/../etc/pipelines/bcf.yaml};
   my @args     = ();
 
@@ -32,7 +33,7 @@ for my $sample ($samples->slice(0, ($limit - 1))) {
   push @args, qq{--pipeline-file $pipeline};
   push @args, qq{--logging $gs_uri};
   push @args, qq{--inputs INPUT_FILE=$cram_uri,NWDID=$nwdid};
-  push @args, qq{--outputs OUTPUT_FILE=$bcf_uri};
+  push @args, qq{--outputs OUTPUT_FILE=$bcf_uri,INDEX_FILE=$csi_uri};
   push @args, sprintf q{--labels nwdid=%s,stage=b38-bcf}, lc($nwdid);
   push @args, '2>&1';
 

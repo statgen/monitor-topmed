@@ -13,6 +13,10 @@ outputParameters:
     localCopy:
       disk: boot
       path: output.bcf
+  - name: INDEX_FILE
+    localCopy:
+      disk: boot
+      path: output.bcf.csi
 resources:
   minimumCpuCores: 1
   minimumRamGb: 12
@@ -29,3 +33,4 @@ docker:
     samtools view -T ${FASTA_PATH} -uh ${INPUT_FILE} \
       | bam clipOverlap --poolSize 100000000 --in -.ubam --out -.ubam \
       | vt discover2 -z -q 20 -b + -r ${FASTA_PATH} -s ${NWDID} -o ${OUTPUT_FILE}
+    bcftools index ${OUTPUT_FILE}
