@@ -12,11 +12,10 @@ topoutdir=/net/topmed/incoming/qc.results
 fixverifybamid=/usr/cluster/topmed/bin/nhlbi.1648.vbid.rewrite.awk
 
 me=qplot
-mem=16G                             # Should be 8G, avoid too many at once on one host
-markverb="${me}ed"
+markverb=$me
+mem=16G                     # Should be 8G, avoid too many at once on one host
 qos=''
 realhost=''
-nodelist=''
 
 if [ "$1" = "-submit" ]; then
   shift
@@ -27,15 +26,15 @@ if [ "$1" = "-submit" ]; then
     exit 4
   fi 
 
-  # Run this on node where bam lives
+  # Run on qos for node where bam lives
   h=`$topmedpath whathost $1 bam`
   if [ "$h" != "" ]; then
     qos="--qos=$h-$me"
-    nodelist="--nodelist=$h"
+    #realhost="--nodelist=$h"
   fi
 
   #   Low rate of access to cram, small output
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $qos $nodelist --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $*`)
+  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $*`)
   if [ "$?" != "0" ]; then
     $topmedcmd mark $1 $markverb failed
     echo "Failed to submit command to SLURM - $l" > $console/$1-$me.out

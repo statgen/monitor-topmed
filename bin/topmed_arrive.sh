@@ -9,6 +9,9 @@
 . /usr/cluster/topmed/bin/topmed_actions.inc
 topmednwd=/usr/cluster/topmed/bin/topmed_nwdid.pl
 
+me=arrive
+markverb=$me
+
 #   We do not expect -submit to be used here
 if [ "$1" = "-submit" ]; then
   shift
@@ -26,7 +29,7 @@ bamid=$1
 bamfile=`$topmedpath wherefile $bamid bam`
 
 #   Mark this as started
-$topmedcmd mark $bamid arrived started || exit $?
+$topmedcmd -persist mark $bamid $markverb started || exit $?
 
 #   Determine build used to generate this bam/cram
 build=''
@@ -55,7 +58,7 @@ $topmedcmd -persist set $bamid build $build
 $topmednwd -bamid $bamid $bamfile
 rc=$?
 if [ "$rc" != "0" ]; then
-  $topmedcmd mark $bamid arrived failed
+  $topmedcmd -persist mark $bamid $markverb failed
   exit $rc
 fi
 
@@ -63,8 +66,8 @@ fi
 $topmedrename $bamid $bamfile
 rc=$?
 if [ "$rc" != "0" ]; then
-  $topmedcmd -persist mark $bamid arrived failed
+  $topmedcmd -persist mark $bamid $markverb failed
   exit $rc
 fi
-$topmedcmd -persist mark $bamid arrived completed
+$topmedcmd -persist mark $bamid $markverb completed
 exit 0

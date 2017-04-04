@@ -13,7 +13,7 @@ backupdir=/net/topmed/working/backups
 
 me=cram
 mem=8G
-markverb="${me}ed"
+markverb=$me
 squeezed=n
 qos=''
 realhost=''

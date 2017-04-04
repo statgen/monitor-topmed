@@ -8,11 +8,11 @@
 topmedxml="/usr/cluster/topmed/bin/topmed_xml.pl"
 ascpcmd="$topmedcmd send2ncbi"
 
+me=ncbiexpt
+markverb=$me
 mem=2G
-markverb=sentexpt
 qos=topmed-redo
 realhost=''
-realhost="--nodelist=topmed"       # Force to machine with external interface
 
 #   Do not allow this to play with anything except year one data
 year=`$topmedcmd show $bamid datayear`

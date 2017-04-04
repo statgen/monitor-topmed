@@ -8,13 +8,13 @@
 
 me=gcepost
 mem=2G
-markverb="${me}ed"
-qos="--qos=topmed-$me"
-realhost=''
+markverb=$me
 gsutil='gsutil -o GSUtil:parallel_composite_upload_threshold=150M'
 incominguri='gs://topmed-recabs'
 bcfuri='gs://topmed-bcf'
 build=38
+qos="--qos=topmed-$me"
+realhost=''
 
 if [ "$1" = "-submit" ]; then
   shift

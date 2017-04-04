@@ -8,13 +8,13 @@
 
 me=gcepull
 mem=2G
-markverb="${me}ed"
+markverb=$me
 cores="--cpus-per-task=1"         # Cores here should be same as gsutil
-qos="--qos=topmed-$me"
-realhost=''
 gsutil='gsutil -o GSUtil:parallel_composite_upload_threshold=150M -o GSUtil:parallel_process_count=1'
 incominguri='gs://topmed-recabs'
 build=38
+qos="--qos=topmed-$me"
+realhost=''
 
 if [ "$1" = "-submit" ]; then
   shift

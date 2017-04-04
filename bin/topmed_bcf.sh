@@ -12,7 +12,7 @@ bam=/usr/cluster/bin/bam
 
 me=bcf
 mem=12G
-markverb="${me}ed"
+markverb=$me
 qos="--qos=topmed-$me"
 build=38
 

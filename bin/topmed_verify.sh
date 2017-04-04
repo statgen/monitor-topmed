@@ -9,7 +9,7 @@
 
 me=verify
 mem=2G
-markverb=verified
+markverb=$me
 qos="--qos=topmed-$me"
 realhost=''
 

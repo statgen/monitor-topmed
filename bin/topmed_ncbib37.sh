@@ -8,11 +8,13 @@
 ascpcmd="$topmedcmd send2ncbi"
 topmedxml="/usr/cluster/topmed/bin/topmed_xml.pl"
 
+me=ncbib37
+markverb=$me
+
 medir=`dirname $0`
 mem=2G
 build=37
 version=remap
-markverb=sentb$build
 jobname=b$build
 xmlonly=N
 qos=topmed-redo
