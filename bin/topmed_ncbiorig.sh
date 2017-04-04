@@ -9,17 +9,22 @@
 ascpcmd="$topmedcmd send2ncbi"
 topmedxml=/usr/cluster/topmed/bin/topmed_xml.pl
 
+me=ncbiorig
+markverb=$me
 mem=2G
-tmpconsole=/net/topmed/working/topmed-output
 topmeddir=/net/topmed/incoming/topmed
 build=37
 version=secondary
-markverb=sentorig
 jobname=orig
-slurmp=topmed-working
 qos=topmed-redo
 realhost=''
-realhost="--nodelist=topmed"       # Force to machine with external interface
+
+#   Do not allow this to play with anything except year one data
+year=`$topmedcmd show $bamid datayear`
+if [ "$year" != "1" ]; then
+  echo "$* must be year ONE data"
+  exit 4
+fi
 
 if [ "$1" = "-submit" ]; then
   shift

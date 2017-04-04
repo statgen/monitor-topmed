@@ -8,17 +8,15 @@
 ascpcmd="$topmedcmd send2ncbi"
 topmedxml="/usr/cluster/topmed/bin/topmed_xml.pl"
 
+me=ncbib38
+markverb=$me
 mem=2G
-tmpconsole=/net/topmed/working/topmed-output
 build=38
 version=remap
-markverb=sentb$build
 jobname=b$build
 xmlonly=N
-slurmp=topmed
 qos=topmed-ncbi
 realhost=''
-realhost="--nodelist=topmed"       # Force to machine with external interface
 
 if [ "$1" = "-xmlonly" ]; then shift; xmlonly=Y; fi    # Force just XML to be sent to NCBI
 if [ "$1" = "-submit" ]; then

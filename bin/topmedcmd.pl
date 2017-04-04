@@ -46,21 +46,21 @@ my $FAILED    = 99;                 # Task failed
 #       Add verbname => db column name to %VALIDVERBS
 #       Add operation verb to %VALIDOPS
 my %VALIDVERBS = (                  # Valid verbs to database colum
-    arrived     => 'state_arrive',
-    md5verified => 'state_verify',
-    backedup    => 'state_backup',  
-    qploted     => 'state_qplot',
-    cramed      => 'state_cram',   
-    sentexpt    => 'state_ncbiexpt',
-    mapped37    => 'state_b37',   
-    gcepushed   => 'state_gce38push',
-    gcepulled   => 'state_gce38pull',
-    gceposted   => 'state_gce38post',
-    mapped38    => 'state_b38',     
-    bcfed       => 'state_bcf',     
-    sentorig    => 'state_ncbiorig',
-    sentb37     => 'state_ncbib37',
-    sentb38     => 'state_ncbib38', 
+    arrive     => 'state_arrive',
+    #verify    => 'state_verify',
+    verify     => 'state_md5ver',
+    qplot      => 'state_qplot',
+    cram       => 'state_cram',   
+cramed       => 'state_cram',   
+    gcepush    => 'state_gce38push',
+    gcepull    => 'state_gce38pull',
+    gcepost    => 'state_gce38post',
+    b37        => 'state_b37',   
+    b38        => 'state_b38',     
+    bcf        => 'state_bcf',     
+    ncbiexpt   => 'state_ncbiexpt',
+    ncbiorig   => 'state_ncbiorig',
+    ncbib37    => 'state_ncbib37',
 );
 my %VALIDSTATUS = (                 # Valid status for the verbs
    notset    => $NOTSET,
@@ -189,6 +189,9 @@ sub Mark {
         if ($col eq 'state_arrive') {       # Used by Kevin for tracking samples
             ExecSQL("UPDATE $opts{bamfiles_table} SET datearrived='" . time() . "' WHERE bamid=$bamid");
         }
+        if ($col eq 'state_md5ver') {       # hack for Chris until new code in place
+            ExecSQL("UPDATE $opts{bamfiles_table} SET datemd5ver='" . time() . "' WHERE bamid=$bamid");
+        }
         if ($col eq 'state_verify') {       # hack for Chris until new code in place
             ExecSQL("UPDATE $opts{bamfiles_table} SET datemd5ver='" . time() . "' WHERE bamid=$bamid");
         }
@@ -211,6 +214,9 @@ sub Mark {
             ExecSQL("UPDATE $opts{bamfiles_table} SET datearrived='-1' WHERE bamid=$bamid");
         }
         if ($col eq 'state_verify') {       # hack for Chris until new code in place
+            ExecSQL("UPDATE $opts{bamfiles_table} SET datemd5ver='-1' WHERE bamid=$bamid");
+        }
+        if ($col eq 'state_md5ver') {       # hack for Chris until new code in place
             ExecSQL("UPDATE $opts{bamfiles_table} SET datemd5ver='-1' WHERE bamid=$bamid");
         }
         if ($col eq 'state_b37') {          # hack for Chris until new code in place

@@ -9,9 +9,7 @@
 me=redo
 mem=2G
 markverb="${me}ed"
-constraint="--constraint eth-10g"
 qos="--qos=topmed-$me"
-slurmp=topmed
 realhost=''
 gsutil='gsutil -o GSUtil:parallel_composite_upload_threshold=150M'
 incominguri='gs://topmed-recabs'
@@ -28,10 +26,10 @@ if [ "$1" = "-submit" ]; then
   fi
 
   #  Submit this script to be run
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*`)
+  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*`)
   if [ "$?" != "0" ]; then
     echo "Failed to submit command to SLURM"
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*"
+    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*"
     exit 1
   fi
   #$topmedcmd mark $1 $markverb submitted

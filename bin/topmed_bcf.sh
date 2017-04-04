@@ -12,10 +12,8 @@ bam=/usr/cluster/bin/bam
 
 me=bcf
 mem=12G
-markverb="${me}ed"
-constraint="--constraint eth-10g"
+markverb=$me
 qos="--qos=topmed-$me"
-slurmp=topmed-working
 build=38
 
 if [ "$1" = "-submit" ]; then
@@ -34,16 +32,12 @@ if [ "$1" = "-submit" ]; then
     #qos="--qos=$h-$me"
   fi
 
-slurmp=topmed               # temporary hack for now, I/O bound, run anywhere
-realhost=''
-constraint=''
-
   #  Submit this script to be run
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*`)
+  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*`)
   if [ "$?" != "0" ]; then
     $topmedcmd mark $1 $markverb failed
     echo "Failed to submit command to SLURM - $l" > $console/$1-$me.out
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*" >> $console/$1-$me.out
+    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*" >> $console/$1-$me.out
     exit 1
   fi
   $topmedcmd mark $1 $markverb submitted

@@ -10,4 +10,7 @@ topmedqplot=/usr/cluster/topmed/bin/topmedqplot.pl
 calcmd5=/usr/cluster/topmed/bin/topmed_calcmd5.sh
 samtools=/usr/cluster/bin/samtools
 console=/net/topmed/working/topmed-output
+slurmp=topmed-working
+tmpconsole=/net/topmed/working/topmed-output
+
 
