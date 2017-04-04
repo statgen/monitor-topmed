@@ -14,9 +14,7 @@ fixverifybamid=/usr/cluster/topmed/bin/nhlbi.1648.vbid.rewrite.awk
 me=qplot
 mem=16G                             # Should be 8G, avoid too many at once on one host
 markverb="${me}ed"
-constraint="--constraint eth-10g"   # Force to major nodes, not r63xx nodes
 qos=''
-slurmp=topmed-working
 realhost=''
 nodelist=''
 
@@ -37,11 +35,11 @@ if [ "$1" = "-submit" ]; then
   fi
 
   #   Low rate of access to cram, small output
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos $nodelist --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $*`)
+  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $qos $nodelist --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $*`)
   if [ "$?" != "0" ]; then
     $topmedcmd mark $1 $markverb failed
     echo "Failed to submit command to SLURM - $l" > $console/$1-$me.out
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos $nodelist --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $*" >> $console/$1-$me.out
+    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $qos $nodelist --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $*" >> $console/$1-$me.out
     exit 1
   fi
   $topmedcmd mark $1 $markverb submitted

@@ -10,13 +10,11 @@ topmedxml="/usr/cluster/topmed/bin/topmed_xml.pl"
 
 medir=`dirname $0`
 mem=2G
-tmpconsole=/net/topmed/working/topmed-output
 build=37
 version=remap
 markverb=sentb$build
 jobname=b$build
 xmlonly=N
-slurmp=topmed-working
 qos=topmed-redo
 realhost=''
 

@@ -79,7 +79,8 @@ $RUNNOTE = "<p><b>Note:</b><br>" .
 //  Create QOS for this new type of action
 $quickcols = array(                     // Map of status column to topmedcmd verb
     'state_arrive'   => 'arrived',
-    'state_verify'   => 'verify',
+'state_md5ver'   => 'verify',
+//    'state_verify'   => 'verify',
     'state_qplot'    => 'qplot',
     'state_cram'     => 'cramed',
     'state_b37'      => 'mapping37',
@@ -96,7 +97,8 @@ $quickcols = array(                     // Map of status column to topmedcmd ver
 );
 $quickletter = array(                   // Map of status column to letter we see
     'state_arrive'   => 'A',
-    'state_verify'   => '5',
+//    'state_verify'   => '5',
+'state_md5ver'   => '5',
     'state_qplot'    => 'Q',
     'state_cram'     => 'C',
     'state_b37'      => '7',
@@ -693,6 +695,7 @@ function ViewBams($runid, $maxdirs, $iammgr) {
                 $d = "<a href='$u' onclick='javascript:popup2(\"$u\",680,720); return false;'>$d</a>";
             }
             if ($c == 'bamsize') { $d = ShortForm($d); }
+            if ($row['poorquality'] != 'N') { $d = "<strike>$d</strike>"; }
             $html .= "<td align='center'>$d</td>\n";
         }           
         if ($iammgr) {

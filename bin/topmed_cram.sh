@@ -13,12 +13,9 @@ backupdir=/net/topmed/working/backups
 
 me=cram
 mem=8G
-console=/net/topmed/working/topmed-output
 markverb="${me}ed"
 squeezed=n
-constraint="--constraint eth-10g"
 qos=''
-slurmp=topmed-working
 realhost=''
 
 if [ "$1" = "-submit" ]; then
@@ -54,11 +51,11 @@ if [ "$1" = "-submit" ]; then
   fi
 
   #  Submit this script to be run
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*`)
+  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*`)
   if [ "$?" != "0" ]; then
     $topmedcmd mark $1 $markverb failed
     echo "Failed to submit command to SLURM - $l" > $console/$1-$me.out
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $constraint $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*" >> $console/$1-$me.out
+    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*" >> $console/$1-$me.out
     exit 1
   fi
   $topmedcmd mark $1 $markverb submitted

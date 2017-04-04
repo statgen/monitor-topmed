@@ -10,13 +10,11 @@ ascpcmd="$topmedcmd send2ncbi"
 topmedxml=/usr/cluster/topmed/bin/topmed_xml.pl
 
 mem=2G
-tmpconsole=/net/topmed/working/topmed-output
 topmeddir=/net/topmed/incoming/topmed
 build=37
 version=secondary
 markverb=sentorig
 jobname=orig
-slurmp=topmed-working
 qos=topmed-redo
 realhost=''
 realhost="--nodelist=topmed"       # Force to machine with external interface
