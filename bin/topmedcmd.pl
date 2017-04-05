@@ -51,10 +51,8 @@ my %VALIDVERBS = (                  # Valid verbs to database colum
     verify     => 'state_md5ver',
     qplot      => 'state_qplot',
     cram       => 'state_cram',   
-cramed       => 'state_cram',   
     gcepush    => 'state_gce38push',
     gcepull    => 'state_gce38pull',
-    gcepost    => 'state_gce38post',
     b37        => 'state_b37',   
     b38        => 'state_b38',     
     bcf        => 'state_bcf',     
@@ -366,7 +364,7 @@ sub WhatNWDID {
     $sth = ExecSQL("SELECT centername FROM $opts{centers_table} WHERE centerid=$href->{centerid}");
     $href = $sth->fetchrow_hashref;
     my $center = uc($href->{centername});
-    print "$nwdid/$bamid can be found in run $run PI $piname for center $center year $datayear\n";
+    print "$nwdid $bamid can be found in run $run PI $piname for center $center year $datayear\n";
 }
 
 #==================================================================
@@ -954,9 +952,9 @@ topmedcmd.pl - Update the database for NHLBI TopMed
 
 =head1 SYNOPSIS
 
-  topmedcmd.pl mark 33 arrived completed   # BAM has arrived
-  topmedcmd.pl mark NWD00234  arrived completed   # Same BAM has arrived
-  topmedcmd.pl unmark 33 arrived           # Reset BAM has arrived
+  topmedcmd.pl mark 33 arrive completed   # BAM has arrived
+  topmedcmd.pl mark NWD00234  arrive completed   # Same BAM has arrived
+  topmedcmd.pl unmark 33 arrive           # Reset BAM has arrived
 
   topmedcmd.pl set 33 jobidqplot 123445    # Set jobidqplot in bamfiles
   topmedcmd.pl set NWD123433 jobidqplot 123445    # Set jobidqplot in bamfiles
@@ -1042,7 +1040,7 @@ Use this to create a CSV file of database columns for Chris.
 B<mark bamid|nwdid dirname  [verb] [state]>
 Use this to set the state for a particular BAM file.
 You may specify the bamid or the NWDID.
-Mark will set a date for the process (e.g. arrived sets state_arrive)
+Mark will set a date for the process (e.g. arrive sets state_arrive)
 and unmark will set that entry to NULL.
 The list of verbs and states can be seen by B<perldoc topmedcmd.pl>.
 

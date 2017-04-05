@@ -22,7 +22,7 @@ include_once "edit.php";
 $qurl =  $_SERVER['SCRIPT_NAME'] . "?fcn=queue'";
 $STATUSLETTERS =  "<i><b>A</b>=File Arrived, <b>5</b>=MD5 Verified, <b>C</b>=BAM=>CRAM, <b>Q</b>=qplot run<br/>" .
     "<b>7</b>=Remapped Build=37, <b>s</b>=Push Build=38 to GCE, <b>s</b>=Pull Build=38 from GCE,<br/>" .
-    "<b>Z</b>=PostProcess GCE Build=38 data, <b>8</b>=Remapped Build=38, <b>B</b>=BCF created<br/>" .
+    "<b>8</b>=Remapped Build=38, <b>B</b>=BCF created<br/>" .
     "<b>X</b>=EXPT=>NCBI <b>S</b>=Orig BAM/CRAM=>NCBI, <b>P</b>=</b>B37=>NCBI, <b>T</b>=B38=>NCBI";
 
 $SHOWSTATUS = "STATUS: " .
@@ -86,7 +86,6 @@ $quickcols = array(                     // Map of status column to topmedcmd ver
     'state_b37'      => 'mapping37',
     'state_gce38push'=> 'gcepush',
     'state_gce38pull'=> 'gcepull',
-    'state_gce38post'=> 'gcepost',
     'state_b38'      => 'mapping38',
     'state_gce38bcf_push'=> 'gcebcfpush',
     'state_gce38bcf_pull'=> 'gcebcfpull',
@@ -104,7 +103,6 @@ $quickletter = array(                   // Map of status column to letter we see
     'state_b37'      => '7',
     'state_gce38push'=> 's',
     'state_gce38pull'=> 'r',
-    'state_gce38post'=> 'Z',
     'state_b38'      => '8',
     'state_gce38bcf_push'=> 'x',
     'state_gce38bcf_pull'=> 'y',
@@ -114,7 +112,7 @@ $quickletter = array(                   // Map of status column to letter we see
     'state_ncbib37'  => 'P'
 );
 $validfunctions = array('all', 'verify', 'qplot', 'cram',
-    'gcepush', 'gcepull', 'gcepost', 'gcebcfpush', 'gcebcfpush');
+    'gcepush', 'gcepull', 'gcebcfpush', 'gcebcfpush');
 $NOTSET = 0;                // Not set
 $REQUESTED = 1;             // Task requested
 $SUBMITTED = 2;             // Task submitted to be run
@@ -137,7 +135,7 @@ $state2str = array(         // Values here are class for SPAN tag
 );
 
 $TOPMEDJOBNAMES = array('verify', 'qplot', 'cram', 'expt', 'orig', 'b37',
-    'push38', 'pull38', 'post38', 'b38', 'pushbcf38', 'pullbcf38', 'bcf');
+    'push38', 'pull38', 'b38', 'pushbcf38', 'pullbcf38', 'bcf');
 
 //  These columns are state values to be converted to people readable strings
 //  See DateState() for possible values
@@ -246,7 +244,6 @@ if ($fcn == 'showout') {                // Show output from a SLURM job
     if ($samplestate == 'C') { $s = 'cram'; }
     if ($samplestate == 's') { $s = 'gcepush'; }
     if ($samplestate == 'r') { $s = 'gcepull'; }
-    if ($samplestate == 'Z') { $s = 'gcepost'; }
     // Hardcoded path cause mario won't play with topmedpath.pl
     $ss = '/net/topmed/working/topmed-output';
     $a = $ss . '/' . $bamid . "-$s.out";
