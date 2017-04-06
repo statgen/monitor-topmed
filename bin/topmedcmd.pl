@@ -187,14 +187,8 @@ sub Mark {
         if ($col eq 'state_arrive') {       # Used by Kevin for tracking samples
             ExecSQL("UPDATE $opts{bamfiles_table} SET datearrived='" . time() . "' WHERE bamid=$bamid");
         }
-        if ($col eq 'state_md5ver') {       # hack for Chris until new code in place
-            ExecSQL("UPDATE $opts{bamfiles_table} SET datemd5ver='" . time() . "' WHERE bamid=$bamid");
-        }
-        if ($col eq 'state_verify') {       # hack for Chris until new code in place
-            ExecSQL("UPDATE $opts{bamfiles_table} SET datemd5ver='" . time() . "' WHERE bamid=$bamid");
-        }
         if ($col eq 'state_b37') {          # hack for Chris until new code in place
-            ExecSQL("UPDATE $opts{bamfiles_table} SET datemapping='" . time() . "' WHERE bamid=$bamid");
+            ExecSQL("UPDATE $opts{bamfiles_table} SET datemapping_b37='" . time() . "' WHERE bamid=$bamid");
         }
         $done++;
     }
@@ -211,14 +205,8 @@ sub Mark {
         if ($col eq 'state_arrive') {       # hack for Chris until new code in place
             ExecSQL("UPDATE $opts{bamfiles_table} SET datearrived='-1' WHERE bamid=$bamid");
         }
-        if ($col eq 'state_verify') {       # hack for Chris until new code in place
-            ExecSQL("UPDATE $opts{bamfiles_table} SET datemd5ver='-1' WHERE bamid=$bamid");
-        }
-        if ($col eq 'state_md5ver') {       # hack for Chris until new code in place
-            ExecSQL("UPDATE $opts{bamfiles_table} SET datemd5ver='-1' WHERE bamid=$bamid");
-        }
         if ($col eq 'state_b37') {          # hack for Chris until new code in place
-            ExecSQL("UPDATE $opts{bamfiles_table} SET datemapping='-1' WHERE bamid=$bamid");
+            ExecSQL("UPDATE $opts{bamfiles_table} SET datemapping_b37='-1' WHERE bamid=$bamid");
         }
         $done++;
     }

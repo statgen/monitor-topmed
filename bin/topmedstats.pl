@@ -126,8 +126,7 @@ sub Jobids {
     $rowsofdata = $sth->rows();
     if (! $rowsofdata) {
         my ($bamcount, $errcount) = (0, 0);             # Today's counts
-        #$sql = "SELECT count(*) FROM $opts{bamfiles_table} WHERE state_verify=$COMPLETED";
-        $sql = "SELECT count(*) FROM $opts{bamfiles_table} WHERE state_md5ver=$COMPLETED";
+        $sql = "SELECT count(*) FROM $opts{bamfiles_table} WHERE state_verify=$COMPLETED";
         $sth = DoSQL($sql, 0);
         $href = $sth->fetchrow_hashref;
         if ($href->{'count(*)'}) { $bamcount = $href->{'count(*)'}; }
