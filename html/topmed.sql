@@ -38,8 +38,8 @@ CREATE TABLE permissions (
     Datamethod is push or pull depending on how data gets to us. */
 DROP TABLE IF EXISTS centers;
 CREATE TABLE centers (
-  centerid     INT         NOT NULL AUTO_INCREMENT,
-  centername   VARCHAR(16) NOT NULL,
+  centerid     INT NOT NULL AUTO_INCREMENT, /* Referenced in nhlbi_qc_metrics */
+  centername   VARCHAR(16) NOT NULL,        /* Referenced in nhlbi_qc_metrics */
   datamethod   VARCHAR(8) NOT NULL DEFAULT 'pull',
   centerdesc   VARCHAR(96) NOT NULL,
   designdesc   TEXT NOT NULL,
@@ -60,7 +60,7 @@ UPDATE centers set centerdesc='NYGC' where centerid=3;
 /* Lists all runs (directories of data). Must be tied to a center */
 DROP TABLE IF EXISTS runs;
 CREATE TABLE runs (
-  runid        INT         NOT NULL AUTO_INCREMENT,
+  runid        INT NOT NULL AUTO_INCREMENT,     /* Referenced in nhlbi_qc_metrics */
   centerid     INT,
   dirname      VARCHAR(64) NOT NULL,
   status       VARCHAR(256),
@@ -78,22 +78,22 @@ CREATE TABLE runs (
 );
 CREATE INDEX index_centerid_dirname ON runs(centerid,dirname);
 CREATE INDEX index_dirname ON runs(dirname);
+
  
+/* ALTER TABLE bamfiles ADD COLUMN datebai VARCHAR(12) AFTER datebackup; */
+/* ALTER TABLE runs ADD  COLUMN offsitebackup CHAR(1) DEFAULT 'N' AFTER datayear */
+/* ALTER TABLE bamfiles CHANGE expt_sampleid expt_sampleid VARCHAR(24) */
+
 /* Lists all BAMs we know about (e.g. NWDID)  Must be tied to a run */
 DROP TABLE IF EXISTS bamfiles;
 CREATE TABLE bamfiles (
-  dateinit     VARCHAR(12),
-  datayear     INT DEFAULT 2,           /* Year of project: 1, 2 ... */
-  build        VARCHAR(4) DEFAULT '37', /* Build original input file user, 37, 38 etc */
-  bamid        INT         NOT NULL AUTO_INCREMENT,
+  bamid        INT         NOT NULL AUTO_INCREMENT, /* Referenced in nhlbi_qc_metrics */
   runid        INT         NOT NULL,
-  bamname_orig VARCHAR(96) NOT NULL,
   bamname      VARCHAR(96) NOT NULL,
-  bamsize      VARCHAR(16) DEFAULT 0,
-  nominal_length  INT DEFAULT 0,
-  nominal_sdev INT DEFAULT 0,
   base_coord   INT DEFAULT 0,
   library_name VARCHAR(96),
+  nominal_sdev INT DEFAULT 0,
+  nominal_length  INT DEFAULT 0,
   cramname     VARCHAR(96) NOT NULL,
   cramchecksum VARCHAR(96) NOT NULL,
   b37cramchecksum VARCHAR(96) NOT NULL,
@@ -102,17 +102,19 @@ CREATE TABLE bamfiles (
   cramflagstat BIGINT UNSIGNED DEFAULT NULL,
   b37flagstat  BIGINT UNSIGNED DEFAULT NULL,
   b38flagstat  BIGINT UNSIGNED DEFAULT NULL,
-  studyname    VARCHAR(96) NOT NULL,
-  piname       VARCHAR(96),
+  datemapping_b38  datetime DEFAULT NULL,   /* Referenced in nhlbi_qc_metrics */
+  datemapping_b37  datetime DEFAULT NULL,   /* Referenced in nhlbi_qc_metrics */
+  studyname    VARCHAR(96) NOT NULL,    /* Referenced in nhlbi_qc_metrics */
+  piname       VARCHAR(96),             /* Referenced in nhlbi_qc_metrics */
   phs          VARCHAR(12),
   phs_consent_short_name VARCHAR(24),
   phs_sra_sample_id VARCHAR(24),
   phs_sra_data_details VARCHAR(255),
-  ncbierr      VARCHAR(255),
+  emsg         VARCHAR(255),
   checksum     VARCHAR(96) NOT NULL,
-  expt_sampleid VARCHAR(24) DEFAULT 'UNKNOWN',  /* NWDID */
-  nwdid_known  CHAR(1) DEFAULT 'N',
-  donot_remap  CHAR(4) DEFAULT '',     /* Build to not remap because original file build is ok */
+  expt_sampleid VARCHAR(24),            /* Referenced in nhlbi_qc_metrics, NWDID */
+  nwdid_known  CHAR(1) DEFAULT 'N',     /* Sample is known to NCBI */
+  poorquality  CHAR(1) DEFAULT 'N',     /* Quality of sample is poor, do not use */
 
 /* Fields to track state for each step */
 /*
@@ -127,85 +129,170 @@ my $FAILEDCHECKSUM = 98;      # Task failed, because checksum at NCBI bad
 my $FAILED    = 99;           # Task failed
 */
   state_arrive   INT DEFAULT 0,
-  state_md5ver   INT DEFAULT 0,
-  state_backup   INT DEFAULT 0,
+  state_verify   INT DEFAULT 0,
   state_cram     INT DEFAULT 0,
-  state_bai      INT DEFAULT 0,
-  state_qplot    INT DEFAULT 0,
-  state_b37      INT DEFAULT 0,     /* File has been remapped to this build */
-  state_b38      INT DEFAULT 0,     /* File has been remapped to this build */
+  state_qplot    INT DEFAULT 0,     /* Referenced in nhlbi_qc_metrics */
+  state_b37      INT DEFAULT 0,     /* Referenced in nhlbi_qc_metrics */
+  state_b38      INT DEFAULT 0,     /* Referenced in nhlbi_qc_metrics */
+
+  state_ncbiexpt INT DEFAULT 0,     /* Year one, experiment defined at NCBI (X) */
+  state_ncbiorig INT DEFAULT 0,     /* Original input file as bam or cram (S) */
+  state_ncbib37  INT DEFAULT 0,     /* Remapped cram build 37 as cram (P) */
 
   state_gce38push  INT DEFAULT 0,   /* Handling b38 data in Google Cloud */
   state_gce38pull  INT DEFAULT 0,
-  state_gce38post  INT DEFAULT 0,   /* Post process state_gce38pull data */
+  state_bcf        INT DEFAULT 0,
+
+  state_gce38bcf_push   INT DEFAULT 0,   /* Put CRAM into BCF bucket */
+  state_gce38bcf_pull   INT DEFAULT 0,   /* Pull BCF data to local store */
+  state_gce38bcf  INT DEFAULT 0,    /* Status of task of remote action */
+  gce38bcf_opid   VARCHAR(255),     /* google pipeline id */
+
+  datearrived  VARCHAR(12),             /* Referenced in nhlbi_qc_metrics */
+  bamsize      VARCHAR(16) DEFAULT 0,   /* Referenced in nhlbi_qc_metrics */
+  datayear     INT DEFAULT 2,           /* Year of project: 1, 2 ... */\
+  build        VARCHAR(4) DEFAULT '37', /* Build original input file user, 37, 38 etc */
+  dateinit     VARCHAR(12),             /* Referenced in nhlbi_qc_metrics */
+  bamname_orig VARCHAR(96) NOT NULL,
 
   PRIMARY KEY  (bamid)
+);
+
+/* ************************** Delete these columns **************************
+
+*/
 
 /*   Handy queries
 
 select bamid,bamname,runid,(select dirname from runs where runid=bamfiles.runid) from bamfiles where state_ncbib37=19;
 
-
   How can we have dozens of files with this checksum ?
 select bamid,bamname from bamfiles where cramb37checksum='d41d8cd98f00b204e9800998ecf8427e'
 */
  
-/* ####################################################
-   Remove these some day 
-   #################################################### */
- 
-  state_ncbiexpt INT DEFAULT 0,     /* Experiment defined at NCBI (X) */
-  state_ncbiorig INT DEFAULT 0,     /* Original input file as bam or cram (S) */
-  state_ncbib37  INT DEFAULT 0,     /* Remapped cram build 37 as cram (P) */
-  state_ncbib38  INT DEFAULT 0,     /* Remapped cram build 38 as cram (T) */
-  time_ncbiexpt  CHAR(19),          /* yyy-mm-ssThh:hh:ss when loaded */
-  time_ncbiorig  CHAR(19),
-  time_ncbib37   CHAR(19),
-  time_ncbib38   CHAR(19),
- 
-  datearrived  VARCHAR(12),
-  datemd5ver   VARCHAR(12),
-  datebackup   VARCHAR(12),
-  datecram     VARCHAR(12),
-  datebai      VARCHAR(12),
-  dateqplot    VARCHAR(12),
-  datecp2ncbi  VARCHAR(12),
-  datemapping  VARCHAR(12),
-  jobidarrived VARCHAR(12),
-  jobidmd5ver  VARCHAR(12),
-  jobidbackup  VARCHAR(12),
-  jobidcram    VARCHAR(12),
-  jobidbai     VARCHAR(12),
-  jobidqplot   VARCHAR(12),
-  jobidnwdid   VARCHAR(12),
-  jobidncbiorig VARCHAR(12),
-  jobidncbib37  VARCHAR(12),
-  jobidncbib38  VARCHAR(12),
-  jobidb37     VARCHAR(12),
-  jobidb38     VARCHAR(12),
-  studyid      INT         NOT NULL,
-  cramorigsent CHAR(1) DEFAULT 'N',
-#   Added for remapping with build37
-  cramb37sent CHAR(1) DEFAULT 'N',
-  cramb37checksum VARCHAR(96) NOT NULL,
-  cramb38checksum VARCHAR(96) NOT NULL,
-  bam_delivered VARCHAR(12),
-  jobidcp2ncbi VARCHAR(12),
-  jobidmapping VARCHAR(12),
-
-  refname      VARCHAR(96) DEFAULT 'UNKNOWN',
-  expt_refname VARCHAR(96) DEFAULT 'UNKNOWN',
-
-);
 CREATE INDEX index_runid   ON bamfiles(runid);
 CREATE INDEX index_nwdid   ON bamfiles(expt_sampleid);
 CREATE INDEX index_refname ON bamfiles(refname);
+CREATE INDEX index_datayear ON bamfiles(datayear);
+CREATE INDEX index_bamflagstat ON bamfiles(bamflagstat);
+CREATE INDEX index_cramflagstat ON bamfiles(cramflagstat);
+CREATE INDEX index_b37flagstat ON bamfiles(b37flagstat);
+CREATE INDEX index_b38flagstat ON bamfiles(b38flagstat);
+CREATE INDEX index_studyname ON bamfiles(studyname);
+CREATE INDEX index_piname ON bamfiles(piname);
+CREATE INDEX index_state_verify ON bamfiles(state_verify);
+CREATE INDEX index_state_cram ON bamfiles(state_cram);
+CREATE INDEX index_state_bai ON bamfiles(state_bai);
+CREATE INDEX index_state_qplot ON bamfiles(state_qplot);
+CREATE INDEX index_state_b37 ON bamfiles(state_b37);
+CREATE INDEX index_state_b38 ON bamfiles(state_b38);
+CREATE INDEX index_state_gce38push ON bamfiles(state_gce38push);
+CREATE INDEX index_state_gce38pull ON bamfiles(state_gce38pull);
+CREATE INDEX index_state_gce38post ON bamfiles(state_gce38post);
+CREATE INDEX index_state_bcf ON bamfiles(state_bcf);
+ALTER TABLE bamfiles ADD UNIQUE (expt_sampleid);
 
-/* ALTER TABLE bamfiles ADD COLUMN datebai VARCHAR(12) AFTER datebackup; */
-/* ALTER TABLE runs ADD  COLUMN offsitebackup CHAR(1) DEFAULT 'N' AFTER datayear */
+-- MySQL Workbench Forward Engineering
 
-/*  This table is keeps track of freezes - sets of samples 
-*/
+SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0;
+SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0;
+SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='TRADITIONAL,ALLOW_INVALID_DATES';
+
+-- -----------------------------------------------------
+-- Table `actions`
+-- -----------------------------------------------------
+DROP TABLE IF EXISTS `actions` ;
+
+CREATE TABLE IF NOT EXISTS `actions` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(45) NOT NULL,
+  PRIMARY KEY (`id`),
+  INDEX `index2` (`name` ASC))
+ENGINE = InnoDB;
+
+-- -----------------------------------------------------
+-- Table `builds`
+-- -----------------------------------------------------
+DROP TABLE IF EXISTS `builds` ;
+
+CREATE TABLE IF NOT EXISTS `builds` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(45) NOT NULL,
+  PRIMARY KEY (`id`),
+  INDEX `index2` (`name` ASC))
+ENGINE = InnoDB;
+
+-- -----------------------------------------------------
+-- Table `bamfiles_actions`
+-- -----------------------------------------------------
+DROP TABLE IF EXISTS `bamfiles_actions` ;
+
+CREATE TABLE IF NOT EXISTS `bamfiles_actions` (
+  `bam_id` INT(11) NOT NULL COMMENT '	',
+  `action_id` INT(11) NOT NULL,
+  `state_id` INT(11) NOT NULL,
+  `build_id` INT(11) NOT NULL,
+  `created_at` DATETIME NOT NULL,
+  `modified_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX `index1` (`bam_id` ASC),
+  INDEX `index2` (`action_id` ASC),
+  INDEX `index3` (`state_id` ASC),
+  UNIQUE INDEX `index4` (`bam_id` ASC, `action_id` ASC, `build_id` ASC),
+  INDEX `index5` (`build_id` ASC),
+  CONSTRAINT `fk_bamfiles_actions_1`
+    FOREIGN KEY (`bam_id`)
+    REFERENCES `nhlbi`.`bamfiles` (`bamid`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION,
+  CONSTRAINT `fk_bamfiles_actions_2`
+    FOREIGN KEY (`action_id`)
+    REFERENCES `actions` (`id`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION,
+  CONSTRAINT `fk_bamfiles_actions_3`
+    FOREIGN KEY (`state_id`)
+    REFERENCES `nhlbi`.`states` (`id`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION,
+  CONSTRAINT `fk_bamfiles_actions_4`
+    FOREIGN KEY (`build_id`)
+    REFERENCES `builds` (`id`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION)
+ENGINE = InnoDB;
+
+SET SQL_MODE=@OLD_SQL_MODE;
+SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;
+SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS;
+
+-- -----------------------------------------------------
+-- Data for table `actions`
+-- -----------------------------------------------------
+START TRANSACTION;
+INSERT INTO `actions` (`id`, `name`) VALUES (1, 'arrive');
+INSERT INTO `actions` (`id`, `name`) VALUES (2, 'verify');
+INSERT INTO `actions` (`id`, `name`) VALUES (3, 'qplot');
+INSERT INTO `actions` (`id`, `name`) VALUES (4, 'cram');
+INSERT INTO `actions` (`id`, `name`) VALUES (5, 'gce-push');
+INSERT INTO `actions` (`id`, `name`) VALUES (6, 'gce-pull');
+INSERT INTO `actions` (`id`, `name`) VALUES (7, 'gce-bcf-push');
+INSERT INTO `actions` (`id`, `name`) VALUES (8, 'gce-bcf-pull');
+INSERT INTO `actions` (`id`, `name`) VALUES (9, 'gce-bcf');
+INSERT INTO `actions` (`id`, `name`) VALUES (10, 'gce-map');
+
+COMMIT;
+
+-- -----------------------------------------------------
+-- Data for table `builds`
+-- -----------------------------------------------------
+START TRANSACTION;
+INSERT INTO `builds` (`id`, `name`) VALUES (1, '37');
+INSERT INTO `builds` (`id`, `name`) VALUES (2, '38');
+
+COMMIT;
+
+
+/*  This table is keeps track of freezes - sets of samples */
 DROP TABLE IF EXISTS freezes;
 CREATE TABLE freezes (
   id      INT PRIMARY KEY AUTO_INCREMENT,
@@ -291,6 +378,8 @@ CREATE TABLE stepstats (
   ncbicount_gcepost INT DEFAULT 0,
   count_b38         INT DEFAULT 0,
   avetime_b38       INT DEFAULT 0,
+  count_bcf         INT DEFAULT 0,
+  avetime_bcf       INT DEFAULT 0,
   ncbicount_b38     INT DEFAULT 0,
 
   bamcount           INT DEFAULT 0,      /* Count of all arrived bams */
@@ -307,202 +396,81 @@ CREATE TABLE stepstats (
   PRIMARY KEY  (yyyymmdd)
 );
 
-/* Lists all BAMs which failed QC -- subset of columns in bamfiles */
-DROP TABLE IF EXISTS bad_bamfiles;
-CREATE TABLE bad_bamfiles (
-  id           INT         NOT NULL AUTO_INCREMENT,
-  bamid        INT         NOT NULL,
-  expt_sampleid VARCHAR(24) NOT NULL,
-  runid        INT         NOT NULL,
-  dateinit     VARCHAR(12),
-  datayear     INT         NOT NULL,
-  build        VARCHAR(4),
-  bamname_orig VARCHAR(96) NOT NULL,
-  bamname      VARCHAR(96) NOT NULL,
-  cramname     VARCHAR(96) NOT NULL,
-  bamsize      VARCHAR(16) NOT NULL,
-  checksum     VARCHAR(96) NOT NULL,
-  cramchecksum VARCHAR(96) NOT NULL,
-  bamflagstat  BIGINT UNSIGNED,
-  cramflagstat BIGINT UNSIGNED,
-  nominal_length  INT,
-  nominal_sdev INT,
-  base_coord   INT,
-  library_name VARCHAR(96),
-  studyname    VARCHAR(96) NOT NULL,
-  piname       VARCHAR(96) NOT NULL,
-  phs          VARCHAR(12),
-  phs_consent_short_name VARCHAR(24),
-  phs_sra_sample_id VARCHAR(24),
-  phs_sra_data_details VARCHAR(255),
-  nwdid_known  CHAR(1),
-
-  state_arrive   INT,
-  state_md5ver   INT,
-  state_cram     INT,
-  state_bai      INT,
-  state_qplot    INT,
-
-  PRIMARY KEY  (id)
-);
-CREATE INDEX bad_index_bamid   ON bad_bamfiles(bamid);
-CREATE INDEX bad_index_runid   ON bad_bamfiles(runid);
-CREATE INDEX bad_index_nwdid   ON bad_bamfiles(expt_sampleid);
-
-
-
-
-
-
-
-
 /* ####################################################
-   View of QC _Metric data    nhlbi_qc_metrics
-+-------------------+-------------+------+-----+---------------------+-------+
-| Field             | Type        | Null | Key | Default             | Extra |
-+-------------------+-------------+------+-----+---------------------+-------+
-| id                | int(11)     | YES  |     | 0                   |       |
-| bam_id            | int(11)     | YES  |     | NULL                |       |
-| pct_freemix       | float       | YES  |     | NULL                |       |
-| n_reads_m         | float       | YES  |     | NULL                |       |
-| pct_mapped        | float       | YES  |     | NULL                |       |
-| pct_mq0           | float       | YES  |     | NULL                |       |
-| pct_paired        | float       | YES  |     | NULL                |       |
-| pct_prop_paired   | float       | YES  |     | NULL                |       |
-| mapped_gb         | float       | YES  |     | NULL                |       |
-| q20_gb            | float       | YES  |     | NULL                |       |
-| pct_q20_base      | float       | YES  |     | NULL                |       |
-| mean_depth        | float       | YES  |     | NULL                |       |
-| pct_genome_cov    | float       | YES  |     | NULL                |       |
-| isize_mode        | float       | YES  |     | NULL                |       |
-| isize_median      | float       | YES  |     | NULL                |       |
-| pct_dups          | float       | YES  |     | NULL                |       |
-| pct_genome_dp5    | float       | YES  |     | NULL                |       |
-| pct_genome_dp10   | float       | YES  |     | NULL                |       |
-| pct_genome_dp20   | float       | YES  |     | NULL                |       |
-| pct_genome_dp30   | float       | YES  |     | NULL                |       |
-| vmr_depth         | float       | YES  |     | NULL                |       |
-| depth_q10         | float       | YES  |     | NULL                |       |
-| depth_q20         | float       | YES  |     | NULL                |       |
-| depth_q30         | float       | YES  |     | NULL                |       |
-| raw_base_gb       | float       | YES  |     | NULL                |       |
-| pct_overlap_reads | float       | YES  |     | NULL                |       |
-| pct_overlap_bases | float       | YES  |     | NULL                |       |
-| isize_iqr         | float       | YES  |     | NULL                |       |
-| isize_stdev       | float       | YES  |     | NULL                |       |
-| gc_depth_0_1      | float       | YES  |     | NULL                |       |
-| gc_depth_1_5      | float       | YES  |     | NULL                |       |
-| gc_depth_5_25     | float       | YES  |     | NULL                |       |
-| gc_depth_25_75    | float       | YES  |     | NULL                |       |
-| gc_depth_75_95    | float       | YES  |     | NULL                |       |
-| gc_depth_95_99    | float       | YES  |     | NULL                |       |
-| gc_depth_99_100   | float       | YES  |     | NULL                |       |
-| library_size_m    | float       | YES  |     | NULL                |       |
-| created_at        | datetime    | YES  |     | NULL                |       |
-| modified_at       | timestamp   | YES  |     | 0000-00-00 00:00:00 |       |
-| sample_id         | varchar(96) | YES  |     | UNKNOWN             |       |
-| study             | varchar(96) | NO   |     | NULL                |       |
-| center            | varchar(16) | NO   |     | NULL                |       |
-| recieved          | datetime    | YES  |     | NULL                |       |
-| size              | varchar(16) | YES  |     | 0                   |       |
-| status_qplot      | varchar(45) | NO   |     | NULL                |       |
-| status_remap_hg37 | varchar(45) | NO   |     | NULL                |       |
-| status_remap_hg38 | varchar(45) | NO   |     | NULL                |       |
-| status_backup     | varchar(45) | NO   |     | NULL                |       |
-| status_ncbi_hg37  | varchar(45) | NO   |     | NULL                |       |
-| status_ncbi_hg38  | varchar(45) | NO   |     | NULL                |       |
-+-------------------+-------------+------+-----+---------------------+-------+
-   #################################################### */
+   View of Kevin's web interface columns
 
-/* ####################################################
-   QC _Metric data    qc_results
-+-------------------+-----------+------+-----+-------------------+----------------+
-| Field             | Type      | Null | Key | Default           | Extra          |
-+-------------------+-----------+------+-----+-------------------+----------------+
-| id                | int(11)   | NO   | PRI | NULL              | auto_increment |
-| bam_id            | int(11)   | NO   | MUL | NULL              |                |
-| pct_freemix       | float     | YES  |     | NULL              |                |
-| n_reads_m         | float     | YES  |     | NULL              |                |
-| pct_mapped        | float     | YES  |     | NULL              |                |
-| pct_mq0           | float     | YES  |     | NULL              |                |
-| pct_paired        | float     | YES  |     | NULL              |                |
-| pct_prop_paired   | float     | YES  |     | NULL              |                |
-| mapped_gb         | float     | YES  |     | NULL              |                |
-| q20_gb            | float     | YES  |     | NULL              |                |
-| pct_q20_base      | float     | YES  |     | NULL              |                |
-| mean_depth        | float     | YES  |     | NULL              |                |
-| pct_genome_cov    | float     | YES  |     | NULL              |                |
-| isize_mode        | float     | YES  |     | NULL              |                |
-| isize_median      | float     | YES  |     | NULL              |                |
-| pct_dups          | float     | YES  |     | NULL              |                |
-| pct_genome_dp5    | float     | YES  |     | NULL              |                |
-| pct_genome_dp10   | float     | YES  |     | NULL              |                |
-| pct_genome_dp20   | float     | YES  |     | NULL              |                |
-| pct_genome_dp30   | float     | YES  |     | NULL              |                |
-| vmr_depth         | float     | YES  |     | NULL              |                |
-| depth_q10         | float     | YES  |     | NULL              |                |
-| depth_q20         | float     | YES  |     | NULL              |                |
-| depth_q30         | float     | YES  |     | NULL              |                |
-| raw_base_gb       | float     | YES  |     | NULL              |                |
-| pct_overlap_reads | float     | YES  |     | NULL              |                |
-| pct_overlap_bases | float     | YES  |     | NULL              |                |
-| isize_iqr         | float     | YES  |     | NULL              |                |
-| isize_stdev       | float     | YES  |     | NULL              |                |
-| gc_depth_0_1      | float     | YES  |     | NULL              |                |
-| gc_depth_1_5      | float     | YES  |     | NULL              |                |
-| gc_depth_5_25     | float     | YES  |     | NULL              |                |
-| gc_depth_25_75    | float     | YES  |     | NULL              |                |
-| gc_depth_75_95    | float     | YES  |     | NULL              |                |
-| gc_depth_95_99    | float     | YES  |     | NULL              |                |
-| gc_depth_99_100   | float     | YES  |     | NULL              |                |
-| library_size_m    | float     | YES  |     | NULL              |                |
-| created_at        | datetime  | NO   |     | NULL              |                |
-| modified_at       | timestamp | NO   |     | CURRENT_TIMESTAMP |                |
-+-------------------+-----------+------+-----+-------------------+----------------+
-
-
-/* ####################################################
-   Remove these some day 
-   #################################################### */
-DROP TABLE IF EXISTS studies;
-CREATE TABLE studies (
-  studyid      INT         NOT NULL AUTO_INCREMENT,
-  studyname    VARCHAR(64) NOT NULL,
-  PRIMARY KEY  (studyid)
-);
-CREATE INDEX index_studyid_studyname ON studies(studyid,studyname);
-CREATE INDEX index_studyname ON studies(studyname);
-
-DROP TABLE IF EXISTS requestfiles;
-CREATE TABLE requestfiles (
-  reqid        INT         NOT NULL AUTO_INCREMENT,
-  centerid     INT         NOT NULL,
-  hostname     VARCHAR(255) NOT NULL,
-  fetchpath    VARCHAR(255) NOT NULL,
-  daterequestor VARCHAR(12),
-  iprequestor  VARCHAR(16),
-  ipuser       VARCHAR(16),
-  status       VARCHAR(127),
-  PRIMARY KEY  (reqid)
-);
-CREATE INDEX index_reqid ON requestfiles(centerid);
-
-
-/* Table of data received from Adam Stine - I think this shows all files they have */
-DROP TABLE IF EXISTS adam;
-CREATE TABLE adam (
-  id           INT         NOT NULL AUTO_INCREMENT,
-  name_1       VARCHAR(64),
-  md5sum_1     VARCHAR(32),
-  upload_id_1  INT,
-  track_date_1 VARCHAR(8),
-  status1      VARCHAR(16),
-  name_2       VARCHAR(64),
-  md5sum_2     VARCHAR(32),
-  upload_id_2  INT,
-  track_date_2 VARCHAR(8),
-  status_2      VARCHAR(16),
-  PRIMARY KEY  (id)
-);
-
+CREATE 
+    ALGORITHM = UNDEFINED 
+    DEFINER = `sqlnhlbi`@`%` 
+    SQL SECURITY DEFINER
+VIEW `nhlbi_qc_metrics` AS
+    SELECT 
+        `b`.`expt_sampleid` AS `sample_id`,
+        `b`.`piname` AS `pi_name`,
+        `b`.`studyname` AS `study`,
+        `c`.`centername` AS `center`,
+        '2016-04-15' AS `seq_date`,
+        FROM_UNIXTIME(`b`.`dateinit`) AS `bam_date`,
+        `q`.`pct_freemix` AS `pct_freemix`,
+        `q`.`n_reads_m` AS `n_reads_m`,
+        `q`.`pct_mapped` AS `pct_mapped`,
+        `q`.`pct_mq0` AS `pct_mq0`,
+        `q`.`pct_paired` AS `pct_paired`,
+        `q`.`pct_prop_paired` AS `pct_prop_paired`,
+        `q`.`mapped_gb` AS `mapped_gb`,
+        `q`.`q20_gb` AS `q20_gb`,
+        `q`.`pct_q20_base` AS `pct_q20_base`,
+        `q`.`mean_depth` AS `mean_depth`,
+        `q`.`pct_genome_cov` AS `pct_genome_cov`,
+        `q`.`isize_mode` AS `isize_mode`,
+        `q`.`isize_median` AS `isize_median`,
+        `q`.`pct_dups` AS `pct_dups`,
+        `q`.`pct_genome_dp5` AS `pct_genome_dp5`,
+        `q`.`pct_genome_dp10` AS `pct_genome_dp10`,
+        `q`.`pct_genome_dp20` AS `pct_genome_dp20`,
+        `q`.`pct_genome_dp30` AS `pct_genome_dp30`,
+        `q`.`vmr_depth` AS `vmr_depth`,
+        `q`.`depth_q10` AS `depth_q10`,
+        `q`.`depth_q20` AS `depth_q20`,
+        `q`.`depth_q30` AS `depth_q30`,
+        `q`.`raw_base_gb` AS `raw_base_gb`,
+        `q`.`pct_overlap_reads` AS `pct_overlap_reads`,
+        `q`.`pct_overlap_bases` AS `pct_overlap_bases`,
+        `q`.`isize_iqr` AS `isize_iqr`,
+        `q`.`isize_stdev` AS `isize_stdev`,
+        `q`.`gc_depth_0_1` AS `gc_depth_0_1`,
+        `q`.`gc_depth_1_5` AS `gc_depth_1_5`,
+        `q`.`gc_depth_5_25` AS `gc_depth_5_25`,
+        `q`.`gc_depth_25_75` AS `gc_depth_25_75`,
+        `q`.`gc_depth_75_95` AS `gc_depth_75_95`,
+        `q`.`gc_depth_95_99` AS `gc_depth_95_99`,
+        `q`.`gc_depth_99_100` AS `gc_depth_99_100`,
+        `q`.`library_size_m` AS `library_size_m`,
+        0 AS `qc`,
+        IF(((`q`.`pct_freemix` < 3)
+                AND (`q`.`pct_genome_dp10` > 95)
+                AND (`q`.`mean_depth` > 30)),
+            1,
+            0) AS `qc_pass`,
+        IF((`q`.`mean_depth` < 30), 1, 0) AS `qc_flagged`,
+        IF(((`q`.`pct_freemix` > 3)
+                OR (`q`.`pct_genome_dp10` < 95)),
+            1,
+            0) AS `qc_fail`,
+        FROM_UNIXTIME(`b`.`datearrived`) AS `recieved`,
+        `b`.`bamsize` AS `size`,
+        `s_qplot`.`name` AS `status_qplot`,
+        `s_b37`.`name` AS `status_remap_hg37`,
+        `s_b38`.`name` AS `status_remap_hg38`,
+        FROM_UNIXTIME(`b`.`datemapping`) AS `mapped_b37`,
+        `b`.`datemapping_b38` AS `mapped_b38`
+    FROM
+        ((((((`bamfiles` `b`
+        JOIN `runs` `r` ON ((`b`.`runid` = `r`.`runid`)))
+        JOIN `centers` `c` ON ((`r`.`centerid` = `c`.`centerid`)))
+        JOIN `states` `s_qplot` ON ((`b`.`state_qplot` = `s_qplot`.`id`)))
+        LEFT JOIN `qc_results` `q` ON ((`q`.`bam_id` = `b`.`bamid`)))
+        JOIN `states` `s_b37` ON ((`b`.`state_b37` = `s_b37`.`id`)))
+        JOIN `states` `s_b38` ON ((`b`.`state_b38` = `s_b38`.`id`)))
+*/
 
