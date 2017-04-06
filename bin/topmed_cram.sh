@@ -53,7 +53,7 @@ if [ "$1" = "-submit" ]; then
   #  Submit this script to be run
   l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*`)
   if [ "$?" != "0" ]; then
-    $topmedcmd mark $1 $markverb failed
+    $topmedcmd -emsg "Failed to submit command to SLURM - $l" mark $1 $markverb failed
     echo "Failed to submit command to SLURM - $l" > $console/$1-$me.out
     echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*" >> $console/$1-$me.out
     exit 1
@@ -87,8 +87,7 @@ extension="${bamfile##*.}"
 #   Get destination directory for backup files
 backupdir=`$topmedpath wherepath $bamid backup`
 if [ "$backupdir" = "" ]; then
-  echo "Unable to determine backup directory for '$bamid'"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "Unable to determine backup directory for '$bamid'" mark $bamid $markverb failed
   exit 2
 fi
 
@@ -106,8 +105,7 @@ chmod 555 $bamfile 2> /dev/null
 #   Be sure that NWDID is set in database
 nwdid=`$topmedcmd show $bamid expt_sampleid`
 if [ "$nwdid" = "" ]; then
-  echo "NWDID not set for $bamid $bamfile"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "NWDID not set for $bamid $bamfile" mark $bamid $markverb failed
   exit 3
 fi
 newname="$nwdid.src.cram"
@@ -121,8 +119,7 @@ newname="$nwdid.src.cram"
 if [ "$extension" = "cram" ]; then
   d=`$topmedcmd -persist show $bamid run`
   if [ "$d" = "" ]; then
-    echo "Unable to determine name of run for '$bamid'"
-    $topmedcmd -persist mark $bamid $markverb failed
+    $topmedcmd -persist -emsg "Unable to determine name of run for '$bamid'" mark $bamid $markverb failed
     exit 3
   fi
   offsite=`$topmedcmd -persist show $d offsite`
@@ -130,15 +127,13 @@ if [ "$extension" = "cram" ]; then
     now=`date +%s`
     cp -p $bamfile.crai $backupdir/$newname.crai
     if [ "$?" != "0" ]; then
-      echo "Copy command failed: cp -p $bamfile.crai $backupdir/$newname.crai"
-      $topmedcmd -persist mark $bamid $markverb failed
+      $topmedcmd -persist -emsg "Copy command failed: cp -p $bamfile.crai $backupdir/$newname.crai" mark $bamid $markverb failed
       exit 3
     fi
 
     cp -p $bamfile $backupdir/$newname
     if [ "$?" != "0" ]; then
-      echo "Copy command failed: cp -p $bamfile $backupdir/$newname"
-      $topmedcmd -persist mark $bamid $markverb failed
+      $topmedcmd -persist -emsg "Copy command failed: cp -p $bamfile $backupdir/$newname" mark $bamid $markverb failed
       exit 3
     fi
     chmod 0444 $backupdir/$newname
@@ -148,15 +143,13 @@ if [ "$extension" = "cram" ]; then
     mkdir -p $backupdir             # Safe to make backup dir cause it is small
     cd $backupdir
     if [ "$?" != "0" ]; then
-        echo "Unable to CD $backupdir. This directory must be created first."
-        $topmedcmd -persist mark $bamid $markverb failed
+        $topmedcmd -persist -emsg "Unable to CD $backupdir. This directory must be created first." mark $bamid $markverb failed
         exit 2
     fi
     ln -sf $bamfile $newname        # Create backup file as symlink
     ln -sf $bamfile.crai $newname.crai
     if [ ! -f $newname ]; then
-        echo "Unable to create backup file '$newname' in '$backupdir'"
-        $topmedcmd -persist mark $bamid $markverb failed
+        $topmedcmd -persist -emsg "Unable to create backup file '$newname' in '$backupdir'" mark $bamid $markverb failed
         exit 2
     fi
   fi
@@ -184,8 +177,7 @@ fi
 #mkdir -p $backupdir            # We run out of space if we make it ourselves
 cd $backupdir
 if [ "$?" != "0" ]; then
-  echo "Unable to CD $backupdir. This directory must be created first."
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "Unable to CD $backupdir. This directory must be created first." mark $bamid $markverb failed
   exit 2
 fi
 
@@ -195,8 +187,7 @@ chkname=`basename $bamfile .bam`
 now=`date +%s`
 $topmedflagstat $bamfile $bamid bamflagstat /tmp/${chkname}.init.stat
 if [ "$?" != "0" ]; then
-  echo "Command failed: $flagstat $bamfile"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "Command failed: $flagstat $bamfile" mark $bamid $markverb failed
   exit 3
 fi
 s=`date +%s`; s=`expr $s - $now`; echo "$flagstat completed in $s seconds"
@@ -231,8 +222,7 @@ s=`date +%s`; s=`expr $s - $now`; echo "Cram created in $s seconds"
 now=`date +%s`
 $samtools index $newname
 if [ "$?" != "0" ]; then
-  echo "Command failed: $samtools index $newname"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist emsg "Command failed: $samtools index $newname" mark $bamid $markverb failed
   exit 3
 fi
 s=`date +%s`; s=`expr $s - $now`; echo "Cram index created in $s seconds"
@@ -241,8 +231,7 @@ s=`date +%s`; s=`expr $s - $now`; echo "Cram index created in $s seconds"
 now=`date +%s`
 $topmedflagstat $newname $bamid cramflagstat /tmp/${chkname}.cram.stat
 if [ "$?" != "0" ]; then
-  echo "Command failed: $flagstat $bamfile"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "Command failed: $flagstat $bamfile" mark $bamid $markverb failed
   exit 3
 fi
 s=`date +%s`; s=`expr $s - $now`; echo "$flagstat for cram completed in $s seconds"
@@ -250,9 +239,8 @@ s=`date +%s`; s=`expr $s - $now`; echo "$flagstat for cram completed in $s secon
 #   Did flagstat output for cram match that for the input bam?
 diff=`diff  /tmp/${chkname}.init.stat  /tmp/${chkname}.cram.stat | wc -l`
 if [ "$diff" != "0" ]; then
-  echo "Stat for backup CRAM file differs from that for original BAM"
+  $topmedcmd -persist -emsg "Stat for backup CRAM file differs from that for original BAM" mark $bamid $markverb failed
   diff  /tmp/${chkname}.init.stat  /tmp/${chkname}.cram.stat
-  $topmedcmd -persist mark $bamid $markverb failed
   exit 2
 fi
 echo "Stat for CRAM file matches that of original"
@@ -263,8 +251,7 @@ now=`date +%s`
 #   Calculate the MD5 for the cram
 md5=`$calcmd5 $newname | awk '{print $1}'`
 if [ "$md5" = "" ]; then
-  echo "Command failed: md5sum $newname"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "Command failed: md5sum $newname" mark $bamid $markverb failed
   exit 3
 fi
 $topmedcmd set $bamid cramchecksum $md5

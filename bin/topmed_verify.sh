@@ -31,7 +31,7 @@ if [ "$1" = "-submit" ]; then
 
   l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $qos $realhost -J $1-$me --output=$console/$1-$me.out $0 $*`)
   if [ "$?" != "0" ]; then
-    $topmedcmd mark $1 $markverb failed
+    $topmedcmd -emsg "Failed to submit command to SLURM - $l" mark $1 $markverb failed
     echo "Failed to submit command to SLURM - $l" > $console/$1-$me.out
     echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $qos $realhost -J $1-$me --output=$console/$1-$me.out $0 $*" >> $console/$1-$me.out
     exit 1
@@ -75,7 +75,7 @@ etime=`expr $etime - $stime`
 echo "MD5SUM  completed in $etime seconds"
 rm -f $tmpfile
 if [ "$rc" != "0" ]; then
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "Md5sum failed" mark $bamid $markverb failed
   exit 1
 fi
 
@@ -88,7 +88,7 @@ stime=`date +%s`
 echo "Calculate flagstat"
 $topmedflagstat $bamfile $bamid bamflagstat
 if [ "$?" != "0" ]; then
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "$topmedflagstat $bamfile failed" mark $bamid $markverb failed
   exit 1
 fi
 etime=`date +%s`
@@ -107,7 +107,7 @@ else
   #   Rename the BAM file
   $topmedrename $bamid $bamfile
   if [ "$?" != "0" ]; then
-    $topmedcmd -persist mark $bamid $markverb failed
+    $topmedcmd -persist -emsg "$topmedrename failed" mark $bamid $markverb failed
     exit 1
   fi
 fi

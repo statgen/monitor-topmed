@@ -35,7 +35,7 @@ if [ "$1" = "-submit" ]; then
   #  Submit this script to be run
   l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*`)
   if [ "$?" != "0" ]; then
-    $topmedcmd mark $1 $markverb failed
+    $topmedcmd -emsg "Failed to submit command to SLURM - $l" mark $1 $markverb failed
     echo "Failed to submit command to SLURM - $l" > $console/$1-$me.out
     echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*" >> $console/$1-$me.out
     exit 1
@@ -63,8 +63,7 @@ stime=`date +%s`
 
 crampath=`$topmedpath wherepath $bamid b$build`
 if [ "$crampath" = "" ]; then
-  echo "Unable to determine where remapped CRAM file should be for '$bamid'"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "Unable to determine where remapped CRAM file should be for '$bamid'" mark $bamid $markverb failed
   exit 2
 fi
 echo "#========= '$d' host=$s $SLURM_JOB_ID $0 bamid=$bamid crampath=$crampath pwd=$p ========="
@@ -78,21 +77,18 @@ $topmedcmd mark $bamid $markverb started
 #   CD to remapped cram file location
 cd $crampath
 if [ "$?" != "0" ]; then
-  echo "Unable to CD to directory for remapped CRAM file '$bamid'"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist emsg "Unable to CD to directory for remapped CRAM file '$bamid'" mark $bamid $markverb failed
   exit 2
 fi
 
 nwdid=`$topmedcmd show $bamid expt_sampleid`
 if [ "$nwdid" = "" ]; then
-  echo "Unable to get expt_sampleid for bamid '$bamid'"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "Unable to get expt_sampleid for bamid '$bamid'" mark $bamid $markverb failed
   exit 2
 fi
 cramfile=`$topmedpath wherefile $bamid b$build`
 if [ ! -f $cramfile ]; then
-  echo "Unable to find remapped cram file '$cramfile'"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "Unable to find remapped cram file '$cramfile'" mark $bamid $markverb failed
   exit 2
 fi
 
@@ -102,8 +98,7 @@ if [ ! -f $crai ]; then
   echo "Creating index file '$cramfile'"
   $samtools index $cramfile 2>&1
   if [ "$?" != "0" ]; then
-    echo "Unable to create index file for bamid '$bamid' [$nwdid]"
-    $topmedcmd -persist mark $bamid $markverb failed
+    $topmedcmd -persist -emsg "Unable to create index file for bamid '$bamid' [$nwdid]" mark $bamid $markverb failed
     exit 2
   fi
   echo "Created CRAI file for bamid '$bamid' [$nwdid]"
@@ -113,8 +108,7 @@ fi
 bcfdir=`$topmedpath wherepath $bamid bcf`
 mkdir -p $bcfdir
 if [ "$?" != "0" ]; then
-  echo "Unable to create BCF output directory for '$bamid' [$nwdid] - $bcfdir"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "Unable to create BCF output directory for '$bamid' [$nwdid] - $bcfdir" mark $bamid $markverb failed
   exit 2
 fi
 bcffile=$bcfdir/$nwdid.bcf
@@ -122,14 +116,12 @@ bcffile=$bcfdir/$nwdid.bcf
 set -o pipefail
 $samtools view -uh $cramfile | $bam clipOverlap --poolSize 100000000 --in -.ubam --out -.ubam | $vt discover2 -z -q 20 -b + -r $vtref -s $nwdid -o $bcffile
 if [ "$?" != "0" ]; then
-  echo "Unable to run VT DISCOVER for bamid '$bamid' [$nwdid] on $cramfile creating $bcffile"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "Unable to run VT DISCOVER for bamid '$bamid' [$nwdid] on $cramfile creating $bcffile" mark $bamid $markverb failed
   exit 2
 fi
 $bcftools index $bcffile
 if [ "$?" != "0" ]; then
-  echo "Unable to run BCFTOOLS for bamid '$bamid' [$nwdid] on $bcffile"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "Unable to run BCFTOOLS for bamid '$bamid' [$nwdid] on $bcffile" mark $bamid $markverb failed
   exit 2
 fi
 

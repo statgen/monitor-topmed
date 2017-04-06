@@ -37,7 +37,7 @@ if [ "$1" = "-submit" ]; then
   #  Submit this script to be run
   l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $cores $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*`)
   if [ "$?" != "0" ]; then
-    $topmedcmd mark $1 $markverb failed
+    $topmedcmd -emsg "Failed to submit command to SLURM - $l" mark $1 $markverb failed
     echo "Failed to submit command to SLURM - $l" > $console/$1-$me.out
     echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $cores $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*" >> $console/$1-$me.out
     exit 1
@@ -61,15 +61,13 @@ bamid=$1
 #   Get remapped cram file location
 crampath=`$topmedpath wherepath $bamid b$build`
 if [ "$crampath" = "" ]; then
-  echo "Unable to determine where remapped CRAM file should go for '$bamid'"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "Unable to determine where remapped CRAM file should go for '$bamid'" mark $bamid $markverb failed
   exit 2
 fi
 
 nwdid=`$topmedcmd show $bamid expt_sampleid`
 if [ "$nwdid" = "" ]; then
-  echo "Unable to get expt_sampleid for bamid '$bamid'"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "Unable to get expt_sampleid for bamid '$bamid'" mark $bamid $markverb failed
   exit 2
 fi
 cramfile=$crampath/$nwdid.recab.cram
@@ -84,8 +82,7 @@ $topmedcmd mark $bamid $markverb started
 
 mkdir -p $crampath
 if [ "$?" != "0" ]; then
-  echo "Unable to create '$crampath' for remapped CRAM for '$bamid'"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "Unable to create '$crampath' for remapped CRAM for '$bamid'" mark $bamid $markverb failed
   exit 2
 fi
 
@@ -94,8 +91,7 @@ fi
 #======================================================================
 cramflagstat=`$topmedcmd show $bamid cramflagstat`
 if [ "$cramflagstat" = "" ]; then
-  echo "Unable to get cramflagstat for bamid '$bamid'"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "Unable to get cramflagstat for bamid '$bamid'" mark $bamid $markverb failed
   exit 2
 fi
 
@@ -103,8 +99,7 @@ stime=`date +%s`
 export BOTO_CONFIG=/net/topmed/working/shared/tpg_gsutil_config.txt
 mkdir -p $crampath
 if [ "$?" != "0" ]; then
-  echo "Unable to create directory for remapped data '$crampath' for bamid '$bamid'"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "Unable to create directory for remapped data '$crampath' for bamid '$bamid'" mark $bamid $markverb failed
   exit 3
 fi
 
@@ -119,8 +114,7 @@ for i in $incominguri $bcfuri; do
   fi
 done
 if [ "$inuri" = "" ]; then
-  echo "Unable to find $nwdid/$nwdid.recab.cram in: $incominguri $bcfuri"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "Unable to find $nwdid/$nwdid.recab.cram in: $incominguri $bcfuri" mark $bamid $markverb failed
   exit 3
 fi
 
@@ -128,16 +122,13 @@ fi
 echo "Checking if flagstat is as we expect from $inuri"
 $gsutil cp  $inuri/$nwdid/$nwdid.recab.cram.flagstat $crampath
 if [ "$?" != "0" ]; then
-  echo "Failed to copy flagstat from GCE: $inuri/$nwdid/$nwdid.recab.cram.flagstat"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "Failed to copy flagstat from GCE: $inuri/$nwdid/$nwdid.recab.cram.flagstat" mark $bamid $markverb failed
   exit 3
 fi
 #   Get number of interest from flagstat file and check it
 n=`grep 'paired in sequencing' $crampath/$nwdid.recab.cram.flagstat | awk '{print $1}'`
 if [ "$n" != "$cramflagstat" ]; then
-  echo "Flagstat '$n' did not match cramflagstat '$cramflagstat' for bamid '$bamid' nwdid $nwdid"
-  echo "URL=$inuri"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "Flagstat '$n' did not match cramflagstat '$cramflagstat' for bamid '$bamid' nwdid $nwdid  -- URL=$inuri" mark $bamid $markverb failed
   # Renaming the flagstat file stops pull from happening again
   $gsutil mv $inuri/$nwdid/$nwdid.recab.cram.flagstat $inuri/$nwdid/$nwdid.recab.cram.flagstat.nomatch
   exit 3
@@ -153,8 +144,7 @@ fi
 echo "Copying remapped CRAM to local file $crampath"
 $gsutil cp $inuri/$nwdid/$nwdid.recab.cram $crampath
 if [ "$?" != "0" ]; then
-  echo "Failed to copy file from GCE $inuri/$nwdid/$nwdid.recab.cram $crampath"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "Failed to copy file from GCE $inuri/$nwdid/$nwdid.recab.cram $crampath" mark $bamid $markverb failed
   exit 3
 fi
 
@@ -163,8 +153,7 @@ echo "Calculating MD5 for local file ($cramfile)"
 md5=(`md5sum $cramfile`)
 md5=${md5[0]}
 if [ "$md5" = "" ]; then
-  echo "Unable to calculate MD5 for remapped '$bamid' [$nwdid] cramfile=$cramfile"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "Unable to calculate MD5 for remapped '$bamid' [$nwdid] cramfile=$cramfile" mark $bamid $markverb failed
   exit 2
 fi
 $topmedcmd -persist set $bamid cramb38checksum $md5

@@ -36,7 +36,7 @@ if [ "$1" = "-submit" ]; then
   #   Low rate of access to cram, small output
   l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $*`)
   if [ "$?" != "0" ]; then
-    $topmedcmd mark $1 $markverb failed
+    $topmedcmd -emsg "Failed to submit command to SLURM - $l" mark $1 $markverb failed
     echo "Failed to submit command to SLURM - $l" > $console/$1-$me.out
     echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $qos $nodelist --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $*" >> $console/$1-$me.out
     exit 1
@@ -80,15 +80,13 @@ fi
 #   Create output directory and CD there
 outdir=`$topmedpath wherepath $bamid qcresults`
 if [ "$outdir" = "" ]; then
-  echo "Unable to get QCRESULTS directory for '$bamid' - $outdir"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "Unable to get QCRESULTS directory for '$bamid' - $outdir"  mark $bamid $markverb failed
   exit 3
 fi
 mkdir -p $outdir
 cd $outdir
 if [ "$?" != "0" ]; then
-  echo "Unable to CD to qplot output directory for '$bamid' - $outdir"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "Unable to CD to qplot output directory for '$bamid' - $outdir" mark $bamid $markverb failed
   exit 3
 fi
 echo "Files will be created in $outdir"
@@ -100,8 +98,7 @@ else
   echo "Creating index file '$bai'"
   $samtools index $bamfile 2>&1
   if [ "$?" != "0" ]; then
-    echo "Unable to create index file for '$bamfile' in '$outdir'"
-    $topmedcmd -persist mark $bamid $markverb failed
+    $topmedcmd -persist -emsg "Unable to create index file for '$bamfile' in '$outdir'" mark $bamid $markverb failed
     exit 2
   fi
 fi
@@ -122,13 +119,11 @@ if [ "$build" = "38" ]; then
   rc=$?
 fi
 if [ "$rc" = "none" ]; then
-  echo "Unknown build '$build', cannot continue with qplot for '$bamfile'"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "Unknown build '$build', cannot continue with qplot for '$bamfile'" mark $bamid $markverb failed
   exit 3
 fi
 if [ "$rc" != "0" ]; then
-  echo "QPLOT failed for '$bamfile'"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "QPLOT failed for '$bamfile'" mark $bamid $markverb failed
   rm -f $basebam.*
   exit 4
 fi
@@ -140,15 +135,13 @@ statsfile=
 bamflagstat=`$topmedcmd show $bamid bamflagstat`   # Same for cram or bam
 tr=`grep TotalReads $basebam.qp.stats | awk '{ print $2 }'`
 if [ "$tr" = "" ]; then
-  echo "QPLOT data $nwdid.src.qp.stats not found or TotalReads not found"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "QPLOT data $nwdid.src.qp.stats not found or TotalReads not found" mark $bamid $markverb failed
   exit 3
 fi
 tr=`perl -E "print $tr*1000000"`    # Man is hard to do mutiply of float in shell !
 tr=`expr $tr + 5001`
 if [ "$tr" -lt "$bamflagstat" ]; then
-  echo "QPLOT data must have been truncated. TotalReads=$tr  Flagstat=$bamflagstat"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "QPLOT data must have been truncated. TotalReads=$tr  Flagstat=$bamflagstat" mark $bamid $markverb failed
   exit 3
 fi
 echo "Qplot output seems reasonable: TotalReads=$tr  Flagstat=$bamflagstat"
@@ -191,9 +184,8 @@ ls -la $basebam.*
 #   Now attempt to put the QPLOT data into the database
 $topmedqplot $outdir $nwdid
 if [ "$?" != "0" ]; then
-  echo "Unable to update the database with the QCPLOT results for '$bamid' [$outdir $nwdid]"
+  $topmedcmd -persist emsg "Unable to update the database with the QCPLOT results for '$bamid' [$outdir $nwdid]" mark $bamid $markverb failed
   echo "Maybe try again later with: $topmedqplot $outdir $nwdid"
-  $topmedcmd -persist mark $bamid $markverb failed
   exit 7
 fi
 

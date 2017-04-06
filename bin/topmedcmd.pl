@@ -92,7 +92,7 @@ our %opts = (
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose maxlongjobs=i persist with-id|bamid
+    help realm=s verbose maxlongjobs=i persist with-id|bamid emsg=s
     )) || die "$Script - Failed to parse options\n";
 
 #   Simple help if requested
@@ -235,7 +235,11 @@ sub Mark {
         $done++;
     }
     if ($done) {
-        if ($opts{verbose}) { print "$Script  'mark $bamid $op $state'  successful\n"; } 
+        if ($opts{verbose}) { print "$Script  'mark $bamid $op $state'  successful\n"; }
+        if (exists($opts{emsg})) {
+            print $opts{emsg} . "\n";
+            ExecSQL("UPDATE $opts{bamfiles_table} SET ncbierr=\"$state -- $opts{emsg}\" WHERE bamid=$bamid");
+        }
     }
     else { die "$Script - Invalid state '$state' for '$op'. Try '$Script -help'\n"; }
 }
@@ -953,6 +957,7 @@ topmedcmd.pl - Update the database for NHLBI TopMed
 =head1 SYNOPSIS
 
   topmedcmd.pl mark 33 arrive completed   # BAM has arrived
+  topmedcmd.pl -emsg 'No file found' mark 33 cram failed   # Action failed, set error msg
   topmedcmd.pl mark NWD00234  arrive completed   # Same BAM has arrived
   topmedcmd.pl unmark 33 arrive           # Reset BAM has arrived
 
@@ -998,6 +1003,10 @@ Functions wherefile, wherepath and whathost were moved into topmedpath.pl.
 =item B<-bamid  -with-id>
 
 Include the bamid or runid for the output from shown.
+
+=item B<-emsg string>
+
+Prints B<string> to STDOUT and saves it in the database.
 
 =item B<-help>
 

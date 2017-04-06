@@ -47,8 +47,7 @@ else
   fi
 fi
 if [ "$build" = "" ]; then
-  echo "Unable to determine build for '$bamfile' (L2=${l[2]} L5=${l[5]}"
-  $topmedcmd mark $bamid arrived failed
+  $topmedcmd -emsg "Unable to determine build for '$bamfile' (L2=${l[2]} L5=${l[5]}" mark $bamid $markverb failed
   exit 4
 fi
 echo "File '$bamfile' [$bamid] is from build $build"
@@ -58,7 +57,7 @@ $topmedcmd -persist set $bamid build $build
 $topmednwd -bamid $bamid $bamfile
 rc=$?
 if [ "$rc" != "0" ]; then
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "$topmednwd failed" mark $bamid $markverb failed
   exit $rc
 fi
 
@@ -66,7 +65,7 @@ fi
 $topmedrename $bamid $bamfile
 rc=$?
 if [ "$rc" != "0" ]; then
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "$topmedrename failed" mark $bamid $markverb failed
   exit $rc
 fi
 $topmedcmd -persist mark $bamid $markverb completed

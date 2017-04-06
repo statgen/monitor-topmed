@@ -45,7 +45,7 @@ if [ "$1" = "-submit" ]; then
   l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $cores $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*`)
   if [ "$?" != "0" ]; then
     echo "Failed to submit command to SLURM - $l" > $console/$1-$me.out
-    $topmedcmd mark $1 $markverb failed
+    $topmedcmd -emsg "Failed to submit command to SLURM - $l" mark $1 $markverb failed
     echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $cores $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*" >> $console/$1-$me.out
     exit 1
   fi
@@ -71,8 +71,7 @@ if [ "$cramfile" = "" ]; then
   cramfile=`$topmedpath wherefile $bamid cram`
 fi
 if [ "$cramfile" = "" ]; then
-  echo "Unable to determine CRAM file for '$bamid'"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "Unable to determine CRAM file for '$bamid'" mark $bamid $markverb failed
   exit 2
 fi
 
@@ -89,20 +88,17 @@ $topmedcmd mark $bamid $markverb started
 #======================================================================
 center=`$topmedcmd show $bamid center`
 if [ "$center" = "" ]; then
-  echo "Unable to get center for bamid '$bamid'"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "Unable to get center for bamid '$bamid'" mark $bamid $markverb failed
   exit 2
 fi
 run=`$topmedcmd show $bamid run`
 if [ "$run" = "" ]; then
-  echo "Unable to get run for bamid '$bamid'"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "Unable to get run for bamid '$bamid'" mark $bamid $markverb failed
   exit 2
 fi
 nwdid=`$topmedcmd show $bamid expt_sampleid`
 if [ "$nwdid" = "" ]; then
-  echo "Unable to get expt_sampleid for bamid '$bamid'"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "Unable to get expt_sampleid for bamid '$bamid'" mark $bamid $markverb failed
   exit 2
 fi
 
@@ -111,8 +107,7 @@ echo "Copying CRAM to $incominguri/$center/$run/$nwdid.src.cram"
 export BOTO_CONFIG=/net/topmed/working/shared/tpg_gsutil_config.txt
 $gsutil cp $cramfile $incominguri/$center/$run/$nwdid.src.cram
 if [ "$?" != "0" ]; then
-  echo "Failed to copy file to Google Cloud"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd -persist -emsg "Failed to copy file to GCE" mark $bamid $markverb failed
   exit 3
 fi
 
@@ -126,8 +121,7 @@ a=`grep 'Unprocessable Entity' $tmperr`     # Ignore errors we do not care about
 rm $tmperr $tmpout
 if [ "$a" = "" ]; then
   if [ "$rc" != "0" ]; then
-    echo "Failed to notify Google Cloud that new file arrived"
-    $topmedcmd -persist mark $bamid $markverb failed
+    $topmedcmd -persist -emsg "Failed to notify Google Cloud that new file arrived" mark $bamid $markverb failed
     exit 3
   fi
 else
