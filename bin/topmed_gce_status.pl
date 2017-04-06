@@ -102,7 +102,6 @@ sub MarkState {
 
         #   Only set state_gce38pull if it is NOTSET or has failed
         my $pull = $sample->state_gce38pull;
-        my $post = $sample->state_gce38post;
         if (! defined($pull)) {
             print "For some reason getting gce38pull failed for '$nwdid'\n";
             next;
@@ -121,7 +120,7 @@ sub MarkState {
         }
         else {
             $countcannot++;
-            $cannotlist .= "$nwdid ($push/$pull/$post) ";
+            $cannotlist .= "$nwdid ($push/$pull) ";
         }
     }
     print "Requested $count pulls to be done, $countcannot NWDIDs could not do pull\n";
@@ -146,7 +145,6 @@ sub VerifyState {
 
     my %counts = ();
     my @didnotdelete = ();
-    my @postfailed = ();
     my @pullfailed = ();
     my @unknownnwdid = ();
     my @nopushdone = ();
@@ -160,7 +158,7 @@ sub VerifyState {
                 print "Unable to find '$nwdid' in database\n";
                 next;
             }
-            #   Database had successful push/pull/post
+            #   Database had successful push/pull
             #   See if remapped sample is here
             my $f = $sample->b38_mapped_path . "/$nwdid.recab.cram";
             my $fflag = $sample->b38_mapped_path . "/$nwdid.recab.cram.flagstat";
@@ -180,7 +178,6 @@ sub VerifyState {
         }
         my $pushstate = $href->{state_gce38push};
         my $pullstate = $href->{state_gce38pull};
-        my $poststate = $href->{state_gce38post};
         #   If flagstat exists, sample is ready to be pulled
         #   See what the database thinks has/will happened
         if ($pushstate != $COMPLETED) {
@@ -202,21 +199,6 @@ sub VerifyState {
             $counts{'PULL failed'}++;
             push @pullfailed,$nwdid;
         }
-
-        if ($poststate == $COMPLETED) {
-            $counts{'POST did not delete files'}++;
-            push @didnotdelete,$nwdid;
-        }
-        if ($poststate == $FAILED || $poststate == $CANCELLED) {
-            $counts{'POST failed'}++;
-            push @postfailed,$nwdid;
-        }
-        if ($poststate == $REQUESTED || $poststate == $SUBMITTED || $poststate == $STARTED) {
-            $counts{'POST in progress'}++;
-        }
-        if ($poststate == $NOTSET) {
-            $counts{'POST yet to be requested'}++;
-        }
     }
 
     # Give summary of what was found
@@ -224,25 +206,6 @@ sub VerifyState {
         print "$k $counts{$k} times\n";
     }
     print "\n";
-    if (@didnotdelete) {
-        print scalar(@didnotdelete) . " POST failed to delete for these: " .
-            substr(join(' ',@didnotdelete),0,50) . " ...\n";
-        if ($opts{verbose}) { print '  ' . join("\n  ", @didnotdelete) . "\n\n "; }
-    }
-    if (@postfailed) {
-        print scalar(@postfailed) . " POST failed for these: " . 
-            substr(join(' ',@postfailed),0,50) . " ...\n";
-        if ($opts{verbose}) {
-            foreach my $nwd (@postfailed) {
-                print $nwd . ' ';
-                my $href = $ahref->{$nwd};
-                my $s = `tail -1 ~/output/$href->{bamid}-gcepost.out 2>/dev/null`;
-                chomp($s);
-                print "$nwd $s\n";
-            }   
-            print "\n ";
-        }
-    }
     if (@pullfailed) {
         print scalar(@pullfailed) . " PULL failed for these: " .
             substr(join(' ',@pullfailed),0,50) . " ...\n";
@@ -276,7 +239,7 @@ sub VerifyState {
     if (@unknownnwdid) {
         print scalar(@unknownnwdid) . " Database marked finished for these: " .
             substr(join(' ',@unknownnwdid),0,50) . " ...\n" .
-            "   Perhaps POST failed to delete this at GCE?\n";
+            "   Perhaps PULL failed to delete this at GCE?\n";
         if ($opts{verbose}) { print '  ' . join("\n  ", @unknownnwdid) . "\n\n "; }
     }
 
@@ -364,7 +327,6 @@ sub CheckState {
         #   Sample is at GCE
         my $pushstate = $sample->state_gce38push;
         my $pullstate = $sample->state_gce38pull;
-        my $poststate = $sample->state_gce38post;
         if ($pushstate == $COMPLETED) {
             #   Sample is at GCE and was pushed
             $counts{GCE_samples_pushed}++;
@@ -376,14 +338,6 @@ sub CheckState {
             if ($pullstate == $COMPLETED) {
                 $counts{GCE_samples_pushed_and_pulled}++;
                 $countslist{GCE_samples_pushed_and_pulled} .= $nwdid . ' ';
-            }
-            if ($poststate == $NOTSET || $pullstate == $FAILED) {
-                $counts{GCE_samples_pushed_and_no_post}++;
-                $countslist{GCE_samples_pushed_and_no_post} .= $nwdid . ' ';
-            }
-            if ($poststate == $COMPLETED) {
-                $counts{GCE_samples_pushed_and_post_done_but_not_removed}++;
-                $countslist{GCE_samples_pushed_and_post_done_but_not_removed} .= $nwdid . ' ';
             }
         }
         else {
@@ -431,25 +385,23 @@ sub GetSQLData {
 
     DBConnect($opts{realm});
     my $sql = "SELECT bamid,expt_sampleid,state_gce38push," .
-        "state_gce38pull,state_gce38post FROM $opts{bamfiles_table}" .
+        "state_gce38pull FROM $opts{bamfiles_table}" .
         " WHERE state_gce38push!=$COMPLETED " .
-        " OR state_gce38pull!=$COMPLETED OR " .
-        " state_gce38post!=$COMPLETED";
+        " OR state_gce38pull!=$COMPLETED";
     my $sth = DoSQL($sql);
     my $ahref = $sth->fetchall_hashref('expt_sampleid');     # Returns array of hash
     return $ahref;
 
     #   Get rows one by one when we don't trust fetchall_hashref to work
     $sql = "SELECT bamid,expt_sampleid,state_gce38push," .
-        "state_gce38pull,state_gce38post FROM $opts{bamfiles_table}";
+        "state_gce38pull FROM $opts{bamfiles_table}";
     $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     my %data = ();
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         if (($href->{state_gce38push} != 20) ||
-            ($href->{state_gce38pull} != 20) ||
-            ($href->{state_gce38post} != 20)) {
+            ($href->{state_gce38pull} != 20)) {
             $data{$href->{expt_sampleid}} = $href;
         }
     }
@@ -461,8 +413,7 @@ sub GetSQLData {
     foreach my $nwdid (keys %{$ahref}) {
         my $href = $ahref->{$nwdid};
         print "bamid=$href->{bamid} nwdid=$href->{expt_sampleid} ($nwdid) " .
-            " push=$href->{state_gce38push} pull=$href->{state_gce38pull} " .
-            " post=$href->{state_gce38post}\n";
+            " push=$href->{state_gce38push} pull=$href->{state_gce38pull}\n";
         $n--;
         if ($n <= 0) { last; }
     }
