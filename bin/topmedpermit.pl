@@ -22,10 +22,23 @@
 ###################################################################
 use strict;
 use warnings;
+use FindBin qw($Bin $Script);
+use lib (
+  qq($FindBin::Bin),
+  qq($FindBin::Bin/../lib),
+  qq($FindBin::Bin/../lib/perl5),
+  qq($FindBin::Bin/../local/lib/perl5),
+  qq(/usr/cluster/topmed/lib/perl5),
+  qq(/usr/cluster/topmed/local/lib/perl5),
+);
+use Getopt::Long;
 use DBIx::Connector;
 
 our ($DBC, $DBH);
 
+#--------------------------------------------------------------
+#   Initialization - Sort out the options and parameters
+#--------------------------------------------------------------
 our %opts = (
     realm => '/usr/cluster/topmed/etc/.db_connections/topmed',
     bamfiles_table => 'bamfiles',
@@ -37,23 +50,36 @@ our %opts = (
 my %VALIDOPS = (                    # Used for permit
     all => 1,
     verify => 1,
-    backup => 1,
     qplot => 1,
     cram => 1,
     nwdid => 1,
-    sexpt => 1,
-    sorig => 1,
     sb37 => 1,
-    bcf => 1,
     gcepush => 1,
     gcepull => 1,
-    gcepost => 1,
+    sb38 => 1,
+    bcf => 1,
+    sexpt => 1,
+    sorig => 1,
 );
+
+Getopt::Long::GetOptions( \%opts,qw(
+    help verbose
+    )) || die "$Script - Failed to parse options\n";
+
+#   Simple help if requested
+if ($#ARGV < 0 || $opts{help}) {
+    warn "$Script [options] permit test|remove|add\n" .
+        "Returns boolean if an action is permitted or not\n" .
+        "or can be used to add or remove a permit-rule\n" .
+        "More details available by entering: perldoc $0\n\n";
+    if ($opts{help}) { system("perldoc $0"); }
+    exit 1;
+}
 
 my $fcn = shift @ARGV;
 DBConnect($opts{realm});
 if ($fcn eq 'permit')    { Permit(@ARGV); exit; }
-die "Invalid function '$fcn'\n";
+die "$Script - Invalid function '$fcn'\n";
 exit;
 
 #==================================================================
