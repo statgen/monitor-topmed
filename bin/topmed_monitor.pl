@@ -209,7 +209,6 @@ if ($fcn eq 'cram') {
 #--------------------------------------------------------------
 if ($fcn eq 'qplot') {
     #   Get list of all samples yet to process
-    #my $sql = "SELECT bamid,state_verify,state_qplot FROM $opts{bamfiles_table}";
     my $sql = "SELECT bamid,state_verify,state_qplot FROM $opts{bamfiles_table}";
     $sql = BuildSQL($sql);
     my $sth = DoSQL($sql);
@@ -218,8 +217,7 @@ if ($fcn eq 'qplot') {
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         #   Only do qplot if verify finished
-        #if ($href->{state_verify} != $COMPLETED) { next; }
-        if ($href->{state_state_verify} != $COMPLETED) { next; }
+        if ($href->{state_verify} != $COMPLETED) { next; }
         if ($opts{suberr} && $href->{state_qplot} >= $FAILEDCHECKSUM) {
             $href->{state_qplot} = $REQUESTED;
         }
@@ -609,10 +607,8 @@ sub GetUnArrivedRuns {
     my $sql = "SELECT runid,dirname FROM $opts{runs_table}";
     my $where = " WHERE arrived!='Y'";
     #   Maybe want some runs
-    if ($opts{runs}) {
-        $opts{runs} =~ s/,/ /g;
-        my @r = split(' ', $opts{runs});
-        $where .= ' AND dirname in (' . join(',',@r) . ')';
+    if ($opts{runs}) { 
+        $where .= " AND dirname='$opts{runs}'";
     }
     $sql .= $where;
     my $sth = DoSQL($sql);

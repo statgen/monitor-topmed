@@ -47,8 +47,7 @@ my $FAILED    = 99;                 # Task failed
 #       Add operation verb to %VALIDOPS
 my %VALIDVERBS = (                  # Valid verbs to database colum
     arrive     => 'state_arrive',
-    #verify    => 'state_verify',
-    verify     => 'state_md5ver',
+    verify     => 'state_verify',
     qplot      => 'state_qplot',
     cram       => 'state_cram',   
     gcepush    => 'state_gce38push',
@@ -226,7 +225,7 @@ sub Mark {
         if ($opts{verbose}) { print "$Script  'mark $bamid $op $state'  successful\n"; }
         if (exists($opts{emsg})) {
             print $opts{emsg} . "\n";
-            ExecSQL("UPDATE $opts{bamfiles_table} SET ncbierr=\"$state -- $opts{emsg}\" WHERE bamid=$bamid");
+            ExecSQL("UPDATE $opts{bamfiles_table} SET emsg=\"$op $state -- $opts{emsg}\" WHERE bamid=$bamid");
         }
     }
     else { die "$Script - Invalid state '$state' for '$op'. Try '$Script -help'\n"; }
@@ -425,8 +424,8 @@ sub SQueue {
             $mosixrunning{$c[4]}++;    # Count of running jobs for this user
             next;
         }
-        if ($c[1] !~ /^topmed/) { next; }    # Not interested in anything but topmed
-        if ($c[4] ne 'topmed') {        # Save partition and not topmed user
+        if ($c[1] !~ /^topmed/) { next; }    # Only want my partition of interest
+        if ($c[4] ne 'topmed' && $c[4] ne 'schelcj') {  # Save partition and not topmed user
             $nottopmed{$c[1]}{$c[4]} = 1;
             next;
         }

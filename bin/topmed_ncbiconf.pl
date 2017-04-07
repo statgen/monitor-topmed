@@ -324,7 +324,7 @@ sub SummaryTableMerge {
         foreach my $k (keys %$eref) {
             if ($opts{verbose}) { print "  $k => $eref->{$k}"; }
             $eref->{$k} =~ s/_/ /g;         # Spaces make the msg more readable
-            my $sql =  "UPDATE $opts{bamfiles_table} SET ncbierr='$k => $eref->{$k}' WHERE expt_sampleid='$nwdid'";
+            my $sql =  "UPDATE $opts{bamfiles_table} SET emsg='$k => $eref->{$k}' WHERE expt_sampleid='$nwdid'";
             DoSQL($sql);
             $nwderrs++;
         }
@@ -414,7 +414,7 @@ sub LookFor {
             if ($opts{verbose}) { print "$nwdid $type loaded $upload_date\n"; }
             my $sql = "UPDATE $opts{bamfiles_table} SET state_ncbi$type=$COMPLETED," .
                 "time_ncbi$type='" . substr($upload_date,0,19) ."'," .
-                "ncbierr='' " .
+                "emsg='' " .
                 "WHERE bamid=$bamid";
             my $sth = DoSQL($sql);
             next;
