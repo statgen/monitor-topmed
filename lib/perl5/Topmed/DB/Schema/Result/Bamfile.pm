@@ -46,11 +46,6 @@ __PACKAGE__->table("bamfiles");
   data_type: 'integer'
   is_nullable: 0
 
-=head2 studyid
-
-  data_type: 'integer'
-  is_nullable: 0
-
 =head2 bamname
 
   data_type: 'varchar'
@@ -171,7 +166,7 @@ __PACKAGE__->table("bamfiles");
   is_nullable: 1
   size: 255
 
-=head2 ncbierr
+=head2 emsg
 
   data_type: 'varchar'
   is_nullable: 1
@@ -181,20 +176,6 @@ __PACKAGE__->table("bamfiles");
 
   data_type: 'varchar'
   is_nullable: 0
-  size: 96
-
-=head2 refname
-
-  data_type: 'varchar'
-  default_value: 'UNKNOWN'
-  is_nullable: 1
-  size: 96
-
-=head2 expt_refname
-
-  data_type: 'varchar'
-  default_value: 'UNKNOWN'
-  is_nullable: 1
   size: 96
 
 =head2 expt_sampleid
@@ -210,12 +191,12 @@ __PACKAGE__->table("bamfiles");
   is_nullable: 1
   size: 1
 
-=head2 donot_remap
+=head2 poorquality
 
   data_type: 'char'
-  default_value: (empty string)
+  default_value: 'N'
   is_nullable: 1
-  size: 4
+  size: 1
 
 =head2 state_arrive
 
@@ -223,25 +204,13 @@ __PACKAGE__->table("bamfiles");
   default_value: 0
   is_nullable: 1
 
-=head2 state_md5ver
-
-  data_type: 'integer'
-  default_value: 0
-  is_nullable: 1
-
-=head2 state_backup
+=head2 state_verify
 
   data_type: 'integer'
   default_value: 0
   is_nullable: 1
 
 =head2 state_cram
-
-  data_type: 'integer'
-  default_value: 0
-  is_nullable: 1
-
-=head2 state_bai
 
   data_type: 'integer'
   default_value: 0
@@ -283,36 +252,6 @@ __PACKAGE__->table("bamfiles");
   default_value: 0
   is_nullable: 1
 
-=head2 state_ncbib38
-
-  data_type: 'integer'
-  default_value: 0
-  is_nullable: 1
-
-=head2 time_ncbiexpt
-
-  data_type: 'char'
-  is_nullable: 1
-  size: 19
-
-=head2 time_ncbiorig
-
-  data_type: 'char'
-  is_nullable: 1
-  size: 19
-
-=head2 time_ncbib37
-
-  data_type: 'char'
-  is_nullable: 1
-  size: 19
-
-=head2 time_ncbib38
-
-  data_type: 'char'
-  is_nullable: 1
-  size: 19
-
 =head2 state_gce38push
 
   data_type: 'integer'
@@ -320,12 +259,6 @@ __PACKAGE__->table("bamfiles");
   is_nullable: 1
 
 =head2 state_gce38pull
-
-  data_type: 'integer'
-  default_value: 0
-  is_nullable: 1
-
-=head2 state_gce38post
 
   data_type: 'integer'
   default_value: 0
@@ -367,169 +300,11 @@ __PACKAGE__->table("bamfiles");
   is_nullable: 1
   size: 12
 
-=head2 datemd5ver
+=head2 datemapping_b37
 
-  data_type: 'varchar'
+  data_type: 'datetime'
+  datetime_undef_if_invalid: 1
   is_nullable: 1
-  size: 12
-
-=head2 dateqplot
-
-  data_type: 'varchar'
-  is_nullable: 1
-  size: 12
-
-=head2 datemapping
-
-  data_type: 'varchar'
-  is_nullable: 1
-  size: 12
-
-=head2 datereport
-
-  data_type: 'varchar'
-  is_nullable: 1
-  size: 12
-
-=head2 datebackup
-
-  data_type: 'varchar'
-  is_nullable: 1
-  size: 12
-
-=head2 datecram
-
-  data_type: 'varchar'
-  is_nullable: 1
-  size: 12
-
-=head2 datebai
-
-  data_type: 'varchar'
-  is_nullable: 1
-  size: 12
-
-=head2 datecp2ncbi
-
-  data_type: 'varchar'
-  is_nullable: 1
-  size: 12
-
-=head2 jobidarrived
-
-  data_type: 'varchar'
-  is_nullable: 1
-  size: 12
-
-=head2 jobidmd5ver
-
-  data_type: 'varchar'
-  is_nullable: 1
-  size: 12
-
-=head2 jobidbackup
-
-  data_type: 'varchar'
-  is_nullable: 1
-  size: 12
-
-=head2 jobidcram
-
-  data_type: 'varchar'
-  is_nullable: 1
-  size: 12
-
-=head2 jobidbai
-
-  data_type: 'varchar'
-  is_nullable: 1
-  size: 12
-
-=head2 jobidqplot
-
-  data_type: 'varchar'
-  is_nullable: 1
-  size: 12
-
-=head2 jobidmapping
-
-  data_type: 'varchar'
-  is_nullable: 1
-  size: 12
-
-=head2 jobidb37
-
-  data_type: 'varchar'
-  is_nullable: 1
-  size: 12
-
-=head2 jobidb38
-
-  data_type: 'varchar'
-  is_nullable: 1
-  size: 12
-
-=head2 jobidnwdid
-
-  data_type: 'varchar'
-  is_nullable: 1
-  size: 12
-
-=head2 jobidncbiorig
-
-  data_type: 'varchar'
-  is_nullable: 1
-  size: 12
-
-=head2 jobidncbib37
-
-  data_type: 'varchar'
-  is_nullable: 1
-  size: 12
-
-=head2 jobidncbib38
-
-  data_type: 'varchar'
-  is_nullable: 1
-  size: 12
-
-=head2 cramb37sent
-
-  data_type: 'char'
-  default_value: 'N'
-  is_nullable: 1
-  size: 1
-
-=head2 cramb37checksum
-
-  data_type: 'varchar'
-  is_nullable: 0
-  size: 96
-
-=head2 cramb38checksum
-
-  data_type: 'varchar'
-  is_nullable: 0
-  size: 96
-
-=head2 jobidcp2ncbi
-
-  data_type: 'varchar'
-  is_nullable: 1
-  size: 12
-
-=head2 bam_delivered
-
-  data_type: 'varchar'
-  is_nullable: 1
-  size: 12
-
-=head2 cramorigsent
-
-  data_type: 'char'
-  default_value: 'N'
-  is_nullable: 1
-  size: 1
 
 =head2 bamsize
 
@@ -569,8 +344,6 @@ __PACKAGE__->add_columns(
   "bamid",
   { data_type => "integer", is_auto_increment => 1, is_nullable => 0 },
   "runid",
-  { data_type => "integer", is_nullable => 0 },
-  "studyid",
   { data_type => "integer", is_nullable => 0 },
   "bamname",
   { data_type => "varchar", is_nullable => 0, size => 96 },
@@ -616,39 +389,21 @@ __PACKAGE__->add_columns(
   { data_type => "varchar", is_nullable => 1, size => 24 },
   "phs_sra_data_details",
   { data_type => "varchar", is_nullable => 1, size => 255 },
-  "ncbierr",
+  "emsg",
   { data_type => "varchar", is_nullable => 1, size => 255 },
   "checksum",
   { data_type => "varchar", is_nullable => 0, size => 96 },
-  "refname",
-  {
-    data_type => "varchar",
-    default_value => "UNKNOWN",
-    is_nullable => 1,
-    size => 96,
-  },
-  "expt_refname",
-  {
-    data_type => "varchar",
-    default_value => "UNKNOWN",
-    is_nullable => 1,
-    size => 96,
-  },
   "expt_sampleid",
   { data_type => "varchar", is_nullable => 1, size => 24 },
   "nwdid_known",
   { data_type => "char", default_value => "N", is_nullable => 1, size => 1 },
-  "donot_remap",
-  { data_type => "char", default_value => "", is_nullable => 1, size => 4 },
+  "poorquality",
+  { data_type => "char", default_value => "N", is_nullable => 1, size => 1 },
   "state_arrive",
   { data_type => "integer", default_value => 0, is_nullable => 1 },
-  "state_md5ver",
-  { data_type => "integer", default_value => 0, is_nullable => 1 },
-  "state_backup",
+  "state_verify",
   { data_type => "integer", default_value => 0, is_nullable => 1 },
   "state_cram",
-  { data_type => "integer", default_value => 0, is_nullable => 1 },
-  "state_bai",
   { data_type => "integer", default_value => 0, is_nullable => 1 },
   "state_qplot",
   { data_type => "integer", default_value => 0, is_nullable => 1 },
@@ -662,21 +417,9 @@ __PACKAGE__->add_columns(
   { data_type => "integer", default_value => 0, is_nullable => 1 },
   "state_ncbib37",
   { data_type => "integer", default_value => 0, is_nullable => 1 },
-  "state_ncbib38",
-  { data_type => "integer", default_value => 0, is_nullable => 1 },
-  "time_ncbiexpt",
-  { data_type => "char", is_nullable => 1, size => 19 },
-  "time_ncbiorig",
-  { data_type => "char", is_nullable => 1, size => 19 },
-  "time_ncbib37",
-  { data_type => "char", is_nullable => 1, size => 19 },
-  "time_ncbib38",
-  { data_type => "char", is_nullable => 1, size => 19 },
   "state_gce38push",
   { data_type => "integer", default_value => 0, is_nullable => 1 },
   "state_gce38pull",
-  { data_type => "integer", default_value => 0, is_nullable => 1 },
-  "state_gce38post",
   { data_type => "integer", default_value => 0, is_nullable => 1 },
   "state_bcf",
   { data_type => "integer", default_value => 0, is_nullable => 1 },
@@ -690,60 +433,12 @@ __PACKAGE__->add_columns(
   { data_type => "varchar", is_nullable => 1, size => 255 },
   "datearrived",
   { data_type => "varchar", is_nullable => 1, size => 12 },
-  "datemd5ver",
-  { data_type => "varchar", is_nullable => 1, size => 12 },
-  "dateqplot",
-  { data_type => "varchar", is_nullable => 1, size => 12 },
-  "datemapping",
-  { data_type => "varchar", is_nullable => 1, size => 12 },
-  "datereport",
-  { data_type => "varchar", is_nullable => 1, size => 12 },
-  "datebackup",
-  { data_type => "varchar", is_nullable => 1, size => 12 },
-  "datecram",
-  { data_type => "varchar", is_nullable => 1, size => 12 },
-  "datebai",
-  { data_type => "varchar", is_nullable => 1, size => 12 },
-  "datecp2ncbi",
-  { data_type => "varchar", is_nullable => 1, size => 12 },
-  "jobidarrived",
-  { data_type => "varchar", is_nullable => 1, size => 12 },
-  "jobidmd5ver",
-  { data_type => "varchar", is_nullable => 1, size => 12 },
-  "jobidbackup",
-  { data_type => "varchar", is_nullable => 1, size => 12 },
-  "jobidcram",
-  { data_type => "varchar", is_nullable => 1, size => 12 },
-  "jobidbai",
-  { data_type => "varchar", is_nullable => 1, size => 12 },
-  "jobidqplot",
-  { data_type => "varchar", is_nullable => 1, size => 12 },
-  "jobidmapping",
-  { data_type => "varchar", is_nullable => 1, size => 12 },
-  "jobidb37",
-  { data_type => "varchar", is_nullable => 1, size => 12 },
-  "jobidb38",
-  { data_type => "varchar", is_nullable => 1, size => 12 },
-  "jobidnwdid",
-  { data_type => "varchar", is_nullable => 1, size => 12 },
-  "jobidncbiorig",
-  { data_type => "varchar", is_nullable => 1, size => 12 },
-  "jobidncbib37",
-  { data_type => "varchar", is_nullable => 1, size => 12 },
-  "jobidncbib38",
-  { data_type => "varchar", is_nullable => 1, size => 12 },
-  "cramb37sent",
-  { data_type => "char", default_value => "N", is_nullable => 1, size => 1 },
-  "cramb37checksum",
-  { data_type => "varchar", is_nullable => 0, size => 96 },
-  "cramb38checksum",
-  { data_type => "varchar", is_nullable => 0, size => 96 },
-  "jobidcp2ncbi",
-  { data_type => "varchar", is_nullable => 1, size => 12 },
-  "bam_delivered",
-  { data_type => "varchar", is_nullable => 1, size => 12 },
-  "cramorigsent",
-  { data_type => "char", default_value => "N", is_nullable => 1, size => 1 },
+  "datemapping_b37",
+  {
+    data_type => "datetime",
+    datetime_undef_if_invalid => 1,
+    is_nullable => 1,
+  },
   "bamsize",
   { data_type => "varchar", default_value => 0, is_nullable => 1, size => 16 },
   "datayear",
@@ -830,8 +525,8 @@ __PACKAGE__->has_many(
 );
 
 
-# Created by DBIx::Class::Schema::Loader v0.07046 @ 2017-03-30 09:45:26
-# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:ZcDeH+MvY5x0y0TBSScvYg
+# Created by DBIx::Class::Schema::Loader v0.07046 @ 2017-04-10 09:59:48
+# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:VCNQXN5sP1VzkgoJacVnVw
 
 
 # You can replace this text with custom code or comments, and it will be preserved on regeneration
