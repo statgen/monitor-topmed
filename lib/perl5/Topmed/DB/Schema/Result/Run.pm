@@ -76,12 +76,6 @@ __PACKAGE__->table("runs");
   is_nullable: 1
   size: 1
 
-=head2 xmlfound
-
-  data_type: 'integer'
-  default_value: 0
-  is_nullable: 1
-
 =head2 arrived
 
   data_type: 'char'
@@ -123,8 +117,6 @@ __PACKAGE__->add_columns(
   { data_type => "integer", default_value => 2, is_nullable => 1 },
   "offsite",
   { data_type => "char", default_value => "N", is_nullable => 1, size => 1 },
-  "xmlfound",
-  { data_type => "integer", default_value => 0, is_nullable => 1 },
   "arrived",
   { data_type => "char", default_value => "N", is_nullable => 1, size => 1 },
   "dateinit",
@@ -148,8 +140,8 @@ __PACKAGE__->add_columns(
 __PACKAGE__->set_primary_key("runid");
 
 
-# Created by DBIx::Class::Schema::Loader v0.07046 @ 2017-01-06 14:26:01
-# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:JVxYT98VHBX50JOe5rkeTg
+# Created by DBIx::Class::Schema::Loader v0.07046 @ 2017-04-10 09:59:48
+# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:cjo8/I3P8YXfNr7xxpthJQ
 
 
 # You can replace this text with custom code or comments, and it will be preserved on regeneration
