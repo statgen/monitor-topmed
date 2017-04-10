@@ -22,8 +22,8 @@ sub completed_for_build {
   my ($self, %params) = @_;
 
   my $state_col_map = {
-    b37 => 'state_b37',
-    b38 => 'state_b38',
+    b37 => 'me.state_b37',
+    b38 => 'me.state_b38',
   };
 
   return unless exists $state_col_map->{$params{build}};
@@ -31,7 +31,12 @@ sub completed_for_build {
   return $self->search(
     {
       $state_col_map->{$params{build}} => $COMPLETED,
+      -and => [
+        {'qc_results.pct_freemix'     => {'<' => 3}},
+        {'qc_results.pct_genome_dp10' => {'>', 95}},
+      ],
     }, {
+      join     => 'qc_results',
       order_by => 'expt_sampleid',
     }
   );
