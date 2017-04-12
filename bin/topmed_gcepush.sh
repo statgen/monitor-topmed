@@ -114,7 +114,8 @@ fi
 #   Tell the Google Cloud processes that a new file has shown up
 tmperr=/tmp/$$.curlstderr
 tmpout=/tmp/$$.curloutput
-curl -f -i -u "csg:WV9kNT35udEE6B9Q" --insecure --data $nwdid --stderr $tmperr --output $tmpout  https://104.198.71.226/api/unprocessed-samples
+
+curl -f -i -u `cat /usr/cluster/topmed/etc/.db_connections/104.198.71.226.cred` --insecure --data $nwdid --stderr $tmperr --output $tmpout  https://104.198.71.226/api/unprocessed-samples
 rc=$?
 cat $tmpout $tmperr                         # So curl results are in log
 a=`grep 'Unprocessable Entity' $tmperr`     # Ignore errors we do not care about
