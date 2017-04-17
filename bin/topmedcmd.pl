@@ -643,11 +643,13 @@ sub ReFormatPartitionData {
         my $sth = ExecSQL("SELECT runid,expt_sampleid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
         if ($sth) {
             my $href = $sth->fetchrow_hashref;
-            if (defined($href->{expt_sampleid})) { $nwdid = $href->{expt_sampleid}; }
-            $sth = ExecSQL("SELECT dirname FROM $opts{runs_table} WHERE runid=$href->{runid}");
-            if ($sth) {
-                $href = $sth->fetchrow_hashref;
-                $dir = $href->{dirname};
+            if (exists($href->{expt_sampleid})) { $nwdid = $href->{expt_sampleid}; }
+            if (exists($href->{runid})) {
+                $sth = ExecSQL("SELECT dirname FROM $opts{runs_table} WHERE runid=$href->{runid}");
+                if ($sth) {
+                    $href = $sth->fetchrow_hashref;
+                    $dir = $href->{dirname};
+                }
             }
         }
     }
