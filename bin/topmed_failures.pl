@@ -55,7 +55,7 @@ our %opts = (
 my $STARTED   = 3;                      # Task started
 my $FAILED    = 99;                     # Task failed
 my %col2name = (
-    md5ver => 'verify',
+    verify => 'verify',
     qplot => 'qplot',
     cram => 'cram',
     ncbiexpt => 'sexpt',
@@ -78,13 +78,13 @@ $statecolsstarted = substr($statecolsstarted,0, length($statecolsstarted)-4);
 
 #   This is a map of part of a column name to the name in the log file
 my %col2logname = (
-    md5ver => 'verify',
-    backup => 'backup',
+    verify => 'verify',
+    cram => 'cram',
     qplot => 'qplot',
 );
 my %col2verb = (                    # Mark job as failed with topmedcmd.pl
-    md5ver => 'md5verified',
-    backup => 'backedup',
+    verify => 'verified',
+    cram => 'cramed',
     qplot => 'qploted',
 );
 my @colnames = keys %col2logname;   # Used in *_Failure functions
