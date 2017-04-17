@@ -130,8 +130,7 @@ sub Jobids {
         $sth = DoSQL($sql, 0);
         $href = $sth->fetchrow_hashref;
         if ($href->{'count(*)'}) { $bamcount = $href->{'count(*)'}; }
-        $sql = "SELECT count(*) FROM $opts{bamfiles_table} WHERE state_ncbiorig=$FAILED OR " .
-            "state_ncbib37=$FAILED OR state_ncbib38=$FAILED";
+        $sql = "SELECT count(*) FROM $opts{bamfiles_table} WHERE state_ncbiorig=$FAILED OR state_ncbib37=$FAILED";
         $sth = DoSQL($sql, 0);
         $href = $sth->fetchrow_hashref;
         if ($href->{'count(*)'}) { $errcount = $href->{'count(*)'}; }
