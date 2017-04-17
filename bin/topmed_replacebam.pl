@@ -226,7 +226,7 @@ open(OUT, '>' . $manifestfile) ||
 print OUT $ss;
 close(OUT);
 
-foreach my $fcn (qw(arrived md5verified baid qploted cramed)) {
+foreach my $fcn (qw(arrived verified qploted cramed)) {
     $cmd = "$opts{topmedcmd} mark $nwdid $fcn requested";
     DoOrDie($cmd);
 }
