@@ -76,6 +76,7 @@ $RUNNOTE = "<p><b>Note:</b><br>" .
 //  Make changes in topmedcmd.pl
 //  Make changes to topmed_status.pl
 //  Make changes to topmed_monitor.pl
+//  Make changes to topmedpermit.pl
 //  Create QOS for this new type of action
 $quickcols = array(                     // Map of status column to topmedcmd verb
     'state_arrive'   => 'arrived',
@@ -110,7 +111,7 @@ $quickletter = array(                   // Map of status column to letter we see
     'state_ncbib37'  => 'P'
 );
 $validfunctions = array('all', 'verify', 'qplot', 'cram',
-    'gcepush', 'gcepull', 'gcebcfpush', 'gcebcfpush');
+    'gcepush', 'gcepull', 'gcebcfpush', 'gcebcfpush', 'bcf');
 $NOTSET = 0;                // Not set
 $REQUESTED = 1;             // Task requested
 $SUBMITTED = 2;             // Task submitted to be run
@@ -159,14 +160,12 @@ if (in_array($_SERVER['REMOTE_USER'], $MGRS)) { $iammgr = 1; }
 if (in_array($_SERVER['REMOTE_USER'], $REQMGRS)) { $iammgr = 1; }
 //  If a manager, allow them to control job submission
 if ($iammgr) {
-    $s = str_replace("index", "datadump", $_SERVER['SCRIPT_NAME']);
     $SHOWSTATUS .= "<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=control' " .
         "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=control\",680,720); " .
         "return false;'>Control_Jobs</a> &nbsp;" .
         "<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=restart' " .
         "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=restart\",680,720); " .
         "return false;'>Restart_Jobs</a> &nbsp;" .
-        "<a href='$s'>DataDump</a> &nbsp;" .
         "<a href='http://nhlbi.sph.umich.edu/report/monitor.php' " .
         "onclick='javascript:popup2(\"http://nhlbi.sph.umich.edu/report/monitor.php\",680,720); " .
         "return false;'>ReMapping</a> &nbsp;";
