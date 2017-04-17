@@ -71,7 +71,7 @@ for ($i=0; $i<$numrows; $i++) {
     array_push($sqldata, $row);
 }
 
-$sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE datayear=$datayear AND state_md5ver=$COMPLETED";
+$sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE datayear=$datayear AND state_verify=$COMPLETED";
 $result = SQL_Query($sql);
 $row = SQL_Fetch($result);
 $totalbamcount = $row['count(*)'];
@@ -151,7 +151,7 @@ if ($fcn == 'plot') {
     MakePlot($plotdata, $title, $legend, '', '', 'stackedbars', 'text-data-yx');
     $XMAX = $xtmp;
 
-    $legend = array('cram', 'qplot', 'bai', 'md5ver', 'bcf');
+    $legend = array('cram', 'qplot', 'verify', 'bcf');
     $title = "Daily Count of Steps Completed";
     $plotdata = array(); 
     for ($i=0; $i<$numrows; $i++) {
