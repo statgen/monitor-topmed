@@ -565,7 +565,7 @@ my $partname = 'this got broken somehow';
 if ($fcn eq 'fixmapping') {
     my %old2new = (
 #        datearrived => 'state_arrive',
-#        datemd5ver => 'state_md5ver',
+#        datemd5ver => 'state_verify',
 #        datebackup => 'state_backup',
 #        datecram => 'state_cram',
 #        datebai => 'state_bai',
