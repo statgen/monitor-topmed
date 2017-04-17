@@ -45,7 +45,7 @@ sub completed_for_build {
 sub find_gce_bcf_samples {
   return shift->search(
     {
-      state_md5ver    => $COMPLETED,
+      state_verify    => $COMPLETED,
       state_gce38push => $COMPLETED,
       state_gce38bcf  => $NOTSET,
     }, {
