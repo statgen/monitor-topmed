@@ -46,6 +46,7 @@ my %attributes2letter = (
     'state_gce38bcf_push'=> 'x',
     'state_gce38bcf_pull'=> 'y',
     'state_bcf'      => 'B',
+    'state_38cp2gce' => 'U',
     'state_ncbiexpt' => 'X',
     'state_ncbiorig' => 'S',
     'state_ncbib37'  => 'P',
