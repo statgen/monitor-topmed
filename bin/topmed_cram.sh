@@ -12,35 +12,20 @@ illuminaref=/net/topmed/incoming/study.reference/study.reference/illumina.hg19.f
 backupdir=/net/topmed/working/backups
 
 me=cram
-mem=8G
 markverb=$me
 squeezed=n
-qos=''
-realhost=''
 
 if [ "$1" = "-submit" ]; then
   shift
-  #   May I submit this job?
-  $topmedpermit permit test $me $1
-  if [ "$?" = "0" ]; then
-    echo "$me $1 not permitted" | tee $console/$1-$me.out
-    exit 4
-  fi 
-
-  # Run this on node where bam lives
-  h=`$topmedpath whathost $1 bam`
-  if [ "$h" != "" ]; then
-    realhost="--nodelist=$h"
-    qos="--qos=$h-$me"
-  fi
+  bamid=`$topmedcmd show $1 bamid`
+  MayIRun $me $bamid
+  MyRealHost $bamid 'bam'
 
   #   Get destination directory for backup files
   backupdir=`$topmedpath wherepath $1 backup`
   if [ "$backupdir" = "" ]; then
-    echo "Unable to determine backup directory for '$bamid'. No job submitted."
-    exit 2
+    Fail "Unable to determine backup directory for '$bamid'. No job submitted."
   fi
-
   #  Is this squeezed or not?  For now this is only files from the Broad usually,
   #  however, not quite always.  $qual is the number of distinct base call quality 
   #  score values plus one if the bam is not squeezed.  (from Tom)
@@ -49,19 +34,7 @@ if [ "$1" = "-submit" ]; then
   if [ $qual -le 11 ]; then
     sq='-squeezed'
   fi
-
-  #  Submit this script to be run
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*`)
-  if [ "$?" != "0" ]; then
-    $topmedcmd -emsg "Failed to submit command to SLURM - $l" mark $1 $markverb failed
-    echo "Failed to submit command to SLURM - $l" > $console/$1-$me.out
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*" >> $console/$1-$me.out
-    exit 1
-  fi
-  $topmedcmd mark $1 $markverb submitted
-  if [ "${l[0]}" = "Submitted" ]; then      # Job was submitted, save job details
-    echo `date` $me ${l[3]} $slurmp $slurmqos $mem >> $console/$1.jobids
-  fi
+  SubmitJob $bamid "$topmed-$me" '8G' "$0 $sq $*"
   exit
 fi
 
@@ -81,34 +54,19 @@ fi
 bamid=$1
 bamfile=`$topmedpath wherefile $bamid bam`
 
-#   Is this a cram or bam
-extension="${bamfile##*.}"
-
 #   Get destination directory for backup files
 backupdir=`$topmedpath wherepath $bamid backup`
 if [ "$backupdir" = "" ]; then
-  $topmedcmd -persist -emsg "Unable to determine backup directory for '$bamid'" mark $bamid $markverb failed
-  exit 2
+  Fail "Unable to determine backup directory for '$bamid'"
 fi
 
-d=`date +%Y/%m/%d`
-s=`hostname`
-p=`pwd`
-echo "#========= '$d' host=$s $SLURM_JOB_ID squeezed=$squeezed $0 bamid=$bamid bamfile=$bamfile backupdir=$backupdir pwd=$p========="
-
-#   Mark this as started
-$topmedcmd mark $bamid $markverb started
+Started
+GetNWDID $bamid
 stime=`date +%s`
+newname="$nwdid.src.cram"
+
 #   Try to force everything as readonly
 chmod 555 $bamfile 2> /dev/null
-
-#   Be sure that NWDID is set in database
-nwdid=`$topmedcmd show $bamid expt_sampleid`
-if [ "$nwdid" = "" ]; then
-  $topmedcmd -persist -emsg "NWDID not set for $bamid $bamfile" mark $bamid $markverb failed
-  exit 3
-fi
-newname="$nwdid.src.cram"
 
 #======================================================================
 #   Original input file was a cram
@@ -116,25 +74,23 @@ newname="$nwdid.src.cram"
 #   Some centers deliver us a cram. In this case we do not need to
 #   create a cram, but just copy it elsewhere.
 #======================================================================
+extension="${bamfile##*.}"
 if [ "$extension" = "cram" ]; then
   d=`$topmedcmd -persist show $bamid run`
   if [ "$d" = "" ]; then
-    $topmedcmd -persist -emsg "Unable to determine name of run for '$bamid'" mark $bamid $markverb failed
-    exit 3
+    Fail "Unable to determine name of run for '$bamid'"
   fi
   offsite=`$topmedcmd -persist show $d offsite`
   if [ "$offsite" = "N" ]; then
     now=`date +%s`
     cp -p $bamfile.crai $backupdir/$newname.crai
     if [ "$?" != "0" ]; then
-      $topmedcmd -persist -emsg "Copy command failed: cp -p $bamfile.crai $backupdir/$newname.crai" mark $bamid $markverb failed
-      exit 3
+      Fail "Copy command failed: cp -p $bamfile.crai $backupdir/$newname.crai"
     fi
 
     cp -p $bamfile $backupdir/$newname
     if [ "$?" != "0" ]; then
-      $topmedcmd -persist -emsg "Copy command failed: cp -p $bamfile $backupdir/$newname" mark $bamid $markverb failed
-      exit 3
+      Fail "Copy command failed: cp -p $bamfile $backupdir/$newname"
     fi
     chmod 0444 $backupdir/$newname
     s=`date +%s`; s=`expr $s - $now`; echo "Copy completed in $s seconds"
@@ -143,30 +99,28 @@ if [ "$extension" = "cram" ]; then
     mkdir -p $backupdir             # Safe to make backup dir cause it is small
     cd $backupdir
     if [ "$?" != "0" ]; then
-        $topmedcmd -persist -emsg "Unable to CD $backupdir. This directory must be created first." mark $bamid $markverb failed
-        exit 2
+        Fail "Unable to CD $backupdir. This directory must be created first."
     fi
     ln -sf $bamfile $newname        # Create backup file as symlink
     ln -sf $bamfile.crai $newname.crai
     if [ ! -f $newname ]; then
-        $topmedcmd -persist -emsg "Unable to create backup file '$newname' in '$backupdir'" mark $bamid $markverb failed
-        exit 2
+        Fail "Unable to create backup file '$newname' in '$backupdir'"
     fi
   fi
 
   # The md5 for the backup is the same as that for the input
   md5=`$topmedcmd show $bamid checksum`
-  $topmedcmd -persist set $bamid cramchecksum $md5
+  SetDB $bamid 'cramchecksum' $md5
 
   #   Paired reads count for this file is unchanged
   reads=`$topmedcmd -persist show $bamid bamflagstat`
-  $topmedcmd -persist set $bamid cramflagstat $reads
+  SetDB $bamid 'cramflagstat' $reads
 
   #   All was good
-  $topmedcmd -persist mark $bamid $markverb completed
+  Successful
   etime=`date +%s`
   etime=`expr $etime - $stime`
-  echo `date` $me $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
+  Log $etime
   echo "CRAM backup completed, created $backupdir/$newname"
   exit
 fi
@@ -177,8 +131,7 @@ fi
 #mkdir -p $backupdir            # We run out of space if we make it ourselves
 cd $backupdir
 if [ "$?" != "0" ]; then
-  $topmedcmd -persist -emsg "Unable to CD $backupdir. This directory must be created first." mark $bamid $markverb failed
-  exit 2
+  Fail "Unable to CD $backupdir. This directory must be created first." 
 fi
 
 chkname=`basename $bamfile .bam`
@@ -187,8 +140,7 @@ chkname=`basename $bamfile .bam`
 now=`date +%s`
 $topmedflagstat $bamfile $bamid bamflagstat /tmp/${chkname}.init.stat
 if [ "$?" != "0" ]; then
-  $topmedcmd -persist -emsg "Command failed: $flagstat $bamfile" mark $bamid $markverb failed
-  exit 3
+  Fail "Command failed: $flagstat $bamfile"
 fi
 s=`date +%s`; s=`expr $s - $now`; echo "$flagstat completed in $s seconds"
 
@@ -206,15 +158,14 @@ now=`date +%s`
 #   Running 'samtools index' on a .cram file does NOT require 
 #   an explicit genome reference sequence, but 'samtools view' 
 #   does.  (And, 'samtools flagstat' does accept .sam input.)
+echo "Creating cram from $bamfile"
 if [ "$squeezed" = "n" ]; then
   $bindir/bam squeeze  --in $bamfile  --out - --rmTags "BI:Z;BD:Z;PG:Z"  --keepDups --binMid  --binQualS  2,3,10,20,25,30,35,40,50 | $samtools view  -C -T  $ref  -  >  $newname 
 else 
   $samtools view  -C -T $ref  $bamfile  >  $newname
 fi
 if [ "$?" != "0" ]; then
-  echo "Command failed: $bindir/bam squeeze  --in $bamfile ..."
-  $topmedcmd -persist mark $bamid $markverb failed
-  exit 1
+  Fail "Command failed: $bindir/bam squeeze  --in $bamfile ..." 
 fi
 s=`date +%s`; s=`expr $s - $now`; echo "Cram created in $s seconds"
 
@@ -222,8 +173,7 @@ s=`date +%s`; s=`expr $s - $now`; echo "Cram created in $s seconds"
 now=`date +%s`
 $samtools index $newname
 if [ "$?" != "0" ]; then
-  $topmedcmd -persist emsg "Command failed: $samtools index $newname" mark $bamid $markverb failed
-  exit 3
+  Fail "Command failed: $samtools index $newname"
 fi
 s=`date +%s`; s=`expr $s - $now`; echo "Cram index created in $s seconds"
 
@@ -231,17 +181,15 @@ s=`date +%s`; s=`expr $s - $now`; echo "Cram index created in $s seconds"
 now=`date +%s`
 $topmedflagstat $newname $bamid cramflagstat /tmp/${chkname}.cram.stat
 if [ "$?" != "0" ]; then
-  $topmedcmd -persist -emsg "Command failed: $flagstat $bamfile" mark $bamid $markverb failed
-  exit 3
+  Fail "Command failed: $flagstat $bamfile"
 fi
 s=`date +%s`; s=`expr $s - $now`; echo "$flagstat for cram completed in $s seconds"
 
 #   Did flagstat output for cram match that for the input bam?
 diff=`diff  /tmp/${chkname}.init.stat  /tmp/${chkname}.cram.stat | wc -l`
 if [ "$diff" != "0" ]; then
-  $topmedcmd -persist -emsg "Stat for backup CRAM file differs from that for original BAM" mark $bamid $markverb failed
   diff  /tmp/${chkname}.init.stat  /tmp/${chkname}.cram.stat
-  exit 2
+  Fail "Stat for backup CRAM file differs from that for original BAM"
 fi
 echo "Stat for CRAM file matches that of original"
 rm -f /tmp/${chkname}.init.stat  /tmp/${chkname}.cram.stat
@@ -251,8 +199,7 @@ now=`date +%s`
 #   Calculate the MD5 for the cram
 md5=`$calcmd5 $newname | awk '{print $1}'`
 if [ "$md5" = "" ]; then
-  $topmedcmd -persist -emsg "Command failed: md5sum $newname" mark $bamid $markverb failed
-  exit 3
+  Fail "Command failed: md5sum $newname"
 fi
 $topmedcmd set $bamid cramchecksum $md5
 s=`date +%s`; s=`expr $s - $now`; echo "MD5 calculated in $s seconds"
@@ -261,5 +208,5 @@ here=`pwd`
 etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "BAM to CRAM backup completed in $etime seconds, created $here/$newname"
-$topmedcmd -persist mark $bamid $markverb completed
-echo `date` $me $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
+Successful
+Log $etime
