@@ -116,6 +116,13 @@ CREATE TABLE bamfiles (
   nwdid_known  CHAR(1) DEFAULT 'N',     /* Sample is known to NCBI */
   poorquality  CHAR(1) DEFAULT 'N',     /* Quality of sample is poor, do not use */
 
+  datearrived  VARCHAR(12),             /* Referenced in nhlbi_qc_metrics */
+  bamsize      VARCHAR(16) DEFAULT 0,   /* Referenced in nhlbi_qc_metrics */
+  datayear     INT DEFAULT 3,           /* Year of project: 1, 2 ... */\
+  build        VARCHAR(4) DEFAULT '37', /* Build original input file user, 37, 38 etc */
+  dateinit     VARCHAR(12),             /* Referenced in nhlbi_qc_metrics */
+  bamname_orig VARCHAR(96) NOT NULL,
+
 /* Fields to track state for each step */
 /*
 my $NOTSET    = 0;            # Not set
@@ -148,19 +155,11 @@ my $FAILED    = 99;           # Task failed
   state_gce38bcf  INT DEFAULT 0,    /* Status of task of remote action */
   gce38bcf_opid   VARCHAR(255),     /* google pipeline id */
 
-  datearrived  VARCHAR(12),             /* Referenced in nhlbi_qc_metrics */
-  bamsize      VARCHAR(16) DEFAULT 0,   /* Referenced in nhlbi_qc_metrics */
-  datayear     INT DEFAULT 3,           /* Year of project: 1, 2 ... */\
-  build        VARCHAR(4) DEFAULT '37', /* Build original input file user, 37, 38 etc */
-  dateinit     VARCHAR(12),             /* Referenced in nhlbi_qc_metrics */
-  bamname_orig VARCHAR(96) NOT NULL,
+  state_38cp2gce  INT DEFAULT 0,    /* Copy local data to BCF buckets */
 
   PRIMARY KEY  (bamid)
 );
 
-/* ************************** Delete these columns **************************
-
-*/
 
 /*   Handy queries
 

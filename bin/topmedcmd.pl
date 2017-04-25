@@ -55,6 +55,7 @@ my %VALIDVERBS = (                  # Valid verbs to database colum
     b37        => 'state_b37',   
     b38        => 'state_b38',     
     bcf        => 'state_bcf',     
+    gcecopy    => 'state_38cp2gce',     
     ncbiexpt   => 'state_ncbiexpt',
     ncbiorig   => 'state_ncbiorig',
     ncbib37    => 'state_ncbib37',
@@ -165,6 +166,7 @@ exit;
 sub Mark {
     my ($bamid, $op, $state) = @_;
     $bamid = GetBamid($bamid);
+    if ($op eq 'fix') { return; }
     if ((! exists($VALIDVERBS{$op})) || (! exists($VALIDSTATUS{$state}))) {
         die "$Script - Invalid 'mark' syntax. Try '$Script -help'\n";
     }
@@ -606,7 +608,9 @@ sub sorthost {
 #==================================================================
 sub ReFormatIOData {
     my ($str) = @_;
+    if ((! defined($str)) || $str eq '') { return ''; }
     my @c = split(' ', $str);
+    if ($#c < 5) { return ''; }
     return sprintf('   %5s %7s %6s', $c[0], $c[3], $c[5]);
 }
 
@@ -618,11 +622,13 @@ sub ReFormatIOData {
 #==================================================================
 sub ReFormatDeviceData {
     my ($str) = @_;
+    if ((! defined($str)) || $str eq '') { return ''; }
     my @c = split(' ', $str);
     if ($c[0] eq 'md20') { $c[0] = '/incoming'; }
     else {
         if ($c[0] eq 'md21') { $c[0] = '/working'; }
     }
+    if ($#c < 3) { return ''; }
     return sprintf('%-9s %10s %10s', $c[0], $c[2], $c[3]);
 }
 
