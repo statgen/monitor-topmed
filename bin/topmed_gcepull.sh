@@ -7,45 +7,16 @@
 . /usr/cluster/topmed/bin/topmed_actions.inc
 
 me=gcepull
-mem=2G
 markverb=$me
+cores="--cpus-per-task=2"           # Cores here should be same as gsutil
 build=38
-qos="--qos=topmed-$me"
-realhost=''
-
-cores="--cpus-per-task=2"         # Cores here should be same as gsutil
-gsutil='gsutil -o GSUtil:parallel_composite_upload_threshold=150M -o GSUtil:parallel_process_count=2'
-incominguri='gs://topmed-recabs'
-bcfuri='gs://topmed-bcf'
 
 if [ "$1" = "-submit" ]; then
   shift
-  #   May I submit this job?
-  $topmedpermit permit test $me $1
-  if [ "$?" = "0" ]; then
-    echo "$me $1 not permitted" | tee $console/$1-$me.out
-    exit 4
-  fi 
-
-  # Run this on node where remapped cram will live
-  h=`$topmedpath whathost $1 b$build`
-  if [ "$h" != "" ]; then
-    realhost="--nodelist=$h"
-    #qos="--qos=$h-$me"
-  fi
-
-  #  Submit this script to be run
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $cores $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*`)
-  if [ "$?" != "0" ]; then
-    $topmedcmd -emsg "Failed to submit command to SLURM - $l" mark $1 $markverb failed
-    echo "Failed to submit command to SLURM - $l" > $console/$1-$me.out
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $cores $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*" >> $console/$1-$me.out
-    exit 1
-  fi
-  $topmedcmd mark $1 $markverb submitted
-  if [ "${l[0]}" = "Submitted" ]; then      # Job was submitted, save job details
-    echo `date` $me ${l[3]} $slurmp $slurmqos $mem >> $console/$1.jobids
-  fi
+  bamid=`$topmedcmd show $1 bamid`
+  MayIRun $me  $bamid
+  MyRealHost $bamid 'b$build'
+  SubmitJob $bamid "$topmed-$me" '2G' "$0 $*"
   exit
 fi
 
@@ -61,47 +32,26 @@ bamid=$1
 #   Get remapped cram file location
 crampath=`$topmedpath wherepath $bamid b$build`
 if [ "$crampath" = "" ]; then
-  $topmedcmd -persist -emsg "Unable to determine where remapped CRAM file should go for '$bamid'" mark $bamid $markverb failed
-  exit 2
+  Fail "Unable to determine where remapped CRAM file should go for '$bamid'"
 fi
-
-nwdid=`$topmedcmd show $bamid expt_sampleid`
-if [ "$nwdid" = "" ]; then
-  $topmedcmd -persist -emsg "Unable to get expt_sampleid for bamid '$bamid'" mark $bamid $markverb failed
-  exit 2
-fi
-cramfile=$crampath/$nwdid.recab.cram
-
-d=`date +%Y/%m/%d`
-s=`hostname`
-p=`pwd`
-echo "#========= '$d' host=$s $SLURM_JOB_ID $0 bamid=$bamid cramfile=$cramfile pwd=$p ========="
-
-#   Mark this as started
-$topmedcmd mark $bamid $markverb started
-
 mkdir -p $crampath
 if [ "$?" != "0" ]; then
-  $topmedcmd -persist -emsg "Unable to create '$crampath' for remapped CRAM for '$bamid'" mark $bamid $markverb failed
-  exit 2
+  Fail "Unable to create '$crampath' for remapped CRAM for '$bamid'"
 fi
+
+Started
+GetNWDID $bamid
+cramfile=$crampath/$nwdid.recab.cram
 
 #======================================================================
 #   Copy remapped CRAM from GCE, check flagstat, fix up database
 #======================================================================
 cramflagstat=`$topmedcmd show $bamid cramflagstat`
 if [ "$cramflagstat" = "" ]; then
-  $topmedcmd -persist -emsg "Unable to get cramflagstat for bamid '$bamid'" mark $bamid $markverb failed
-  exit 2
+  Fail "Unable to get cramflagstat for bamid '$bamid'"
 fi
 
 stime=`date +%s`
-export BOTO_CONFIG=/net/topmed/working/shared/tpg_gsutil_config.txt
-mkdir -p $crampath
-if [ "$?" != "0" ]; then
-  $topmedcmd -persist -emsg "Unable to create directory for remapped data '$crampath' for bamid '$bamid'" mark $bamid $markverb failed
-  exit 3
-fi
 
 #   Remapped cram could be > one place (arrgh!)  Figure out where it is
 inuri=''
@@ -114,7 +64,7 @@ for i in $incominguri $bcfuri; do
   fi
 done
 if [ "$inuri" = "" ]; then
-  $topmedcmd -persist -emsg "Unable to find $nwdid/$nwdid.recab.cram in: $incominguri $bcfuri" mark $bamid $markverb failed
+  Fail "Unable to find $nwdid/$nwdid.recab.cram in: $incominguri $bcfuri"
   exit 3
 fi
 
@@ -122,16 +72,14 @@ fi
 echo "Checking if flagstat is as we expect from $inuri"
 $gsutil cp  $inuri/$nwdid/$nwdid.recab.cram.flagstat $crampath
 if [ "$?" != "0" ]; then
-  $topmedcmd -persist -emsg "Failed to copy flagstat from GCE: $inuri/$nwdid/$nwdid.recab.cram.flagstat" mark $bamid $markverb failed
-  exit 3
+  Fail "Failed to copy flagstat from GCE: $inuri/$nwdid/$nwdid.recab.cram.flagstat"
 fi
 #   Get number of interest from flagstat file and check it
 n=`grep 'paired in sequencing' $crampath/$nwdid.recab.cram.flagstat | awk '{print $1}'`
 if [ "$n" != "$cramflagstat" ]; then
-  $topmedcmd -persist -emsg "Flagstat '$n' did not match cramflagstat '$cramflagstat' for bamid '$bamid' nwdid $nwdid  -- URL=$inuri" mark $bamid $markverb failed
   # Renaming the flagstat file stops pull from happening again
   $gsutil mv $inuri/$nwdid/$nwdid.recab.cram.flagstat $inuri/$nwdid/$nwdid.recab.cram.flagstat.nomatch
-  exit 3
+  Fail "Flagstat '$n' did not match cramflagstat '$cramflagstat' for bamid '$bamid' nwdid $nwdid  -- URL=$inuri"
 fi
 echo "Flagstat value is correct: $n"
 
@@ -144,8 +92,7 @@ fi
 echo "Copying remapped CRAM to local file $crampath"
 $gsutil cp $inuri/$nwdid/$nwdid.recab.cram $crampath
 if [ "$?" != "0" ]; then
-  $topmedcmd -persist -emsg "Failed to copy file from GCE $inuri/$nwdid/$nwdid.recab.cram $crampath" mark $bamid $markverb failed
-  exit 3
+  Fail "Failed to copy file from GCE $inuri/$nwdid/$nwdid.recab.cram $crampath"
 fi
 
 #   Post processing needed here
@@ -153,8 +100,7 @@ echo "Calculating MD5 for local file ($cramfile)"
 md5=(`md5sum $cramfile`)
 md5=${md5[0]}
 if [ "$md5" = "" ]; then
-  $topmedcmd -persist -emsg "Unable to calculate MD5 for remapped '$bamid' [$nwdid] cramfile=$cramfile" mark $bamid $markverb failed
-  exit 2
+  Fail "Unable to calculate MD5 for remapped '$bamid' [$nwdid] cramfile=$cramfile"
 fi
 $topmedcmd -persist set $bamid cramb38checksum $md5
 echo "Set checksum for b$build file"
@@ -179,7 +125,7 @@ etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "Copy of remapped CRAM from GCE to $crampath completed in $etime seconds"
 
-$topmedcmd -persist mark $bamid $markverb completed
+Successful
 $topmedcmd -persist mark $bamid gcepost completed
-echo `date` $me $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
+Log $etime
 exit

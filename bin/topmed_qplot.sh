@@ -13,38 +13,13 @@ fixverifybamid=/usr/cluster/topmed/bin/nhlbi.1648.vbid.rewrite.awk
 
 me=qplot
 markverb=$me
-mem=16G                     # Should be 8G, avoid too many at once on one host
-qos=''
-realhost=''
 
 if [ "$1" = "-submit" ]; then
   shift
-  #   May I submit this job?
-  $topmedpermit permit test $me $1
-  if [ "$?" = "0" ]; then
-    echo "$me $1 not permitted" | tee $console/$1-$me.out
-    exit 4
-  fi 
-
-  # Run on qos for node where bam lives
-  h=`$topmedpath whathost $1 bam`
-  if [ "$h" != "" ]; then
-    qos="--qos=$h-$me"
-    #realhost="--nodelist=$h"
-  fi
-
-  #   Low rate of access to cram, small output
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $*`)
-  if [ "$?" != "0" ]; then
-    $topmedcmd -emsg "Failed to submit command to SLURM - $l" mark $1 $markverb failed
-    echo "Failed to submit command to SLURM - $l" > $console/$1-$me.out
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $qos $nodelist --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $*" >> $console/$1-$me.out
-    exit 1
-  fi
-  $topmedcmd mark $1 $markverb submitted
-  if [ "${l[0]}" = "Submitted" ]; then      # Job was submitted, save job details
-    echo `date` qplot ${l[3]} $slurmp $qos $realhost $mem $realhost >> $console/$1.jobids
-  fi
+  bamid=`$topmedcmd show $1 bamid`
+  MayIRun $me $bamid
+  MyRealHost $bamid 'bam'
+  SubmitJob $bamid "$realhost-$me" '16G' "$0 $*"
   exit
 fi
 
@@ -57,37 +32,27 @@ if [ "$1" = "" ]; then
 fi
 bamid=$1
 bamfile=`$topmedpath wherefile $bamid bam`
-
-#   Is this a cram or bam
 extension="${bamfile##*.}"
 
 #   Mark this as started
-$topmedcmd mark $bamid $markverb started
-d=`date +%Y/%m/%d`
-stime=`date +%s`
-s=`hostname`
-echo "#========= $d host=$s $SLURM_JOB_ID $0 bamid=$bamid bamfile=$bamfile ========="
+Started 
+GetNWDID $bamid
+
+#   Figure out index file name
 bai=$bamfile.bai
 if [ "$extension" = "cram" ]; then
   bai=$bamfile.crai
-fi
-nwdid=`$topmedcmd -persist show $bamid expt_sampleid`
-if [ "$nwdid" = "" ]; then
-  echo "Unable to find the NWDID for '$bamid'"
-  exit 6
 fi
 
 #   Create output directory and CD there
 outdir=`$topmedpath wherepath $bamid qcresults`
 if [ "$outdir" = "" ]; then
-  $topmedcmd -persist -emsg "Unable to get QCRESULTS directory for '$bamid' - $outdir"  mark $bamid $markverb failed
-  exit 3
+  Fail "Unable to get QCRESULTS directory for '$bamid' - $outdir"
 fi
 mkdir -p $outdir
 cd $outdir
 if [ "$?" != "0" ]; then
-  $topmedcmd -persist -emsg "Unable to CD to qplot output directory for '$bamid' - $outdir" mark $bamid $markverb failed
-  exit 3
+  Fail "Unable to CD to qplot output directory for '$bamid' - $outdir"
 fi
 echo "Files will be created in $outdir"
 
@@ -98,8 +63,7 @@ else
   echo "Creating index file '$bai'"
   $samtools index $bamfile 2>&1
   if [ "$?" != "0" ]; then
-    $topmedcmd -persist -emsg "Unable to create index file for '$bamfile' in '$outdir'" mark $bamid $markverb failed
-    exit 2
+    Fail "Unable to create index file for '$bamfile' in '$outdir'"
   fi
 fi
 
@@ -113,19 +77,17 @@ if [ "$build" = "37" ]; then
   --label $basebam --stats $basebam.qp.stats --Rcode $basebam.qp.R $bamfile 2>&1
   rc=$?
 fi
-if [ "$build" = "38" ]; then
+if [ "$build" = "38" ]; then        # Someday this will fail because it got moved
   hmkangfiles=/net/fantasia/home/hmkang/code/working/gotcloud_topmed_tmp
   $samtools view -uh -T /data/local/ref/gotcloud.ref/hg38/hs38DH.fa $bamfile | $hmkangfiles/gotcloud/bin/qplot --reference /data/local/ref/gotcloud.ref/hg38/hs38DH.fa --dbsnp /data/local/ref/gotcloud.ref/hg38/dbsnp_142.b38.vcf.gz --stats $basebam.qp.stats --Rcode $basebam.qp.R -.ubam 2>&1
   rc=$?
 fi
 if [ "$rc" = "none" ]; then
-  $topmedcmd -persist -emsg "Unknown build '$build', cannot continue with qplot for '$bamfile'" mark $bamid $markverb failed
-  exit 3
+  Fail "Unknown build '$build', cannot continue with qplot for '$bamfile'"
 fi
 if [ "$rc" != "0" ]; then
-  $topmedcmd -persist -emsg "QPLOT failed for '$bamfile'" mark $bamid $markverb failed
   rm -f $basebam.*
-  exit 4
+  Fail "QPLOT failed for '$bamfile'"
 fi
 
 #   One last sanity check. Qplot can easily be fooled if samtools truncates
@@ -135,14 +97,12 @@ statsfile=
 bamflagstat=`$topmedcmd show $bamid bamflagstat`   # Same for cram or bam
 tr=`grep TotalReads $basebam.qp.stats | awk '{ print $2 }'`
 if [ "$tr" = "" ]; then
-  $topmedcmd -persist -emsg "QPLOT data $nwdid.src.qp.stats not found or TotalReads not found" mark $bamid $markverb failed
-  exit 3
+  Fail "QPLOT data $nwdid.src.qp.stats not found or TotalReads not found"
 fi
 tr=`perl -E "print $tr*1000000"`    # Man is hard to do mutiply of float in shell !
 tr=`expr $tr + 5001`
 if [ "$tr" -lt "$bamflagstat" ]; then
-  $topmedcmd -persist -emsg "QPLOT data must have been truncated. TotalReads=$tr  Flagstat=$bamflagstat" mark $bamid $markverb failed
-  exit 3
+  Fail "QPLOT data must have been truncated. TotalReads=$tr  Flagstat=$bamflagstat"
 fi
 echo "Qplot output seems reasonable: TotalReads=$tr  Flagstat=$bamflagstat"
 
@@ -168,15 +128,11 @@ else
     rc=$?
 fi
 if [ "$rc" != "0" ]; then
-  echo "VerifyBAMID failed for '$bamid'"
-  $topmedcmd -persist mark $bamid $markverb failed
   rm -f $basebam.*
-  exit 5
+  Fail "VerifyBAMID failed for '$bamid'"
 fi
 etime=`date +%s`
-etime=`expr $etime - $stime`
 echo "VerifyBAMID on '$bamfile' successful (at second $etime)"
-etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "Command completed in $etime seconds. Created files:"
 ls -la $basebam.*
@@ -184,11 +140,10 @@ ls -la $basebam.*
 #   Now attempt to put the QPLOT data into the database
 $topmedqplot $outdir $nwdid
 if [ "$?" != "0" ]; then
-  $topmedcmd -persist emsg "Unable to update the database with the QCPLOT results for '$bamid' [$outdir $nwdid]" mark $bamid $markverb failed
   echo "Maybe try again later with: $topmedqplot $outdir $nwdid"
-  exit 7
+  Fail "Unable to update the database with the QCPLOT results for '$bamid' [$outdir $nwdid]"
 fi
 
-$topmedcmd -persist mark $bamid $markverb completed
-  echo `date` $me $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
+Successful
+Log $etime
 exit 0

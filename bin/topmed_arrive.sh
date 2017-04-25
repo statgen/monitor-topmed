@@ -28,8 +28,8 @@ fi
 bamid=$1
 bamfile=`$topmedpath wherefile $bamid bam`
 
-#   Mark this as started
-$topmedcmd -persist mark $bamid $markverb started || exit $?
+Started
+GetNWDID $bamid
 
 #   Determine build used to generate this bam/cram
 build=''
@@ -47,11 +47,11 @@ else
   fi
 fi
 if [ "$build" = "" ]; then
-  $topmedcmd -emsg "Unable to determine build for '$bamfile' (L2=${l[2]} L5=${l[5]}" mark $bamid $markverb failed
+  Fail "Unable to determine build for '$bamfile' (L2=${l[2]} L5=${l[5]}"
   exit 4
 fi
 echo "File '$bamfile' [$bamid] is from build $build"
-$topmedcmd -persist set $bamid build $build
+SetDB $bamid 'build' $build
 
 #   Set NWDID and other database fields
 $topmednwd -bamid $bamid $bamfile

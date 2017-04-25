@@ -7,52 +7,15 @@
 . /usr/cluster/topmed/bin/topmed_actions.inc
 
 me=gcepush
-mem=2G
 markverb=$me
 cores="--cpus-per-task=2"           # Cores here should be same as gsutil
-gsutil='gsutil -o GSUtil:parallel_composite_upload_threshold=150M -o GSUtil:parallel_process_count=2'
-incominguri='gs://topmed-incoming'
-qos="--qos=topmed-$me"
-realhost=''
 
 if [ "$1" = "-submit" ]; then
   shift
-  #   May I submit this job?
-  $topmedpermit permit test $me $1
-  if [ "$?" = "0" ]; then
-    echo "$me $1 not permitted" | tee $console/$1-$me.out
-    exit 4
-  fi 
-
-  # Run this on node where cram lives, unless it is csgspare and then make up something
-  h=`$topmedpath whathost $1 cram`
-  if [ "$h" != "" ]; then
-    if [ "$h" = "csgspare" ]; then
-      n=`perl -e "{ print $1%7 }"`
-      h="topmed$n"
-      if [ "$h" = "topmed0" ]; then
-        h=topmed2
-      fi
-      if [ "$h" = "topmed1" ]; then
-        h=topmed4
-      fi
-    fi
-    realhost="--nodelist=$h"
-    #qos="--qos=$h-$me"
-  fi
-
-  #  Submit this script to be run
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $cores $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*`)
-  if [ "$?" != "0" ]; then
-    echo "Failed to submit command to SLURM - $l" > $console/$1-$me.out
-    $topmedcmd -emsg "Failed to submit command to SLURM - $l" mark $1 $markverb failed
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem $realhost $cores $qos --workdir=$console -J $1-$me --output=$console/$1-$me.out $0 $sq $*" >> $console/$1-$me.out
-    exit 1
-  fi
-  $topmedcmd mark $1 $markverb submitted
-  if [ "${l[0]}" = "Submitted" ]; then      # Job was submitted, save job details
-    echo `date` $me ${l[3]} $slurmp $slurmqos $mem >> $console/$1.jobids
-  fi
+  bamid=`$topmedcmd show $1 bamid`
+  MayIRun $me  $bamid
+  RandomRealHost $bamid
+  SubmitJob $bamid "$topmed-$me" '2G' "$0 $*"
   exit
 fi
 
@@ -71,44 +34,38 @@ if [ "$cramfile" = "" ]; then
   cramfile=`$topmedpath wherefile $bamid cram`
 fi
 if [ "$cramfile" = "" ]; then
-  $topmedcmd -persist -emsg "Unable to determine CRAM file for '$bamid'" mark $bamid $markverb failed
-  exit 2
+  Fail "Unable to determine CRAM file for '$bamid'"
 fi
 
-d=`date +%Y/%m/%d`
-s=`hostname`
-p=`pwd`
-echo "#========= '$d' host=$s $SLURM_JOB_ID $0 bamid=$bamid cramfile=$cramfile pwd=$p ========="
-
-#   Mark this as started
-$topmedcmd mark $bamid $markverb started
+Started
+GetNWDID $bamid
 
 #======================================================================
 #   Copy CRAM to Google Cloud
 #======================================================================
 center=`$topmedcmd show $bamid center`
 if [ "$center" = "" ]; then
-  $topmedcmd -persist -emsg "Unable to get center for bamid '$bamid'" mark $bamid $markverb failed
-  exit 2
+  Fail "Unable to get center for bamid '$bamid'"
 fi
 run=`$topmedcmd show $bamid run`
 if [ "$run" = "" ]; then
-  $topmedcmd -persist -emsg "Unable to get run for bamid '$bamid'" mark $bamid $markverb failed
-  exit 2
+  Fail "Unable to get run for bamid '$bamid'"
 fi
-nwdid=`$topmedcmd show $bamid expt_sampleid`
-if [ "$nwdid" = "" ]; then
-  $topmedcmd -persist -emsg "Unable to get expt_sampleid for bamid '$bamid'" mark $bamid $markverb failed
-  exit 2
+datayear=`$topmedcmd show $bamid datayear`
+if [ "$datayear" = "3" ]; then
+  build=`$topmedcmd show $bamid build`
+  if [ "$build" = "38" ]; then
+    Fail "Datayear $datayear build $build jobs should not be remapped (bamid '$bamid')"
+  else
+    echo "Datayear $datayear build $build needs remapping"
+  fi
 fi
 
 stime=`date +%s`
 echo "Copying CRAM to $incominguri/$center/$run/$nwdid.src.cram"
-export BOTO_CONFIG=/net/topmed/working/shared/tpg_gsutil_config.txt
 $gsutil cp $cramfile $incominguri/$center/$run/$nwdid.src.cram
 if [ "$?" != "0" ]; then
-  $topmedcmd -persist -emsg "Failed to copy file to GCE" mark $bamid $markverb failed
-  exit 3
+  Fail "Failed to copy file to GCE"
 fi
 
 #   Tell the Google Cloud processes that a new file has shown up
@@ -122,8 +79,9 @@ a=`grep 'Unprocessable Entity' $tmperr`     # Ignore errors we do not care about
 rm $tmperr $tmpout
 if [ "$a" = "" ]; then
   if [ "$rc" != "0" ]; then
-    $topmedcmd -persist -emsg "Failed to notify Google Cloud that new file arrived" mark $bamid $markverb failed
-    exit 3
+    Fail "Failed to notify Google Cloud that new file arrived"
+  else
+    echo "Told Jonathan's system there is a new sample to remap"
   fi
 else
   echo "I think an Unprocessable Entity means this file was just being sent by accident"
@@ -134,6 +92,6 @@ etime=`date +%s`
 etime=`expr $etime - $stime`
 
 echo "Copy of CRAM to Google CLoud completed in $etime seconds"
-$topmedcmd -persist mark $bamid $markverb completed
-echo `date` $me $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
+Successful
+Log $etime
 exit
