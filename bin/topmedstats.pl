@@ -41,7 +41,6 @@ my %STEPS = (                       # List of steps we collect data for
     b37 => 1,
     gcepush => 1,
     gcepull => 1,
-    gcepost => 1,
     b38 => 1,
     bcf => 1,
 );
