@@ -188,7 +188,7 @@ if ($fcn eq 'cram') {
     $sql = BuildSQL($sql);
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { next; }
+    if (! $rowsofdata) { exit; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         #   Only create cram if file has been verified
@@ -358,24 +358,23 @@ if ($fcn eq 'pullbcf') {
 }
 
 #--------------------------------------------------------------
-#   Create BCF file - create bcf file locally. Never used?
+#   Create BCF file - create bcf file locally
 #--------------------------------------------------------------
 if ($fcn eq 'bcf') {
     #   Get list of all samples yet to process
-    my $sql = "SELECT bamid,state_b38,state_bcf,poorquality FROM $opts{bamfiles_table} WHERE state_bcf!=$COMPLETED";
+    my $sql = "SELECT bamid,state_b38,state_gce38bcf FROM $opts{bamfiles_table} WHERE state_bcf!=$COMPLETED";
     $sql = BuildSQL($sql);
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { next; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
-        if ($href->{poorquality} ne 'N') { next; }
-        if (! $href->{state_b38}) { next; }
         if ($href->{state_b38} != $COMPLETED) { next; }
-        if ($opts{suberr} && $href->{state_bcf} >= $FAILEDCHECKSUM) {
-            $href->{state_bcf} = $REQUESTED;
+        if ($href->{state_gce38bcf} == $COMPLETED) { next; }
+        if ($opts{suberr} && $href->{state_gce38bcf} >= $FAILEDCHECKSUM) {
+            $href->{state_gce38bcf} = $REQUESTED;
         }
-        if ($href->{state_bcf} != $NOTSET && $href->{state_bcf} != $REQUESTED) { next; }
+        if ($href->{state_gce38bcf} != $NOTSET && $href->{state_gce38bcf} != $REQUESTED) { next; }
         if (! BatchSubmit("$opts{topmedbcf} -submit $href->{bamid}")) { last; }
     }
     ShowSummary($fcn);
