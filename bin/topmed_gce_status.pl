@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 ###################################################################
 #
-# Name: topmed_gce_pull.pl
+# Name: topmed_gce_status.pl
 #
 # Description:
 #   Use this program to update the database to request that remapped
@@ -46,6 +46,7 @@ our %opts = (
     gcecachefileprefix => "gce_status",
     gsuri => 'gs://topmed-recabs/\*/\*.flagstat',
     realm => '/usr/cluster/topmed/etc/.db_connections/topmed',
+    pipeline_desc => 'gcloud alpha genomics operations describe',
     bamfiles_table => 'bamfiles',
 );
 
@@ -55,7 +56,7 @@ Getopt::Long::GetOptions( \%opts,qw(
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$Script [options] check|mark|verify\n" .
+    warn "$Script [options] bcf|check|mark|verify\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
     exit 1;
@@ -68,12 +69,85 @@ my $nowdate = strftime('%Y/%m/%d %H:%M', localtime);
 #--------------------------------------------------------------
 #   Execute the command provided
 #--------------------------------------------------------------
+if ($fcn eq 'bcf')      { CheckBCF(@ARGV); exit; }
 if ($fcn eq 'check')    { CheckState(@ARGV); exit; }
 if ($fcn eq 'mark')     { MarkState(@ARGV); exit; }
 if ($fcn eq 'verify')   { VerifyState(@ARGV); exit; }
 
 die "$Script  - Invalid function '$fcn'\n";
 exit;
+
+#==================================================================
+# Subroutine:
+#   CheckBCF()
+#
+#   Find all cases of completed bcf samples at Google and mark
+#   them to be pulled.
+#==================================================================
+sub CheckBCF {
+    #my ($x) = @_;
+    print "$nowdate CheckBCF\n";
+
+    DBConnect($opts{realm});
+    my $sql = "SELECT bamid,expt_sampleid,state_gce38bcf_pull," .
+        "state_gce38bcf,gce38bcf_opid FROM $opts{bamfiles_table}" .
+        " WHERE state_gce38bcf_pull!=$COMPLETED AND gce38bcf_opid=''";
+    my $sth = DoSQL($sql);
+    my $ahref = $sth->fetchall_hashref('expt_sampleid');
+
+    print "Checking BCF for " . scalar(keys %{$ahref}) . " database samples\n";
+    my $count = 0;
+    foreach my $nwdid (keys %{$ahref}) {
+        my $href = $ahref->{$nwdid};
+        if ($opts{verbose}) { say $nwdid; }
+        my $sample = $schema->resultset('Bamfile')->find_by_nwdid($nwdid);
+        if (! $sample) {
+            print "Unable to find '$nwdid' in database\n";
+            next;
+        }
+        if (! $sample->gce38bcf_opid) { next; }
+        my $cmd = $opts{pipeline_desc} . ' ' . $sample->gce38bcf_opid;
+        my $status = YAML::Syck::Load(io->pipe($cmd)->chomp->all());
+
+        if (exists($status->{done}) && $status->{done} ne 'true') {
+            say $sample->expt_sampleid . ' : NOT COMPLETE';
+            next;
+        }
+        if (exists($status->{error})) {
+            say  $sample->expt_sampleid . ' : FAILED';
+            $sample->update({state_gce38bcf => $FAILED});
+            $sample->update({emsg => $status->{error}{message}});
+            $count++;
+            if ($count >= $opts{max}) {
+                if ($opts{verbose}) { print "Maximum requests reached\n"; }
+                last;
+            }
+            next;
+        }
+
+        # XXX - best guess that the operation succeeded:
+        #     - done is true
+        #     - no error attribute
+        #     - has an event list
+        #     - last event was an ok state
+        #
+        if (exists($status->{metadata}) && exists($status->{metadata}->{events}) &&
+            scalar @{$status->{metadata}->{events}}) {
+            if ($status->{metadata}->{events}->[-1]->{description} eq 'ok') {
+                say $sample->expt_sampleid . ' : COMPLETED';
+                $sample->update({state_gce38bcf => $COMPLETED});
+                $count++;
+                if ($count >= $opts{max}) {
+                    if ($opts{verbose}) { print "Maximum requests reached\n"; }
+                    last;
+                }
+            }
+        }
+        else {
+            say "NWDID operation was a mystery to me. CMD=$cmd";
+        }
+    }
+}
 
 #==================================================================
 # Subroutine:
@@ -140,8 +214,8 @@ sub VerifyState {
     print "$nowdate VerifyState\n";
 
     my $nwdref = CacheGSData();
-    my $ahref = GetSQLData();        # Get array of nwdid -> hash
-    print "Checking " . scalar(keys %{$ahref}) . " database samples\n";
+    my $ahref = GetSQLRemappedData();        # Get array of nwdid -> hash
+    print "Checking remapped " . scalar(keys %{$ahref}) . " database samples\n";
 
     my %counts = ();
     my @didnotdelete = ();
@@ -375,12 +449,11 @@ sub CheckState {
 
 #==================================================================
 # Subroutine:
-#   GetSQLData()
+#   GetSQLRemappedData()
 #
-#   Execute the SQL
-#   Return a reference to an array of hashes of the SQL data
+#   Return a reference to an array of hashes of remapped data
 #==================================================================
-sub GetSQLData {
+sub GetSQLRemappedData {
     #my ($x) = @_;
 
     DBConnect($opts{realm});
@@ -392,7 +465,7 @@ sub GetSQLData {
     my $ahref = $sth->fetchall_hashref('expt_sampleid');     # Returns array of hash
     return $ahref;
 
-    #   Get rows one by one when we don't trust fetchall_hashref to work
+    #   Get rows one by one so we get only the samples to pull
     $sql = "SELECT bamid,expt_sampleid,state_gce38push," .
         "state_gce38pull FROM $opts{bamfiles_table}";
     $sth = DoSQL($sql);
@@ -417,6 +490,24 @@ sub GetSQLData {
         $n--;
         if ($n <= 0) { last; }
     }
+    return $ahref;
+}
+
+#==================================================================
+# Subroutine:
+#   GetSQLBCFData()
+#
+#   Return a reference to an array of hashes of bcf data
+#==================================================================
+sub GetSQLBCFData {
+    #my ($x) = @_;
+
+    DBConnect($opts{realm});
+    my $sql = "SELECT bamid,expt_sampleid,state_gce38bcf_pull," .
+        "state_gce38bcf,gce38bcf_opid FROM $opts{bamfiles_table}" .
+        " WHERE state_gce38bcf_pull!=$COMPLETED ";
+    my $sth = DoSQL($sql);
+    my $ahref = $sth->fetchall_hashref('expt_sampleid');     # Returns array of hash
     return $ahref;
 }
 
@@ -498,13 +589,13 @@ __END__
 
 =head1 NAME
 
-topmed_gce_pull.pl - Manage the state_gce38* flags and remapped files
+topmed_gce_status.pl - Manage the state_gce38* flags and remapped files
 
 =head1 SYNOPSIS
  
-  topmed_gce_pull.pl check                  # Check files and data for consistency
-  topmed_gce_pull.pl mark                   # Sets state_gce38pull in database
-  topmed_gce_pull.pl verify                 # Compares files at Google and database state
+  topmed_gce_status.pl check        # Check files and data for consistency
+  topmed_gce_status.pl mark         # Sets state_gce38pull in database
+  topmed_gce_status.pl verify       # Compares files at Google and database state
 
 =head1 DESCRIPTION
 
