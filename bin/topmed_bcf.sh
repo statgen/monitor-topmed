@@ -18,7 +18,7 @@ if [ "$1" = "-submit" ]; then
   bamid=`$topmedcmd show $1 bamid`
   MayIRun $me $bamid
   MyRealHost $bamid b$build
-  SubmitJob $bamid "$topmed-$me" '16G' "$0 $*"
+  SubmitJob $bamid "topmed-$me" '24G' "$0 $*"
   exit
 fi
 

@@ -18,7 +18,7 @@ if [ "$1" = "-submit" ]; then
   shift
   bamid=`$topmedcmd show $1 bamid`
   MayIRun $me $bamid
-  MyRealHost $bamid 'bam'
+  RandomRealHost $bamid 'bam'
   SubmitJob $bamid "$realhost-$me" '16G' "$0 $*"
   exit
 fi

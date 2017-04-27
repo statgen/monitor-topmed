@@ -34,7 +34,7 @@ if [ "$1" = "-submit" ]; then
   if [ $qual -le 11 ]; then
     sq='-squeezed'
   fi
-  SubmitJob $bamid "$topmed-$me" '8G' "$0 $sq $*"
+  SubmitJob $bamid "$realhost-$me" '8G' "$0 $sq $*"
   exit
 fi
 

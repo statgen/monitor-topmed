@@ -15,7 +15,7 @@ if [ "$1" = "-submit" ]; then
   bamid=`$topmedcmd show $1 bamid`
   MayIRun $me  $bamid
   RandomRealHost $bamid
-  SubmitJob $bamid "$topmed-$me" '2G' "$0 $*"
+  SubmitJob $bamid "topmed-$me" '2G' "$0 $*"
   exit
 fi
 
@@ -55,7 +55,9 @@ datayear=`$topmedcmd show $bamid datayear`
 if [ "$datayear" = "3" ]; then
   build=`$topmedcmd show $bamid build`
   if [ "$build" = "38" ]; then
-    Fail "Datayear $datayear build $build jobs should not be remapped (bamid '$bamid')"
+    echo "Datayear $datayear build $build jobs should not be remapped (bamid '$bamid')"
+    Successful
+    exit 0
   else
     echo "Datayear $datayear build $build needs remapping"
   fi
