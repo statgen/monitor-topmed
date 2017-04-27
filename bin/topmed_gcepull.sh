@@ -5,6 +5,7 @@
 #	Copy remapped CRAM for a sample from GCE
 #
 . /usr/cluster/topmed/bin/topmed_actions.inc
+topmed_check_recab=/usr/cluster/topmed/bin/topmed_check_recab.pl
 
 me=gcepull
 markverb=$me
@@ -95,6 +96,13 @@ if [ "$?" != "0" ]; then
   Fail "Failed to copy file from GCE $inuri/$nwdid/$nwdid.recab.cram $crampath"
 fi
 
+#   Remapping can still result in a trashed file
+set -o pipefail
+$samtools view -H $f | grep '^@RG' | $topmed_check_recab
+if [ "$?" != "0" ]; then
+  Fail "Remapped file '$f' header has multiple ids"
+fi
+
 #   Post processing needed here
 echo "Calculating MD5 for local file ($cramfile)"
 md5=(`md5sum $cramfile`)
@@ -102,14 +110,14 @@ md5=${md5[0]}
 if [ "$md5" = "" ]; then
   Fail "Unable to calculate MD5 for remapped '$bamid' [$nwdid] cramfile=$cramfile"
 fi
-$topmedcmd -persist set $bamid cramb38checksum $md5
-echo "Set checksum for b$build file"
-$topmedcmd -persist set $bamid b${build}flagstat $cramflagstat
+echo "Set checksum and flagstat for b$build file"
+SetDB $bamid ${build}cramchecksum $md5
+SetDB $bamid b${build}flagstat $cramflagstat
 
 #   Save date of file in database
 $topmedcmd setdate $bamid datemapping_b38 $cramfile
 
-#   Clean up data in GCE if data found in incoming.  Move remapped data to bcf bucket for now
+#   Clean up data in GCE if data found in incoming.  Move remapped data to bcf bucket
 if [ "$inuri" = "$incominguri" ]; then
   $gsutil mv $incominguri/$nwdid/$cramfile.flagstat  $bcfuri/$nwdid/$cramfile.flagstat
   $gsutil mv $incominguri/$nwdid/$cramfile           $bcfuri/$nwdid/$cramfile
@@ -126,6 +134,5 @@ etime=`expr $etime - $stime`
 echo "Copy of remapped CRAM from GCE to $crampath completed in $etime seconds"
 
 Successful
-$topmedcmd -persist mark $bamid gcepost completed
 Log $etime
 exit
