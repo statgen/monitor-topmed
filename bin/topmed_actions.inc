@@ -70,6 +70,7 @@ function Fail {
 #   Uses global variables: $bamid $markverb
 #------------------------------------------------------------------
 function Started {
+  $topmedcmd -persist mark $bamid $markverb started
   d=`date +%Y/%m/%d`
   s=`hostname`
   echo "#==Started== '$d' host=$s $SLURM_JOB_ID $0 bamid=$bamid ========="
@@ -93,7 +94,7 @@ function SetDB {
   local col=$2
   local val="$3"
   $topmedcmd -persist set $bamid $col "$val"
-  if [ "$?" != "" ]; then
+  if [ "$?" != "0" ]; then
     Fail "Unable to set column '$col' to '$val' for bamid '$bamid'" 
   fi
 }
@@ -174,8 +175,8 @@ function SubmitJob {
   fi
   l=(`/usr/cluster/bin/sbatch -p $slurmp $mem $r $cores $q --workdir=$console -J $bamid-$me --output=$console/$bamid-$me.out $cmdtorun`)
   if [ "$?" != "0" ]; then
-    Fail "Failed to submit command to SLURM - $l" | tee -a $console/$bamid-$me.out
     echo "CMD=/usr/cluster/bin/sbatch -p $slurmp $mem $r $cores $q --workdir=$console -J $bamid-$me --output=$console/$bamid-$me.out $cmdtorun" >> $console/$bamid-$me.out
+    Fail "Failed to submit command to SLURM - $l" | tee -a $console/$bamid-$me.out
     exit 1
   fi
   # Job was submitted, save job details
