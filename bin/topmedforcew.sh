@@ -23,4 +23,4 @@ fi
 # echo "Forcing '$1' to be writable for the monitor"
 chgrp topmed .
 chmod 770 .
-chmod 664 Manifest.txt *.md5 2> /dev/null   # Failure is OK
+chmod 660 Manifest.txt *.md5 *.cram *.crai *.bam *.bai 2> /dev/null   # Failure is OK
