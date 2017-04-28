@@ -23,14 +23,6 @@
 use strict;
 use warnings;
 use FindBin qw($Bin $Script);
-use lib (
-  qq($FindBin::Bin),
-  qq($FindBin::Bin/../lib),
-  qq($FindBin::Bin/../lib/perl5),
-  qq($FindBin::Bin/../local/lib/perl5),
-  qq(/usr/cluster/topmed/lib/perl5),
-  qq(/usr/cluster/topmed/local/lib/perl5),
-);
 use Getopt::Long;
 use DBIx::Connector;
 
@@ -163,12 +155,13 @@ sub Permit {
     }
 
     if ($run ne 'all') {
-        $sql = "SELECT runid FROM $opts{runs_table} WHERE dirname='$run'";
+        $sql = "SELECT runid,dirname FROM $opts{runs_table} WHERE dirname='$run' OR runid=$run";
         $sth = DoSQL($sql);
         $rowsofdata = $sth->rows();
         if (! $rowsofdata) { die "Run '$run' is not known\n"; }
         $href = $sth->fetchrow_hashref;
         $runid = $href->{runid};
+        $run = $href->{dirname};
     }
 
     $sql = "INSERT INTO $opts{permissions_table} " .
