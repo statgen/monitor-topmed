@@ -133,6 +133,7 @@ etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "Copy of remapped CRAM from GCE to $crampath completed in $etime seconds"
 
+SetDB $bamid state_b${build} 20     # Mark b38 as done
 Successful
 Log $etime
 exit
