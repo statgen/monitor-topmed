@@ -55,6 +55,7 @@ if [ "$?" != "0" ]; then
   Fail "Unable to CD to qplot output directory for '$bamid' - $outdir"
 fi
 echo "Files will be created in $outdir"
+stime=`date +%s`
 
 #   If necessary, create the index file
 if [ -f $bai ]; then
