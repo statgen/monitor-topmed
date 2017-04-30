@@ -192,7 +192,7 @@ $infotext = "<p class='intro'>The <a href='http://www.nhlbi.nih.gov/'>NHLBI</a> 
     "(<a href='mailto:tblackw@umich.edu'>tblackw@umich.edu</a>). $s</p>\n";
 
 //  Real parameters for each form, default is ''
-$parmcols = array('fcn', 'maxdir', 'desc', 'center',
+$parmcols = array('fcn', 'maxdir', 'desc', 'center', 'datayear',
     'run', 'runid', 'bamid', 'centerid', 'fetchpath', 'hostname', 'col',
     'op', 'id', 'samplestate');
 extract (isolate_parms($parmcols));
@@ -267,7 +267,7 @@ if ($fcn == 'reqshow') {
     exit;
 }
 if ($fcn == 'permit') {
-    $h = HandlePermit($op, $center, $run, $id);
+    $h = HandlePermit($op, $datayear, $center, $run, $id);
     print ControlJobs($h);
     print dofooter($HDR['footer']);
     exit;
@@ -842,6 +842,13 @@ function ControlJobs($h) {
         "<input type='hidden' name='fcn' value='permit'>\n" .
         "<table align='left' width='80%' border='0'>\n" .
         "<tr>" .
+        "<td align='right'><b>Data Year</b></td>" .
+        "<td>&nbsp;</td>" .
+        "<td><input type='text' name='datayear' length='8' value='all'></td>" .
+        "<td>&nbsp;</td>" .
+        "<td><font color='green'> 1, 2 3 etc.  </font></td>" .
+        "</tr>\n" .
+        "<tr>" .
         "<td align='right'><b>Center</b></td>" .
         "<td>&nbsp;</td>" .
         "<td><input type='text' name='center' length='8' value='all'></td>" .
@@ -871,7 +878,7 @@ function ControlJobs($h) {
         "</table>\n</form>\n";
     
     //  This shows what is in effect and allows on to delete an entry
-    $hdrcols  = array('operation', 'centername', 'dirname', 'centerid', 'runid');
+    $hdrcols  = array('operation', 'datayear', 'centername', 'dirname');
     $sql = 'SELECT * FROM ' . $LDB['permissions'];
     $result = SQL_Query($sql);
     $numrows = SQL_NumRows($result);
@@ -892,7 +899,7 @@ function ControlJobs($h) {
         reset($hdrcols);
         foreach ($hdrcols as $c) {
             $d = $row[$c];
-            if ((! isset($d)) || ($d == '')) { $d = 'all'; }
+            if ((! isset($d)) || ($d == '') || $d == '0') { $d = 'all'; }
             $html .= "<td align='center'>$d</td>\n";
         }
         $html .= "<td align='center'><a href='$url&amp;op=del&amp;id=$row[id]'>" .
@@ -907,7 +914,7 @@ function ControlJobs($h) {
 #   html = HandlePermit($op, $center, $run, $id)
 #   Update permissions table, return HTML about results
 ---------------------------------------------------------------*/
-function HandlePermit($op, $center, $run, $id) {
+function HandlePermit($op, $datayear, $center, $run, $id) {
     global $validfunctions, $LDB;
     $html = "Nothing honey";
     if ($op == '') { return ''; }       // Avoid misleading err msgs
@@ -924,7 +931,7 @@ function HandlePermit($op, $center, $run, $id) {
     if (! in_array($op, $validfunctions)) {
         return Emsg("Invalid operation '$op' - How'd you do that?", 1);
     }
-    $cmd = escapeshellcmd("/usr/cluster/topmed/bin/topmedpermit.pl permit add $op $center $run");
+    $cmd = escapeshellcmd("/usr/cluster/topmed/bin/topmedpermit.pl permit add $op $datayear $center $run");
     $s = `$cmd 2>&1`;
     return "<pre>$s</pre>\n";
 }

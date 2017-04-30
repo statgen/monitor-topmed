@@ -26,6 +26,7 @@ mysql -u sqlnhlbi --password=g9X+6iaO -h localhost nhlbi < /tmp/nhlbi.sql
 DROP TABLE IF EXISTS permissions;
 CREATE TABLE permissions (
   id           INT         NOT NULL AUTO_INCREMENT,
+  datayear     INT         NOT NULL,            # 0 = all
   centerid     INT         NOT NULL,            # 0 = all
   centername   VARCHAR(16) NOT NULL,
   runid        INT         NOT NULL,            # 0 = all
