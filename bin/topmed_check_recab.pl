@@ -39,8 +39,12 @@ use warnings;
 my %id = ();
 while (<>) {
   chomp;
-  my ($h) = grep {/^SM:/} split(/\t/);
+  my $h = grep {/^SM:/} split(/\t/);
   $id{$h} = 1;
 }       
 
-exit (scalar keys %id == 1) ? 0 : 1;
+my @samples = keys %id;
+my $n = scalar(@samples);
+if ($n == 1) { exit 0; }
+print "Incorrect number of samples found: " . join(' ', @samples) . "\n";
+exit(1);
