@@ -16,8 +16,8 @@ if [ "$1" = "-submit" ]; then
   shift
   bamid=`$topmedcmd show $1 bamid`
   MayIRun $me  $bamid
-  MyRealHost $bamid 'b$build'
-  SubmitJob $bamid "$topmed-$me" '2G' "$0 $*"
+  MyRealHost $bamid "b$build"
+  SubmitJob $bamid "topmed-$me" '2G' "$0 $*"
   exit
 fi
 
@@ -85,7 +85,7 @@ fi
 echo "Flagstat value is correct: $n"
 
 #   See if we have already done this
-f=$crampath/$nwdid/$nwdid.recab.cram
+f=$crampath/$nwdid.recab.cram
 if [ -f $f ]; then
   echo "Replacing existing CRAM $f"
 fi
@@ -102,6 +102,7 @@ $samtools view -H $f | grep '^@RG' | $topmed_check_recab
 if [ "$?" != "0" ]; then
   Fail "Remapped file '$f' header has multiple ids"
 fi
+echo "Only one sample found in the header"
 
 #   Post processing needed here
 echo "Calculating MD5 for local file ($cramfile)"
@@ -111,7 +112,7 @@ if [ "$md5" = "" ]; then
   Fail "Unable to calculate MD5 for remapped '$bamid' [$nwdid] cramfile=$cramfile"
 fi
 echo "Set checksum and flagstat for b$build file"
-SetDB $bamid ${build}cramchecksum $md5
+SetDB $bamid b${build}cramchecksum $md5
 SetDB $bamid b${build}flagstat $cramflagstat
 
 #   Save date of file in database
