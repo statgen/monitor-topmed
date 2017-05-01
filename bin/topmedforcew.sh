@@ -21,6 +21,7 @@ if [ "$?" != "0" ]; then
   exit 4
 fi
 # echo "Forcing '$1' to be writable for the monitor"
-chgrp topmed .
+# chown -R topmed .     #   This should not be done cause it messes up ACLs
+#chgrp topmed .
 chmod 770 .
 chmod 660 Manifest.txt *.md5 *.cram *.crai *.bam *.bai 2> /dev/null   # Failure is OK
