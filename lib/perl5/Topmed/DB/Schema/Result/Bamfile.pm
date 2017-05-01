@@ -210,6 +210,12 @@ __PACKAGE__->table("bamfiles");
   default_value: 0
   is_nullable: 1
 
+=head2 state_gce38backup
+
+  data_type: 'integer'
+  default_value: 0
+  is_nullable: 1
+
 =head2 state_cram
 
   data_type: 'integer'
@@ -294,6 +300,12 @@ __PACKAGE__->table("bamfiles");
   is_nullable: 1
   size: 255
 
+=head2 state_38cp2gce
+
+  data_type: 'integer'
+  default_value: 0
+  is_nullable: 1
+
 =head2 datearrived
 
   data_type: 'varchar'
@@ -316,7 +328,7 @@ __PACKAGE__->table("bamfiles");
 =head2 datayear
 
   data_type: 'integer'
-  default_value: 2
+  default_value: 3
   is_nullable: 1
 
 =head2 build
@@ -403,6 +415,8 @@ __PACKAGE__->add_columns(
   { data_type => "integer", default_value => 0, is_nullable => 1 },
   "state_verify",
   { data_type => "integer", default_value => 0, is_nullable => 1 },
+  "state_gce38backup",
+  { data_type => "integer", default_value => 0, is_nullable => 1 },
   "state_cram",
   { data_type => "integer", default_value => 0, is_nullable => 1 },
   "state_qplot",
@@ -431,6 +445,8 @@ __PACKAGE__->add_columns(
   { data_type => "integer", default_value => 0, is_nullable => 1 },
   "gce38bcf_opid",
   { data_type => "varchar", is_nullable => 1, size => 255 },
+  "state_38cp2gce",
+  { data_type => "integer", default_value => 0, is_nullable => 1 },
   "datearrived",
   { data_type => "varchar", is_nullable => 1, size => 12 },
   "datemapping_b37",
@@ -442,7 +458,7 @@ __PACKAGE__->add_columns(
   "bamsize",
   { data_type => "varchar", default_value => 0, is_nullable => 1, size => 16 },
   "datayear",
-  { data_type => "integer", default_value => 2, is_nullable => 1 },
+  { data_type => "integer", default_value => 3, is_nullable => 1 },
   "build",
   { data_type => "varchar", default_value => 37, is_nullable => 1, size => 4 },
   "dateinit",
@@ -525,8 +541,8 @@ __PACKAGE__->has_many(
 );
 
 
-# Created by DBIx::Class::Schema::Loader v0.07046 @ 2017-04-10 09:59:48
-# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:VCNQXN5sP1VzkgoJacVnVw
+# Created by DBIx::Class::Schema::Loader v0.07046 @ 2017-05-01 14:56:31
+# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:5aho/HvYdsqKqbYfUXMEcw
 
 
 # You can replace this text with custom code or comments, and it will be preserved on regeneration
