@@ -138,6 +138,7 @@ my $FAILED    = 99;           # Task failed
 */
   state_arrive   INT DEFAULT 0,
   state_verify   INT DEFAULT 0,
+  state_gce38backup INT DEFAULT 0,
   state_cram     INT DEFAULT 0,
   state_qplot    INT DEFAULT 0,     /* Referenced in nhlbi_qc_metrics */
   state_b37      INT DEFAULT 0,     /* Referenced in nhlbi_qc_metrics */
