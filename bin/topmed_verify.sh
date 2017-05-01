@@ -61,10 +61,21 @@ etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "Calculated bamflagstat in $etime seconds"
 
-chmod 0444 $bamfile     # This might fail, but that's OK
+#   If necessary, create the index file
+extension="${bamfile##*.}"
+bai=$bamfile.bai
+if [ "$extension" = "cram" ]; then
+  bai=$bamfile.crai
+fi
+if [ ! -f $bai ]; then
+  echo "Creating index file '$bai'"
+  $samtools index $bamfile 2>&1
+  if [ "$?" != "0" ]; then
+    Fail "Unable to create index file for '$bamfile'"
+  fi
+fi
 
 #   If original file was cram, then some fields are the same for both cram and bam
-extension="${bamfile##*.}"
 if [ "$extension" = "cram" ]; then
   a=`$topmedcmd -persist show $bamid bamflagstat`
   SetDB $bamid 'cramflagstat' $a
