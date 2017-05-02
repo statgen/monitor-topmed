@@ -362,7 +362,7 @@ if ($fcn eq 'pullbcf') {
 #--------------------------------------------------------------
 if ($fcn eq 'bcf') {
     #   Get list of all samples yet to process
-    my $sql = "SELECT bamid,state_b38,state_gce38bcf FROM $opts{bamfiles_table} WHERE state_bcf!=$COMPLETED";
+    my $sql = "SELECT bamid,state_b38,state_gce38bcf FROM $opts{bamfiles_table} WHERE state_gce38bcf!=$COMPLETED";
     $sql = BuildSQL($sql);
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
@@ -382,11 +382,11 @@ if ($fcn eq 'bcf') {
 }
 
 #--------------------------------------------------------------
-#   Copy local data to GCE storage
+#   Copy local data to GCE storage   NOT CORRECT
 #--------------------------------------------------------------
 if ($fcn eq 'gcecopy') {
     #   Get list of all samples yet to process
-    my $sql = "SELECT bamid,state_b38,state_bcf,state_38cp2gce,poorquality FROM $opts{bamfiles_table} WHERE state_38cp2gce!=$COMPLETED";
+    my $sql = "SELECT bamid,state_b38,state_gce38bcf,state_38cp2gce,poorquality FROM $opts{bamfiles_table} WHERE state_38cp2gce!=$COMPLETED";
     $sql = BuildSQL($sql);
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
@@ -395,9 +395,9 @@ if ($fcn eq 'gcecopy') {
         my $href = $sth->fetchrow_hashref;
         if ($href->{poorquality} ne 'N') { next; }
         if (! $href->{state_b38}) { next; }
-        if (! $href->{state_bcf}) { next; }
+        if (! $href->{state_gce38bcf}) { next; }
         if ($href->{state_b38} != $COMPLETED) { next; }
-        if ($href->{state_bcf} != $COMPLETED) { next; }
+        if ($href->{state_gce38bcf} != $COMPLETED) { next; }
         if ($href->{state_38cp2gce} != $COMPLETED) { next; }
         if ($opts{suberr} && $href->{state_38cp2gce} >= $FAILEDCHECKSUM) {
             $href->{state_38cp2gce} = $REQUESTED;

@@ -80,12 +80,7 @@ CREATE TABLE runs (
 CREATE INDEX index_centerid_dirname ON runs(centerid,dirname);
 CREATE INDEX index_dirname ON runs(dirname);
 
- 
-/* ALTER TABLE bamfiles ADD COLUMN datebai VARCHAR(12) AFTER datebackup; */
-/* ALTER TABLE runs ADD  COLUMN offsitebackup CHAR(1) DEFAULT 'N' AFTER datayear */
-/* ALTER TABLE bamfiles CHANGE expt_sampleid expt_sampleid VARCHAR(24) */
-
-/* Lists all BAMs we know about (e.g. NWDID)  Must be tied to a run */
+ /* All BAMs we know about (e.g. NWDID)  Must be tied to a run */
 DROP TABLE IF EXISTS bamfiles;
 CREATE TABLE bamfiles (
   bamid        INT         NOT NULL AUTO_INCREMENT, /* Referenced in nhlbi_qc_metrics */
@@ -123,6 +118,7 @@ CREATE TABLE bamfiles (
   build        VARCHAR(4) DEFAULT '37', /* Build original input file user, 37, 38 etc */
   dateinit     VARCHAR(12),             /* Referenced in nhlbi_qc_metrics */
   bamname_orig VARCHAR(96) NOT NULL,
+  gce38bcf_opid   VARCHAR(255),         /* Google pipeline id */
 
 /* Fields to track state for each step */
 /*
@@ -138,32 +134,40 @@ my $FAILED    = 99;           # Task failed
 */
   state_arrive   INT DEFAULT 0,
   state_verify   INT DEFAULT 0,
-  state_gce38backup INT DEFAULT 0,
+  state_gcebackup INT DEFAULT 0,
   state_cram     INT DEFAULT 0,
   state_qplot    INT DEFAULT 0,     /* Referenced in nhlbi_qc_metrics */
   state_b37      INT DEFAULT 0,     /* Referenced in nhlbi_qc_metrics */
+
+  state_gce38push  INT DEFAULT 0,   /* Handling b38 data in Google Cloud */
+  state_gce38pull  INT DEFAULT 0,
   state_b38      INT DEFAULT 0,     /* Referenced in nhlbi_qc_metrics */
+
+  state_gce38bcf_push   INT DEFAULT 0,   /* Put CRAM into BCF bucket */
+  state_gce38bcf_pull   INT DEFAULT 0,   /* Pull BCF data to local store */
+  state_gce38bcf  INT DEFAULT 0,    /* Created BCF data */
+
+  state_gce38copy INT DEFAULT 0,    /* Copy local data to BCF buckets */
 
   state_ncbiexpt INT DEFAULT 0,     /* Year one, experiment defined at NCBI (X) */
   state_ncbiorig INT DEFAULT 0,     /* Original input file as bam or cram (S) */
   state_ncbib37  INT DEFAULT 0,     /* Remapped cram build 37 as cram (P) */
 
-  state_gce38push  INT DEFAULT 0,   /* Handling b38 data in Google Cloud */
-  state_gce38pull  INT DEFAULT 0,
-  state_bcf        INT DEFAULT 0,
-
-  state_gce38bcf_push   INT DEFAULT 0,   /* Put CRAM into BCF bucket */
-  state_gce38bcf_pull   INT DEFAULT 0,   /* Pull BCF data to local store */
-  state_gce38bcf  INT DEFAULT 0,    /* Status of task of remote action */
-  gce38bcf_opid   VARCHAR(255),     /* google pipeline id */
-
-  state_38cp2gce  INT DEFAULT 0,    /* Copy local data to BCF buckets */
 
   PRIMARY KEY  (bamid)
 );
 
+/*   Remove this from bamfiles
+  state_38cp2gce  INT DEFAULT 0,
+  state_bcf        INT DEFAULT 0,
+  state_gceb38ackup INT DEFAULT 0,
+*/
+
 
 /*   Handy queries
+    ALTER TABLE bamfiles ADD COLUMN datebai VARCHAR(12) AFTER datebackup;
+    ALTER TABLE runs ADD  COLUMN offsitebackup CHAR(1) DEFAULT 'N' AFTER datayear;
+    ALTER TABLE bamfiles CHANGE expt_sampleid expt_sampleid VARCHAR(24);
 
 select bamid,bamname,runid,(select dirname from runs where runid=bamfiles.runid) from bamfiles where state_ncbib37=19;
 

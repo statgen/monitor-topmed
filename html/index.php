@@ -20,10 +20,12 @@ include_once "edit.php";
 //print "<!-- _POST=\n"; print_r($_POST); print " -->\n";
 
 $qurl =  $_SERVER['SCRIPT_NAME'] . "?fcn=queue'";
-$STATUSLETTERS =  "<i><b>A</b>=File Arrived, <b>5</b>=MD5 Verified, <b>C</b>=BAM=>CRAM, <b>Q</b>=qplot run<br/>" .
-    "<b>7</b>=Remapped Build=37, <b>s</b>=Push Build=38 to GCE, <b>s</b>=Pull Build=38 from GCE,<br/>" .
-    "<b>8</b>=Remapped Build=38, <b>B</b>=BCF created, <b>U</b>=Upload 38 Data to GCE<br/>" .
-    "<b>X</b>=EXPT=>NCBI <b>S</b>=Orig BAM/CRAM=>NCBI, <b>P</b>=</b>B37=>NCBI, <b>T</b>=B38=>NCBI";
+$STATUSLETTERS =  "<br/> " .
+    "<i><b>A</b>=File Arrived, <b>5</b>=MD5 Verified, <b>B</b>=Remote Backup of CRAM, <b>C</b>=BAM=>CRAM, <b>Q</b>=qplot run,<br/>" .
+    "<b>7</b>=Remapped Build=37,<br/>" .
+    "<b>s</b>=Push Build=38 to GCE, <b>r</b>=Pull Build=38 from GCE, <b>8</b>=Remapped Build=38,<br/>" .
+    "<b>x</b>=Push BCF 38 to GCE, <b>y</b>=Pull BCF 38 from GCE, <b>V</b>=Completed BCF/VT 38,<br/>" .
+    "<b>X</b>=EXPT=>NCBI <b>S</b>=Orig BAM/CRAM=>NCBI, <b>P</b>=</b>B37=>NCBI";
 
 $SHOWSTATUS = "STATUS: " .
     "<a onclick='javascript:window.location.reload()'><img src='refresh.png' alt='refresh'></a> &nbsp;" .
@@ -52,7 +54,7 @@ $BAMNOTE = "<p><b>Note:</b><br>" .
     "<span class='started'> started </span>&nbsp;" . 
     "<span class='submitted'> submitted </span>&nbsp;" .
     "<br>" .
-    "<i>Status:</i> state of tasks ($STATUSLETTERS)<br>" .
+    "<i>Status:</i> state of tasks $STATUSLETTERS<br>" .
     "</p>\n";
 $RUNNOTE = "<p><b>Note:</b><br>" .
     "<i>Status of <b>all BAMs</b> in run:</i>&nbsp;" .
@@ -89,8 +91,7 @@ $quickcols = array(                     // Map of status column to topmedcmd ver
     'state_b38'      => 'mapping38',
     'state_gce38bcf_push'=> 'gcebcfpush',
     'state_gce38bcf_pull'=> 'gcebcfpull',
-    'state_gce38bcf'=> 'gce38bcf',
-    'state_bcf'      => 'bcf',
+    'state_gce38bcf' => 'gcebcf',
     'state_38cp2gce' => 'gcecopy',
     'state_ncbiexpt' => 'sendexpt',
     'state_ncbiorig' => 'sendorig',
@@ -107,15 +108,14 @@ $quickletter = array(                   // Map of status column to letter we see
     'state_b38'      => '8',
     'state_gce38bcf_push'=> 'x',
     'state_gce38bcf_pull'=> 'y',
-    'state_gce38bcf'=> 'b',
-    'state_bcf'      => 'B',
+    'state_gce38bcf' => 'V',
     'state_38cp2gce' => 'U',
     'state_ncbiexpt' => 'X',
     'state_ncbiorig' => 'S',
     'state_ncbib37'  => 'P'
 );
-$validfunctions = array('all', 'verify', 'qplot', 'cram',
-    'gcepush', 'gcepull', 'gcebcfpush', 'gcebcfpush', 'bcf', 'gcecopy');
+$validfunctions = array('all', 'verify', 'gcebackup', 'qplot', 'cram',
+    'gcepush', 'gcepull', 'gcebcfpush', 'gcebcfpush', 'gcebcf', 'gcecopy');
 $NOTSET = 0;                // Not set
 $REQUESTED = 1;             // Task requested
 $SUBMITTED = 2;             // Task submitted to be run
@@ -137,7 +137,7 @@ $state2str = array(         // Values here are class for SPAN tag
     $FAILED => 'failed'
 );
 
-$TOPMEDJOBNAMES = array('verify', 'qplot', 'cram', 'expt', 'orig', 'b37',
+$TOPMEDJOBNAMES = array('verify', 'backup', 'qplot', 'cram', 'expt', 'orig', 'b37',
     'push38', 'pull38', 'b38', 'pushbcf38', 'pullbcf38', 'bcf', 'gcecopy');
 
 //  These columns are state values to be converted to people readable strings

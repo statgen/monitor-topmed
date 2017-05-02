@@ -35,21 +35,21 @@ use Getopt::Long;
 
 #   These represent states the run can be in. column name to letter
 my %attributes2letter = (
-    'state_arrive'   => 'A',
-    'state_verify'   => '5',
-    'state_qplot'    => 'Q',
-    'state_cram'     => 'C',
-    'state_b37'      => '7',
-    'state_gce38push'=> 's',
-    'state_gce38pull'=> 'r',
-    'state_b38'      => '8',
+    'state_arrive'    => 'A',
+    'state_verify'    => '5',
+    'state_qplot'     => 'Q',
+    'state_cram'      => 'C',
+    'state_b37'       => '7',
+    'state_gce38push' => 's',
+    'state_gce38pull' => 'r',
+    'state_b38'       => '8',
     'state_gce38bcf_push'=> 'x',
     'state_gce38bcf_pull'=> 'y',
-    'state_bcf'      => 'B',
-    'state_38cp2gce' => 'U',
-    'state_ncbiexpt' => 'X',
-    'state_ncbiorig' => 'S',
-    'state_ncbib37'  => 'P',
+    'state_gce38bcf'  => 'V',
+    'state_gce38copy' => 'U',
+    'state_ncbiexpt'  => 'X',
+    'state_ncbiorig'  => 'S',
+    'state_ncbib37'   => 'P',
 );
 
 my $NOTSET    = 0;            # Not set
