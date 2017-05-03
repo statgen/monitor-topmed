@@ -162,7 +162,7 @@ if ($fcn eq 'verify') {
     $sql = BuildSQL($sql);
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { next; }
+    if (! $rowsofdata) { exit; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         #   Only do verify if file has arrived and ready to be run
@@ -213,7 +213,7 @@ if ($fcn eq 'qplot') {
     $sql = BuildSQL($sql);
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { next; }
+    if (! $rowsofdata) { exit; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         #   Only do qplot if verify finished
@@ -233,11 +233,11 @@ if ($fcn eq 'qplot') {
 #--------------------------------------------------------------
 if ($fcn eq 'push') {
     #   Get list of all samples yet to process
-    my $sql = "SELECT bamid,state_cram,state_gce38push,poorquality FROM $opts{bamfiles_table} WHERE state_gce38_push!=$COMPLETED";
+    my $sql = "SELECT bamid,state_cram,state_gce38push,poorquality FROM $opts{bamfiles_table} WHERE state_gce38push!=$COMPLETED";
     $sql = BuildSQL($sql);
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { next; }
+    if (! $rowsofdata) { exit; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         #   Only send data if cram was done
@@ -263,7 +263,7 @@ if ($fcn eq 'pull') {
     $sql = BuildSQL($sql);
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { next; }
+    if (! $rowsofdata) { exit; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         #   Only get data if remap was done and requested
@@ -288,7 +288,7 @@ if ($fcn eq 'post') {
     $sql = BuildSQL($sql);
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { next; }
+    if (! $rowsofdata) { exit; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         #   Only post process data that we already fetched
@@ -314,7 +314,7 @@ if ($fcn eq 'pushbcf') {
     $sql = BuildSQL($sql);
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { next; }
+    if (! $rowsofdata) { exit; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         #   Only send data if cram was done
@@ -340,7 +340,7 @@ if ($fcn eq 'pullbcf') {
     $sql = BuildSQL($sql);
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { next; }
+    if (! $rowsofdata) { exit; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         #   Only get data if bcf was done and requested
@@ -358,7 +358,7 @@ if ($fcn eq 'pullbcf') {
 }
 
 #--------------------------------------------------------------
-#   Create BCF file - create bcf file locally
+#   Create BCF file locally at the moment
 #--------------------------------------------------------------
 if ($fcn eq 'bcf') {
     #   Get list of all samples yet to process
@@ -366,7 +366,7 @@ if ($fcn eq 'bcf') {
     $sql = BuildSQL($sql);
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { next; }
+    if (! $rowsofdata) { exit; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         if ($href->{state_b38} != $COMPLETED) { next; }
@@ -390,7 +390,7 @@ if ($fcn eq 'gcecopy') {
     $sql = BuildSQL($sql);
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { next; }
+    if (! $rowsofdata) { exit; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         if ($href->{poorquality} ne 'N') { next; }
@@ -418,7 +418,7 @@ if ($fcn eq 'sexpt') {
     $sql = BuildSQL($sql);
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { next; }
+    if (! $rowsofdata) { exit; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         #   Only do if this NWDID if all the local steps have completed
@@ -460,7 +460,7 @@ if ($fcn eq 'sorig') {
     $sql = BuildSQL($sql);
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { next; }
+    if (! $rowsofdata) { exit; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         #   Only send the original BAM if the experiment was accepted at NCBI
@@ -495,7 +495,7 @@ if ($fcn eq 'sb37') {
     $sql = BuildSQL($sql);
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { next; }
+    if (! $rowsofdata) { exit; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         if ($href->{poorquality} != 'N') { next; }
