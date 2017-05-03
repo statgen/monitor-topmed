@@ -94,12 +94,12 @@ etime=`date +%s`
 etime=`expr $etime - $stime`
 
 echo "Copy of CRAM to Google CLoud completed in $etime seconds"
-SetDB $bamid state_gce${build}bcf_push 0    # Mark bcf as not done yet
-SetDB $bamid state_gce${build}bcf_pull 0
-SetDB $bamid state_gce${build}bcf 0
+SetDB $bamid state_gce38bcf_push 0  # Mark bcf as not done yet
+SetDB $bamid state_gce38bcf_pull 0
+SetDB $bamid state_gce38bcf 0
 
-SetDB $bamid state_gce${build}pull 0    # Mark B38 remapping as not done yet
-SetDB $bamid state_b${build} 0
+SetDB $bamid state_gce38pull 0      # Mark B38 remapping as not done yet
+SetDB $bamid state_b38 0
 
 Successful
 Log $etime
