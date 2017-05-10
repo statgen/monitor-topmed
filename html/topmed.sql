@@ -67,9 +67,9 @@ CREATE TABLE runs (
   status       VARCHAR(256),
   bamcount     INT,
   datayear     INT DEFAULT 2,          /* Year of project: 1, 2 ... */
-  offsite      CHAR(1) DEFAULT('N'),   /* Original files kept offsite (N,Y,D) */
+  offsite      CHAR(1) DEFAULT 'N',    /* Original files kept offsite (N,Y,D) */
   xmlfound     INT DEFAULT 0,          /* Remove this */
-  arrived      CHAR(1) DEFAULT('N'),   /* Y or N that all files arrived for this run */
+  arrived      CHAR(1) DEFAULT 'N',    /* Y or N that all files arrived for this run */
 
   dateinit     VARCHAR(12),
   datecomplete VARCHAR(12),
@@ -119,6 +119,7 @@ CREATE TABLE bamfiles (
   dateinit     VARCHAR(12),             /* Referenced in nhlbi_qc_metrics */
   bamname_orig VARCHAR(96) NOT NULL,
   gce38bcf_opid   VARCHAR(255),         /* Google pipeline id */
+  offsite      CHAR(1) DEFAULT 'N',     /* Original files kept offsite (N,Y,D) */
 
 /* Fields to track state for each step */
 /*
@@ -161,6 +162,8 @@ my $FAILED    = 99;           # Task failed
   state_38cp2gce  INT DEFAULT 0,
   state_bcf        INT DEFAULT 0,
   state_gceb38ackup INT DEFAULT 0,
+     Remove this from runs
+  offsite      CHAR(1) DEFAULT 'N',
 */
 
 
