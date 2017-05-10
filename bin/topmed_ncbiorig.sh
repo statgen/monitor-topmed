@@ -5,46 +5,23 @@
 #	Send the proper set of files to NCBI for the original/secondary files
 #
 . /usr/cluster/topmed/bin/topmed_actions.inc
-
+topmedxml="/usr/cluster/topmed/bin/topmed_xml.pl"
 ascpcmd="$topmedcmd send2ncbi"
-topmedxml=/usr/cluster/topmed/bin/topmed_xml.pl
-
 me=ncbiorig
 markverb=$me
-mem=2G
-topmeddir=/net/topmed/incoming/topmed
-build=37
 version=secondary
-jobname=orig
-qos=topmed-redo
-realhost=''
-
-#   Do not allow this to play with anything except year one data
-year=`$topmedcmd show $bamid datayear`
-if [ "$year" != "1" ]; then
-  echo "$* must be year ONE data"
-  exit 4
-fi
 
 if [ "$1" = "-submit" ]; then
   shift
-  #   May I submit this job?
-  #$topmedcmd permit test sorig $1
-  #if [ "$?" = "0" ]; then
-  #  exit 4
-  #fi 
-
-  #  Submit this script to be run
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos $realhost --workdir=$console -J $1-$jobname --output=$console/$1-$jobname.out $0 $*`)
-  if [ "$?" != "0" ]; then
-    echo "Failed to submit command to SLURM"
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos $realhost --workdir=$console -J $1-$jobname --output=$console/$1-$jobname.out $0 $*"
-    exit 1
+  bamid=`$topmedcmd show $1 bamid`
+  #   Do not allow this to play with anything except year one data
+  year=`$topmedcmd show $1 datayear`
+  if [ "$year" != "1" ]; then
+    Fail "$0 $* must be year ONE data, not '$year'"
   fi
-  $topmedcmd mark $1 $markverb submitted
-  if [ "${l[0]}" = "Submitted" ]; then      # Job was submitted, save jobdetails
-    echo `date` $jobname ${l[3]} $slurmp $slurmqos $mem >> $console/$1.jobids
-  fi
+  MayIRun $me  $bamid
+  MyRealHost $bamid 'bam'
+  SubmitJob $bamid "topmed-redo" '2G' "$0 $*"
   exit
 fi
 
@@ -56,41 +33,34 @@ if [ "$1" = "" ]; then
   exit 1
 fi
 bamid=$1
-shift
 
-$topmedcmd mark $bamid $markverb started
-#   Get some values from the database
-nwdid=`$topmedcmd show $bamid expt_sampleid`
-if [ "$nwdid" = "" ]; then
-  echo "Invalid bamid '$bamid'. NWDID not known"
-  $topmedcmd -persist mark $bamid $markverb failed
-  exit 2
+Started
+
+#   Do not allow this to play with anything except year one data
+year=`$topmedcmd show $bamid datayear`
+if [ "$year" != "1" ]; then
+  Fail "$0 $* must be year ONE data, not '$year'"
 fi
+
+GetNWDID $bamid
+
 center=`$topmedcmd show $bamid center`
 if [ "$center" = "" ]; then
-  echo "Invalid bamid '$bamid'. CENTER not known"
-  $topmedcmd -persist mark $bamid $markverb failed
-  exit 2
+  Fail "Invalid bamid '$bamid'. CENTER not known"
 fi
 build=`$topmedcmd show $bamid build`
 if [ "$build" = "" ]; then
-  echo "Invalid build '$build'. BUILD not known"
-  $topmedcmd -persist mark $bamid $markverb failed
-  exit 2
+  Fail "Invalid build '$build'. BUILD not known"
 fi
 origbam=`$topmedcmd show $bamid bamname`
 if [ "$origbam" = "" ]; then
-  echo "Invalid bamid '$bamid'. BAMNAME not known"
-  $topmedcmd -persist mark $bamid $markverb failed
-  exit 2
+  Fail "Invalid bamid '$bamid'. BAMNAME not known"
 fi
 
 #   Go to our working directory
-cd $tmpconsole
+cd $console
 if [ "$?" != "0" ]; then
-  echo "Unable to CD to '$tmpconsole' to create XML file"
-  $topmedcmd -persist mark $bamid $markverb failed
-  exit 2
+  Fail "Unable to CD to '$console' to create XML file"
 fi
 mkdir XMLfiles 2>/dev/null
 cd XMLfiles
@@ -140,15 +110,11 @@ else
 fi
 
 if [ "$checksum" = "" ]; then
-  echo "Invalid bamid '$bamid' ($sendfile). CHECKSUM not known"
-  $topmedcmd -persist mark $bamid $markverb failed
-  exit 2
+  Fail "Invalid bamid '$bamid' ($sendfile). CHECKSUM not known"
 fi
 
 if [ ! -f "$sendfile" ]; then
-  echo "Original file for bamid '$bamid' ($sendfile) not found"
-  $topmedcmd -persist mark $bamid $markverb failed
-  exit 2
+  Fail "Original file for bamid '$bamid' ($sendfile) not found"
 fi
 
 d=`date +%Y/%m/%d`
@@ -157,18 +123,14 @@ echo "#========= $d $SLURM_JOB_ID $0 bamid=$bamid file=$sendfile ========="
 #   Create the XML to be sent
 $topmedxml -xmlprefix $here/ -build $build -type $version $bamid $sendfile $checksum
 if [ "$?" != "0" ]; then
-  echo "Unable to create $version run XML files"
-  $topmedcmd -persist mark $bamid $markverb failed
-  exit 2
+  Fail "Unable to create $version run XML files"
 fi
 
 #   Check files we created
 files=''
 for f in $nwdid-$version.$build.submit.xml $nwdid-$version.$build.run.xml; do
   if [ ! -f $f ]; then
-    echo "Missing XML file '$f'"   
-    $topmedcmd -persist mark $bamid $markverb failed
-    exit 2
+    Fail "Missing XML file '$f'"   
   fi
   files="$files $f"
 done
@@ -176,9 +138,7 @@ done
 #   Make a TAR of the XML files to send
 tar cf $nwdid-$version.$build.tar $files
 if [ "$?" != "0" ]; then
-  echo "Unable to create TAR of XML files"
-  $topmedcmd -persist mark $bamid $markverb failed
-  exit 2
+  Fail "Unable to create TAR of XML files"
 fi
 files=$nwdid-$version.$build.tar
 
@@ -189,9 +149,7 @@ $ascpcmd $sendfile
 rc=$?
 rm -f $sendfile
 if [ "$rc" != "0" ]; then
-  echo "FAILED to send data file '$sendfile' (rc=$rc)"
-  $topmedcmd -persist mark $bamid $markverb failed
-  exit 2
+  Fail "FAILED to send data file '$sendfile' (rc=$rc)"
 fi
 etime=`date +%s`
 etime=`expr $etime - $stime`
@@ -199,17 +157,12 @@ echo "File sent in $etime seconds"
 
 echo "Sending XML files to NCBI - $files"
 $ascpcmd $files
-if [ "$?" = "0" ]; then
-  echo "XML files '$files' sent to NCBI"
-  $topmedcmd -persist mark $bamid $markverb delivered
-  echo `date` $jobname $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
-  exit
+if [ "$?" != "0" ]; then
+  Fail "FAILED to send data XML files to NCBI - $files"
 fi
 
-echo "FAILED to send data XML files to NCBI - $files"
-$topmedcmd mark $bamid $markverb failed 
-exit 1
-
-
-
-
+echo "XML files '$files' sent to NCBI"
+etime=`date +%s`
+etime=`expr $etime - $stime`
+$topmedcmd -persist -emsg "" mark $bamid $markverb delivered    # Cannot use Successful
+Log $etime
