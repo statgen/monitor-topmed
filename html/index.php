@@ -83,15 +83,16 @@ $RUNNOTE = "<p><b>Note:</b><br>" .
 $quickcols = array(                     // Map of status column to topmedcmd verb
     'state_arrive'   => 'arrived',
     'state_verify'   => 'verify',
-    'state_qplot'    => 'qplot',
     'state_cram'     => 'cramed',
+    'state_gcebackup'   => 'gcebackup',
+    'state_qplot'    => 'qplot',
     'state_b37'      => 'mapping37',
     'state_gce38push'=> 'gcepush',
     'state_gce38pull'=> 'gcepull',
     'state_b38'      => 'mapping38',
-    'state_gce38bcf_push'=> 'gcebcfpush',
-    'state_gce38bcf_pull'=> 'gcebcfpull',
-    'state_gce38bcf' => 'gcebcf',
+    'state_gce38bcf_push'=> 'bcf',
+    'state_gce38bcf_pull'=> 'bcf',
+    'state_gce38bcf' => 'bcf',
     'state_38cp2gce' => 'gcecopy',
     'state_ncbiexpt' => 'sendexpt',
     'state_ncbiorig' => 'sendorig',
@@ -100,6 +101,7 @@ $quickcols = array(                     // Map of status column to topmedcmd ver
 $quickletter = array(                   // Map of status column to letter we see
     'state_arrive'   => 'A',
     'state_verify'   => '5',
+    'state_gcebackup'=> 'B',
     'state_qplot'    => 'Q',
     'state_cram'     => 'C',
     'state_b37'      => '7',
@@ -115,7 +117,7 @@ $quickletter = array(                   // Map of status column to letter we see
     'state_ncbib37'  => 'P'
 );
 $validfunctions = array('all', 'verify', 'gcebackup', 'qplot', 'cram',
-    'gcepush', 'gcepull', 'gcebcfpush', 'gcebcfpush', 'gcebcf', 'gcecopy');
+    'gcepush', 'gcepull', 'bcf', 'gcecopy');
 $NOTSET = 0;                // Not set
 $REQUESTED = 1;             // Task requested
 $SUBMITTED = 2;             // Task submitted to be run
@@ -536,7 +538,7 @@ function ViewRuns($center, $maxdirs, $iammgr) {
 ---------------------------------------------------------------*/
 function ShowRunYear($cid, $maxdirs, $datayear, $iammgr) {
     global $LDB;
-    $hdrcols  = array('dirname', 'status', 'bamcount', 'build', 'offsite');
+    $hdrcols  = array('dirname', 'status', 'bamcount', 'build');
 
     //  Walk through database getting data for this center
     $sql = 'SELECT * FROM ' . $LDB['runs'] . " WHERE centerid=$cid AND datayear=$datayear ORDER BY runid DESC";
