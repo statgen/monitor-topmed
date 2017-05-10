@@ -7,13 +7,16 @@ topmedpath=/usr/cluster/topmed/bin/topmedpath.pl
 topmedrename=/usr/cluster/topmed/bin/topmedrename.pl
 topmedflagstat=/usr/cluster/topmed/bin/topmed_flagstat.sh
 topmedqplot=/usr/cluster/topmed/bin/topmedqplot.pl
+bam=/usr/cluster/bin/bam
 calcmd5=/usr/cluster/topmed/bin/topmed_calcmd5.sh
 samtools=/usr/cluster/bin/samtools
+vt=/usr/cluster/software/trusty/topmed-year1-freeze3a/master/vt/vt
+vtref=/net/topmed/working/mapping/gotcloud/ref/hg38/hs38DH.fa
+bcftools=/usr/cluster/bin/bcftools
 console=/net/topmed/working/topmed-output
 slurmp=topmed-working
 build=38
 realhost=''
-tmpconsole=/net/topmed/working/topmed-output
 
 #cores="--cpus-per-task=2"         # Cores here should be same as gsutil
 cores=''                            # Set to same as gsutil if it will be used
@@ -48,7 +51,7 @@ function MayIRun {
 #   Uses global variables: $SLURM_JOB_ID $console $bamid $me
 #------------------------------------------------------------------
 function Log {
-  local timnel=$1
+  local timel=$1
   echo `date` $me $SLURM_JOB_ID ok $timel secs >> $console/$bamid.jobids
 }
 
@@ -96,6 +99,19 @@ function SetDB {
   $topmedcmd -persist set $bamid $col "$val"
   if [ "$?" != "0" ]; then
     Fail "Unable to set column '$col' to '$val' for bamid '$bamid'" 
+  fi
+}
+
+#------------------------------------------------------------------
+# Subroutine:
+#   val=`GetDB(col)`
+#   Uses global variables: $bamid
+#------------------------------------------------------------------
+function GetDB {
+  local col=$1
+  $topmedcmd show $bamid $col
+  if [ "$?" != "0" ]; then
+    Fail "Unable to get column '$col' for bamid '$bamid'" 
   fi
 }
 
