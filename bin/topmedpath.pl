@@ -54,6 +54,10 @@ our %opts = (
     wresults37dir => 'working/schelcj/results',
     iresults37dir => 'incoming/schelcj/results',
     results38dir => 'working/mapping/results',
+    gcebackupuri => 'gs://topmed-backups',
+    gcebcfuri => 'gs://topmed-bcf',
+    gceuploaduri => 'gs://topmed-bcf',
+    gceremapuri => 'gs://topmed-incoming',
     verbose => 0,
 );
 
@@ -64,13 +68,14 @@ Getopt::Long::GetOptions( \%opts,qw(
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
     my $m = "$Script [options] [-persist]";
-    warn "$m wherepath|where bamid|nwdid bam|backup|cram|qcresults|console|b37|b38|bcf\n" .
+    warn "$m wherepath|where bamid|nwdid KEYWORD\n" .
         "  or\n" .
-        "$m whathost bamid|nwdid bam|backup|cram|qcresults|b37|b38|bcf\n" .
+        "$m whathost bamid|nwdid KEYWORD\n" .
         "  or\n" .
-        "$m wherefile bamid|nwdid bam|backup|cram|qcresults|b37|b38\n" .
+        "$m wherefile bamid|nwdid KEYWORD\n" .
         "  or\n" .
         "$m whatbamid bamname\n" .
+        "WHERE KEYWORD is one of bam|cram|localbackup|remotebackup|qcresults|console|b37|b38|bcf|upload\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
     exit 1;
@@ -95,10 +100,6 @@ exit;
 #   $path = WherePath($bamid, $set, $extra1)
 #
 #   Print paths to various things for bamid based on $set
-#     bam       Print directory for a bam
-#     backup    Print directory for backups file
-#     qcresults Print directory where qc.results for a bamfile
-#     console   Print directory where SLURM console output lives
 #==================================================================
 sub WherePath {
     my ($bamid, $set, $extra1) = @_;
@@ -136,9 +137,16 @@ sub WherePath {
     }
  
     #   Find where the cram file lives
-    if ($set eq 'backup' || $set eq 'cram') {
+    if ($set eq 'cram' || $set eq 'localbackup') {
         my $bakbamfdir = abs_path("$opts{netdir}/$opts{backupsdir}/$centername/$rundir") || '';
         print "$bakbamfdir\n";
+        exit;
+    }
+
+    #   Find where the GCE backup cram file lives
+    if ($set eq 'remotebackup') {
+        my $gcebackup = "$opts{gcebackupuri}/$centername/$rundir";
+        print "$gcebackup\n";
         exit;
     }
 
@@ -177,6 +185,12 @@ sub WherePath {
         exit;
     }
  
+    if ($set eq 'upload') {
+        my $gceupload = "$opts{gceuploaduri}/$nwdid";
+        print "$gceupload\n";
+        exit;
+    }
+
     die "$Script - Unknown Where option '$set'\n";
 }
 
@@ -185,9 +199,6 @@ sub WherePath {
 #   $host = WhatHost($bamid, $set)
 #
 #   Print host name for the path to various things for bamid based on $set
-#     bam       Print host where BAM actually exists
-#     backup    Print host for backups file
-#     qcresults Print host where qc.results for a bamfile is
 #==================================================================
 sub WhatHost {
     my ($bamid, $set, $extra1) = @_;
@@ -225,7 +236,7 @@ sub WhatHost {
     }
  
     #   Find where the backup CRAM lives and show host
-    if ($set eq 'backup' || $set eq 'cram') {
+    if ($set eq 'cram' || $set eq 'localbackup') {
         my $backuphost = 'none';
         my $bakbamfdir = abs_path("$opts{netdir}/$opts{backupsdir}/$centername/$rundir");
         if ($bakbamfdir =~ /\/net\/([^\/]+)\//) { $backuphost = $1; }
@@ -270,11 +281,6 @@ sub WhatHost {
 #   $filepath = WhereFile($bamid, $set)
 #
 #   Print paths to various files for bamid based on $set
-#     bam       Print file path where BAM actually exists, no symlink,
-#     backup    Print file path for backups
-#     qcresults Print file path to selfSM in qc.results for a bamfile
-#     b37       Print directory for remapped b37
-#     b38       Print directory for remapped b38
 #==================================================================
 sub WhereFile {
     my ($bamid, $set) = @_;
@@ -317,8 +323,8 @@ sub WhereFile {
         exit;
     }
  
-    #   Find where the backup CRAM lives
-    if ($set eq 'backup' || $set eq 'cram') {
+    #   Find where the local backup CRAM lives
+    if ($set eq 'cram' || $set eq 'localbackup') {
         my $bakfile = abs_path("$opts{netdir}/$opts{backupsdir}/$centername/$rundir") || '';
         if ($bakfile) {
             print $bakfile . "/$cramname\n";
@@ -326,6 +332,13 @@ sub WhereFile {
         else {
             warn "WhereFile: abs_path($opts{netdir}/$opts{backupsdir}/$centername/$rundir) failed\n";
         }
+        exit;
+    }
+
+    #   Find where the backup GCE cram file lives
+    if ($set eq 'remotebackup') {
+        my $gcebackup = "$opts{gcebackupuri}/$centername/$rundir/$nwdid.src.cram";
+        print "$gcebackup\n";
         exit;
     }
 
@@ -431,17 +444,21 @@ topmedpath.pl - Show paths for data in the TopMed database
 =head1 SYNOPSIS
  
   topmedcmd.pl wherepath 2199 bam          # Returns real path to bam
-  topmedcmd.pl wherepath 2199 backup       # Returns path to backups directory
+  topmedcmd.pl wherepath 2199 cram         # Returns path to cram directory
   topmedcmd.pl wherepath 2199 qcresults    # Returns path to directory for qc.results
   topmedcmd.pl wherepath 2199 console      # Returns path to directory for SLURM output
-  
+  topmedcmd.pl wherepath 2199 backup       # Returns GCE URI to where backup might be
+  topmedcmd.pl wherepath 2199 upload       # Returns GCE URI to where all files are copied
+
   topmedcmd.pl whathost 2199 bam           # Returns host for bam
-  topmedcmd.pl whathost 2199 cram          # Returns host for backups directory
+  topmedcmd.pl whathost 2199 cram          # Returns host for cram directory
   topmedcmd.pl whathost 2199 qcresults     # Returns host for directory for qc.results
 
   topmedcmd.pl wherefile 2199 bam          # Returns path to bam file (may not exist)
-  topmedcmd.pl wherefile 2199 backup       # Returns path for backups file (may not exist)
+  topmedcmd.pl wherefile 2199 cram         # Returns path for cram file (may not exist)
   topmedcmd.pl wherefile 2199 qcresults    # Returns path for qc.results *.vb.SelfSM file (may not exist)
+  topmedcmd.pl wherefile 2199 remotelbackup  # Returns GCE URI to where backup file might be
+  topmedcmd.pl wherefile 2199 localbackup    # Returns path to local backup (cram)
 
 =head1 DESCRIPTION
 
@@ -474,10 +491,12 @@ Provided for developers to see additional information.
 Parameters to this program are grouped into several groups which are used
 to deal with specific sets of information in the monitor databases.
 
-B<wherepath bamid|nwdid bam|backup|qcresults|console|b37|b38>
+B<wherepath bamid|nwdid bam|cram|backup|qcresults|console|b37|b38>
 If B<bam> was specified, display the path to the real bam file.
 
-If B<backup or cram> was specified, display the path to the backup directory.
+If B<cram> or B<localbackup> was specified, display the path to the backup directory.
+
+If B<remotebackup> was specified, display the GCE path (e.g. gs://topmed-backups/...)
 
 If B<qcresults> was specified, display the path to the directory where
 the qc.results for this bamid will be.
@@ -489,10 +508,10 @@ If B<b37> was specified, display the path to the directory of remapped data for 
 
 If B<b38> was specified, display the path to the directory of remapped data for build 37 results can be found.
 
-B<whathhost bamid|nwdid bam|backup|qcresults>
+B<whathhost bamid|nwdid bam|cram|qcresults>
 returns the host for the bam, backup, cram or qc.results for the bam file.
 
-B<wherefile bamid|nwdid bam|backup|qcresults>
+B<wherefile bamid|nwdid bam|cram|backup|qcresults>
 returns the path to the file for the bam, backup. cram or qc.results. This file may not exist
 
 
