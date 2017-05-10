@@ -101,6 +101,8 @@ SetDB $bamid state_gce38bcf 0
 SetDB $bamid state_gce38pull 0      # Mark B38 remapping as not done yet
 SetDB $bamid state_b38 0
 
+SetDB $bamid state_gce38copy 0      # Mark copy files to GCE as not done yet
+
 Successful
 Log $etime
 exit
