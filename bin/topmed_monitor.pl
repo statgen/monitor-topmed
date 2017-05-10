@@ -51,6 +51,7 @@ our %opts = (
     topmedcmd => "$topmedbin/topmedcmd.pl",
     topmedarrive => "$topmedbin/topmed_arrive.sh",
     topmedverify => "$topmedbin/topmed_verify.sh",
+    topmedbackup => "$topmedbin/topmed_gcebackup.sh",
     topmedcram   => "$topmedbin/topmed_cram.sh",
     topmedqplot  => "$topmedbin/topmed_qplot.sh",
     topmedexpt  => "$topmedbin/topmed_ncbiexpt.sh",
@@ -158,8 +159,8 @@ if (! flock($fh, LOCK_EX|LOCK_NB)) { die "Stopping - another instance of '$Scrip
 #--------------------------------------------------------------
 if ($fcn eq 'verify') {
     #   Get list of all samples yet to process
-    my $sql = "SELECT bamid,bamname,state_arrive,state_verify,checksum FROM $opts{bamfiles_table} WHERE state_verify!=$COMPLETED";
-    $sql = BuildSQL($sql);
+    my $sql = BuildSQL("SELECT bamid,bamname,state_arrive,state_verify,checksum FROM $opts{bamfiles_table}",
+        "WHERE state_verify!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { exit; }
@@ -173,7 +174,7 @@ if ($fcn eq 'verify') {
         }
         if ($href->{state_verify} != $NOTSET && $href->{state_verify} != $REQUESTED) { next; }
         #if ($href->{state_verify} != $NOTSET && $href->{state_verify} != $REQUESTED) { next; }
-        if (! BatchSubmit("$opts{topmedverify} -submit $href->{bamid} $href->{checksum}")) { last; }
+        if (! BatchSubmit("$opts{topmedverify} -submit $href->{bamid}")) { last; }
     }
     ShowSummary($fcn);
     exit;
@@ -184,15 +185,14 @@ if ($fcn eq 'verify') {
 #--------------------------------------------------------------
 if ($fcn eq 'cram') {
     #   Get list of all samples yet to process
-    my $sql = "SELECT bamid,state_verify,state_cram FROM $opts{bamfiles_table} WHERE state_cram!=$COMPLETED";
-    $sql = BuildSQL($sql);
+    my $sql = BuildSQL("SELECT bamid,state_verify,state_cram FROM $opts{bamfiles_table}",
+        "WHERE state_cram!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { exit; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         #   Only create cram if file has been verified
-        #if ($href->{state_verify} != $COMPLETED) { next; }
         if ($href->{state_verify} != $COMPLETED) { next; }
         if ($opts{suberr} && $href->{state_cram} >= $FAILEDCHECKSUM) {
             $href->{state_cram} = $REQUESTED;
@@ -204,13 +204,38 @@ if ($fcn eq 'cram') {
     exit;
 }
 
+
+#--------------------------------------------------------------
+#   Backup some files offsite
+#--------------------------------------------------------------
+if ($fcn eq 'backup') {
+    #   Get list of all samples yet to process
+    my $sql = BuildSQL("SELECT bamid,bamname,state_cram,state_gcebackup FROM $opts{bamfiles_table}",
+        "WHERE state_gcebackup!=$COMPLETED");
+    my $sth = DoSQL($sql);
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { exit; }
+    for (my $i=1; $i<=$rowsofdata; $i++) {
+        my $href = $sth->fetchrow_hashref;
+        #   Only do backup if file has been verified
+        if ($href->{state_cram} != $COMPLETED) { next; }
+        if ($opts{suberr} && $href->{state_gcebackup} >= $FAILEDCHECKSUM) {
+            $href->{state_gcebackup} = $REQUESTED;
+        }
+        if ($href->{state_gcebackup} != $NOTSET && $href->{state_gcebackup} != $REQUESTED) { next; }
+        if (! BatchSubmit("$opts{topmedbackup} -submit $href->{bamid}")) { last; }
+    }
+    ShowSummary($fcn);
+    exit;
+}
+
 #--------------------------------------------------------------
 #   Run QPLOT on BAMs
 #--------------------------------------------------------------
 if ($fcn eq 'qplot') {
     #   Get list of all samples yet to process
-    my $sql = "SELECT bamid,state_verify,state_qplot FROM $opts{bamfiles_table} WHERE state_qplot!=$COMPLETED";
-    $sql = BuildSQL($sql);
+    my $sql = BuildSQL("SELECT bamid,state_verify,state_qplot FROM $opts{bamfiles_table}",
+        "WHERE state_qplot!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { exit; }
@@ -233,8 +258,8 @@ if ($fcn eq 'qplot') {
 #--------------------------------------------------------------
 if ($fcn eq 'push') {
     #   Get list of all samples yet to process
-    my $sql = "SELECT bamid,state_cram,state_gce38push,poorquality FROM $opts{bamfiles_table} WHERE state_gce38push!=$COMPLETED";
-    $sql = BuildSQL($sql);
+    my $sql = BuildSQL("SELECT bamid,state_cram,state_gce38push,poorquality FROM $opts{bamfiles_table}",
+        "WHERE state_gce38push!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { exit; }
@@ -259,8 +284,8 @@ if ($fcn eq 'push') {
 #--------------------------------------------------------------
 if ($fcn eq 'pull') {
     #   Get list of all samples yet to process
-    my $sql = "SELECT bamid,state_gce38push,state_gce38pull,poorquality FROM $opts{bamfiles_table} WHERE state_gce38pull!=$COMPLETED";
-    $sql = BuildSQL($sql);
+    my $sql = BuildSQL("SELECT bamid,state_gce38push,state_gce38pull,poorquality FROM $opts{bamfiles_table}", 
+        "WHERE state_gce38pull!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { exit; }
@@ -284,8 +309,8 @@ if ($fcn eq 'pull') {
 #--------------------------------------------------------------
 if ($fcn eq 'post') {
     #   Get list of all samples yet to process
-    my $sql = "SELECT bamid,state_gce38pull,state_gce38post,poorquality FROM $opts{bamfiles_table} WHERE state_gce38post!=$COMPLETED";
-    $sql = BuildSQL($sql);
+    my $sql = BuildSQL("SELECT bamid,state_gce38pull,state_gce38post,poorquality FROM $opts{bamfiles_table}",
+        "WHERE state_gce38post!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { exit; }
@@ -310,15 +335,15 @@ if ($fcn eq 'post') {
 #--------------------------------------------------------------
 if ($fcn eq 'pushbcf') {
     #   Get list of all samples yet to process
-    my $sql = "SELECT bamid,state_cram,state_gce38bcf_push,poorquality FROM $opts{bamfiles_table} WHERE state_gce38bcf_push!=$COMPLETED";
-    $sql = BuildSQL($sql);
+    my $sql = BuildSQL("SELECT bamid,state_cram,state_gce38bcf_push,poorquality FROM $opts{bamfiles_table}",
+        "WHERE state_gce38bcf_push!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { exit; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         #   Only send data if cram was done
-        if ($href->{poorquality} != 'N') { next; }
+        if ($href->{poorquality} ne 'N') { next; }
         if ($href->{state_cram} != $COMPLETED) { next; }
         if ($opts{suberr} && $href->{state_gce38push} >= $FAILED) {
             $href->{state_gce38bcf_push} = $REQUESTED;
@@ -336,15 +361,15 @@ if ($fcn eq 'pushbcf') {
 #--------------------------------------------------------------
 if ($fcn eq 'pullbcf') {
     #   Get list of all samples yet to process
-    my $sql = "SELECT bamid,state_gce38bcf_push,state_gce38bcf_pull,poorquality FROM $opts{bamfiles_table} WHERE state_gce38bcf_pull!=$COMPLETED";
-    $sql = BuildSQL($sql);
+    my $sql = BuildSQL("SELECT bamid,state_gce38bcf_push,state_gce38bcf_pull,poorquality FROM $opts{bamfiles_table}",
+        "WHERE state_gce38bcf_pull!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { exit; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         #   Only get data if bcf was done and requested
-        if ($href->{poorquality} != 'N') { next; }
+        if ($href->{poorquality} ne 'N') { next; }
         if ($href->{state_gce38bcf_push} != $COMPLETED) { next; }
         if ($href->{state_gce38bcf_pull} != $COMPLETED) { next; }
         if ($opts{suberr} && $href->{state_gce38bcf_pull} >= $FAILED) {
@@ -362,8 +387,8 @@ if ($fcn eq 'pullbcf') {
 #--------------------------------------------------------------
 if ($fcn eq 'bcf') {
     #   Get list of all samples yet to process
-    my $sql = "SELECT bamid,state_b38,state_gce38bcf FROM $opts{bamfiles_table} WHERE state_gce38bcf!=$COMPLETED";
-    $sql = BuildSQL($sql);
+    my $sql = BuildSQL("SELECT bamid,state_b38,state_gce38bcf FROM $opts{bamfiles_table}",
+        "WHERE state_gce38bcf!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { exit; }
@@ -386,8 +411,8 @@ if ($fcn eq 'bcf') {
 #--------------------------------------------------------------
 if ($fcn eq 'gcecopy') {
     #   Get list of all samples yet to process
-    my $sql = "SELECT bamid,state_b38,state_gce38bcf,state_38cp2gce,poorquality FROM $opts{bamfiles_table} WHERE state_38cp2gce!=$COMPLETED";
-    $sql = BuildSQL($sql);
+    my $sql = BuildSQL("SELECT bamid,state_b38,state_gce38bcf,state_38cp2gce,poorquality FROM $opts{bamfiles_table}",
+        "WHERE state_38cp2gce!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { exit; }
@@ -414,16 +439,15 @@ if ($fcn eq 'gcecopy') {
 #--------------------------------------------------------------
 if ($fcn eq 'sexpt') {
     #   Get list of all samples yet to process
-    my $sql = "SELECT * FROM $opts{bamfiles_table} WHERE datayear=1";
-    $sql = BuildSQL($sql);
+    my $sql = BuildSQL("SELECT * FROM $opts{bamfiles_table}", "WHERE datayear=1");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { exit; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         #   Only do if this NWDID if all the local steps have completed
-        if ($href->{nwdid_known} != 'Y') { next; }
-        if ($href->{poorquality} != 'N') { next; }
+        if ($href->{nwdid_known} ne 'Y') { next; }
+        if ($href->{poorquality} ne 'N') { next; }
         if ($href->{state_qplot} != $COMPLETED) { next; }
         if ($href->{state_cram} != $COMPLETED) { next; }
 
@@ -456,15 +480,15 @@ if ($fcn eq 'sexpt') {
 #--------------------------------------------------------------
 if ($fcn eq 'sorig') {
     #   Get list of all samples yet to process
-    my $sql = "SELECT * FROM $opts{bamfiles_table} WHERE datayear=1 AND state_ncbiexpt=$COMPLETED";
-    $sql = BuildSQL($sql);
+    my $sql = BuildSQL("SELECT * FROM $opts{bamfiles_table}",
+        "WHERE datayear=1 AND state_ncbiexpt=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { exit; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         #   Only send the original BAM if the experiment was accepted at NCBI
-        if ($href->{poorquality} != 'N') { next; }
+        if ($href->{poorquality} ne 'N') { next; }
         if ($href->{state_ncbiexpt} != $COMPLETED) { next; }
         #   Check important fields for this BAM are possibly correct
         my $skip = '';
@@ -491,14 +515,14 @@ if ($fcn eq 'sorig') {
 #--------------------------------------------------------------
 if ($fcn eq 'sb37') {
     #   Get list of all samples yet to process
-    my $sql = "SELECT * FROM $opts{bamfiles_table} WHERE datayear=1 AND state_ncbiexpt=$COMPLETED";
-    $sql = BuildSQL($sql);
+    my $sql = BuildSQL("SELECT * FROM $opts{bamfiles_table}",
+        "WHERE datayear=1 AND state_ncbiexpt=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { exit; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
-        if ($href->{poorquality} != 'N') { next; }
+        if ($href->{poorquality} ne 'N') { next; }
         my $skip = '';
         foreach my $col (qw(checksum expt_sampleid)) {
             if (exists($href->{$col}) && $href->{$col}) { next; }
@@ -601,15 +625,18 @@ sub BuildSQL {
         $s = $sql . " as b JOIN $opts{runs_table} AS r on b.runid=r.runid " .
             "JOIN $opts{centers_table} AS c on r.centerid=c.centerid " .
             "WHERE c.centername='$opts{center}'";
+        $where =~ s/where //i;
     }
     #   For a specific run (overrides center)
     if ($opts{runs}) {
         $s = $sql . " as b JOIN $opts{runs_table} AS r on b.runid=r.runid " .
             "WHERE r.dirname='$opts{runs}'";
+        $where =~ s/where //i;
     }
 
     #   Add in caller's WHERE
-    if ($where) { $s .= " AND $where"; }
+    if ($where =~ /\s*WHERE\s/) { $s .= ' ' . $where; }
+    else { $s .= " AND $where"; }
 
     #   Add support for datayear
     if ($opts{datayear}) { $s .= " AND datayear=$opts{datayear}"; }
