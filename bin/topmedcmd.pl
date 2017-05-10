@@ -48,6 +48,7 @@ my $FAILED    = 99;                 # Task failed
 my %VALIDVERBS = (                  # Valid verbs to database colum
     arrive     => 'state_arrive',
     verify     => 'state_verify',
+    gcebackup  => 'state_gcebackup',
     qplot      => 'state_qplot',
     cram       => 'state_cram',   
     gcepush    => 'state_gce38push',
@@ -55,7 +56,7 @@ my %VALIDVERBS = (                  # Valid verbs to database colum
     b37        => 'state_b37',   
     b38        => 'state_b38',     
     bcf        => 'state_gce38bcf',     
-    gcecopy    => 'state_38cp2gce',     
+    gcecopy    => 'state_gce38copy',     
     ncbiexpt   => 'state_ncbiexpt',
     ncbiorig   => 'state_ncbiorig',
     ncbib37    => 'state_ncbib37',
@@ -800,7 +801,7 @@ sub Show {
     my ($bamid, $col) = @_;
     my ($sth, $rowsofdata, $href);
 
-    #   This could be a run name.g Does not start with NWD, not all digits
+    #   This could be a run name. Does not start with NWD, not all digits
     if ($bamid !~ /^NWD/ && $bamid =~ /\D+/) {
         $sth = ExecSQL("SELECT runid,$col FROM $opts{runs_table} WHERE dirname='$bamid'", 0);
         if ($sth) {
