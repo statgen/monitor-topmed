@@ -7,39 +7,20 @@
 . /usr/cluster/topmed/bin/topmed_actions.inc
 topmedxml="/usr/cluster/topmed/bin/topmed_xml.pl"
 ascpcmd="$topmedcmd send2ncbi"
-
 me=ncbiexpt
 markverb=$me
-mem=2G
-qos=topmed-redo
-realhost=''
-
-#   Do not allow this to play with anything except year one data
-year=`$topmedcmd show $bamid datayear`
-if [ "$year" != "1" ]; then
-  echo "$* must be year ONE data"
-  exit 4
-fi
 
 if [ "$1" = "-submit" ]; then
   shift
-  #   May I submit this job?
-  #$topmedcmd permit test sexpt $1
-  #if [ "$?" = "0" ]; then
-  #  exit 4
-  #fi 
-
-  #  Submit this script to be run
-  l=(`/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos $realhost --workdir=$console -J $1-expt --output=$console/$1-sexpt.out $0 $*`)
-  if [ "$?" != "0" ]; then
-    echo "Failed to submit command to SLURM"
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp --mem=$mem --qos=$qos $realhost --workdir=$console -J $1-expt --output=$console/$1-sexpt.out $0 $*"
-    exit 1
+  bamid=`$topmedcmd show $1 bamid`
+  #   Do not allow this to play with anything except year one data
+  year=`$topmedcmd show $1 datayear`
+  if [ "$year" != "1" ]; then
+    Fail "$0 $* must be year ONE data, not '$year'"
   fi
-  $topmedcmd mark $1 $markverb submitted
-  if [ "${l[0]}" = "Submitted" ]; then      # Job was submitted, save job details
-    echo `date` expt ${l[3]} $slurmp $slurmqos $mem >> $console/$1.jobids
-  fi
+  MayIRun $me  $bamid
+  MyRealHost $bamid 'bam'
+  SubmitJob $bamid "topmed-redo" '2G' "$0 $*"
   exit
 fi
 
@@ -51,25 +32,21 @@ if [ "$1" = "" ]; then
   exit 1
 fi
 bamid=$1
-shift
 
-$topmedcmd mark $bamid $markverb started
+Started
 
-nwdid=`$topmedcmd show $bamid expt_sampleid`
-if [ "$nwdid" = "" ]; then
-  echo "Invalid bamid '$bamid'. NWDID not known"
-  $topmedcmd -persist mark $bamid $markverb failed
-  exit 2
+#   Do not allow this to play with anything except year one data
+year=`$topmedcmd show $bamid datayear`
+if [ "$year" != "1" ]; then
+  Fail "$0 $* must be year ONE data, not '$year'"
 fi
 
-d=`date +%Y/%m/%d`
-echo "#========= $d $SLURM_JOB_ID $0 bamid=$bamid files=$* ========="
+GetNWDID $bamid
+
 #   Go to our working directory
 cd $console
 if [ "$?" != "0" ]; then
-  echo "Unable to CD to '$console' to create XML file"
-  $topmedcmd -persist mark $bamid $markverb failed
-  exit 2
+  Fail "Unable to CD to '$console' to create XML file"
 fi
 mkdir XMLfiles 2>/dev/null
 cd XMLfiles
@@ -78,18 +55,14 @@ here=`pwd`
 #   Create the XML to be sent
 $topmedxml -xmlprefix $here/ -type expt $bamid
 if [ "$?" != "0" ]; then
-  echo "Unable to create experiment XML files"
-  $topmedcmd -persist mark $bamid $markverb failed
-  exit 2
+  Fail "Unable to create experiment XML files"
 fi
 
 #   Check files we created
 files=''
 for f in $nwdid-expt.submit.xml $nwdid.expt.xml; do
   if [ ! -f $f ]; then
-    echo "Missing XML file '$f'"   
-    $topmedcmd -persist mark $bamid $markverb failed
-    exit 2
+    Fail "Missing XML file '$f'"   
   fi
   files="$files $f"
 done
@@ -98,24 +71,17 @@ done
 stime=`date +%s`
 tar cf $nwdid-expt.tar $files
 if [ "$?" != "0" ]; then
-  echo "Unable to create TAR of XML files"
-  $topmedcmd -persist mark $bamid $markverb failed
-  exit 2
+  Fail "Unable to create TAR of XML files"
 fi
 files=$nwdid-expt.tar
 
 echo "Sending XML files to NCBI - $files"
 $ascpcmd $files
-if [ "$?" = "0" ]; then
-  echo "XML files '$files' sent to NCBI"
-  $topmedcmd -persist mark $bamid $markverb delivered
-  etime=`date +%s`
-  etime=`expr $etime - $stime`
-  echo `date` expt $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
-  exit
+if [ "$?" != "0" ]; then
+  Fail "FAILED to send XML files to NCBI - $files"
 fi
-
-echo "FAILED to send XML files to NCBI - $files"
-$topmedcmd -persist mark $bamid $markverb failed 
-exit 1
-
+echo "XML files '$files' sent to NCBI"
+etime=`date +%s`
+etime=`expr $etime - $stime`
+$topmedcmd -persist -emsg "" mark $bamid $markverb delivered    # Cannot use Successful
+Log $etime
