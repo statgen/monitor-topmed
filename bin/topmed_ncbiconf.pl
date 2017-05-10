@@ -413,7 +413,7 @@ sub LookFor {
             $statsref->{$type . 'loaded'}++;
             if ($opts{verbose}) { print "$nwdid $type loaded $upload_date\n"; }
             my $sql = "UPDATE $opts{bamfiles_table} SET state_ncbi$type=$COMPLETED," .
-                "time_ncbi$type='" . substr($upload_date,0,19) ."'," .
+#                "time_ncbi$type='" . substr($upload_date,0,19) ."'," .
                 "emsg='' " .
                 "WHERE bamid=$bamid";
             my $sth = DoSQL($sql);
