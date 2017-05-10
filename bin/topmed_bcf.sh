@@ -5,10 +5,6 @@
 #	Create BCF file for a remapped CRAM
 #
 . /usr/cluster/topmed/bin/topmed_actions.inc
-vt=/usr/cluster/software/trusty/topmed-year1-freeze3a/master/vt/vt
-vtref=/net/topmed/working/mapping/gotcloud/ref/hg38/hs38DH.fa
-bcftools=/usr/cluster/bin/bcftools
-bam=/usr/cluster/bin/bam
 
 me=bcf
 markverb=$me
