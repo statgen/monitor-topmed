@@ -75,9 +75,9 @@ if [ "$piname" = "" ]; then
 fi
 
 #   Go to our working directory
-cd $tmpconsole
+cd $console
 if [ "$?" != "0" ]; then
-  echo "Unable to CD to '$tmpconsole' to create XML file"
+  echo "Unable to CD to '$console' to create XML file"
   $topmedcmd -persist mark $bamid $markverb failed
   exit 2
 fi
