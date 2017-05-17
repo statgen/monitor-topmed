@@ -169,11 +169,9 @@ if ($fcn eq 'verify') {
         #   Only do verify if file has arrived and ready to be run
         if ($href->{state_arrive} != $COMPLETED) { next; }
         if ($opts{suberr} && $href->{state_verify} >= $FAILEDCHECKSUM) {
-            #$href->{state_verify} = $REQUESTED;
             $href->{state_verify} = $REQUESTED;
         }
         if ($href->{state_verify} != $NOTSET && $href->{state_verify} != $REQUESTED) { next; }
-        #if ($href->{state_verify} != $NOTSET && $href->{state_verify} != $REQUESTED) { next; }
         if (! BatchSubmit("$opts{topmedverify} -submit $href->{bamid}")) { last; }
     }
     ShowSummary($fcn);
