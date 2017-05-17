@@ -83,6 +83,7 @@ if [ "$n" != "$cramflagstat" ]; then
   Fail "Flagstat '$n' did not match cramflagstat '$cramflagstat' for bamid '$bamid' nwdid $nwdid  -- URL=$inuri"
 fi
 echo "Flagstat value is correct: $n"
+SetDB $bamid b38flagstat $n
 
 #   See if we have already done this
 f=$crampath/$nwdid.recab.cram
