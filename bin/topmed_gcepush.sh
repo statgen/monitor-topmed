@@ -9,6 +9,7 @@
 me=gcepush
 markverb=$me
 cores="--cpus-per-task=2"           # Cores here should be same as gsutil
+incominguri='gs://topmed-incoming'
 
 if [ "$1" = "-submit" ]; then
   shift
