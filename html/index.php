@@ -174,8 +174,8 @@ if ($iammgr) {
         "return false;'>Restart_Jobs</a> &nbsp;" .
         "<a href='http://nhlbi.sph.umich.edu/report/monitor.php' " .
         "onclick='javascript:popup2(\"http://nhlbi.sph.umich.edu/report/monitor.php\",680,720); " .
-        "return false;'>ReMapping</a> &nbsp;";
-        
+        "return false;'>ReMapping</a> &nbsp;" .
+        "<a href='http://www-topmed1.sph.umich.edu/topmed/' target='_blank'>New Site</a>";
 }
 print doheader($HDR['title'], 1);
 
