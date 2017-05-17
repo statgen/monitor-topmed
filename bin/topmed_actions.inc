@@ -104,11 +104,12 @@ function SetDB {
 
 #------------------------------------------------------------------
 # Subroutine:
-#   val=`GetDB(col)`
+#   val=`GetDB(bamid, col)`
 #   Uses global variables: $bamid
 #------------------------------------------------------------------
 function GetDB {
-  local col=$1
+  local bamid=$1
+  local col=$2
   $topmedcmd show $bamid $col
   if [ "$?" != "0" ]; then
     Fail "Unable to get column '$col' for bamid '$bamid'" 
