@@ -14,7 +14,8 @@ if [ "$1" = "-submit" ]; then
   shift
   bamid=`$topmedcmd show $1 bamid`
   MayIRun $me  $bamid
-  RandomRealHost $bamid
+  realhost=topmed                   # Force to this node cause the others are wonky
+  #RandomRealHost $bamid
   SubmitJob $bamid "topmed-$me" '2G' "$0 $*"
   exit
 fi
@@ -28,14 +29,14 @@ if [ "$1" = "" ]; then
 fi
 bamid=$1
 
-file=`$topmedpath wherefile $bamid bam`
-if [ "$file" = "" ]; then
-  Fail "Unable to determine original BAM or CRAM file for '$bamid'"
-fi
-
 Started
 GetNWDID $bamid
 stime=`date +%s`
+
+file=`GetDB $bamid bamname`
+if [ "$file" = "" ]; then
+  Fail "Unable to determine BAMNAME for '$bamid'"
+fi
 
 datayear=`$topmedcmd show $bamid datayear`
 build=`$topmedcmd show $bamid build`
@@ -45,6 +46,7 @@ extension="${file##*.}"
 #======================================================================
 if [ "$extension" = "cram" -a "$datayear" = "3" -a "$build" = "38" ]; then  
   backupuri=`$topmedpath wherepath $nwdid backup`
+  cramfile=`$topmedpath wherefile $bamid cram`
 
   echo "Backup of CRAM to $backupuri/$nwdid.src.cram to GCE"
   f=`basename $cramfile`
@@ -100,6 +102,7 @@ if [ "$extension" = "cram" ]; then
   if [ "$?" != "0" ]; then
       Fail "Unable to CD $cramdir. This directory must be created first."
   fi
+  cramfile=`$topmedpath wherefile $bamid cram`
   newname=`basename $cramfile`
   ln -sf $bamfile $newname        # Create backup file as symlink in case of screwy names
   ln -sf $bamfile.crai $newname.crai
