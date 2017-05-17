@@ -71,6 +71,12 @@ if [ ! -f $bai ]; then
   echo "Creating index file '$bai'"
   $samtools index $bamfile 2>&1
   if [ "$?" != "0" ]; then
+    #   This might be a trashed reference index for samtools, if so remove it
+    a=`grep 'cram_ref_load: Assertion' $console/$bamid-$me.out`
+    if [ "$a" != "" ]; then
+      rm -rf $HOME/.cache/hts-ref/*/*
+      Fail "Unable to create index file for '$bamfile' - removed dirty reference cache. Just restart me."
+    fi
     Fail "Unable to create index file for '$bamfile'"
   fi
 fi
