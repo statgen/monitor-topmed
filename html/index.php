@@ -6,7 +6,7 @@
 # Description:
 #   Display information for tracking NHLBI TopMed data
 #
-# Copyright (C) 2015 Terry Gliedt, University of Michigan
+# Copyright (C) 2015-2017 Terry Gliedt, University of Michigan
 # This is free software; you can redistribute it and/or modify it under the
 # terms of the GNU General Public License as published by the Free Software
 # Foundation; See http://www.gnu.org/copyleft/gpl.html
@@ -18,6 +18,7 @@ include_once 'DBMySQL.php';
 include_once "edit.php";
 
 //print "<!-- _POST=\n"; print_r($_POST); print " -->\n";
+//print "<!-- _SERVER=\n"; print_r($_SERVER); print " -->\n";
 
 $qurl =  $_SERVER['SCRIPT_NAME'] . "?fcn=queue'";
 $STATUSLETTERS =  "<br/> " .
@@ -93,7 +94,7 @@ $quickcols = array(                     // Map of status column to topmedcmd ver
     'state_gce38bcf_push'=> 'bcf',
     'state_gce38bcf_pull'=> 'bcf',
     'state_gce38bcf' => 'bcf',
-    'state_38cp2gce' => 'gcecopy',
+    'state_gce38copy'=> 'gcecopy',
     'state_ncbiexpt' => 'sendexpt',
     'state_ncbiorig' => 'sendorig',
     'state_ncbib37'  => 'sendb37'
@@ -101,9 +102,9 @@ $quickcols = array(                     // Map of status column to topmedcmd ver
 $quickletter = array(                   // Map of status column to letter we see
     'state_arrive'   => 'A',
     'state_verify'   => '5',
+    'state_cram'     => 'C',
     'state_gcebackup'=> 'B',
     'state_qplot'    => 'Q',
-    'state_cram'     => 'C',
     'state_b37'      => '7',
     'state_gce38push'=> 's',
     'state_gce38pull'=> 'r',
@@ -111,12 +112,12 @@ $quickletter = array(                   // Map of status column to letter we see
     'state_gce38bcf_push'=> 'x',
     'state_gce38bcf_pull'=> 'y',
     'state_gce38bcf' => 'V',
-    'state_38cp2gce' => 'U',
+    'state_gce38copy'=> 'U',
     'state_ncbiexpt' => 'X',
     'state_ncbiorig' => 'S',
     'state_ncbib37'  => 'P'
 );
-$validfunctions = array('all', 'verify', 'gcebackup', 'qplot', 'cram',
+$validfunctions = array('all', 'verify', 'cram', 'gcebackup', 'qplot',
     'gcepush', 'gcepull', 'bcf', 'gcecopy');
 $NOTSET = 0;                // Not set
 $REQUESTED = 1;             // Task requested
@@ -139,7 +140,7 @@ $state2str = array(         // Values here are class for SPAN tag
     $FAILED => 'failed'
 );
 
-$TOPMEDJOBNAMES = array('verify', 'backup', 'qplot', 'cram', 'expt', 'orig', 'b37',
+$TOPMEDJOBNAMES = array('verify', 'cram', 'backup', 'qplot', 'expt', 'orig', 'b37',
     'push38', 'pull38', 'b38', 'pushbcf38', 'pullbcf38', 'bcf', 'gcecopy');
 
 //  These columns are state values to be converted to people readable strings
@@ -152,15 +153,14 @@ $JS['SPACER'] = "&nbsp;&nbsp;&nbsp;&nbsp;";
 $JS['CLOSE'] = "<p align='right'><font size='-1'><a href='javascript:window.close()'>Close</a>" . $JS['SPACER'];
 $JS['BACK'] = "<p align='right'><font size='-1'><a href='javascript:history.back()'>Back</a>" . $JS['SPACER'];
 
-//  Fixed values for status in requestfiles database
-$REQ_STATUS['QUEUED'] = 'request_queued';
-
-//print "<!-- _POST=\n"; print_r($_POST); print " -->\n";
-
 //-------------------------------------------------------------------
 //  Get parameters passed in via normal invocation
 //-------------------------------------------------------------------
 if (! isset($_SERVER['REMOTE_USER'])) { $_SERVER['REMOTE_USER'] = 'none'; }
+
+//  Hack because Sean has taken weeks to not get cosign to work on new host
+if (preg_match_all('/topmed1/', $_SERVER['HTTP_HOST'])) { $_SERVER['REMOTE_USER'] = 'tpg'; $_SERVER['HACK'] = 'Y'; }
+
 $iammgr = 0;
 if (in_array($_SERVER['REMOTE_USER'], $MGRS)) { $iammgr = 1; }
 if (in_array($_SERVER['REMOTE_USER'], $REQMGRS)) { $iammgr = 1; }
@@ -261,13 +261,6 @@ if ($fcn == 'showout') {                // Show output from a SLURM job
     print dofooter($HDR['footer']);
     exit;
 }
-if ($fcn == 'reqshow') {
-    $a = 1;
-    if ($iammgr) { $a = 0; }
-    print ViewPullQueue($centerid, $a);
-    print dofooter($HDR['footer']);
-    exit;
-}
 if ($fcn == 'permit') {
     $h = HandlePermit($op, $datayear, $center, $run, $id);
     print ControlJobs($h);
@@ -297,6 +290,7 @@ if ($fcn == 'restartjobs') {
 if ($fcn == 'showqlocal') {
     print "<center>$SHOWSTATUS &nbsp;&nbsp;&nbsp;</center>\n";
     $cmd = "/usr/cluster/topmed/bin/slurm_query.sh -squeue ignored ignored";
+    //$cmd = '/usr/cluster/topmed/bin/topmedcmd.pl squeue';
     print `$cmd`;
     exit;
 }
@@ -333,17 +327,6 @@ if ($iammgr) {
         print dofooter($HDR['footer']);
         exit;
     }
-    if ($fcn == 'reqfetch') {
-        print PromptFetch($centerid);
-        print dofooter($HDR['footer']);
-        exit;
-    }
-    if ($fcn == 'reqsave') {
-        print QueueFetch($centerid, $hostname, $fetchpath);
-        print dofooter($HDR['footer']);
-        exit;
-    }
-
     if ($fcn == 'editrun') {
         $sql = 'SELECT * FROM ' . $LDB['runs'] . " WHERE runid='$runid'";
         $result = SQL_Query($sql);
@@ -387,108 +370,6 @@ if ($iammgr) {
 Emsg("Unknown directive '$fcn'.");
 Nice_Exit("How'd you do that?");
 exit;
-
-/*---------------------------------------------------------------
-#   html = PromptFetch($cid)
-#   Prompt for a fetch request of remote data
----------------------------------------------------------------*/
-function PromptFetch($cid) {
-    global $CENTERID2NAME, $JS;
-
-    //  Verify the center is known
-    if (! isset($CENTERID2NAME[$cid])) {
-        return Emsg("Center '$cid' is unknown. How'd you do that?", 1) . $JS['CLOSE'];
-    }
-    $center = strtoupper($CENTERID2NAME[$cid]);
-    $html = "<h3 align='center'>Request Pull of a Run From '$center'</h3>\n" .
-        "<p>Filling out this form will initiate a pull of your data " .
-        "by NHLBI TopMed at the University of Michigan. Be careful to provide the correct " .
-        "hostname and path to your Run.</p>\n";
-
-    //  Now generate form so user can queue a fetch of remote data
-    $html .= "<form action='" . $_SERVER['PHP_SELF'] . "?fcn=reqsave' method='post'>\n" .
-        "<input type='hidden' name='centerid' value='$cid'>\n";
-    $html .= "<b>Hostname</b>&nbsp;&nbsp;" .
-        "<input type='text' name='hostname' size='24'>" .
-        "<br/><font size='-1' color='green'>Fully qualified hostname to fetch data from</font></td>" .
-        "<br/><br/>" .
-        "<b>Fetch Path</b>&nbsp;&nbsp;</td>" .
-        "<input type='text' name='fetchpath' size='70'>" .
-        "<br/><font size='-1' color='green'>Fully qualified path to Run directory on host</font></td>" .
-        "<br/><br/>" .
-        "<input type='submit' value=' Queue Request to Fetch Data '>\n" .
-        "<input type='button' name='close' value=' Close ' onclick='javascript:window.close()'>\n" .
-        "</form>\n";
-    $html .= $JS['VSPACER'] . $JS['CLOSE'];
-    return $html;
-}
-
-/*---------------------------------------------------------------
-#   html = QueueFetch($cid, $host, $path)
-#   Verify and queue a request to fetch remote data
----------------------------------------------------------------*/
-function QueueFetch($cid, $host, $path) {
-    global $LDB, $CENTERID2NAME, $JS, $REQ_STATUS;
-
-    //  Verify the center is known
-    if (! isset($CENTERID2NAME[$cid])) {
-        return Emsg("Center '$cid' is unknown. How'd you do that?", 1) . $JS['CLOSE'];
-    }
-    $center = strtoupper($CENTERID2NAME[$cid]);
-    $html = "<h3 align='center'>Queue Pull of a Run From '$center'</h3>\n";
-
-    //  Do basic sanity check on input
-    if (! preg_match('/^\//', $path)) {
-        return Emsg("Path '$path' is not fully qualified (must start with '/'.", 1) . $JS['BACK'];
-
-    }
-    $hostip = gethostbyname($host);
-    if ($hostip == $host) {
-        return Emsg("Hostname '$host' cannot be resolved. Invalid host", 1) . $JS['BACK'];
-    }
-
-    //  Make sure this request has not been made before
-    $sql = 'SELECT * FROM ' . $LDB['pulls'] . " WHERE centerid=$cid AND " .
-        "fetchpath='$path'";
-    $result = SQL_Query($sql);
-    $numrows = SQL_NumRows($result);
-    if ($numrows) {             // Yikes, this already exists
-        return Emsg("Duplicate request: '$path' already queued. Nothing done.", 1) .
-         $JS['VSPACER'] . $JS['BACK'];
-    }
-    $d = date('Y/m/d');
-    $sql = 'INSERT INTO ' . $LDB['pulls'] .
-        ' (centerid,hostname,fetchpath,daterequestor,iprequestor,ipuser,status) ' .
-        "VALUES($cid,'$host','$path','$d','" . $_SERVER['REMOTE_ADDR'] . "','" .
-        $_SERVER['REMOTE_USER'] . "','" . $REQ_STATUS['QUEUED'] . "')";
-    $result = SQL_Query($sql);
-    $html .= "<p>Request for '$path' from host '$host' has been queued</p>\n" .
-         $JS['VSPACER'] . $JS['CLOSE'];
-    return $html;
-}
-
-/*---------------------------------------------------------------
-#   html = ViewPullQueue($cid, $onlyactive)
-#   Verify and queue a request to fetch remote data
----------------------------------------------------------------*/
-function ViewPullQueue($cid, $onlyactive=1) {
-    global $LDB, $CENTERID2NAME, $JS, $REQ_STATUS;
-
-    //  Verify the center is known
-    if (! isset($CENTERID2NAME[$cid])) {
-        return Emsg("Center '$cid' is unknown. How'd you do that?", 1) . $JS['CLOSE'];
-    }
-    $center = strtoupper($CENTERID2NAME[$cid]);
-    if ($onlyactive) { $a = 'Active'; }
-    else { $a = 'All'; }
-    $html = "<h3 align='center'>Queue of $a Pull Runs From '$center'</h3>\n";
-
-    //  Make sure this request has not been made before
-    $sql = 'SELECT * FROM ' . $LDB['pulls'] . " WHERE centerid=$cid";
-    if ($onlyactive) { $sql .= "AND status='" . $REQ_STATUS['QUEUED'] . "'"; }
-    $html .= ShowTable($LDB['pulls'], $sql);
-    return $html;
-}
 
 /*---------------------------------------------------------------
 #   html = ViewRuns($center, $maxdirs, $iammgr)
@@ -987,12 +868,14 @@ function RestartJobs($h) {
         "<option value='none'>none</option>" .
         "<option value='arrive'>arrive</option>" .
         "<option value='verify'>verify</option>" .
-        "<option value='qplot'>qplot</option>" .
         "<option value='cram'>cram</option>" .
+        "<option value='gcebackup'>backup</option>" .
+        "<option value='qplot'>qplot</option>" .
         "<option value='gce38push'>push</option>" .
         "<option value='gce38pull'>pull</option>" .
         "<option value='gce38post'>post</option>" .
         "<option value='bcf'>bcf</option>" .
+        "<option value='gce38copy'>upload</option>" .
         "</select></td>" .
         "<td><font color='green'>&nbsp; </font></td>" .
         "<td>&nbsp;</td>" .
