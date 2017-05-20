@@ -83,7 +83,28 @@ if [ "$extension" = "cram" ]; then
     echo "I think I correctly created the CRAM directory for $bamid"
   fi
 
+  #  Be sure the cram file exists or make a symlink to it
+  f="$nwdid.src.cram"
+  if [ ! -f "$cramdir/$f" ]; then
+    cd $cramdir
+    if [ "$?" != "0" ]; then
+      Fail "Unable to CD to cramdir '$cramdir'"
+    fi
+    bfile=`GetDB $bamid bamname`
+    if [ "$?" != "0" ]; then
+      Fail "Unable to find bamname for '$bamid'"
+    fi
+    ln -s $bfile $f
+    if [ "$?" != "0" ]; then
+      Fail "Unable to create symlink to '$f' for '$bamid'"
+    fi
+    echo "Creating symlink to '$f' to original cram file"
+  fi
+
   echo "MD5 for cram, same as original file"
+  v=`$topmedcmd show $bamid checksum`
+  SetDB $bamid 'cramchecksum' $v
+
   v=`$topmedcmd show $bamid checksum`
   SetDB $bamid 'cramchecksum' $v
 
