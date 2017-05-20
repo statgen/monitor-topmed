@@ -31,17 +31,32 @@ if [ "$1" = "" ]; then
   exit 1
 fi
 bamid=$1
-bamfile=`$topmedpath wherefile $bamid bam`
-extension="${bamfile##*.}"
 
 #   Mark this as started
 Started 
 GetNWDID $bamid
 
 #   Figure out index file name
+bamfile=`$topmedpath wherefile $bamid bam`
 bai=$bamfile.bai
-if [ "$extension" = "cram" ]; then
+if [ "$bamfile" = "" ]; then
+  bamfile=`$topmedpath wherefile $bamid cram`
   bai=$bamfile.crai
+fi
+if [ "$bamfile" = "" ]; then
+  Fail "Unable to get source file for '$bamid'"
+fi
+extension="${bamfile##*.}"
+
+#   If necessary, create the index file
+if [ -f $bai ]; then
+  echo "Using existing index file '$bai'"
+else
+  echo "Creating index file '$bai'"
+  $samtools index $bamfile 2>&1
+  if [ "$?" != "0" ]; then
+    Fail "Unable to create index file for '$bamfile'"
+  fi
 fi
 
 #   Create output directory and CD there
@@ -56,17 +71,6 @@ if [ "$?" != "0" ]; then
 fi
 echo "Files will be created in $outdir"
 stime=`date +%s`
-
-#   If necessary, create the index file
-if [ -f $bai ]; then
-  echo "Using existing index file '$bai'"
-else
-  echo "Creating index file '$bai'"
-  $samtools index $bamfile 2>&1
-  if [ "$?" != "0" ]; then
-    Fail "Unable to create index file for '$bamfile' in '$outdir'"
-  fi
-fi
 
 #   Run qplot, output written to current working directory
 basebam=`basename $bamfile .$extension`
