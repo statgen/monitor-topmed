@@ -44,8 +44,24 @@ extension="${file##*.}"
 #======================================================================
 #   Backup CRAM to GCE for only datayear=3 and build=38,
 #======================================================================
-if [ "$extension" = "cram" -a "$datayear" = "3" -a "$build" = "38" ]; then  
-  backupuri=`$topmedpath wherepath $nwdid backup`
+if [ "$extension" = "cram" -a "$datayear" = "3" -a "$build" = "38" ]; then
+  stime=`date +%s`
+
+  # Start by making sure the local filesystem backup is set
+  f=`$topmedpath wherefile $bamid cram`
+  if [ ! -f $f ]; then
+    echo "Set up local working directory so we can always find the cram"
+    bamdir=`$topmedpath wherepath $bamid bam`
+    cramdir=`$topmedpath wherepath $bamid cram`
+    if [ "$cramdir" = "" -o "$bamdir" = "" ]; then
+      Fail "Unable to determine BAM or CRAm directory for '$bamid'"
+    fi
+    echo "Create symlink to original run since backup will be offsite"
+    ln -s $bamdir $cramdir
+  fi
+
+  # Now backup the file offsite
+  backupuri=`$topmedpath wherepath $nwdid remotebackup`
   cramfile=`$topmedpath wherefile $bamid cram`
 
   echo "Backup of CRAM to $backupuri/$nwdid.src.cram to GCE"
@@ -54,12 +70,12 @@ if [ "$extension" = "cram" -a "$datayear" = "3" -a "$build" = "38" ]; then
   if [ "$?" != "0" ]; then
     Fail "Failed to copy file to GCE: cp $cramfile $backupuri/$f"
   fi
-  echo "Backup of CRAM to Google CLoud completed in $etime seconds"
   $topmedcmd set $bamid 'offsite' D         # Mark this as backed up offsite
 
   etime=`date +%s`
   etime=`expr $etime - $stime`
-  
+  echo "Backup of CRAM to Google CLoud completed in $etime seconds"
+
   Successful
   Log $etime
   exit
