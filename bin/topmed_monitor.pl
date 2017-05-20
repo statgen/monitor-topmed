@@ -232,7 +232,7 @@ if ($fcn eq 'backup') {
 #--------------------------------------------------------------
 if ($fcn eq 'qplot') {
     #   Get list of all samples yet to process
-    my $sql = BuildSQL("SELECT bamid,state_verify,state_qplot FROM $opts{bamfiles_table}",
+    my $sql = BuildSQL("SELECT bamid,state_gcebackup,state_qplot FROM $opts{bamfiles_table}",
         "WHERE state_qplot!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
@@ -240,7 +240,7 @@ if ($fcn eq 'qplot') {
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         #   Only do qplot if verify finished
-        if ($href->{state_verify} != $COMPLETED) { next; }
+        if ($href->{state_gcebackup} != $COMPLETED) { next; }
         if ($opts{suberr} && $href->{state_qplot} >= $FAILEDCHECKSUM) {
             $href->{state_qplot} = $REQUESTED;
         }
@@ -409,23 +409,21 @@ if ($fcn eq 'bcf') {
 #--------------------------------------------------------------
 if ($fcn eq 'gcecopy') {
     #   Get list of all samples yet to process
-    my $sql = BuildSQL("SELECT bamid,state_b38,state_gce38bcf,state_38cp2gce,poorquality FROM $opts{bamfiles_table}",
-        "WHERE state_38cp2gce!=$COMPLETED");
+    my $sql = BuildSQL("SELECT bamid,state_b38,state_gce38bcf,state_gce38copy,poorquality FROM $opts{bamfiles_table}",
+        "WHERE state_gce38copy!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { exit; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         if ($href->{poorquality} ne 'N') { next; }
-        if (! $href->{state_b38}) { next; }
-        if (! $href->{state_gce38bcf}) { next; }
         if ($href->{state_b38} != $COMPLETED) { next; }
         if ($href->{state_gce38bcf} != $COMPLETED) { next; }
-        if ($href->{state_38cp2gce} != $COMPLETED) { next; }
-        if ($opts{suberr} && $href->{state_38cp2gce} >= $FAILEDCHECKSUM) {
-            $href->{state_38cp2gce} = $REQUESTED;
+        if ($href->{state_gce38copy} == $COMPLETED) { next; }
+        if ($opts{suberr} && $href->{state_gce38copy} >= $FAILEDCHECKSUM) {
+            $href->{state_gce38copy} = $REQUESTED;
         }
-        if ($href->{state_38cp2gce} != $NOTSET && $href->{state_38cp2gce} != $REQUESTED) { next; }
+        if ($href->{state_gce38copy} != $NOTSET && $href->{state_gce38copy} != $REQUESTED) { next; }
         if (! BatchSubmit("$opts{topmedgcecopy} -submit $href->{bamid}")) { last; }
     }
     ShowSummary($fcn);
