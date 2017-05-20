@@ -35,6 +35,7 @@ use File::Basename;
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
+my $NOTSET    = 0;            # Not set
 our %opts = (
     realm => '/usr/cluster/topmed/etc/.db_connections/topmed',
     centers_table => 'centers',
@@ -269,10 +270,17 @@ sub AddBams {
             "If data is incoming, this might be OK\n";
         }
     }
-    
-    #   Last thing, see if there has been little changed in this directory
-    #   If nothing has changed in a long time, make this run as 'arrived'
-    #   and we'll never come back here again.
+
+    #   If SOME ALL the sample has been processed as arrived, maybe we do not
+    #   need to look at this run any more.
+    $sql = "SELECT bamid from $opts{bamfiles_table} WHERE state_arrive!=$NOTSET";
+    $sth = DoSQL($sql);
+    my $numberarrived = $sth->rows();
+    if (! $numberarrived) { return 1; }         # No sample processed, keep looking
+
+    #   At least one sample was marked as arrived, see if there has been little changed
+    #   in this directory in a long time, then make this run as 'arrived' so we'll
+    #   look at this run again
     my $oldestbamdate = OldestBAM($d);
     if ((time() - $oldestbamdate) > $opts{arrivedsecs}) {
         $sql = "UPDATE $opts{runs_table}  SET arrived='Y' WHERE runid=$runid";
