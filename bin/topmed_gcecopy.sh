@@ -10,7 +10,6 @@ me=gcecopy
 markverb=$me
 cores="--cpus-per-task=2"           # Cores here should be same as gsutil
 stat="stat --printf=%s"
-bcftools=/usr/cluster/bin/bcftools
 
 if [ "$1" = "-submit" ]; then
   shift
@@ -89,38 +88,45 @@ sizerecabcsi=`$stat $recabcsi`
 #   Copy the file to the remote destination only if the size differs
 #======================================================================
 copylist=''
+clist=''
 copyuri=`$topmedpath wherepath $nwdid upload`
 
 l=(`$gsutil stat $copyuri/$baserecabcram | grep Content-Length:`)
 gcesize=${l[1]}
-#echo "$baserecabcram sizes= $sizerecabcram $gcesize"
-if [ $sizerecabcram != $gcesize ]; then
+if [ "$sizerecabcram" != "$gcesize" ]; then
+  echo "$baserecabcram sizes= $sizerecabcram $gcesize"
   copylist="$copylist $recabcram"
+  clist="$clist $baserecabcram"
 fi
 
 l=(`$gsutil stat $copyuri/$baserecabcrai | grep Content-Length:`)
 gcesize=${l[1]}
-#echo "$baserecabcrai sizes= $sizerecabcrai $gcesize"
-if [ $sizerecabcrai != $gcesize ]; then
+if [ "$sizerecabcrai" != "$gcesize" ]; then
+  echo "$baserecabcrai sizes= $sizerecabcrai $gcesize"
   copylist="$copylist $recabcrai"
+  clist="$clist $baserecabcrai"
 fi
 
 l=(`$gsutil stat $copyuri/$baserecabbcf | grep Content-Length:`)
 gcesize=${l[1]}
-#echo "$baserecabbcf sizes= $sizerecabbcf $gcesize"
-if [ $sizerecabbcf != $gcesize ]; then
+if [ "$sizerecabbcf" != "$gcesize" ]; then
+  echo "$baserecabbcf sizes= $sizerecabbcf $gcesize"
   copylist="$copylist $recabbcf"
+  clist="$clist $baserecabbcf"
 fi
 
 l=(`$gsutil stat $copyuri/$baserecabcsi | grep Content-Length:`)
 gcesize=${l[1]}
-#echo "$baserecabcsi sizes= $sizerecabcsi $gcesize"
-if [ $sizerecabcsi != $gcesize ]; then
+if [ "$sizerecabcsi" != "$gcesize" ]; then
+  echo "$baserecabcsi sizes= $sizerecabcsi $gcesize"
   copylist="$copylist $recabcsi"
+  clist="$clist $baserecabcsi"
 fi
 
 if [ "$copylist" != "" ]; then
-  echo "====> Copying these files to $copyuri:  $copylist"
+  echo ""
+  echo "====> Copying these files to $copyuri:  $clist"
+Fail "Copying to $copyuri:  $clist"
   for f in $copylist; do
     echo "Copying $f"
     echo $gsutil cp $f $copyuri
