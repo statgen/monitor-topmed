@@ -635,7 +635,7 @@ sub BuildSQL {
     else { $s .= " AND $where"; }
 
     #   Add support for datayear
-    if ($opts{datayear}) { $s .= " AND datayear=$opts{datayear}"; }
+    if ($opts{datayear}) { $s .= " AND b.datayear=$opts{datayear}"; }
 
     #   Support randomization
     if ($opts{random}) { $s .= ' ORDER BY RAND()'; }
