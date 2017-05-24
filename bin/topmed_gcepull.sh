@@ -45,7 +45,7 @@ cramfile=$crampath/$nwdid.recab.cram
 #======================================================================
 #   Copy remapped CRAM from GCE, check flagstat, fix up database
 #======================================================================
-cramflagstat=`$topmedcmd show $bamid cramflagstat`
+cramflagstat=`GetDB $bamid cramflagstat`
 if [ "$cramflagstat" = "" ]; then
   Fail "Unable to get cramflagstat for bamid '$bamid'"
 fi

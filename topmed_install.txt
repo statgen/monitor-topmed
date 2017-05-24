@@ -12,35 +12,39 @@ Sync to master
 
 If you must merge code, be sure to sign into github as tgliedt, then the merge button will appear
 
+#   PW=LsdI2HafPS
 
 ssh topmed
-rm -rf ~/dev/monitor-topmed 
 cd ~/dev
-git clone https://github.com/statgen/monitor-topmed.git
+#   If starting all over
+  rm -rf ~/dev/monitor-topmed
+  git clone git@github.com:statgen/monitor-topmed.git
+
+#   Normal processing
 cd ~/dev/monitor-topmed
+git pull                # Not needed if starting over
 
 mkdir -p /working/build
 chmod 0775 /working/build
 chgrp topmed-dev /working/build
 
-d=/working/build/monitor-topmed
-#   If you get errors in build do this, but it'll be lots longer:  rm -rf $d
-rex build    # Puts build in $d
+#   Build locally.  If database changes were made, update schema
+  rex schema
+  git commit -m "DB changes" -a
+  git push
+  #   Update database information.  Check if schemas are correct
+  ls -l $builddir/lib/perl5/Topmed/DB/Schema/Result
 
-$d/scripts/schema.pl
-#   Check if schemas are correct
-ls -l $d/lib/perl5/Topmed/DB/Schema/Result
+#   Normal build locally
+builddir=/working/build/monitor-topmed
+rex -E prod build
 
 #   Install in production place with a different scheme?
-#rex -E prod build
-#rex -E prod install
-#rex -E test install    # installed in /var/tmp/monitor   Does not work
-rex install             # Builds to $d
+rex -E prod install    # installed in /var/tmp/monitor
 
-#   Sanity check
-#/var/tmp/monitor-topmed/bin/topmedcmd.pl
-$d/bin/topmedcmd.pl
 
-rsync -av * /usr/cluster/topmed
-#   You must manually remove code which was deleted from git
 
+Copy prod-install to production to be used
+rsync -av /var/tmp/monitor/* /usr/cluster/topmed
+
+l

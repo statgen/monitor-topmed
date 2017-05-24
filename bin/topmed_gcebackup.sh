@@ -37,8 +37,8 @@ if [ "$file" = "" ]; then
   Fail "Unable to determine BAMNAME for '$bamid'"
 fi
 
-datayear=`$topmedcmd show $bamid datayear`
-build=`$topmedcmd show $bamid build`
+datayear=`GetDB $bamid datayear`
+build=`GetDB $bamid build`
 extension="${file##*.}"
 #======================================================================
 #   Backup CRAM to GCE for only datayear=3 and build=38,
@@ -74,7 +74,7 @@ if [ "$extension" = "cram" -a "$datayear" = "3" -a "$build" = "38" ]; then
   if [ "$?" != "0" ]; then
     Fail "Failed to copy file to GCE: cp $cramfile.crai $backupuri/$f.crai"
   fi
-  $topmedcmd set $bamid 'offsite' D         # Mark this as backed up offsite
+  SetDB $bamid 'offsite' D          # Mark this as backed up offsite
 
   etime=`date +%s`
   etime=`expr $etime - $stime`
@@ -106,7 +106,7 @@ fi
 #   Original file was a cram - should have been backed up offsite
 #======================================================================
 if [ "$extension" = "cram" ]; then
-  offsite=`$topmedcmd show $bamid offsite`
+  offsite=`GetDB $bamid offsite`
   if [ "$offsite" != "D" ]; then
     Fail "Original file was a CRAM ($bamid) but was not backed up offsite ($offsite)"
   fi

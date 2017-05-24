@@ -43,17 +43,17 @@ GetNWDID $bamid
 #======================================================================
 #   Copy CRAM to Google Cloud
 #======================================================================
-center=`$topmedcmd show $bamid center`
+center=`GetDB $bamid center`
 if [ "$center" = "" ]; then
   Fail "Unable to get center for bamid '$bamid'"
 fi
-run=`$topmedcmd show $bamid run`
+run=`GetDB $bamid run`
 if [ "$run" = "" ]; then
   Fail "Unable to get run for bamid '$bamid'"
 fi
-datayear=`$topmedcmd show $bamid datayear`
+datayear=`GetDB $bamid datayear`
 if [ "$datayear" = "3" ]; then
-  build=`$topmedcmd show $bamid build`
+  build=`GetDB $bamid build`
   if [ "$build" = "38" ]; then
     stime=`date +%s`
     #======================================================================

@@ -26,7 +26,7 @@ if [ "$1" = "" ]; then
   exit 1
 fi
 bamid=$1
-checksum=`$topmedcmd show $bamid checksum`
+checksum=`GetDB $bamid checksum`
 bamfile=`$topmedpath wherefile $bamid bam`
 
 Started

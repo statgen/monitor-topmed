@@ -16,7 +16,7 @@ squeezed=n
 
 if [ "$1" = "-submit" ]; then
   shift
-  bamid=`$topmedcmd show $1 bamid`
+  bamid=`GetDB $1 bamid`
   MayIRun $me $bamid
   MyRealHost $bamid 'bam'
 
@@ -62,8 +62,8 @@ if [ "$extension" = "cram" ]; then
   cramdir=`$topmedpath wherepath $bamid cram`
   if [ ! -d "$cramdir" ]; then
     echo "No CRAM path known, we will attempt to create a symlink to the original run"
-    center=`$topmedcmd show $bamid center`
-    run=`$topmedcmd show $bamid run`
+    center=`GetDB $bamid center`
+    run=`GetDB $bamid run`
     #   Go to where backups directory for this run should be
     d=/net/topmed/working/backups/incoming/topmed/$center
     cd $d
@@ -111,13 +111,13 @@ if [ "$extension" = "cram" ]; then
   fi
 
   echo "MD5 for cram, same as original file"
-  v=`$topmedcmd show $bamid checksum`
+  v=`GetDB $bamid checksum`
   SetDB $bamid 'cramchecksum' $v
 
-  v=`$topmedcmd show $bamid checksum`
+  v=`GetDB $bamid checksum`
   SetDB $bamid 'cramchecksum' $v
 
-  flagstat=`$topmedcmd show $bamid cramflagstat`
+  flagstat=`GetDB $bamid cramflagstat`
   if [ "$flagstat" = "" ]; then
     echo "New CRAM, calculate flagstat for $cramfile"
     now=`date +%s`
@@ -129,7 +129,7 @@ if [ "$extension" = "cram" ]; then
     echo "$flagstat for CRAM completed in $s seconds"
   else 
     echo "Flagstat for cram, same as original file"
-    v=`$topmedcmd show $bamid bamflagstat`
+    v=`GetDB $bamid bamflagstat`
     SetDB $bamid 'cramflagstat' $v
     echo "No CRAM actually created, just did database bookkeeping"
   fi
@@ -157,7 +157,7 @@ fi
 s=`date +%s`; s=`expr $s - $now`; echo "$flagstat completed in $s seconds"
 
 #   Illumina cram files require a different fasta
-center=`$topmedcmd show $bamid center`
+center=`GetDB $bamid center`
 if [ "$center" = "illumina" ]; then
   ref=$illuminaref
   echo "BAM to CRAM for '$center' requires a different fasta file '$ref'"

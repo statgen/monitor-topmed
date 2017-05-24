@@ -99,7 +99,7 @@ fi
 #   when reading the bamfile (NFS surprise).
 #   This should fail if the TotalReads < bmflagstat value + 5000
 statsfile=
-bamflagstat=`$topmedcmd show $bamid bamflagstat`   # Same for cram or bam
+bamflagstat=`GetDB $bamid bamflagstat`   # Same for cram or bam
 tr=`grep TotalReads $basebam.qp.stats | awk '{ print $2 }'`
 if [ "$tr" = "" ]; then
   Fail "QPLOT data $nwdid.src.qp.stats not found or TotalReads not found"

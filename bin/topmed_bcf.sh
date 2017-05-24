@@ -11,7 +11,7 @@ markverb=$me
 
 if [ "$1" = "-submit" ]; then
   shift
-  bamid=`$topmedcmd show $1 bamid`
+  bamid=`GetDB $1 bamid`
   MayIRun $me $bamid
   MyRealHost $bamid b$build
   SubmitJob $bamid "topmed-$me" '24G' "$0 $*"
@@ -41,8 +41,7 @@ fi
 #   CD to remapped cram file location
 cd $crampath
 if [ "$?" != "0" ]; then
-  $topmedcmd -persist emsg "Unable to CD to directory for remapped CRAM file '$bamid'"
-  exit 2
+  Fail "Unable to CD to directory for remapped CRAM file '$bamid'"
 fi
 
 cramfile=`$topmedpath wherefile $bamid b$build`

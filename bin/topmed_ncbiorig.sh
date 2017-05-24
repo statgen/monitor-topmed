@@ -15,7 +15,7 @@ if [ "$1" = "-submit" ]; then
   shift
   bamid=`$topmedcmd show $1 bamid`
   #   Do not allow this to play with anything except year one data
-  year=`$topmedcmd show $1 datayear`
+  year=`GetDB $1 datayear`
   if [ "$year" != "1" ]; then
     Fail "$0 $* must be year ONE data, not '$year'"
   fi
@@ -37,22 +37,22 @@ bamid=$1
 Started
 
 #   Do not allow this to play with anything except year one data
-year=`$topmedcmd show $bamid datayear`
+year=`GetDB $bamid datayear`
 if [ "$year" != "1" ]; then
   Fail "$0 $* must be year ONE data, not '$year'"
 fi
 
 GetNWDID $bamid
 
-center=`$topmedcmd show $bamid center`
+center=`GetDB $bamid center`
 if [ "$center" = "" ]; then
   Fail "Invalid bamid '$bamid'. CENTER not known"
 fi
-build=`$topmedcmd show $bamid build`
+build=`GetDB $bamid build`
 if [ "$build" = "" ]; then
   Fail "Invalid build '$build'. BUILD not known"
 fi
-origbam=`$topmedcmd show $bamid bamname`
+origbam=`GetDB $bamid bamname`
 if [ "$origbam" = "" ]; then
   Fail "Invalid bamid '$bamid'. BAMNAME not known"
 fi
@@ -68,7 +68,7 @@ here=`pwd`
 
 #   Figure out what file to send. Either a BAM or a CRAM
 sendcram='N'
-datayear=`$topmedcmd show $bamid datayear`  # What year data is this
+datayear=`GetDB $bamid datayear`  # What year data is this
 if [ "$center" = "broad" -a "$datayear" != '1' ]; then
   sendcram='Y'
 fi

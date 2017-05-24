@@ -14,7 +14,7 @@ if [ "$1" = "-submit" ]; then
   shift
   bamid=`$topmedcmd show $1 bamid`
   #   Do not allow this to play with anything except year one data
-  year=`$topmedcmd show $1 datayear`
+  year=`GetDB $1 datayear`
   if [ "$year" != "1" ]; then
     Fail "$0 $* must be year ONE data, not '$year'"
   fi
@@ -36,7 +36,7 @@ bamid=$1
 Started
 
 #   Do not allow this to play with anything except year one data
-year=`$topmedcmd show $bamid datayear`
+year=`GetDB $bamid datayear`
 if [ "$year" != "1" ]; then
   Fail "$0 $* must be year ONE data, not '$year'"
 fi
