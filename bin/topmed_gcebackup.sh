@@ -8,7 +8,6 @@
 
 me=gcebackup
 markverb=$me
-cores="--cpus-per-task=2"           # Cores here should be same as gsutil
 
 if [ "$1" = "-submit" ]; then
   shift
@@ -64,11 +63,16 @@ if [ "$extension" = "cram" -a "$datayear" = "3" -a "$build" = "38" ]; then
   backupuri=`$topmedpath wherepath $nwdid remotebackup`
   cramfile=`$topmedpath wherefile $bamid cram`
 
-  echo "Backup of CRAM to $backupuri/$nwdid.src.cram to GCE"
   f=`basename $cramfile`
-  $gsutil cp $cramfile $backupuri/$f
+  echo "Backup of CRAM to $backupuri/$f to GCE"
+  $gsutilbig cp $cramfile $backupuri/$f
   if [ "$?" != "0" ]; then
     Fail "Failed to copy file to GCE: cp $cramfile $backupuri/$f"
+  fi
+  echo "Backup of CRAM to $backupuri/$f.crai to GCE"
+  $gsutil cp $cramfile.crai $backupuri/$f.crai
+  if [ "$?" != "0" ]; then
+    Fail "Failed to copy file to GCE: cp $cramfile.crai $backupuri/$f.crai"
   fi
   $topmedcmd set $bamid 'offsite' D         # Mark this as backed up offsite
 
