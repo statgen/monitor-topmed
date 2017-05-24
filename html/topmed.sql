@@ -66,7 +66,7 @@ CREATE TABLE runs (
   dirname      VARCHAR(64) NOT NULL,
   status       VARCHAR(256),
   bamcount     INT,
-  datayear     INT DEFAULT 2,          /* Year of project: 1, 2 ... */
+  datayear     INT DEFAULT 3,          /* Year of project: 1, 2 ... */
   offsite      CHAR(1) DEFAULT 'N',    /* Original files kept offsite (N,Y,D) */
   xmlfound     INT DEFAULT 0,          /* Remove this */
   arrived      CHAR(1) DEFAULT 'N',    /* Y or N that all files arrived for this run */
@@ -153,7 +153,6 @@ my $FAILED    = 99;           # Task failed
   state_ncbiexpt INT DEFAULT 0,     /* Year one, experiment defined at NCBI (X) */
   state_ncbiorig INT DEFAULT 0,     /* Original input file as bam or cram (S) */
   state_ncbib37  INT DEFAULT 0,     /* Remapped cram build 37 as cram (P) */
-
 
   PRIMARY KEY  (bamid)
 );
