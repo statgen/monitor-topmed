@@ -8,7 +8,6 @@
 
 me=gcecopy
 markverb=$me
-cores="--cpus-per-task=2"           # Cores here should be same as gsutil
 stat="stat --printf=%s"
 
 if [ "$1" = "-submit" ]; then
@@ -86,56 +85,98 @@ sizerecabcsi=`$stat $recabcsi`
 #======================================================================
 #   All the files of interest exist locally
 #   Copy the file to the remote destination only if the size differs
+#   Just to be sure if the cram or bcf is missing, copy the index too
 #======================================================================
-copylist=''
-clist=''
+replacelist=''
+rlist=''
+cmissinglist=''
+cmissing=''
 copyuri=`$topmedpath wherepath $nwdid upload`
 
 l=(`$gsutil stat $copyuri/$baserecabcram | grep Content-Length:`)
 gcesize=${l[1]}
 if [ "$sizerecabcram" != "$gcesize" ]; then
-  echo "$baserecabcram sizes= $sizerecabcram $gcesize"
-  copylist="$copylist $recabcram"
-  clist="$clist $baserecabcram"
-fi
-
-l=(`$gsutil stat $copyuri/$baserecabcrai | grep Content-Length:`)
+  echo "$baserecabcram sizes= $sizerecabcram / $gcesize"
+  if [ "$gcesize" = "" ]; then
+    cmissing="$cmissing $baserecabcram $baserecabcrai"
+    cmissinglist="$cmissinglist $recabcram $recabcrai"
+  else
+    replacelist="$replacelist $recabcram $recabcrai"
+    rlist="$rlist $baserecabcram $baserecabcrai"
+  fi
+else
+  l=(`$gsutil stat $copyuri/$baserecabcrai | grep Content-Length:`)
 gcesize=${l[1]}
-if [ "$sizerecabcrai" != "$gcesize" ]; then
-  echo "$baserecabcrai sizes= $sizerecabcrai $gcesize"
-  copylist="$copylist $recabcrai"
-  clist="$clist $baserecabcrai"
+  if [ "$sizerecabcrai" != "$gcesize" ]; then
+    echo "$baserecabcrai sizes= $sizerecabcrai / $gcesize"
+    if [ "$gcesize" = "" ]; then
+      cmissing="$cmissing $baserecabcrai"
+      cmissinglist="$cmissinglist $recabcrai"
+    else
+      replacelist="$replacelist $recabcrai"
+      rlist="$rlist $baserecabcrai"
+    fi
+  fi
 fi
 
 l=(`$gsutil stat $copyuri/$baserecabbcf | grep Content-Length:`)
 gcesize=${l[1]}
 if [ "$sizerecabbcf" != "$gcesize" ]; then
-  echo "$baserecabbcf sizes= $sizerecabbcf $gcesize"
-  copylist="$copylist $recabbcf"
-  clist="$clist $baserecabbcf"
-fi
-
-l=(`$gsutil stat $copyuri/$baserecabcsi | grep Content-Length:`)
-gcesize=${l[1]}
-if [ "$sizerecabcsi" != "$gcesize" ]; then
-  echo "$baserecabcsi sizes= $sizerecabcsi $gcesize"
-  copylist="$copylist $recabcsi"
-  clist="$clist $baserecabcsi"
-fi
-
-if [ "$copylist" != "" ]; then
   echo ""
-  echo "====> Copying these files to $copyuri:  $clist"
-Fail "Copying to $copyuri:  $clist"
-  for f in $copylist; do
-    echo "Copying $f"
-    echo $gsutil cp $f $copyuri
+  echo "$baserecabbcf sizes= $sizerecabbcf / $gcesize"
+  if [ "$gcesize" = "" ]; then
+    cmissing="$cmissing $baserecabbcf $baserecabcsi"
+    cmissinglist="$cmissinglist $recabbcf $recabcsi"
+  else
+    replacelist="$replacelist $recabbcf $recabcsi"
+    rlist="$rlist $baserecabbcf $baserecabcsi"
+  fi
+else
+  l=(`$gsutil stat $copyuri/$baserecabcsi | grep Content-Length:`)
+gcesize=${l[1]}
+  if [ "$sizerecabcsi" != "$gcesize" ]; then
+    echo "$baserecabcsi sizes= $sizerecabcsi / $gcesize"
+    if [ "$gcesize" = "" ]; then
+      cmissing="$cmissing $baserecabcs"
+      cmissinglist="$cmissinglist $recabcsi"
+    else
+      replacelist="$replacelist $recabcsi"
+      rlist="$rlist $baserecabcsi"
+    fi
+  fi
+fi
+
+#   First copy just the files that are missing
+if [ "$cmissing" != "" ]; then
+  echo ""
+  echo ""
+  echo "====> Copying MISSING files to $copyuri:  $cmissing"
+  for f in $cmissinglist; do
+    basef=`basename $f`
+    echo "Copying $basef"
+    $gsutilbig cp $f $copyuri/$basef
     if [ "$?" != "0" ]; then
-      Fail "Failed to copy file to GCE"
+      Fail "Failed to copy $basef to GCE"
+    fi
+  done
+fi
+
+#   Now, copy all the files that need replacing
+if [ "$replacelist" != "" ]; then
+  echo ""
+  echo "====> Replace in $copyuri:  $rlist"
+Fail "Replace in $copyuri:  $rlist"
+  for f in $replacelist; do
+    basef=`basename $f`
+    echo "Copying $basef"
+    $gsutilbig cp $f $copyuri/$basef
+    if [ "$?" != "0" ]; then
+      Fail "Failed to copy $basef to GCE"
     fi
   done
 else
-  echo "No files to copy, everything for $bamid $nwdid is up to date"
+  echo "No more files to copy, everything for $bamid $nwdid is up to date"
+  $gsutil ls -l $copyuri
 fi
 
 etime=`date +%s`
