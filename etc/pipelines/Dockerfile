@@ -1,22 +1,72 @@
-FROM ubuntu:16.04
+FROM topmed-base
 
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    curl \
-    git \
-    libncurses-dev \
-    unzip \
-    zlib1g-dev
+LABEL maintainer "Chris Scheller <schelcj@umich.edu>"
 
-COPY cpp-std-namespace.patch /usr/local/src
-RUN git clone https://github.com/statgen/topmed_freeze3_calling.git /usr/local/src/topmed_freeze3_calling
-RUN cd /usr/local/src/topmed_freeze3_calling && patch -p1 < ../cpp-std-namespace.patch
-RUN make -C /usr/local/src/topmed_freeze3_calling/htslib install
-RUN make -C /usr/local/src/topmed_freeze3_calling
-RUN ln -s /usr/local/src/topmed_freeze3_calling/vt/vt /usr/local/bin/vt
-RUN ln -s /usr/local/src/topmed_freeze3_calling/samtools/samtools /usr/local/bin/samtools
-RUN ln -s /usr/local/src/topmed_freeze3_calling/gotcloud/src/bamUtil/bin/bam /usr/local/bin/bam
+ENV BUILD_PREFIX  /usr/local
+ENV BUILD_BIN_DIR ${BUILD_PREFIX}/bin
+ENV BUILD_SRC_DIR ${BUILD_PREFIX}/src
 
-RUN mkdir -p /usr/local/share/ref
-COPY ref/hs38DH.fa* /usr/local/share/ref/
-#RUN /usr/local/src/topmed_freeze3_calling/samtools/misc/seq_cache_populate.pl -root /usr/local/share/ref/md5 /usr/local/share/ref/hs38DH.fa
+# package:  htslib
+# source: http://www.htslib.org/download/
+RUN wget -P ${BUILD_SRC_DIR} https://github.com/samtools/htslib/releases/download/1.4.1/htslib-1.4.1.tar.bz2
+RUN tar -C ${BUILD_SRC_DIR} -jxf ${BUILD_SRC_DIR}/htslib-1.4.1.tar.bz2
+RUN cd ${BUILD_SRC_DIR}/htslib-1.4.1 && ./configure --prefix=${BUILD_PREFIX} && make && make PREFIX=${BUILD_PREFIX} install
+
+# package:  samtools
+# source: http://www.htslib.org/download/
+RUN wget -P ${BUILD_SRC_DIR} https://github.com/samtools/samtools/releases/download/1.4.1/samtools-1.4.1.tar.bz2
+RUN tar -C ${BUILD_SRC_DIR} -jxf ${BUILD_SRC_DIR}/samtools-1.4.1.tar.bz2
+RUN cd ${BUILD_SRC_DIR}/samtools-1.4.1 && ./configure --prefix=${BUILD_PREFIX} && make && make PREFIX=${BUILD_PREFIX} install
+
+# package:  bcftools
+# source: http://www.htslib.org/download/
+RUN wget -P ${BUILD_SRC_DIR} https://github.com/samtools/bcftools/releases/download/1.4.1/bcftools-1.4.1.tar.bz2
+RUN tar -C ${BUILD_SRC_DIR} -jxf ${BUILD_SRC_DIR}/bcftools-1.4.1.tar.bz2
+RUN cd ${BUILD_SRC_DIR}/bcftools-1.4.1 && make && make PREFIX=${BUILD_PREFIX} install
+
+# package:  bwa
+# source: https://github.com/lh3/bwa
+RUN wget -P ${BUILD_SRC_DIR} https://github.com/lh3/bwa/releases/download/v0.7.15/bwa-0.7.15.tar.bz2
+RUN tar -C ${BUILD_SRC_DIR} -jxf ${BUILD_SRC_DIR}/bwa-0.7.15.tar.bz2
+RUN cd ${BUILD_SRC_DIR}/bwa-0.7.15 && make
+RUN ln -s ${BUILD_SRC_DIR}/bwa-0.7.15/bwa ${BUILD_BIN_DIR}
+
+# package:  veritfy-bam-id
+# source: https://github.com/Griffan/VerifyBamID
+RUN git clone https://github.com/Griffan/VerifyBamID.git ${BUILD_SRC_DIR}/verify-bam-id
+RUN cd ${BUILD_SRC_DIR}/verify-bam-id && cmake ./ && make && cp bin/* ${BUILD_BIN_DIR}
+
+# package:  vt
+# source: https://github.com/atks/vt
+RUN wget -P ${BUILD_SRC_DIR} https://github.com/atks/vt/archive/0.5772.tar.gz
+RUN tar -C ${BUILD_SRC_DIR} -zxf ${BUILD_SRC_DIR}/0.5772.tar.gz
+RUN cd ${BUILD_SRC_DIR}/vt-0.5772 && make
+RUN ln -s ${BUILD_SRC_DIR}/vt-0.5772/vt ${BUILD_BIN_DIR}
+
+# package:  samblaster
+# source: https://github.com/GregoryFaust/samblaster
+RUN wget -P ${BUILD_SRC_DIR} https://github.com/GregoryFaust/samblaster/archive/v.0.1.24.tar.gz
+RUN tar -C ${BUILD_SRC_DIR} -zxf ${BUILD_SRC_DIR}/v.0.1.24.tar.gz
+RUN cd ${BUILD_SRC_DIR}/samblaster-v.0.1.24 && make
+RUN ln -s ${BUILD_SRC_DIR}/samblaster-v.0.1.24/samblaster ${BUILD_BIN_DIR}
+
+# package:  bamutil - master
+# source: https://github.com/statgen/bamUtil
+RUN git clone https://github.com/statgen/bamUtil ${BUILD_SRC_DIR}/bam-util
+RUN cd ${BUILD_SRC_DIR}/bam-util && make cloneLib && make && make install INSTALLDIR=${BUILD_BIN_DIR}
+
+# package:  bamutil - ext-mem-sort-manage
+# source: https://github.com/statgen/bamUtil
+# branch: ExternalMemorySortManager
+RUN cd ${BUILD_SRC_DIR}/bam-util && git checkout ExternalMemorySortManager && git checkout master
+RUN cd ${BUILD_SRC_DIR}/bam-util && git worktree add ../bam-util-ext-mem-sort-manager ExternalMemorySortManager
+RUN sed -i 's/EXE=bam/EXE=bam-util-ext-mem-sort-manager/g' ${BUILD_SRC_DIR}/bam-util-ext-mem-sort-manager/src/Makefile
+RUN cd ${BUILD_SRC_DIR}/bam-util-ext-mem-sort-manager && make cloneLib && make install INSTALLDIR=${BUILD_BIN_DIR}
+
+# package:  bamutil - non-primary-debup
+# source: https://github.com/statgen/bamUtil
+# branch: NonPrimaryDedup
+RUN cd ${BUILD_SRC_DIR}/bam-util && git checkout NonPrimaryDedup && git checkout master
+RUN cd ${BUILD_SRC_DIR}/bam-util && git worktree add ../bam-util-non-primary-dedup NonPrimaryDedup
+RUN sed -i 's/EXE=bam/EXE=bam-util-non-primary-dedup/g' ${BUILD_SRC_DIR}/bam-util-non-primary-dedup/src/Makefile
+RUN cd ${BUILD_SRC_DIR}/bam-util-non-primary-dedup && make cloneLib && make install INSTALLDIR=${BUILD_BIN_DIR}
