@@ -18,9 +18,12 @@ slurmp=topmed-working
 build=38
 realhost=''
 
-#cores="--cpus-per-task=2"         # Cores here should be same as gsutil
 cores=''                            # Set to same as gsutil if it will be used
-gsutil='gsutil -o GSUtil:parallel_composite_upload_threshold=150M -o GSUtil:parallel_process_count=2'
+gsutil="gsutil -m"
+gsutilbig='gsutil -o GSUtil:parallel_composite_upload_threshold=150M'
+#   No need to parallel processing 
+#cores="--cpus-per-task=2"         # Cores here should be same as gsutil
+#gsutil='gsutil -o GSUtil:parallel_composite_upload_threshold=150M -o GSUtil:parallel_process_count=2'
 incominguri='gs://topmed-recabs'
 bcfuri='gs://topmed-bcf'
 export BOTO_CONFIG=/net/topmed/working/shared/tpg_gsutil_config.txt
