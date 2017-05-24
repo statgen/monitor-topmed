@@ -61,7 +61,6 @@ my %col2name = (
     ncbiexpt => 'sexpt',
     ncbiorig => 'sorig',
     ncbib37 => 'sb37',
-    ncbib38 => 'sb38',
 );
 my @cols2check = keys %col2name;
 my @astatecols = ();                    # Array of state column names
