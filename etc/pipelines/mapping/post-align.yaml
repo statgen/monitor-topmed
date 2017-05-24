@@ -1,22 +1,42 @@
-name: bcf_generation
-description: Generate BCF file
+name: post-align
+description: post-align
 inputParameters:
   - name: INPUT_FILE
     localCopy:
       disk: boot
       path: input.cram
-  - name: FASTA_PATH
-    defaultValue: /usr/local/share/ref/hs38DH.fa
+  - name: REFERENCE_PATH
+    defaultValue: /usr/local/share/resources/hs38DH.fa
+  - name: VCF_PATH
+    defaultValue: /usr/local/share/resources/Homo_sapiens_assembly38.dbsnp138.vcf.gz
+  - name: MERGED_BAM
+    defaultValue: /merged.bam
   - name: NWDID
 outputParameters:
-  - name: OUTPUT_FILE
+  - name: CRAM
+    localCopy:
+      disk: boot
+      path: output.cram
+  - name: CRAI
+    localCopy:
+      disk: boot
+      path: output.cram
+  - name: BCF
     localCopy:
       disk: boot
       path: output.bcf
-  - name: INDEX_FILE
+  - name: CSI
     localCopy:
       disk: boot
       path: output.bcf.csi
+  - name: METRICS
+    localCopy:
+      disk: boot
+      path: dedup_lowmem.metrics
+  - name: FLAGSTAT
+    localCopy:
+      disl: boot
+      path: output.flagstat
 resources:
   minimumCpuCores: 1
   minimumRamGb: 12
@@ -27,10 +47,23 @@ resources:
     - us-central1-c
     - us-central1-f
 docker:
-  imageName: us.gcr.io/topmed-1366/vt-discover
+  imageName: us.gcr.io/topmed-1366/topmed-mapping-b38-y3
   cmd: |
     set -o pipefail
-    samtools view -T ${FASTA_PATH} -uh ${INPUT_FILE} \
+
+    samtools merge --threads 1 -c ${CRAM} ${SORTED_BAMS}
+
+    bam-util-non-primary-dedup dedup_LowMem --allReadNames \
+      --binCustom --binQualS 0:2,3:3,4:4,5:5,6:6,7:10,13:20,23:30 \
+      --log ${METRICS} --recab --in ${MERGED_BAM} --out -.ubam \
+      --refFile ${REFERENCE_PATH} --dbsnp ${VCF_PATH} \
+      | samtools view -h -C -T ${REFERENCE_PATH} -o ${CRAM} --threads 1
+
+    samtools flagstat ${CRAM} > ${FLAGSTAT}
+    samtools index ${CRAM}
+
+    samtools view -T ${REFERENCE_PATH} -uh ${CRAM} \
       | bam clipOverlap --poolSize 100000000 --in -.ubam --out -.ubam \
-      | vt discover2 -z -q 20 -b + -r ${FASTA_PATH} -s ${NWDID} -o ${OUTPUT_FILE}
-    bcftools index ${OUTPUT_FILE}
+      | vt discover2 -z -q 20 -b + -r ${REFERENCE_PATH} -s ${NWDID} -o ${BCF}
+
+    bcftools index ${BCF}
