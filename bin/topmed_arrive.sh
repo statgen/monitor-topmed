@@ -57,16 +57,15 @@ SetDB $bamid 'build' $build
 $topmednwd -bamid $bamid $bamfile
 rc=$?
 if [ "$rc" != "0" ]; then
-  $topmedcmd -persist -emsg "$topmednwd failed" mark $bamid $markverb failed
-  exit $rc
+  Fail "$topmednwd failed"
 fi
 
 #   Rename the bamfile to NWD and fix the database
 $topmedrename $bamid $bamfile
 rc=$?
 if [ "$rc" != "0" ]; then
-  $topmedcmd -persist -emsg "$topmedrename failed" mark $bamid $markverb failed
-  exit $rc
+  Fail "$topmedrename failed"
 fi
-$topmedcmd -persist mark $bamid $markverb completed
+
+Successful
 exit 0

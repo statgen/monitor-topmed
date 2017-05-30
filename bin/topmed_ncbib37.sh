@@ -16,7 +16,7 @@ if [ "$1" = "-submit" ]; then
   shift
   bamid=`$topmedcmd show $1 bamid`
   #   Do not allow this to play with anything except year one data
-  year=`$topmedcmd show $1 datayear`
+  year=`GetDB $1 datayear`
   if [ "$year" != "1" ]; then
     Fail "$0 $* must be year ONE data, not '$year'"
   fi
@@ -38,18 +38,18 @@ bamid=$1
 Started
 
 #   Do not allow this to play with anything except year one data
-year=`$topmedcmd show $bamid datayear`
+year=`GetDB $bamid datayear`
 if [ "$year" != "1" ]; then
   Fail "$0 $* must be year ONE data, not '$year'"
 fi
 
 GetNWDID $bamid
 
-center=`$topmedcmd show $bamid center`
+center=`GetDB $bamid center`
 if [ "$center" = "" ]; then
   Fail "Invalid bamid '$bamid'. CENTER not known"
 fi
-piname=`$topmedcmd show $bamid piname`
+piname=`GetDB $bamid piname`
 if [ "$piname" = "" ]; then
   Fail "Invalid bamid '$bamid'. PINAME not known"
 fi
@@ -73,7 +73,7 @@ sendfile=`$topmedpath wherefile $bamid b$build`
 if [ "$sendfile" = '' ]; then
   Fail "Remapped CRAM for Build $build for bamid '$bamid' not found ($sendfile)"
 fi
-checksum=`$topmedcmd show $bamid b${build}cramchecksum`
+checksum=`GetDB  $bamid b${build}cramchecksum`
 if [ "$checksum" = "" ]; then
   echo "Calculating MD5 for CRAM"
   stime=`date +%s`

@@ -158,8 +158,8 @@ $JS['BACK'] = "<p align='right'><font size='-1'><a href='javascript:history.back
 //-------------------------------------------------------------------
 if (! isset($_SERVER['REMOTE_USER'])) { $_SERVER['REMOTE_USER'] = 'none'; }
 
-//  Hack because Sean has taken weeks to not get cosign to work on new host
-if (preg_match_all('/topmed1/', $_SERVER['HTTP_HOST'])) { $_SERVER['REMOTE_USER'] = 'tpg'; $_SERVER['HACK'] = 'Y'; }
+//  Hack because cosign did not work on new host
+//if (preg_match_all('/topmed1/', $_SERVER['HTTP_HOST'])) { $_SERVER['REMOTE_USER'] = 'tpg'; $_SERVER['HACK'] = 'Y'; }
 
 $iammgr = 0;
 if (in_array($_SERVER['REMOTE_USER'], $MGRS)) { $iammgr = 1; }

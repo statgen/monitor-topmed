@@ -9,8 +9,6 @@ topmed_check_recab=/usr/cluster/topmed/bin/topmed_check_recab.pl
 
 me=gcepull
 markverb=$me
-cores="--cpus-per-task=2"           # Cores here should be same as gsutil
-build=38
 
 if [ "$1" = "-submit" ]; then
   shift
@@ -47,7 +45,7 @@ cramfile=$crampath/$nwdid.recab.cram
 #======================================================================
 #   Copy remapped CRAM from GCE, check flagstat, fix up database
 #======================================================================
-cramflagstat=`$topmedcmd show $bamid cramflagstat`
+cramflagstat=`GetDB $bamid cramflagstat`
 if [ "$cramflagstat" = "" ]; then
   Fail "Unable to get cramflagstat for bamid '$bamid'"
 fi

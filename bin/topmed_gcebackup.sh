@@ -8,7 +8,6 @@
 
 me=gcebackup
 markverb=$me
-cores="--cpus-per-task=2"           # Cores here should be same as gsutil
 
 if [ "$1" = "-submit" ]; then
   shift
@@ -38,8 +37,8 @@ if [ "$file" = "" ]; then
   Fail "Unable to determine BAMNAME for '$bamid'"
 fi
 
-datayear=`$topmedcmd show $bamid datayear`
-build=`$topmedcmd show $bamid build`
+datayear=`GetDB $bamid datayear`
+build=`GetDB $bamid build`
 extension="${file##*.}"
 #======================================================================
 #   Backup CRAM to GCE for only datayear=3 and build=38,
@@ -64,13 +63,18 @@ if [ "$extension" = "cram" -a "$datayear" = "3" -a "$build" = "38" ]; then
   backupuri=`$topmedpath wherepath $nwdid remotebackup`
   cramfile=`$topmedpath wherefile $bamid cram`
 
-  echo "Backup of CRAM to $backupuri/$nwdid.src.cram to GCE"
   f=`basename $cramfile`
-  $gsutil cp $cramfile $backupuri/$f
+  echo "Backup of CRAM to $backupuri/$f to GCE"
+  $gsutilbig cp $cramfile $backupuri/$f
   if [ "$?" != "0" ]; then
     Fail "Failed to copy file to GCE: cp $cramfile $backupuri/$f"
   fi
-  $topmedcmd set $bamid 'offsite' D         # Mark this as backed up offsite
+  echo "Backup of CRAM to $backupuri/$f.crai to GCE"
+  $gsutil cp $cramfile.crai $backupuri/$f.crai
+  if [ "$?" != "0" ]; then
+    Fail "Failed to copy file to GCE: cp $cramfile.crai $backupuri/$f.crai"
+  fi
+  SetDB $bamid 'offsite' D          # Mark this as backed up offsite
 
   etime=`date +%s`
   etime=`expr $etime - $stime`
@@ -102,7 +106,7 @@ fi
 #   Original file was a cram - should have been backed up offsite
 #======================================================================
 if [ "$extension" = "cram" ]; then
-  offsite=`$topmedcmd show $bamid offsite`
+  offsite=`GetDB $bamid offsite`
   if [ "$offsite" != "D" ]; then
     Fail "Original file was a CRAM ($bamid) but was not backed up offsite ($offsite)"
   fi

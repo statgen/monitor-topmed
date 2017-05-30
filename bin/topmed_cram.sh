@@ -16,7 +16,7 @@ squeezed=n
 
 if [ "$1" = "-submit" ]; then
   shift
-  bamid=`$topmedcmd show $1 bamid`
+  bamid=`GetDB $1 bamid`
   MayIRun $me $bamid
   MyRealHost $bamid 'bam'
 
@@ -60,29 +60,31 @@ if [ "$extension" = "cram" ]; then
   # Check if cram directory exists for this bamid
   # If not, attempt to create ot (e.g. link cram direct to original input run)
   cramdir=`$topmedpath wherepath $bamid cram`
-  if [ "$cramdir" = "" ]; then
+  if [ ! -d "$cramdir" ]; then
     echo "No CRAM path known, we will attempt to create a symlink to the original run"
-    center=`$topmedcmd show $bamid center`
-    run=`$topmedcmd show $bamid run`
+    center=`GetDB $bamid center`
+    run=`GetDB $bamid run`
+    #   Go to where backups directory for this run should be
     d=/net/topmed/working/backups/incoming/topmed/$center
-    mkdir -p $d
-    if [ "$?" != "0" ];  then
-      Fail "Unable to create CRAM directory $d. This directory must be created first." 
-    fi
-    echo "Created CRAM $d"
     cd $d
     if [ "$?" != "0" ];  then
       Fail "Unable to CD to CRAM directory $d" 
     fi
-    bdir=`$topmedpath wherepath $bamid bam`
+    #   Get home of original source files  (e.g. /net/topmed/incoming/topmed/...)
+    #   Now make the /net be relative so it could work in FLUX someday
+    bdir=`$topmedpath wherepath $bamid bam | sed -e 's:/net:../../../../../..:'`
     ln -s $bdir .
+    #   Check if this worked
     cramdir=`$topmedpath wherepath $bamid cram`
-    if [ "$?" != "0" ];  then
+    if [ "$cramdir" = "" ];  then
       Fail "Unable to create CRAM directory for '$bamid'" 
+    else
+      if [ ! -d $cramdir ]; then
+        Fail "Cannot find directory to backup cram (e.g. original source dir)"
+      fi
     fi
-    echo "I think I correctly created the CRAM directory for $bamid"
+    echo "Created the CRAM directory for $bamid: $cramdir"
   fi
-
   #  Be sure the cram file exists or make a symlink to it
   f="$nwdid.src.cram"
   if [ ! -f "$cramdir/$f" ]; then
@@ -98,17 +100,24 @@ if [ "$extension" = "cram" ]; then
     if [ "$?" != "0" ]; then
       Fail "Unable to create symlink to '$f' for '$bamid'"
     fi
-    echo "Creating symlink to '$f' to original cram file"
+    echo "Created symlink for $f"
+    if [ ! -f "$f.crai" ]; then         # Create link to crai as needed too
+      ln -s $bfile.crai $f.crai
+      if [ "$?" != "0" ]; then
+        Fail "Unable to create symlink to '$f.crai' for '$bamid'"
+      fi
+      echo "Created symlink for $f.crai"
+    fi
   fi
 
   echo "MD5 for cram, same as original file"
-  v=`$topmedcmd show $bamid checksum`
+  v=`GetDB $bamid checksum`
   SetDB $bamid 'cramchecksum' $v
 
-  v=`$topmedcmd show $bamid checksum`
+  v=`GetDB $bamid checksum`
   SetDB $bamid 'cramchecksum' $v
 
-  flagstat=`$topmedcmd show $bamid cramflagstat`
+  flagstat=`GetDB $bamid cramflagstat`
   if [ "$flagstat" = "" ]; then
     echo "New CRAM, calculate flagstat for $cramfile"
     now=`date +%s`
@@ -120,7 +129,7 @@ if [ "$extension" = "cram" ]; then
     echo "$flagstat for CRAM completed in $s seconds"
   else 
     echo "Flagstat for cram, same as original file"
-    v=`$topmedcmd show $bamid bamflagstat`
+    v=`GetDB $bamid bamflagstat`
     SetDB $bamid 'cramflagstat' $v
     echo "No CRAM actually created, just did database bookkeeping"
   fi
@@ -148,7 +157,7 @@ fi
 s=`date +%s`; s=`expr $s - $now`; echo "$flagstat completed in $s seconds"
 
 #   Illumina cram files require a different fasta
-center=`$topmedcmd show $bamid center`
+center=`GetDB $bamid center`
 if [ "$center" = "illumina" ]; then
   ref=$illuminaref
   echo "BAM to CRAM for '$center' requires a different fasta file '$ref'"
