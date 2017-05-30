@@ -1,3 +1,12 @@
+# Example command:
+#
+# gcloud alpha genomics pipelines run \
+#   --pipeline-file etc/pipelines/mapping/post-align.yaml \
+#   --inputs NWDID=NWD123456,INPUT_PATH=gs://topmed-mapping/align/NWD123456/*.cram \
+#   --outputs CRAM=gs://topmed-mapping/results/NWD123456/NWD123456.recab.cram,CRAI=gs://topmed-mapping/results/NWD123456/NWD123456.recab.cram.crai,BCF=gs://topmed-mapping/results/NWD123456/NWD123456.bcf,CSI=gs://topmed-mapping/results/NWD123456/NWD123456.bcf.csi,METRICS=gs://topmed-mapping/results/NWD123456/NWD123456.dedup_lowmem.metrics,FLAGSTAT=gs://topmed-mapping/results/NWD123456/NWD123456.recab.cram.flagstat \ 
+#   --logging gs://topmed-mapping/results/NWD123456 \
+#   --labels nwdid=nwd123456,stage=post-align,build=38,year=3
+#
 name: post-align
 description: post-align
 inputParameters:

@@ -1,3 +1,12 @@
+# Example command:
+#
+# gcloud alpha genomics pipelines run \
+#   --pipeline-file etc/pipelines/mapping/align.yaml \
+#   --inputs INPUT_FILE=gs://topmed-mapping/pre-align/NWD123456/NWD123456.0.foo.fastq.gz,READ_GROUP=foo \
+#   --outputs OUTPUT_FILE=gs://topmed-mapping/align/NWD123456.0.foo.cram,OK_FILE=gs://topmed-mapping/align/NWD123456.0.foo.cram.ok,FASTQ_READS_FILE=gs://topmed-mapping/align/NWD123456.0.foo.fastq.gz.reads,FLAGSTAT_FILE=gs://topmed-mapping/align/NWD123456.0.foo.cram.flagstat \
+#   --logging gs://topmed-mapping/results/NWD123456 \
+#   --labels nwdid=nwd123456,stage=align,build=38,year=3,read-group-id=42
+#
 name: align
 description: align
 inputParameters:

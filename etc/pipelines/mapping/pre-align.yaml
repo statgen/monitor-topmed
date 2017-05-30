@@ -1,3 +1,11 @@
+# Example command:
+#
+# gcloud alpha genomics pipelines run \
+#   --pipeline-file etc/pipelines/mapping/pre-align.yaml \
+#   --inputs INPUT_FILE=gs://topmed-incoming/NWD123456/NWD123456.src.cram,NWDID=NWD123456 \
+#   --outputs OUTPUT_PATH=gs://topmed-mapping/pre-align/NWD123456/
+#   --logging gs://topmed-mapping/results/NWD123456 \
+#   --labels nwdid=nwd123456,stage=pre-align,build=38,year=3
 name: pre-align
 description: pre-align
 inputParameters:
