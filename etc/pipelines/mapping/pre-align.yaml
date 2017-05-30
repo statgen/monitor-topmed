@@ -1,0 +1,36 @@
+name: pre-align
+description: pre-align
+inputParameters:
+  - name: INPUT_FILE
+    localCopy:
+      disk: boot
+      path: /input.src.cram
+  - name: NWDID
+  - name: REFERENCE_PATH
+    defaultValue: /usr/local/share/resources/hs38DH.fa
+  - name: REF_CACHE
+    defaultValue: /usr/local/share/resources/hts-ref/md5/%2s/%2s/%s
+outputParameters:
+  - name: OUTPUT_PATH
+    localCopy:
+      path: /output/*
+      disk: boot
+resources:
+  minimumCpuCores: 1
+  minimumRamGb: 7
+  bootDiskSizeGb: 300
+  zones:
+    - us-central1-a
+    - us-central1-b
+    - us-central1-c
+    - us-central1-f
+docker:
+  imageName: us.gcr.io/topmed-1366/topmed-mapping-b38-y3
+  cmd: |
+    set -eu -o pipefail
+
+    samtools view -uh -F 0x900 ${INPUT_FILE} \
+      | bam-util-ext-mem-sort-manager squeeze --in -.ubam --keepDups --rmTags AS:i,BD:Z,BI:Z,XS:i,MC:Z,MD:Z,NM:i,MQ:i --out -.ubam \
+      | samtools sort -l 1 -@ 1 -n -T /output/${NWDID}.samtools_sort_tmp - \
+      | samtools fixmate - - \
+      | bam-util-ext-mem-sort-manager bam2fastq --in -.bam --outBase /output/${NWDID} --maxRecordLimitPerFq 20000000 --sortByReadNameOnTheFly --readname --gzip
