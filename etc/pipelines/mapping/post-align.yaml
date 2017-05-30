@@ -9,7 +9,7 @@ inputParameters:
     defaultValue: /usr/local/share/resources/hs38DH.fa
   - name: VCF_PATH
     defaultValue: /usr/local/share/resources/Homo_sapiens_assembly38.dbsnp138.vcf.gz
-  - name: MERGED_CRAM
+  - name: MERGED_BAM
     defaultValue: /merged.bam
   - name: NWDID
 outputParameters:
@@ -63,11 +63,11 @@ docker:
         $input
     done
 
-    samtools merge --threads 1 -c ${MERGED_CRAM} /input/*.sorted.bam
+    samtools merge --threads 1 -c ${MERGED_BAM} /input/*.sorted.bam
 
     bam-util-non-primary-dedup dedup_LowMem --allReadNames \
       --binCustom --binQualS 0:2,3:3,4:4,5:5,6:6,7:10,13:20,23:30 \
-      --log ${METRICS} --recab --in ${MERGED_CRAM} --out -.ubam \
+      --log ${METRICS} --recab --in ${MERGED_BAM} --out -.ubam \
       --refFile ${REFERENCE_PATH} --dbsnp ${VCF_PATH} \
       | samtools view -h -C -T ${REFERENCE_PATH} -o ${CRAM} --threads 1
 
