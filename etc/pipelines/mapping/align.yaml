@@ -1,0 +1,51 @@
+name: align
+description: align
+inputParameters:
+  - name: INPUT_FILE
+    disk: boot
+    path: /input.fastq.gz
+  - name: REFERENCE_PATH
+    defaultValue: /usr/local/share/resources/hs38DH.fa
+  - name: REF_CACHE
+    defaultValue: /usr/local/share/resources/hts-ref/md5/%2s/%2s/%s
+  - name: READ_GROUP
+outputParameters:
+  - name: OUTPUT_FILE
+    localCopy:
+      path: /output.cram
+      disk: boot
+  - name: OK_FILE
+    localCopy:
+      path: /output.cram.ok
+      disk: boot
+  - name: FASTQ_READS_FILE
+    localCopy:
+      path: /output.fastq.gz.reads
+      disk: boot
+  - name: FLAGSTAT_FILE
+    localCopy:
+      path: /output.cram.flagstat
+      disk: boot
+resources:
+  minimumCpuCores: 32
+  minimumRamGb: 64
+  bootDiskSizeGb: 200
+  preemptible: true
+  zones:
+    - us-central1-a
+    - us-central1-b
+    - us-central1-c
+    - us-central1-f
+docker:
+  imageName: us.gcr.io/topmed-1366/topmed-mapping-b38-y3
+  cmd: |
+    set -eu -o pipefail
+
+    bwa mem -t 32 -K 100000000 -Y -p -R "${READ_GROUP}" ${REFERENCE_PATH} ${INPUT_FILE} \
+      | samblaster -a --addMateTags \
+      | samtools view -@ 32 -T ${REFERENCE_PATH} -C -o ${OUTPUT_FILE} -
+
+    touch ${OK_FILE}
+
+    $(( $(zcat ${INPUT_FILE}) | wc -l / 4 )) > ${FASTQ_READS_FILE}
+    samtools flagstat ${OUTPUT_FILE} > ${FLAGSTAT_FILE}
