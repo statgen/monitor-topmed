@@ -1,46 +1,46 @@
 name: post-align
 description: post-align
 inputParameters:
-  - name: INPUT_FILE
+  - name: INPUT_PATH
     localCopy:
       disk: boot
-      path: input.cram
+      path: /input
   - name: REFERENCE_PATH
     defaultValue: /usr/local/share/resources/hs38DH.fa
   - name: VCF_PATH
     defaultValue: /usr/local/share/resources/Homo_sapiens_assembly38.dbsnp138.vcf.gz
-  - name: MERGED_BAM
+  - name: MERGED_CRAM
     defaultValue: /merged.bam
   - name: NWDID
 outputParameters:
   - name: CRAM
     localCopy:
       disk: boot
-      path: output.cram
+      path: /output/output.cram
   - name: CRAI
     localCopy:
       disk: boot
-      path: output.cram
+      path: /output/output.cram.crai
   - name: BCF
     localCopy:
       disk: boot
-      path: output.bcf
+      path: /output/output.bcf
   - name: CSI
     localCopy:
       disk: boot
-      path: output.bcf.csi
+      path: /output/output.bcf.csi
   - name: METRICS
     localCopy:
       disk: boot
-      path: dedup_lowmem.metrics
+      path: /output/dedup_lowmem.metrics
   - name: FLAGSTAT
     localCopy:
       disl: boot
-      path: output.flagstat
+      path: /output/output.cram.flagstat
 resources:
   minimumCpuCores: 1
-  minimumRamGb: 12
-  bootDiskSizeGb: 250
+  minimumRamGb: 7
+  bootDiskSizeGb: 300
   zones:
     - us-central1-a
     - us-central1-b
@@ -49,13 +49,25 @@ resources:
 docker:
   imageName: us.gcr.io/topmed-1366/topmed-mapping-b38-y3
   cmd: |
-    set -o pipefail
+    set -eu -o pipefail
 
-    samtools merge --threads 1 -c ${CRAM} ${SORTED_BAMS}
+    for file in $(ls /input); do
+      input="/input/${file}"
+
+      samtools flagstat $input > ${input}.flagstat
+
+      samtools sort --reference ${REFERENCE_PATH} \
+        --threads 1 \
+        -T ${input%.cram}.tmp \
+        -o ${input%.cram}.sorted.bam \
+        $input
+    done
+
+    samtools merge --threads 1 -c ${MERGED_CRAM} /input/*.sorted.bam
 
     bam-util-non-primary-dedup dedup_LowMem --allReadNames \
       --binCustom --binQualS 0:2,3:3,4:4,5:5,6:6,7:10,13:20,23:30 \
-      --log ${METRICS} --recab --in ${MERGED_BAM} --out -.ubam \
+      --log ${METRICS} --recab --in ${MERGED_CRAM} --out -.ubam \
       --refFile ${REFERENCE_PATH} --dbsnp ${VCF_PATH} \
       | samtools view -h -C -T ${REFERENCE_PATH} -o ${CRAM} --threads 1
 
