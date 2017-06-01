@@ -18,6 +18,11 @@ has 'stage' => (
   required => 1,
 );
 
+has 'operation_id' => (
+  is  => 'rw',
+  isa => 'Str',
+);
+
 has 'pipeline' => (
   is      => 'ro',
   isa     => 'Str',
@@ -129,8 +134,20 @@ sub run {
   chomp(my $output = capture($cmd));
   (my $operation_id = $output) =~ s|Running \[operations/([^\]]+)\]\.|$1|g;
 
+  $self->operation_id($operation_id);
+
   return $operation_id;
 }
+
+sub is_failed {
+}
+
+sub is_completed {
+}
+
+sub is_running {
+}
+
 
 __PACKAGE__->meta->make_immutable;
 
