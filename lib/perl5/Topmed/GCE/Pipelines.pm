@@ -62,6 +62,18 @@ has 'labels' => (
   },
 );
 
+around 'add_label' => sub {
+  my ($orig, $self, %params) = @_;
+
+  for (keys %params) {
+    unless ($params{$_} =~ /[a-z]([-a-z0-9]*[a-z0-9])?/i) {
+      die "invalid label value: $params{$_}";
+    }
+  }
+
+  return $self->$orig(%params);
+};
+
 sub _build_pipeline {
   my ($self, $arg) = @_;
 
@@ -85,14 +97,12 @@ sub _cmd {
 }
 
 sub _build_logging {
-
-  # TODO - not sure about where this should live yet
   return qq($GOOGLE_BUCKETS{mapping}/logs/) . shift->sample_id;
 }
 
 sub _stringify {
   my ($self, @pairs) = @_;
-  return join($COMMA, map {$_->[0] . $EQUAL . $_->[1]} @pairs);
+  return join($COMMA, map {$_->[0] . $EQUAL . $_->[1]} sort {$a->[0] cmp $b->[0]} @pairs);
 }
 
 sub inputs_stringify {
@@ -107,7 +117,7 @@ sub outputs_stringify {
 
 sub labels_stringify {
   my $self = shift;
-  return $self->_stringify($self->label_pairs);
+  return lc($self->_stringify($self->label_pairs));
 }
 
 sub run {

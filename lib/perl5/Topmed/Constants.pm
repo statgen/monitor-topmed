@@ -103,7 +103,7 @@ Readonly::Hash our %GOOGLE_BUCKETS => (
   recabs   => 'gs://topmed-recabs/',
   logs     => 'gs://topmed-logs/',
   bcf      => 'gs://topmed-bcf/',
-  mapping  => 'gs://topmed-mapping/',
+  mapping  => 'gs://topmed-mapping',
 );
 
 Readonly::Scalar our $GOOGLE_PIPELINE_CMD  => q{gcloud alpha genomics pipelines};

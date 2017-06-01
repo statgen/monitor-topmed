@@ -10,6 +10,7 @@ requires 'Class::CSV';
 requires 'YAML::Syck';
 requires 'Parallel::ForkManager';
 
+requires 'Moose';
 requires 'Class::Method::Modifiers';
 
 requires 'DBIx::Class';
@@ -18,3 +19,6 @@ requires 'DBIx::Class::Schema::Loader';
 requires 'DateTime';
 requires 'DateTime::Duration';
 requires 'DateTime::Format::MySQL';
+
+requires 'Test::Class';
+requires 'Test::Most';
