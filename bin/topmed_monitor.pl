@@ -621,13 +621,17 @@ sub BuildSQL {
         $s = $sql . " as b JOIN $opts{runs_table} AS r on b.runid=r.runid " .
             "JOIN $opts{centers_table} AS c on r.centerid=c.centerid " .
             "WHERE c.centername='$opts{center}'";
-        $where =~ s/where //i;
+        if ($opts{datayear}) { $s .= " AND b.datayear=$opts{datayear}"; }
+        $opts{datayear} = '';
+        $where =~ s/where //i;          # Remove WHERE from caller
     }
     #   For a specific run (overrides center)
     if ($opts{runs}) {
         $s = $sql . " as b JOIN $opts{runs_table} AS r on b.runid=r.runid " .
             "WHERE r.dirname='$opts{runs}'";
-        $where =~ s/where //i;
+        if ($opts{datayear}) { $s .= " AND b.datayear=$opts{datayear}"; }
+        $opts{datayear} = '';
+        $where =~ s/where //i;          # Remove WHERE from caller
     }
 
     #   Add in caller's WHERE
@@ -635,7 +639,7 @@ sub BuildSQL {
     else { $s .= " AND $where"; }
 
     #   Add support for datayear
-    if ($opts{datayear}) { $s .= " AND b.datayear=$opts{datayear}"; }
+    if ($opts{datayear}) { $s .= " AND datayear=$opts{datayear}"; }
 
     #   Support randomization
     if ($opts{random}) { $s .= ' ORDER BY RAND()'; }
