@@ -165,7 +165,7 @@ fi
 if [ "$replacelist" != "" ]; then
   echo ""
   echo "====> Replace in $copyuri:  $rlist"
-Fail "Replace in $copyuri:  $rlist"
+#Fail "Replace in $copyuri:  $rlist"
   for f in $replacelist; do
     basef=`basename $f`
     echo "Copying $basef"
