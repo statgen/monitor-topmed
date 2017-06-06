@@ -101,8 +101,11 @@ if ($opts{remove}) {
 #--------------------------------------------------------------
 my $f = $dirname . '/' . $nwdid;
 my $self  = `ls $f*.vb.selfSM`;
+chomp($self);
 my $stats = `ls $f*.qp.stats`;
+chomp($stats);
 my $r     = `ls $f*.qp.R`;
+chomp($r);
 my @metrics = parseQCFiles($self, $stats, $r);
 
 if ($opts{verbose}) { print "$nwdid parsed:\n"; foreach my $v (@metrics) { print "$v\n"; } }
