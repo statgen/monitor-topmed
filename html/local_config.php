@@ -15,7 +15,7 @@
 # terms of the GNU General Public License as published by the Free Software
 # Foundation; See http://www.gnu.org/copyleft/gpl.html
 #################################################################*/
-$VERSION = '0.9';
+$VERSION = '1.0';
 
 //  Be sure I can see syntax errors
 //ini_set('error_reporting', E_ALL ^ E_NOTICE);
@@ -23,31 +23,25 @@ $VERSION = '0.9';
 error_reporting(E_ALL);
 
 //  These guys can do anything for any monitor action
-$MGRS = array('tpg', 'scaron', 'schelcj');
+$MGRS = array('tpg', 'schelcj');
 
-if ($MON == 'topmed') {
-    $HDR['home'] = '/monitor/topmed';        // Banner URL
-    $HDR['title'] = 'NHLBI TOPMed - Data Tracking';   // Banner title
-    $HDR['logo'] = '/monitor/images/nhlbilogo_banner.png';     // Banner logo
-    $HDR['local'] = "    <link href='/monitor/css/TOPMEDstyle.css' rel='stylesheet'>\n" .
-        "    <script src='/monitor/js/TOPMEDjs.js'></script>\n";
+$HDR['home'] = '/topmed';        // Banner URL
+$HDR['title'] = 'NHLBI TOPMed - Data Tracking';   // Banner title
+$HDR['logo'] = '/topmed/images/nhlbilogo_banner.png';     // Banner logo
+$HDR['local'] = "    <link href='/topmed/css/TOPMEDstyle.css' rel='stylesheet'>\n" .
+    "    <script src='/topmed/js/TOPMEDjs.js'></script>\n";
 
-    $LDB['bindir'] = '/usr/cluster/topmed/bin';
-    $LDB['realm'] = $LDB['bindir'] . '/../etc/.db_connections/topmed';
-    $LDB['centers'] = 'centers';            // SQL table names
-    $LDB['runs'] = 'runs';
-    $LDB['bamfiles'] = 'bamfiles';
-    $LDB['stepstats'] = 'stepstats';
-    $LDB['permissions'] = 'permissions';
-    $LDB['pulls'] = 'requestfiles';
+$LDB['bindir'] = '/usr/cluster/topmed/bin';
+$LDB['realm'] = $LDB['bindir'] . '/../etc/.db_connections/topmed';
+$LDB['centers'] = 'centers';            // SQL table names
+$LDB['runs'] = 'runs';
+$LDB['bamfiles'] = 'bamfiles';
+$LDB['stepstats'] = 'stepstats';
+$LDB['permissions'] = 'permissions';
 
-    //  These guys can request activities
-    $REQMGRS = array('tblackw');
-}
+//  These guys can request activities
+$REQMGRS = array('tblackw');
 
-//================================================================
-//     Common for all monitor programs
-//================================================================
 //  Here are common META tags
 $HDR['meta'] = <<<END
     <meta name='description' content='Monitor CSG Data'/>
@@ -61,11 +55,11 @@ $HDR['meta'] = <<<END
 END;
 //  Add Twitter Bootstrap to the local CSS/JS
 $tb = <<<END
-    <link href='/monitor/css/bootstrap.min.css' rel='stylesheet'>
+    <link href='/topmed/css/bootstrap.min.css' rel='stylesheet'>
     <script src='https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js'></script>
     <script src='https://oss.maxcdn.com/respond/1.4.2/respond.min.js'></script>
     <script src='https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js'></script>
-    <script src='/monitor/js/bootstrap.min.js'></script>
+    <script src='/topmed/js/bootstrap.min.js'></script>
 
 END;
 $HDR['local'] = $tb . $HDR['local'];
@@ -74,10 +68,10 @@ $HDR['local'] = $tb . $HDR['local'];
 if (isset($HDR['footer'])) { $f = $HDR['footer']; }
 else { $f = ''; }
 $HDR['footer'] = <<<END
-Copyright (c) 2010- University of Michigan<br/>
+Copyright (c) 2009- University of Michigan<br/>
 Report problems to <a class='footer' href='mailto:tpg@umich.edu'>tpg@umich.edu</a><br/>
 $f
-<br/>Last Revision: Feb 2017 <br/>
+<br/>Last Revision: June 2017 <br/>
 
 END;
 
