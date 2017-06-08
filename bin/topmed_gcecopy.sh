@@ -44,7 +44,7 @@ baserecabcram=`basename $recabcram`
 sizerecabcram=`$stat $recabcram`
 
 recabcrai=$recabcram.crai
-if [ ! -f $recabcrai ]; then
+if [ -z $recabcrai -o ! -f $recabcrai ]; then
   echo "CRAI missing, trying to create it"
   $samtools index $recabcram
   if [ "$?" != "0" ]; then
