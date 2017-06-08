@@ -854,11 +854,22 @@ function HandleRestartJobs($dirname, $samplestate, $op) {
         return Emsg("Run '$dirname' is not known, try again", 1);
     }
 
-    $sql = "UPDATE " . $LDB['bamfiles'] . " SET state_$op=0 WHERE runid=$runid AND state_$op=$samplestate";
+    $sql = "UPDATE " . $LDB['bamfiles'] . " SET ";
+    if ($op == 'bcf') {         # Special case to reset ALL states for an action
+        $sql .= "state_gce38bcf_push=0,state_gce38bcf_pull=0,state_gce38bcf=0,state_bcf=0 " .
+            "WHERE runid=$runid AND state_bcf=$samplestate OR " .
+            "state_gce38bcf_push=$samplestate OR " .
+            "state_gce38bcf_pull=$samplestate OR " .
+            "state_gce38bcf=$samplestate";
+    }
+    else {
+        $sql .= "state_$op=0  WHERE runid=$runid AND state_$op=$samplestate";
+    }
     $html = "<h3>Changing State for Samples in '$dirname'</h3>\n" .
         "SQL=$sql<br>\n";
     $result = SQL_Query($sql);
     $changes = SQL_AffectedRows();
+
     $html .= Emsg("Changed $changes rows, hope that was what you wanted", 1);
     $html .= "<br/><br/>\n";
     return $html;
