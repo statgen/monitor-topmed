@@ -14,7 +14,7 @@ if [ "$1" = "-submit" ]; then
   bamid=`GetDB $1 bamid`
   MayIRun $me $bamid
   MyRealHost $bamid b$build
-  SubmitJob $bamid "topmed-$me" '24G' "$0 $*"
+  SubmitJob $bamid "topmed-$me" '48G' "$0 $*"
   exit
 fi
 
@@ -51,7 +51,7 @@ fi
 
 #   Create crai for cram if it does not exist
 crai="$cramfile.crai"
-if [ ! -f $crai ]; then
+if [ -z $crai -o ! -f $crai ]; then
   echo "Creating index file '$cramfile'"
   $samtools index $cramfile 2>&1
   if [ "$?" != "0" ]; then
