@@ -14,7 +14,7 @@ if [ "$1" = "-submit" ]; then
   bamid=`GetDB $1 bamid`
   MayIRun $me $bamid
   MyRealHost $bamid b$build
-  SubmitJob $bamid "topmed-$me" '48G' "$0 $*"
+  SubmitJob $bamid "topmed-$me" '128G' "$0 $*"
   exit
 fi
 
