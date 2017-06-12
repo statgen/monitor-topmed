@@ -153,7 +153,7 @@ sub CreateRun {
         "VALUES($cid,'$d','',0,'$nowdate')";
     my $sth = DoSQL($sql);
     my $runid = $sth->{mysql_insertid};
-    print "$Script - Added run '$d'\n";
+    print "$Script - Added run '$d' [ $runid ]\n";
     $opts{runcount}++;
     return $runid;
 }
