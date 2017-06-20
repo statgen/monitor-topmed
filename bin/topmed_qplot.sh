@@ -10,9 +10,51 @@ gcbin=/net/mario/gotcloud/bin
 gcref=/net/mario/nodeDataMaster/local/ref/gotcloud.ref
 topoutdir=/net/topmed/incoming/qc.results
 fixverifybamid=/usr/cluster/topmed/bin/nhlbi.1648.vbid.rewrite.awk
-
+verifybamid_dir=/usr/cluster/software/trusty/verify-bam-id
+verifybamid=$verifybamid_dir/1.0.0-b38/bin/VerifyBamID
+qplot=/usr/cluster/bin/qplot
 me=qplot
 markverb=$me
+
+#------------------------------------------------------------------
+# Subroutine:
+#   QplotCheck(statsfile, bamid)
+#   Sanity check. Qplot can easily be fooled if samtools truncates
+#   when reading the bamfile (NFS surprise).
+#   This should fail if the TotalReads < bmflagstat value + 5000
+#------------------------------------------------------------------
+function QplotCheck {
+  local statsfile=$1
+  local bamid=$2
+
+  bamflagstat=`GetDB $bamid bamflagstat`   # Same for cram or bam
+  tr=`grep TotalReads $statsfile | awk '{ print $2 }'`
+  if [ "$tr" = "" ]; then
+    Fail "QPLOT data $statsfile not found or TotalReads not found"
+  fi
+  tr=`perl -E "print $tr*1000000"`    # Man, is it hard to do mutiply of float in shell!
+  tr=`expr $tr + 5001`
+  if [ "$tr" -lt "$bamflagstat" ]; then
+    Fail "QPLOT data must have been truncated. TotalReads=$tr Flagstat=$bamflagstat"
+  fi
+  echo "Qplot output seems reasonable: TotalReads=$tr Flagstat=$bamflagstat"
+}
+
+#------------------------------------------------------------------
+# Subroutine:
+#   RC_Check(rc, basenam, msg)    Check return code and fail with msg
+#------------------------------------------------------------------
+function RC_Check {
+  local rc=$1
+  local basenam=$2
+  local msg=$3
+
+  if [ "$rc" != "0" ]; then
+      rm -f $basebam.*
+      Fail $msg
+  fi
+}  
+
 
 if [ "$1" = "-submit" ]; then
   shift
@@ -34,29 +76,54 @@ bamid=$1
 
 #   Mark this as started
 Started 
-GetNWDID $bamid
+nwdid=`GetNWDID $bamid`
 
 #   Figure out index file name
 bamfile=`$topmedpath wherefile $bamid bam`
-bai=$bamfile.bai
-if [ "$bamfile" = "" ]; then
+if [ ! -f $bamfile ]; then      # BAM should exist, but if not, try CRAM
   bamfile=`$topmedpath wherefile $bamid cram`
-  bai=$bamfile.crai
+  echo "BAM not found, using CRAM for '$bamid'"
 fi
 if [ "$bamfile" = "" ]; then
-  Fail "Unable to get source file for '$bamid'"
+  Fail "Unable to get source file for '$bamid'; $bamfile"
 fi
 extension="${bamfile##*.}"
+if [ "$extension" = "bam" ]; then
+  bai=$bamfile.bai
+elif [ "$extension" = "cram" ]; then
+  bai=$bamfile.crai
+else
+  Fail "Unknown extension '$extension' for $bamfile"
+fi
 
-#   If necessary, create the index file
+basebam=`basename $bamfile .$extension`
+build=`$topmedcmd -persist show $bamid build`
+if [ "$build" != "37" -a "$build" != "38" ]; then
+  Fail "Unknown build '$build', cannot continue with qplot for '$bamfile'"
+fi
+
+#   If necessary, create the index file. Check for zero length file
+if [ -z $bai ]; then
+  rm -f $bai
+fi
 if [ -f $bai ]; then
   echo "Using existing index file '$bai'"
 else
   echo "Creating index file '$bai'"
   $samtools index $bamfile 2>&1
   if [ "$?" != "0" ]; then
+    #   This might be a trashed reference index for samtools, if so remove it
+    a=`grep 'cram_ref_load: Assertion' $console/$bamid-$me.out`
+    if [ "$a" != "" ]; then
+      rm -rf $HOME/.cache/hts-ref/*/*
+      Fail "Unable to create index file for '$bamfile' - removed dirty reference cache. Just restart me."
+    fi
     Fail "Unable to create index file for '$bamfile'"
   fi
+fi
+
+if [ -z $bai ]; then
+  Fail "Zero length index file: $bai"
 fi
 
 #   Create output directory and CD there
@@ -72,74 +139,92 @@ fi
 echo "Files will be created in $outdir"
 stime=`date +%s`
 
-#   Run qplot, output written to current working directory
-basebam=`basename $bamfile .$extension`
-build=`$topmedcmd -persist show $bamid build`
-rc=none
-echo "Running qplot for build '$build'"
+#   Run qplot.  Right now we have different processes for cram vs bam and which build
+echo "Running qplot for build '$build' extension '$extension'"
+
+ref37=$gcref/hs37d5.fa
+dbsnp37=$gcref/dbsnp_142.b37.vcf.gz
+ref38=/data/local/ref/gotcloud.ref/hg38/hs38DH.fa
+dbsnp38=/data/local/ref/gotcloud.ref/hg38/dbsnp_142.b38.vcf.gz
+hmkangfiles=/net/fantasia/home/hmkang/code/working/gotcloud_topmed_tmp
+
+#===================================================
+#  Build 37, bam or cram
+#===================================================
 if [ "$build" = "37" ]; then
-  $gcbin/qplot --reference  $gcref/hs37d5.fa --dbsnp $gcref/dbsnp_142.b37.vcf.gz \
-  --label $basebam --stats $basebam.qp.stats --Rcode $basebam.qp.R $bamfile 2>&1
-  rc=$?
-fi
-if [ "$build" = "38" ]; then        # Someday this will fail because it got moved
-  hmkangfiles=/net/fantasia/home/hmkang/code/working/gotcloud_topmed_tmp
-  $samtools view -uh -T /data/local/ref/gotcloud.ref/hg38/hs38DH.fa $bamfile | $hmkangfiles/gotcloud/bin/qplot --reference /data/local/ref/gotcloud.ref/hg38/hs38DH.fa --dbsnp /data/local/ref/gotcloud.ref/hg38/dbsnp_142.b38.vcf.gz --stats $basebam.qp.stats --Rcode $basebam.qp.R -.ubam 2>&1
-  rc=$?
-fi
-if [ "$rc" = "none" ]; then
-  Fail "Unknown build '$build', cannot continue with qplot for '$bamfile'"
-fi
-if [ "$rc" != "0" ]; then
-  rm -f $basebam.*
-  Fail "QPLOT failed for '$bamfile'"
+  if [ "$extension" = "bam" ]; then
+    #   Run qplot on 37 bam
+    $qplot --reference $ref37 --dbsnp $dbsnp37 --label $basebam --stats $basebam.qp.stats \
+      --Rcode $basebam.qp.R $bamfile 2>&1
+    RC_Check $? $basebam "QPLOT failed for '$bamfile'"
+    QplotCheck "$basebam.qp.stats" $bamid               # Fails if stats are bad
+    #   Run verifybamid - use old version
+    $gcbin/verifyBamID --bam  $bamfile --vcf $gcref/hapmap_3.3.b37.sites.vcf.gz	\
+      --site --free-full --chip-none --ignoreRG --precise --maxDepth 80 \
+      --grid 0.02 --out $basebam.vb 2>&1
+    #   New verifybamid does not work with b37 bam
+    #verifybamid_res=$verifybamid_dir/src/VerifyBamID/resource
+    #verifybamid_dat=$verifybamid_res/1000g.100k.b37.vcf.gz.dat
+    #$verifybamid --UDPath ${verifybamid_dat}.UD --BedPath ${verifybamid_dat}.bed \
+    #  --MeanPath ${verifybamid_dat}.mu --Reference $ref37 --BamFile $bamfile > $basebam.vb.raw 2>&1
+echo "Not doing: $verifybamid --UDPath ${verifybamid_dat}.UD --BedPath ${verifybamid_dat}.bed --MeanPath ${verifybamid_dat}.mu --Reference $ref37 --BamFile $bamfile > $basebam.vb.raw"
+    RC_Check $? $basebam "VerifyBAMID failed for '$bamfile'"
+  else
+    #   Run qplot on 37 cram
+    $samtools view -uh -T $ref37 $bamfile | $hmkangfiles/gotcloud/bin/qplot --reference $ref37 \
+      --stats $basebam.qp.stats --Rcode $basebam.qp.R -.ubam 2>&1
+    RC_Check $? $basebam "QPLOT failed for '$bamfile'"
+    QplotCheck "$basebam.qp.stats" $bamid               # Fails if stats are bad
+    #   Run verifybamid
+    verifybamid_res=$verifybamid_dir/src/VerifyBamID/resource
+    verifybamid_dat=$verifybamid_res/1000g.100k.b37.vcf.gz.dat
+    $verifybamid --UDPath ${verifybamid_dat}.UD --BedPath ${verifybamid_dat}.bed \
+      --MeanPath ${verifybamid_dat}.mu --Reference $ref37 --BamFile $bamfile > $basebam.vb
+    RC_Check $? $basebam "VerifyBAMID failed for '$bamfile'"
+      #   Convert this verifybamid output ($basebam.vb.selfSM) like all others
+    awk -f $fixverifybamid -v NWD=$nwdid $basebam.vb
+    RC_Check $? $basebam "$fixverifybamid failed for '$bamfile'"
+  fi
 fi
 
-#   One last sanity check. Qplot can easily be fooled if samtools truncates
-#   when reading the bamfile (NFS surprise).
-#   This should fail if the TotalReads < bmflagstat value + 5000
-statsfile=
-bamflagstat=`GetDB $bamid bamflagstat`   # Same for cram or bam
-tr=`grep TotalReads $basebam.qp.stats | awk '{ print $2 }'`
-if [ "$tr" = "" ]; then
-  Fail "QPLOT data $nwdid.src.qp.stats not found or TotalReads not found"
+#===================================================
+#  Build 38, bam or cram
+#===================================================
+if [ "$build" = "38" ]; then
+  if [ "$extension" = "bam" ]; then
+    #   Run qplot on 38 bam
+    $qplot --reference $ref38 --dbsnp $dbsnp38 --label $basebam --stats $basebam.qp.stats \
+      --Rcode $basebam.qp.R $bamfile 2>&1
+    RC_Check $? $basebam "QPLOT failed for '$bamfile'"
+    QplotCheck "$basebam.qp.stats" $bamid               # Fails if stats are bad
+    #   Run verifybamid
+    verifybamid_res=$verifybamid_dir/src/VerifyBamID/resource
+    verifybamid_dat=$verifybamid_res/1000g.100k.b38.vcf.gz.dat
+    $verifybamid --UDPath ${verifybamid_dat}.UD --BedPath ${verifybamid_dat}.bed \
+      --MeanPath ${verifybamid_dat}.mu --Reference $ref38 --BamFile $bamfile > $basebam.vb
+    RC_Check $? $basebam "VerifyBAMID failed for '$bamfile'"
+  else
+    #   Run qplot on 38 cram
+    $samtools view -uh -T $ref38 $bamfile | $qplot --reference $ref38 --dbsnp $dbsnp38 --stats $basebam.qp.stats --Rcode $basebam.qp.R -.ubam 2>&1
+    RC_Check $? $basebam "QPLOT failed for '$bamfile'"
+    QplotCheck "$basebam.qp.stats" $bamid               # Fails if stats are bad
+    #   Run verifybamid
+    verifybamid_res=$verifybamid_dir/src/VerifyBamID/resource
+    verifybamid_dat=$verifybamid_res/1000g.100k.b38.vcf.gz.dat
+    $verifybamid --UDPath ${verifybamid_dat}.UD --BedPath ${verifybamid_dat}.bed \
+      --MeanPath ${verifybamid_dat}.mu --Reference $ref38 --BamFile $bamfile > $basebam.vb
+    RC_Check $? $basebam "VerifyBAMID failed for '$bamfile'"
+      #   Convert this verifybamid output ($basebam.vb.selfSM) like all others
+    awk -f $fixverifybamid -v NWD=$nwdid $basebam.vb
+    RC_Check $? $basebam "$fixverifybamid failed for '$bamfile'"
+  fi
 fi
-tr=`perl -E "print $tr*1000000"`    # Man is hard to do mutiply of float in shell !
-tr=`expr $tr + 5001`
-if [ "$tr" -lt "$bamflagstat" ]; then
-  Fail "QPLOT data must have been truncated. TotalReads=$tr  Flagstat=$bamflagstat"
-fi
-echo "Qplot output seems reasonable: TotalReads=$tr  Flagstat=$bamflagstat"
 
 etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "QPLOT on '$bamfile' successful (at second $etime)"
 
-#   Run verifybamid, output written to current working directory
-#   Notice the special case for a cram.  Very non-production looking
-if [ "$extension" = "cram" ]; then
-  hmkangfiles=/net/fantasia/home/hmkang/code/working/gotcloud_topmed_tmp
-  $hmkangfiles/contamination-finder/build/ContaminationFinder --UDPath $hmkangfiles/resources/1000g.10k.vcf.gz.dat.UD --BedPath $hmkangfiles/resources/10k.build38.bed --MeanPath $hmkangfiles/resources/1000g.10k.vcf.gz.dat.mu --Reference /data/local/ref/gotcloud.ref/hg38/hs38DH.fa --BamFile $bamfile > $basebam.vb
-  rc=$?
-  #   Convert this verifybamid output ($basebam.vb.selfSM ) like all others
-  if [ "$rc" = "0" ]; then
-    awk -f $fixverifybamid -v NWD=$nwdid $basebam.vb
-    rc=$?
-  fi
-else
-  $gcbin/verifyBamID --bam  $bamfile --vcf $gcref/hapmap_3.3.b37.sites.vcf.gz	\
-    --site --free-full --chip-none --ignoreRG --precise --maxDepth 80 \
-    --grid 0.02	--out  $basebam.vb 2>&1
-    rc=$?
-fi
-if [ "$rc" != "0" ]; then
-  rm -f $basebam.*
-  Fail "VerifyBAMID failed for '$bamid'"
-fi
-etime=`date +%s`
-echo "VerifyBAMID on '$bamfile' successful (at second $etime)"
-etime=`expr $etime - $stime`
-echo "Command completed in $etime seconds. Created files:"
+echo "Created files:"
 ls -la $basebam.*
 
 #   Now attempt to put the QPLOT data into the database
