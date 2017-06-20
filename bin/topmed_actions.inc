@@ -129,6 +129,7 @@ function GetNWDID {
   if [ "$nwdid" = "" ]; then
     Fail "Unable to find the NWDID for '$bamid'" 
   fi
+  echo $nwdid
 }
 
 #------------------------------------------------------------------
