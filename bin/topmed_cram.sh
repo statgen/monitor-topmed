@@ -183,11 +183,11 @@ if [ "$?" != "0" ]; then
 fi
 s=`date +%s`; s=`expr $s - $now`; echo "Cram created in $s seconds"
 
-#   Build index for the new file
+#   Create the index file as necessary
 now=`date +%s`
-$samtools index $newname
+$topmedmakeindex $newname $console/$bamid-$me.out
 if [ "$?" != "0" ]; then
-  Fail "Command failed: $samtools index $newname"
+  Fail Fail "Unable to create index file for '$newname'"
 fi
 s=`date +%s`; s=`expr $s - $now`; echo "CRAM index created in $s seconds"
 

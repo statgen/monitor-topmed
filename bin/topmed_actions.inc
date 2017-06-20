@@ -6,6 +6,7 @@ topmedpermit=/usr/cluster/topmed/bin/topmedpermit.pl
 topmedpath=/usr/cluster/topmed/bin/topmedpath.pl
 topmedrename=/usr/cluster/topmed/bin/topmedrename.pl
 topmedflagstat=/usr/cluster/topmed/bin/topmed_flagstat.sh
+topmedmakeindex=/usr/cluster/topmed/bin/topmedmakeindex.sh
 topmedqplot=/usr/cluster/topmed/bin/topmedqplot.pl
 bam=/usr/cluster/bin/bam
 calcmd5=/usr/cluster/topmed/bin/topmed_calcmd5.sh

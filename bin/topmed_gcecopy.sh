@@ -42,18 +42,14 @@ if [ ! -f $recabcram ]; then
 fi
 baserecabcram=`basename $recabcram`
 sizerecabcram=`$stat $recabcram`
-
 recabcrai=$recabcram.crai
-if [ -z $recabcrai -o ! -f $recabcrai ]; then
-  echo "CRAI missing, trying to create it"
-  $samtools index $recabcram
-  if [ "$?" != "0" ]; then
-    Fail "Unable to create CRAI for $bamid' for: $recabcram"
-  fi
+
+#   Create the index file as necessary
+$topmedmakeindex $recabcram $console/$bamid-$me.out
+if [ "$?" != "0" ]; then
+  Fail Fail "Unable to create index file for '$recabcram'"
 fi
-if [ ! -f $recabcrai ]; then
-  Fail "CRAI file for '$bamid' does not exist: $recabcrai"
-fi
+
 baserecabcrai=`basename $recabcrai`
 sizerecabcrai=`$stat $recabcrai`
 

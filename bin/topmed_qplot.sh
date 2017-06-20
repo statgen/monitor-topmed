@@ -55,7 +55,6 @@ function RC_Check {
   fi
 }  
 
-
 if [ "$1" = "-submit" ]; then
   shift
   bamid=`$topmedcmd show $1 bamid`
@@ -87,43 +86,16 @@ fi
 if [ "$bamfile" = "" ]; then
   Fail "Unable to get source file for '$bamid'; $bamfile"
 fi
-extension="${bamfile##*.}"
-if [ "$extension" = "bam" ]; then
-  bai=$bamfile.bai
-elif [ "$extension" = "cram" ]; then
-  bai=$bamfile.crai
-else
-  Fail "Unknown extension '$extension' for $bamfile"
-fi
 
-basebam=`basename $bamfile .$extension`
 build=`$topmedcmd -persist show $bamid build`
 if [ "$build" != "37" -a "$build" != "38" ]; then
   Fail "Unknown build '$build', cannot continue with qplot for '$bamfile'"
 fi
 
-#   If necessary, create the index file. Check for zero length file
-if [ -z $bai ]; then
-  rm -f $bai
-fi
-if [ -f $bai ]; then
-  echo "Using existing index file '$bai'"
-else
-  echo "Creating index file '$bai'"
-  $samtools index $bamfile 2>&1
-  if [ "$?" != "0" ]; then
-    #   This might be a trashed reference index for samtools, if so remove it
-    a=`grep 'cram_ref_load: Assertion' $console/$bamid-$me.out`
-    if [ "$a" != "" ]; then
-      rm -rf $HOME/.cache/hts-ref/*/*
-      Fail "Unable to create index file for '$bamfile' - removed dirty reference cache. Just restart me."
-    fi
-    Fail "Unable to create index file for '$bamfile'"
-  fi
-fi
-
-if [ -z $bai ]; then
-  Fail "Zero length index file: $bai"
+#   Create the index file as necessary
+$topmedmakeindex $bamfile $console/$bamid-$me.out
+if [ "$?" != "0" ]; then
+  Fail Fail "Unable to create index file for '$bamfile'"
 fi
 
 #   Create output directory and CD there
@@ -140,6 +112,8 @@ echo "Files will be created in $outdir"
 stime=`date +%s`
 
 #   Run qplot.  Right now we have different processes for cram vs bam and which build
+extension="${bamfile##*.}"
+basebam=`basename $bamfile .$extension`
 echo "Running qplot for build '$build' extension '$extension'"
 
 ref37=$gcref/hs37d5.fa

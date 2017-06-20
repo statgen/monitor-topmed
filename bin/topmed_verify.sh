@@ -61,27 +61,14 @@ etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "Calculated bamflagstat in $etime seconds"
 
-#   If necessary, create the index file
-extension="${bamfile##*.}"
-bai=$bamfile.bai
-if [ "$extension" = "cram" ]; then
-  bai=$bamfile.crai
-fi
-if [ ! -f $bai ]; then
-  echo "Creating index file '$bai'"
-  $samtools index $bamfile 2>&1
-  if [ "$?" != "0" ]; then
-    #   This might be a trashed reference index for samtools, if so remove it
-    a=`grep 'cram_ref_load: Assertion' $console/$bamid-$me.out`
-    if [ "$a" != "" ]; then
-      rm -rf $HOME/.cache/hts-ref/*/*
-      Fail "Unable to create index file for '$bamfile' - removed dirty reference cache. Just restart me."
-    fi
-    Fail "Unable to create index file for '$bamfile'"
-  fi
+#   Create the index file as necessary
+$topmedmakeindex $bamfile $console/$bamid-$me.out
+if [ "$?" != "0" ]; then
+  Fail Fail "Unable to create index file for '$bamfile'"
 fi
 
 #   If original file was cram, then some fields are the same for both cram and bam
+extension="${bamfile##*.}"
 if [ "$extension" = "cram" ]; then
   a=`$topmedcmd -persist show $bamid bamflagstat`
   SetDB $bamid 'cramflagstat' $a
