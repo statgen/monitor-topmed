@@ -49,7 +49,7 @@ bamid=$1
 bamfile=`$topmedpath wherefile $bamid bam`
 
 Started
-GetNWDID $bamid
+nwdid=`GetNWDID $bamid`
 stime=`date +%s`
 
 extension="${bamfile##*.}"

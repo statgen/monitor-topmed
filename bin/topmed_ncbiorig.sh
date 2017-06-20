@@ -42,7 +42,7 @@ if [ "$year" != "1" ]; then
   Fail "$0 $* must be year ONE data, not '$year'"
 fi
 
-GetNWDID $bamid
+nwdid=`GetNWDID $bamid`
 
 center=`GetDB $bamid center`
 if [ "$center" = "" ]; then

@@ -38,7 +38,7 @@ if [ "$cramfile" = "" ]; then
 fi
 
 Started
-GetNWDID $bamid
+nwdid=`GetNWDID $bamid`
 
 #======================================================================
 #   Copy CRAM to Google Cloud

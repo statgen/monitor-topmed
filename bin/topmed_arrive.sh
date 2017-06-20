@@ -29,7 +29,7 @@ bamid=$1
 bamfile=`$topmedpath wherefile $bamid bam`
 
 Started
-#GetNWDID $bamid                # Only case where we do not get NWDID right away
+#nwdid=`GetNWDID $bamid`            # Only case where we do not get NWDID right away
 
 #   Determine build used to generate this bam/cram
 build=''

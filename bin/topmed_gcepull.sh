@@ -39,7 +39,7 @@ if [ "$?" != "0" ]; then
 fi
 
 Started
-GetNWDID $bamid
+nwdid=`GetNWDID $bamid`
 cramfile=$crampath/$nwdid.recab.cram
 
 #======================================================================

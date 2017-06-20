@@ -28,7 +28,7 @@ fi
 bamid=$1
 
 Started
-GetNWDID $bamid
+nwdid=`GetNWDID $bamid`
 stime=`date +%s`
 crampath=`$topmedpath wherepath $bamid b$build`
 if [ "$crampath" = "" ]; then

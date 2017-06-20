@@ -29,7 +29,7 @@ fi
 bamid=$1
 
 Started
-GetNWDID $bamid
+nwdid=`GetNWDID $bamid`
 stime=`date +%s`
 
 #   Get remapped cram file
