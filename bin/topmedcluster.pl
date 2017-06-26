@@ -43,11 +43,12 @@ our %opts = (
     runs_table => 'runs',
     squeuecmd => "/usr/cluster/bin/squeue -a -o '%.9i %.15P %.15q %.14j %.8u %.2t %.8M %.6D %R %.9n' -p topmed-working",    
     verbose => 0,
+    maxlongjobs => 6,
     consoledir => 'working/topmed-output',
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help verbose
+    help verbose maxlongjobs=i
     )) || die "$Script - Failed to parse options\n";
 
 #   Simple help if requested
@@ -355,6 +356,10 @@ This program supports simple commands to show information about the cluster syst
 =item B<-help>
 
 Generates this output.
+
+=item B<-maxlongjobs N>
+
+Specifies the number of long running jobs to show. This defaults to B<6>.
 
 =item B<-verbose>
 
