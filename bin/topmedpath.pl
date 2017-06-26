@@ -37,6 +37,7 @@ use Cwd qw(realpath abs_path);
 
 use Topmed::DB;
 
+
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
@@ -55,6 +56,7 @@ our %opts = (
     iresults37dir => 'incoming/schelcj/results',
     results38dir => 'working/mapping/results',
     gcebackupuri => 'gs://topmed-backups',
+    gcearchiveuri => 'gs://topmed-archives',
     gcebcfuri => 'gs://topmed-bcf',
     gceuploaduri => 'gs://topmed-bcf',
     gceremapuri => 'gs://topmed-incoming',
@@ -75,7 +77,7 @@ if ($#ARGV < 0 || $opts{help}) {
         "$m wherefile bamid|nwdid KEYWORD\n" .
         "  or\n" .
         "$m whatbamid bamname\n" .
-        "WHERE KEYWORD is one of bam|cram|localbackup|remotebackup|qcresults|console|b37|b38|bcf|upload\n" .
+        "WHERE KEYWORD is one of bam|cram|localbackup|remotebackup|remotearchive|qcresults|console|b37|b38|bcf|upload\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
     exit 1;
@@ -146,6 +148,13 @@ sub WherePath {
     #   Find where the GCE backup cram file lives
     if ($set eq 'remotebackup') {
         my $gcebackup = "$opts{gcebackupuri}/$centername/$rundir";
+        print "$gcebackup\n";
+        exit;
+    }
+
+    #   Find where the GCE archive bam file lives
+    if ($set eq 'remotearchive') {
+        my $gcebackup = "$opts{gcearchiveuri}/$centername/$rundir";
         print "$gcebackup\n";
         exit;
     }
@@ -337,8 +346,15 @@ sub WhereFile {
 
     #   Find where the backup GCE cram file lives
     if ($set eq 'remotebackup') {
-        my $gcebackup = "$opts{gcebackupuri}/$centername/$rundir/$nwdid.src.cram";
+        my $gcebackup = "$opts{gcebackupuri}/$centername/$rundir/$cramname";
         print "$gcebackup\n";
+        exit;
+    }
+
+    #   Find where the archive GCE bam file lives
+    if ($set eq 'remotearchive') {
+        my $gcearchive = "$opts{gcearchiveuri}/$centername/$rundir/$bamname";
+        print "$gcearchive\n";
         exit;
     }
 
@@ -495,6 +511,8 @@ B<wherepath bamid|nwdid bam|cram|backup|qcresults|console|b37|b38>
 If B<bam> was specified, display the path to the real bam file.
 
 If B<cram> or B<localbackup> was specified, display the path to the backup directory.
+
+If B<remotearchive> was specified, display the GCE path (e.g. gs://topmed-archives/...)
 
 If B<remotebackup> was specified, display the GCE path (e.g. gs://topmed-backups/...)
 
