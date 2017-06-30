@@ -21,7 +21,10 @@ if [ "$?" != "0" ]; then
   exit 4
 fi
 # echo "Forcing '$1' to be writable for the monitor"
-# chown -R topmed .     #   This should not be done cause it messes up ACLs
-#chgrp topmed .
+#   This should not be done cause it messes up ACLs. Well that's what was said
+#   however when the owner is not topmed, I cannot rename files in then
+#   directory, so I will continue to mess up the ACLs
+chown -R topmed .
+chgrp topmed .
 chmod 770 .
 chmod 660 Manifest.txt *.md5 *.cram *.crai *.bam *.bai 2> /dev/null   # Failure is OK
