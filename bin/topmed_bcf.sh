@@ -16,13 +16,13 @@ if [ "$1" = "-submit" ]; then
   mem=32G
   if [ "$datayear" = "3" ]; then     # Year three can require LOTS of memory
     bamsize=`$topmedcmd show $bamid bamsize`
-    if [ "$bamsize" -gt "40255183256"] then
+    if [ "$bamsize" -gt "40255183256" ]; then
       mem=128G
-    elif [ "$bamsize" -gt "35044692321"] then
+    elif [ "$bamsize" -gt "35044692321" ]; then
       mem=78G
-    elif [ "$bamsize" -gt "31848365056"] then
+    elif [ "$bamsize" -gt "31848365056" ]; then
       mem=64G
-    elif [ "$bamsize" -gt "23023087355"] then
+    elif [ "$bamsize" -gt "23023087355" ]; then
       mem=48G
     fi
   fi
