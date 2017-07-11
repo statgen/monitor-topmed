@@ -96,7 +96,7 @@ foreach my $cid (keys %{$centersref}) {
         my $bamid = $href->{bamid};
         my $incomingdir = `$opts{topmedpath} wherepath $bamid bam`;
         chomp($incomingdir);
-        my $backupsdir = `$opts{topmedpath} wherepath $bamid backup`;
+        my $backupsdir = `$opts{topmedpath} wherepath $bamid localbackup`;
         chomp($backupsdir);
 
         #   If original file was a bam, just check that backups can be done
