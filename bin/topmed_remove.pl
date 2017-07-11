@@ -36,6 +36,8 @@ our %opts = (
     qcresultsdir => 'incoming/qc.results',
     incomingdir => 'incoming/topmed',
     topmedcmd => '/usr/cluster/topmed/bin/topmedcmd.pl',
+    topmedpath => '/usr/cluster/topmed/bin/topmedpath.pl',
+    gsutil => '/usr/bin/gsutil',
     dosql => '/usr/cluster/boehnke/bin/dosql.pl',
     manifestfile => 'Manifest.txt',
     verbose => 0,
@@ -65,9 +67,9 @@ if ($opts{findnwdid}) {
 my $cmd = "$opts{topmedcmd} whatnwdid $bamid";
 my $s = `$cmd` || die "$Script - Unknown NWDID/BAMID '$bamid'\n";
 my @c = split(' ', $s);
-if ($c[0] !~ /^(NWD\d+)\/(\d+)/) { die "$Script - Unknown NWDID/BAMID '$bamid'\n"; }
-($nwdid, $bamid) = ($1, $2);
-my $run = $c[6];
+if ($c[0] !~ /^(NWD\d+)/) { die "$Script - Unknown NWDID/BAMID '$bamid'\n"; }
+($nwdid, $bamid) = ($c[0], $c[1]);
+my $run = $c[7];
 $run =~ s/\'//g;
 
 if ($opts{backupdir} && (! -d $opts{backupdir})) {
@@ -86,7 +88,7 @@ $cmd = "$opts{topmedcmd} show $nwdid bamsize";
 my $bamsize = `$cmd` || 'Not Set';
 chomp($bamsize);
 
-$cmd = "$opts{topmedcmd} wherefile $nwdid bam";
+$cmd = "$opts{topmedpath} wherefile $nwdid bam";
 my $bamname_filepath = `$cmd`;
 chomp($bamname_filepath);
 $cmd = "dirname $bamname_filepath";
@@ -97,19 +99,28 @@ if (! -f $bamname_filepath) { $bamname_filepath = 'None'; }
 my $manifestfile = "$runpath/$opts{manifestfile}";
 if (! -f $manifestfile) { $manifestfile = 'None'; }
 
-$cmd = "$opts{topmedcmd} wherefile $nwdid backup";
+$cmd = "$opts{topmedpath} wherefile $nwdid localbackup";
 my $cramname_filepath = `$cmd`;
 chomp($cramname_filepath);
 my $crainame_filepath = $cramname_filepath . '.crai';
+
+$cmd = "$opts{topmedpath} wherefile $nwdid bcf";
+my $bcffile_filepath = `$cmd`;
+chomp($bcffile_filepath);
+
 if (! -f $cramname_filepath) { $cramname_filepath = 'None'; }
 if (! -f $crainame_filepath) { $crainame_filepath = 'None'; }
+if (! -f $bcffile_filepath)  { $bcffile_filepath = 'None'; }
 
-
-$cmd = "$opts{topmedcmd} wherepath $nwdid qcresults";
+$cmd = "$opts{topmedpath} wherepath $nwdid qcresults";
 my $qcresults_path = `$cmd`;
 chomp($qcresults_path);
 if (! -d $qcresults_path) { $qcresults_path = 'None'; }
 else { $qcresults_path .= "/$nwdid.*"; }
+
+my $remotebackup = GetGSFiles($nwdid, 'remotebackup');
+my $remotearchive = GetGSFiles($nwdid, 'remotearchive');
+my $upload = GetGSFiles($nwdid, 'upload');
 
 my $baiextension = 'bai';
 if ($bamname =~ /\.cram$/) { $baiextension = 'crai'; }
@@ -130,13 +141,18 @@ print "Remove $nwdid [$bamid] \n" .
     "  Run: $run  is at  $runpath\n" .
     "  Bamname: $bamname\n" .
     "  Size: $bamsize\n" .
-    "Files to be REMOVED:\n" .
+    "Local files to be REMOVED:\n" .
     "  Original input file: $bamname_filepath\n" .
-    "    and removed in Manifest: $manifestfile\n" .
+    "    and to be removed in Manifest: $manifestfile\n" .
     "  $baiextension file: $bainame_filepath\n" .
     "  CRAM file: $cramname_filepath\n" .
     "  CRAI file: $crainame_filepath\n" .
+    "  BCF file: $bcffile_filepath\n" .
     "  QC Results files: $qcresults_path\n" .
+    "Remote files to be REMOVED:\n" .
+    "  Remote BACKUP file: $remotebackup\n" .
+    "  Remote ARCHIVE file: $remotearchive\n" .
+    "  Remote UPLOAD file: $upload\n" .
     '';
 if ($opts{backupdir}) {
     print "  Backups will be done to: $opts{backupdir}\n";
@@ -154,7 +170,6 @@ if (! $opts{noprompt}) {
 #--------------------------------------------------------------
 #   We are ready to make the changes
 #--------------------------------------------------------------;
-
 print "Removing $nwdid [$bamname] starting.  It'd be a great idea to NOT stop this.\n";
 
 if ($opts{backupdir}) {
@@ -190,8 +205,16 @@ open(OUT, '>' . $manifestfile) ||
 print OUT $ss;
 close(OUT);
 
+#   Remove remote files
+foreach my $f (split(' ', "$remotebackup $remotearchive $upload")) {
+    if ($f eq 'None') { next; }
+    $cmd = "$opts{gsutil} rm -f $f";
+    DoOrDie($cmd);
+    print "Removed remote file $f\n";
+}
+    
 #   Remove individual files and QC results
-$cmd = "rm -rf $bamname_filepath $bainame_filepath $cramname_filepath $crainame_filepath $qcresults_path";
+$cmd = "rm -rf $bamname_filepath $bainame_filepath $cramname_filepath $crainame_filepath $qcresults_path $bcffile_filepath";
 DoOrDie($cmd);
 print "Files removed\n";
 
@@ -214,6 +237,28 @@ exit;
 sub DoOrDie {
     if ($opts{verbose}) { print "  Execute: $_[0]\n"; return; }
     system($cmd) && die "$Script - FAILURE  cmd=$cmd\n";
+}
+
+#==================================================================
+# Subroutine:
+#   GetGSFiles(n, index)
+#
+#   Return a string of remote files or None
+#==================================================================
+sub GetGSFiles {
+    my ($n, $index) = @_;
+
+    my $cmd = "$opts{topmedpath} wherepath $n $index";
+    my $s = `$cmd`;
+    chomp($s);
+    $cmd = "$opts{gsutil} ls $s/$n\* | grep gs://";
+    $cmd = `$cmd`;
+    my @files = ();
+    foreach my $f (split(' ', $cmd)) {
+        if ($f =~ /(gs\S+)/) { push @files,$1; }
+    }
+    if (@files) { return join(' ', @files); }
+    return  'None';
 }
 
 #==================================================================
