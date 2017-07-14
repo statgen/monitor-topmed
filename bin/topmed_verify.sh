@@ -14,7 +14,7 @@ if [ "$1" = "-submit" ]; then
   bamid=`$topmedcmd show $1 bamid`
   MayIRun $me  $bamid
   MyRealHost $bamid 'bam'
-  SubmitJob $bamid "$realhost-verify" '2G' "$0 $*"
+  SubmitJob $bamid "$realhost-verify" '4G' "$0 $*"
   exit
 fi
 
