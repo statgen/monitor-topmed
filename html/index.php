@@ -797,7 +797,7 @@ function RestartJobs($h) {
     $html .= "<td><select name='samplestate'>" .
         "<option value='99'>Failed</option>" .
         "<option value='2'>Submitted</option>" .
-        "<option value='3'>Running</option>" .
+        "<option value='3'>Started</option>" .
         "<option value='19'>Delivered</option>" .
         "<option value='98'>FailedChecksum</option>" .
         "</select></td>" .
