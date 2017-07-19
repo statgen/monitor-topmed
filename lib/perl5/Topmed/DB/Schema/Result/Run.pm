@@ -66,7 +66,7 @@ __PACKAGE__->table("runs");
 =head2 datayear
 
   data_type: 'integer'
-  default_value: 2
+  default_value: 3
   is_nullable: 1
 
 =head2 offsite
@@ -114,7 +114,7 @@ __PACKAGE__->add_columns(
   "bamcount",
   { data_type => "integer", is_nullable => 1 },
   "datayear",
-  { data_type => "integer", default_value => 2, is_nullable => 1 },
+  { data_type => "integer", default_value => 3, is_nullable => 1 },
   "offsite",
   { data_type => "char", default_value => "N", is_nullable => 1, size => 1 },
   "arrived",
@@ -140,8 +140,8 @@ __PACKAGE__->add_columns(
 __PACKAGE__->set_primary_key("runid");
 
 
-# Created by DBIx::Class::Schema::Loader v0.07046 @ 2017-04-10 09:59:48
-# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:cjo8/I3P8YXfNr7xxpthJQ
+# Created by DBIx::Class::Schema::Loader v0.07046 @ 2017-07-19 14:49:03
+# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:LGTT+WqGEyBXcy3DoIB+Rw
 
 
 # You can replace this text with custom code or comments, and it will be preserved on regeneration
