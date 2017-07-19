@@ -19,6 +19,7 @@ our @EXPORT = (
     $TAB
     $COLON
     $SLASH
+    $EQUAL
     $MAX_DELAY
     $TIMEZONE
     )
@@ -38,6 +39,7 @@ our @EXPORT_OK = (
     $TAB
     $COLON
     $SLASH
+    $EQUAL
     $MAX_DELAY
     $TIMEZONE
     %GOOGLE_BUCKETS
@@ -91,6 +93,7 @@ Readonly::Scalar our $SPACE      => q{ };
 Readonly::Scalar our $TAB        => qq{\t};
 Readonly::Scalar our $COLON      => q{:};
 Readonly::Scalar our $SLASH      => q{/};
+Readonly::Scalar our $EQUAL      => q{=};
 Readonly::Scalar our $TIMEZONE   => q{America/Detroit};
 
 Readonly::Hash our %GOOGLE_BUCKETS => (
@@ -100,6 +103,7 @@ Readonly::Hash our %GOOGLE_BUCKETS => (
   recabs   => 'gs://topmed-recabs/',
   logs     => 'gs://topmed-logs/',
   bcf      => 'gs://topmed-bcf/',
+  mapping  => 'gs://topmed-mapping',
 );
 
 Readonly::Scalar our $GOOGLE_PIPELINE_CMD  => q{gcloud alpha genomics pipelines};

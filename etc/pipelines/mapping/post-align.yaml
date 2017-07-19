@@ -1,0 +1,90 @@
+# Example command:
+#
+# gcloud alpha genomics pipelines run \
+#   --pipeline-file etc/pipelines/mapping/post-align.yaml \
+#   --inputs NWDID=NWD123456,INPUT_PATH=gs://topmed-mapping/align/NWD123456/*.cram \
+#   --outputs CRAM=gs://topmed-mapping/results/NWD123456/NWD123456.recab.cram,CRAI=gs://topmed-mapping/results/NWD123456/NWD123456.recab.cram.crai,BCF=gs://topmed-mapping/results/NWD123456/NWD123456.bcf,CSI=gs://topmed-mapping/results/NWD123456/NWD123456.bcf.csi,METRICS=gs://topmed-mapping/results/NWD123456/NWD123456.dedup_lowmem.metrics,FLAGSTAT=gs://topmed-mapping/results/NWD123456/NWD123456.recab.cram.flagstat \ 
+#   --logging gs://topmed-mapping/results/NWD123456 \
+#   --labels nwdid=nwd123456,stage=post-align,build=38,year=3
+#
+name: post-align
+description: post-align
+inputParameters:
+  - name: INPUT_PATH
+    localCopy:
+      disk: boot
+      path: /input
+  - name: REFERENCE_PATH
+    defaultValue: /usr/local/share/resources/hs38DH.fa
+  - name: VCF_PATH
+    defaultValue: /usr/local/share/resources/Homo_sapiens_assembly38.dbsnp138.vcf.gz
+  - name: MERGED_BAM
+    defaultValue: /merged.bam
+  - name: NWDID
+outputParameters:
+  - name: CRAM
+    localCopy:
+      disk: boot
+      path: /output/output.cram
+  - name: CRAI
+    localCopy:
+      disk: boot
+      path: /output/output.cram.crai
+  - name: BCF
+    localCopy:
+      disk: boot
+      path: /output/output.bcf
+  - name: CSI
+    localCopy:
+      disk: boot
+      path: /output/output.bcf.csi
+  - name: METRICS
+    localCopy:
+      disk: boot
+      path: /output/dedup_lowmem.metrics
+  - name: FLAGSTAT
+    localCopy:
+      disl: boot
+      path: /output/output.cram.flagstat
+resources:
+  minimumCpuCores: 1
+  minimumRamGb: 7
+  bootDiskSizeGb: 300
+  zones:
+    - us-central1-a
+    - us-central1-b
+    - us-central1-c
+    - us-central1-f
+docker:
+  imageName: us.gcr.io/topmed-1366/topmed-mapping-b38-y3
+  cmd: |
+    set -eu -o pipefail
+
+    for file in $(ls /input); do
+      input="/input/${file}"
+
+      samtools flagstat $input > ${input}.flagstat
+
+      samtools sort --reference ${REFERENCE_PATH} \
+        --threads 1 \
+        -T ${input%.cram}.tmp \
+        -o ${input%.cram}.sorted.bam \
+        $input
+    done
+
+    samtools merge --threads 1 -c ${MERGED_BAM} /input/*.sorted.bam
+
+    bam-util-non-primary-dedup dedup_LowMem --allReadNames \
+      --binCustom --binQualS 0:2,3:3,4:4,5:5,6:6,7:10,13:20,23:30 \
+      --log ${METRICS} --recab --in ${MERGED_BAM} --out -.ubam \
+      --refFile ${REFERENCE_PATH} --dbsnp ${VCF_PATH} \
+      | samtools view -h -C -T ${REFERENCE_PATH} -o ${CRAM} --threads 1
+
+    samtools flagstat ${CRAM} > ${FLAGSTAT}
+    samtools index ${CRAM}
+
+    samtools view -T ${REFERENCE_PATH} -uh ${CRAM} \
+      | bam clipOverlap --poolSize 100000000 --in -.ubam --out -.ubam \
+      | vt discover2 -z -q 20 -b + -r ${REFERENCE_PATH} -s ${NWDID} -o ${BCF}
+
+    bcftools index ${BCF}
