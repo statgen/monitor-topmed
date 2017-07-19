@@ -15,7 +15,7 @@ if [ "$1" = "-submit" ]; then
   bamid=`$topmedcmd show $1 bamid`
   MayIRun $me  $bamid
   RandomRealHost $bamid
-  SubmitJob $bamid "topmed-$me" '2G' "$0 $*"
+  SubmitJob $bamid "topmed-$me" '4G' "$0 $*"
   exit
 fi
 
@@ -38,7 +38,7 @@ if [ "$cramfile" = "" ]; then
 fi
 
 Started
-GetNWDID $bamid
+nwdid=`GetNWDID $bamid`
 
 #======================================================================
 #   Copy CRAM to Google Cloud

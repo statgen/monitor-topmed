@@ -35,7 +35,7 @@ use File::Basename;
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
-my $NOTSET    = 0;            # Not set
+my $NOTSET    = 0;          # Not set
 our %opts = (
     realm => '/usr/cluster/topmed/etc/.db_connections/topmed',
     centers_table => 'centers',
@@ -45,12 +45,13 @@ our %opts = (
     runcount => 0,
     bamcount => 0,
     bamcountruns => '',
-    arrivedsecs => 86400*7,         # If no new bam in a week, stop looking at run
+    arrivedsecs => 86400*7, # If no new bam in a week, stop looking at run
+    ignorearrived => 0,     # If set, ignored arrived database field
     verbose => 0,
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose center=s run=s
+    help realm=s verbose center=s run=s ignorearrived
     )) || die "Failed to parse options\n";
 
 #   Simple help if requested
@@ -91,6 +92,7 @@ foreach my $centerid (keys %{$centersref}) {
             $dir = $href->{dirname};            
             $knownruns{$dir}{runid} = $href->{runid};
             $knownruns{$dir}{arrived} = $href->{arrived};
+            if ($opts{ignorearrived}) { $knownruns{$dir}{arrived} = 'N'; }
         }
     }
     #   Get list of all runs for this center
@@ -153,7 +155,7 @@ sub CreateRun {
         "VALUES($cid,'$d','',0,'$nowdate')";
     my $sth = DoSQL($sql);
     my $runid = $sth->{mysql_insertid};
-    print "$Script - Added run '$d'\n";
+    print "$Script - Added run '$d' [ $runid ]\n";
     $opts{runcount}++;
     return $runid;
 }
@@ -380,6 +382,10 @@ The default is to run against all centers.
 =item B<-help>
 
 Generates this output.
+
+=item B<-ignorearrived>
+
+Specifies we should re-look at the run because something new has arrived.
 
 =item B<-realm NAME>
 

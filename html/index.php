@@ -11,7 +11,7 @@
 # terms of the GNU General Public License as published by the Free Software
 # Foundation; See http://www.gnu.org/copyleft/gpl.html
 #################################################################*/
-$MON='topmed'; include_once 'local_config.php';
+include_once 'local_config.php';
 include_once 'common.php';
 include_once 'header.php';
 include_once 'DBMySQL.php';
@@ -30,14 +30,14 @@ $STATUSLETTERS =  "<br/> " .
 
 $SHOWSTATUS = "STATUS: " .
     "<a onclick='javascript:window.location.reload()'><img src='refresh.png' alt='refresh'></a> &nbsp;" .
-    "<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=showqlocal' " .
-    "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=showqlocal\",680,720); " .
+    "<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=queue' " .
+    "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=queue\",680,720); " .
     "return false;'>Local_Queue</a> &nbsp;" .
     "<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=df' " .
     "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=df\",680,720); " .
     "return false;'>Disk_Usage</a> &nbsp;";
 
-$SHOWSTATUS .= "<a href='/monitor/topmed/plot.php' target='plots'> " .
+$SHOWSTATUS .= "<a href='/topmed/plot.php' target='plots'> " .
     " Plots</a> &nbsp;";
 
 $SHOWSTATUS .="<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=logs' " .
@@ -158,9 +158,6 @@ $JS['BACK'] = "<p align='right'><font size='-1'><a href='javascript:history.back
 //-------------------------------------------------------------------
 if (! isset($_SERVER['REMOTE_USER'])) { $_SERVER['REMOTE_USER'] = 'none'; }
 
-//  Hack because cosign did not work on new host
-//if (preg_match_all('/topmed1/', $_SERVER['HTTP_HOST'])) { $_SERVER['REMOTE_USER'] = 'tpg'; $_SERVER['HACK'] = 'Y'; }
-
 $iammgr = 0;
 if (in_array($_SERVER['REMOTE_USER'], $MGRS)) { $iammgr = 1; }
 if (in_array($_SERVER['REMOTE_USER'], $REQMGRS)) { $iammgr = 1; }
@@ -174,8 +171,7 @@ if ($iammgr) {
         "return false;'>Restart_Jobs</a> &nbsp;" .
         "<a href='http://nhlbi.sph.umich.edu/report/monitor.php' " .
         "onclick='javascript:popup2(\"http://nhlbi.sph.umich.edu/report/monitor.php\",680,720); " .
-        "return false;'>ReMapping</a> &nbsp;" .
-        "<a href='http://www-topmed1.sph.umich.edu/topmed/' target='_blank'>New Site</a>";
+        "return false;'>ReMapping</a> &nbsp;";
 }
 print doheader($HDR['title'], 1);
 
@@ -198,21 +194,19 @@ $parmcols = array('fcn', 'maxdir', 'desc', 'center', 'datayear',
     'run', 'runid', 'bamid', 'centerid', 'fetchpath', 'hostname', 'col',
     'op', 'id', 'samplestate');
 extract (isolate_parms($parmcols));
-if (! $center) { $center = 'year2'; }
+if (! $center) { $center = 'year3'; }
 if (! $fcn)    { $fcn = 'runs'; }
 if (! $maxdir) { $maxdir = 0; }     // Show all data
 
 DB_Connect($LDB['realm']);
-GetCenters();                   // Get maps to identify centers
+GetCenters();                       // Get maps to identify centers
 $HTML = '';
 
-if ($fcn == 'queue') {              // This cannot work until statgen can run squeue :-(
-    $q = 'topmed-incoming';
-    print "<h3 align='center'>SLURM Queue:  $q</h3>\n" .
-        "<div class='indent'><table width='80%'><pre>\n";
-    print shell_exec("/usr/cluster/bin/squeue -p $q");
+if ($fcn == 'queue') {
+    print "<center>$SHOWSTATUS &nbsp;&nbsp;&nbsp;</center>\n";
+    $c = $LDB['bindir'] . "/topmedcluster.pl squeue 2>&1";
+    print "<pre>\n" . shell_exec($c) . "</pre>\n";
     print "<p align='right'><font size='-1'><a href='javascript:window.close()'>Close</a>&nbsp;&nbsp;&nbsp;</p>\n";
-    print dofooter($HDR['footer']);
     exit;
 }
 if ($fcn == 'runs') {
@@ -287,25 +281,29 @@ if ($fcn == 'restartjobs') {
     exit;
 }
 
-if ($fcn == 'showqlocal') {
-    print "<center>$SHOWSTATUS &nbsp;&nbsp;&nbsp;</center>\n";
-    $cmd = "/usr/cluster/topmed/bin/slurm_query.sh -squeue ignored ignored";
-    //$cmd = '/usr/cluster/topmed/bin/topmedcmd.pl squeue';
-    print `$cmd`;
-    exit;
-}
-
 if ($fcn == 'df') {
+    $c = '/bin/df -h';
+    $hosts = array('', '2', '3', '4', '5', '6', '7', '8', '9', '10');
+    foreach ($hosts as $n) {
+        $h = 'topmed' . $n;
+        $c .= " /net/$h/incoming topmed /net/$h/working";
+    }
     print "<center>$SHOWSTATUS &nbsp;&nbsp;&nbsp;</center>\n";
-    $cmd = "/usr/cluster/topmed/bin/slurm_query.sh -df ignored";
-    print `$cmd`;
+    print "<pre>\n" . shell_exec($c) . "</pre>\n";
     exit;
 }
 
 if ($fcn == 'logs') {
-    print "<center>$SHOWSTATUS &nbsp;&nbsp;&nbsp;</center>\n";
-    $cmd = "/usr/cluster/topmed/bin/slurm_query.sh -logs ignored";
-    print `$cmd`;
+    print "<center>$SHOWSTATUS &nbsp;&nbsp;&nbsp;</center>\n<pre>\n";
+    $d = '/net/topmed/working/topmed-output/';
+    if (! chdir($d)) { print "Cannot CD to '$d': $!\n"; }
+    else {
+        $logs=explode("\n", `ls topmed*.log`);
+        foreach ($logs as $f) {
+            if ($f) { print "<b>Showing $f</b>\n" . `tail -6 $f`; }
+        }
+    }
+    print "</pre>\n";
     exit;
 }
 
@@ -592,60 +590,6 @@ function ViewBams($runid, $maxdirs, $iammgr) {
 }
 
 /*---------------------------------------------------------------
-#   html = ShowSLURMIcoming($host)
-#   Show summary of SLURM queues for this host
----------------------------------------------------------------*/
-function ShowSLURMIcoming($host) {
-    global $TOPMEDJOBNAMES;
-    $JOBSTOSHOW = 10;
-
-    //  Get state for this machine
-    $cmd = "/usr/cluster/bin/scontrol show node $host | grep State=";
-    $results = `$cmd`;
-    $nodestate = 'State=Cannot be Determined';
-
-    #   This should work too, returning something like 'State=MIXED'
-    #   except gcsdev does not work. Somehow the 48109 port is blocked maybe?
-    #$results = `/usr/bin/wget -o /dev/null -O $tmpfile.0 $url/shownode/$h`;
-
-    if (preg_match('/(State=\S+)/', $results, $m)) { $nodestate = $m[1]; }
-    if (preg_match('/DRAIN/', $nodestate)) { $nodestate = "<font color=red>$nodestate  </font>"; }
-
-    //  Get number jobs queued
-    $tmpfile = '/tmp/tempfile.topmed';
-    $partition = "${host}-incoming";
-    $cmd = "/usr/cluster/bin/squeue --format '%A %.14j %.3t %.10M %R' -p $partition > $tmpfile";
-    system($cmd);
-    $cmd = "wc -l $tmpfile";
-    $results = `$cmd`;
-    $queuesize = 'empty';
-    if (preg_match('/(\d+) /', $results, $m)) { $queuesize = $m[1] - 1; }
-    print "<p>Partition <b>$partition</b> has $queuesize jobs queued &nbsp;&nbsp;&nbsp;&nbsp;  $nodestate\n";
-
-    //  Show summary of topmed-related jobs of interest
-    if ($queuesize) {
-        reset($TOPMEDJOBNAMES);
-        foreach ($TOPMEDJOBNAMES as $t) {
-            $cmd = "grep $t $tmpfile | wc -l";
-            if (preg_match('/(\d+)/', `$cmd`, $m)) { $queued = $m[1]; }
-            else { $queued = '?'; }
-            if ($queued == 0) { continue; }
-            $cmd = "grep $t $tmpfile | grep ' R ' | wc -l";
-            if (preg_match('/(\d+)/', `$cmd`, $m)) { $r = $m[1]; }
-            else { $r = '?'; }
-            print "<br/>&nbsp;&nbsp;&nbsp; $t jobs: $queued queued ($r running)\n";
-        }
-    
-        //  Show a few queued jobs
-        $cmd = "tail -$JOBSTOSHOW $tmpfile";
-        print "<br/>Last $JOBSTOSHOW queued jobs are:</p><pre>";
-        print `$cmd`;
-        print "</pre>\n";
-  }
-  unlink($tmpfile);
-}
-
-/*---------------------------------------------------------------
 #   html = ViewBamDetail($bamid)
 #   Show details for a particular run
 ---------------------------------------------------------------*/
@@ -853,7 +797,7 @@ function RestartJobs($h) {
     $html .= "<td><select name='samplestate'>" .
         "<option value='99'>Failed</option>" .
         "<option value='2'>Submitted</option>" .
-        "<option value='3'>Running</option>" .
+        "<option value='3'>Started</option>" .
         "<option value='19'>Delivered</option>" .
         "<option value='98'>FailedChecksum</option>" .
         "</select></td>" .
@@ -910,11 +854,22 @@ function HandleRestartJobs($dirname, $samplestate, $op) {
         return Emsg("Run '$dirname' is not known, try again", 1);
     }
 
-    $sql = "UPDATE " . $LDB['bamfiles'] . " SET state_$op=0 WHERE runid=$runid AND state_$op=$samplestate";
+    $sql = "UPDATE " . $LDB['bamfiles'] . " SET ";
+    if ($op == 'bcf') {         # Special case to reset ALL states for an action
+        $sql .= "state_gce38bcf_push=0,state_gce38bcf_pull=0,state_gce38bcf=0,state_bcf=0 " .
+            "WHERE runid=$runid AND state_bcf=$samplestate OR " .
+            "state_gce38bcf_push=$samplestate OR " .
+            "state_gce38bcf_pull=$samplestate OR " .
+            "state_gce38bcf=$samplestate";
+    }
+    else {
+        $sql .= "state_$op=0  WHERE runid=$runid AND state_$op=$samplestate";
+    }
     $html = "<h3>Changing State for Samples in '$dirname'</h3>\n" .
         "SQL=$sql<br>\n";
     $result = SQL_Query($sql);
     $changes = SQL_AffectedRows();
+
     $html .= Emsg("Changed $changes rows, hope that was what you wanted", 1);
     $html .= "<br/><br/>\n";
     return $html;
@@ -974,6 +929,7 @@ function GetCenters() {
 ---------------------------------------------------------------*/
 function QuickStatus($r, $url) {
     global $quickcols, $quickletter;
+    //  Add a small separator to 'group' certain actions
     $h = '';
     $col = '';
     $span='notset';
@@ -984,7 +940,7 @@ function QuickStatus($r, $url) {
         $s =  $quickletter[$c];
         if ($val == 'failed' || $val == 'started') {
             $s = str_replace('XX', $quickletter[$c], $url);
-        } 
+        }
         $h .= "<span class='$val'>&nbsp;" . $s . "&nbsp;</span>";
     }
     return $h;
@@ -1005,18 +961,21 @@ function DateState($t) {
 
 /*---------------------------------------------------------------
 # html = CalcRunStatus($str)
-#   Convert status string into short hand status
+#   Convert status string into shorthand status
 #   str should look like: A=done,5=processing,B=unknown etc
 #   returns string of html
 ---------------------------------------------------------------*/
 function CalcRunStatus($str) {
     global $quickletter;
+    $separator_actions = array('Q','7','8','V', 'U');
     //return $str;          // To see original state
     $h = '';
     $cols = array_values($quickletter);
     foreach ($cols as $c) {
         $span='notset';
         if (preg_match("/$c=([^,]+),/", $str, $m)) { $span = $m[1]; }
+        //  Add a separator class after certain actions
+        if (in_array($c, $separator_actions)) { $span .= " separator"; }
         $h .= "<span class='$span'> $c </span>";
     }
     return $h;

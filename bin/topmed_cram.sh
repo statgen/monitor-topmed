@@ -6,7 +6,6 @@
 #
 . /usr/cluster/topmed/bin/topmed_actions.inc
 
-bindir=/usr/cluster/bin
 ref=/net/mario/gotcloud/gotcloud.ref/hs37d5.fa
 illuminaref=/net/topmed/incoming/study.reference/study.reference/illumina.hg19.fa
 
@@ -49,7 +48,7 @@ bamid=$1
 bamfile=`$topmedpath wherefile $bamid bam`
 
 Started
-GetNWDID $bamid
+nwdid=`GetNWDID $bamid`
 stime=`date +%s`
 
 extension="${bamfile##*.}"
@@ -174,20 +173,20 @@ echo "Creating cram from $bamfile"
 newname=`$topmedpath wherefile $bamid cram`
 newname=`basename $newname`
 if [ "$squeezed" = "n" ]; then
-  $bindir/bam squeeze  --in $bamfile  --out - --rmTags "BI:Z;BD:Z;PG:Z"  --keepDups --binMid  --binQualS  2,3,10,20,25,30,35,40,50 | $samtools view  -C -T  $ref  -  >  $newname 
+  $bam squeeze  --in $bamfile  --out - --rmTags "BI:Z;BD:Z;PG:Z"  --keepDups --binMid  --binQualS  2,3,10,20,25,30,35,40,50 | $samtools view  -C -T  $ref  -  >  $newname 
 else 
   $samtools view  -C -T $ref  $bamfile  >  $newname
 fi
 if [ "$?" != "0" ]; then
-  Fail "Command failed: $bindir/bam squeeze  --in $bamfile ..." 
+  Fail "Command failed: $bam squeeze  --in $bamfile ..." 
 fi
 s=`date +%s`; s=`expr $s - $now`; echo "Cram created in $s seconds"
 
-#   Build index for the new file
+#   Create the index file as necessary
 now=`date +%s`
-$samtools index $newname
+$topmedmakeindex $newname $console/$bamid-$me.out
 if [ "$?" != "0" ]; then
-  Fail "Command failed: $samtools index $newname"
+  Fail Fail "Unable to create index file for '$newname'"
 fi
 s=`date +%s`; s=`expr $s - $now`; echo "CRAM index created in $s seconds"
 

@@ -76,6 +76,8 @@ our %opts = (
     topdir => '/net/topmed/incoming/topmed',
     backupdir => '/working/backups/incoming/topmed',
     resultsdir => '/incoming/qc.results',    
+    submitlog => '/tmp/batchsubmit.log',
+    consoledir => '/net/topmed/working/topmed-output',
     dryrun => 0,
     verbose => 0,
     maxjobs => 100,
@@ -132,6 +134,12 @@ if ($fcn eq 'arrive') {
             my $f = $opts{topdir} . "/$href->{centername}/$href->{dirname}/" . $href->{bamname};
             my @stats = stat($f);
             if (! @stats) { next; }     # No real data
+            #   Check ownership of run. Things break if now owned by topmed
+            my $owner = getpwuid($stats[4]);
+            my $gid = $stats[5];
+            if ($owner ne 'topmed' || $gid ne '2307982') {
+                print "Ignoring run '$runsref->{$runid}' owned by $owner/$gid\n";
+            }
             #   See if we should mark this as arrived
             #   All BAMs must start with NWD. Only skip this if the BAM name
             #   is NWD and it is marked as completed
@@ -139,7 +147,10 @@ if ($fcn eq 'arrive') {
             #   If the mtime on the file is very recent, it might still be coming
             if ((time() - $stats[9]) < 3600) { next; }  # Catch it next time
             #   Run the command
-            BatchSubmit("$opts{topmedarrive} $href->{bamid}");  # Note, not run in SLURM
+            my $rc = BatchSubmit("$opts{topmedarrive} $href->{bamid}");  # Not run in SLURM
+            if ($rc > 0) {          # Unable to submit, capture output
+                rename($opts{submitlog}, "$opts{consoledir}/$href->{bamid}-arrive.out")
+            }
         }
     }
     ShowSummary('Samples arrived');
@@ -548,25 +559,27 @@ die "Invalid request '$fcn'. Try '$Script --help'\n";
 #   cmd - command
 #
 # Returns:
-#   boolean if jobs may still be submitted
+#   0  - no more jobs can be submitted
+#   <0 - submit successful, more jobs can be submitted
+#   >0 - submit failed, more jobs can be submitted
 #==================================================================
 sub BatchSubmit {
     my ($cmd) = @_;
     $opts{maxjobs}--;
     if ($opts{maxjobs} < 0) { return 0; }
     if ($opts{maxjobs} == 0 && $opts{verbose}) { print "Limit of jobs to be submitted has been reached\n"; }
-    if ($opts{dryrun}) { print "dryrun => $cmd\n"; return 1; }
-    my $rc = system("$cmd 2>&1");
+    if ($opts{dryrun}) { print "dryrun => $cmd\n"; return -1; }
+    my $rc = system("$cmd 2>&1 | tee $opts{submitlog}");
     $rc = $rc >> 8;
     if ($rc == 0) {
         $opts{jobcount}++;
         if ($opts{verbose}) { print "submitted => $cmd\n"; }
-        return 1;
+        return -1;
     }
     $opts{maxjobs}++;                   # Submit failed, keep trying
     if ($rc == 4) { $opts{jobsnotpermitted}++; }
     else { $opts{jobsfailedsubmission}++; }
-    return 1;
+    return $rc;                         # Pass failing return code too
 }
 
 #==================================================================
@@ -621,13 +634,17 @@ sub BuildSQL {
         $s = $sql . " as b JOIN $opts{runs_table} AS r on b.runid=r.runid " .
             "JOIN $opts{centers_table} AS c on r.centerid=c.centerid " .
             "WHERE c.centername='$opts{center}'";
-        $where =~ s/where //i;
+        if ($opts{datayear}) { $s .= " AND b.datayear=$opts{datayear}"; }
+        $opts{datayear} = '';
+        $where =~ s/where //i;          # Remove WHERE from caller
     }
     #   For a specific run (overrides center)
     if ($opts{runs}) {
         $s = $sql . " as b JOIN $opts{runs_table} AS r on b.runid=r.runid " .
             "WHERE r.dirname='$opts{runs}'";
-        $where =~ s/where //i;
+        if ($opts{datayear}) { $s .= " AND b.datayear=$opts{datayear}"; }
+        $opts{datayear} = '';
+        $where =~ s/where //i;          # Remove WHERE from caller
     }
 
     #   Add in caller's WHERE
@@ -635,7 +652,7 @@ sub BuildSQL {
     else { $s .= " AND $where"; }
 
     #   Add support for datayear
-    if ($opts{datayear}) { $s .= " AND b.datayear=$opts{datayear}"; }
+    if ($opts{datayear}) { $s .= " AND datayear=$opts{datayear}"; }
 
     #   Support randomization
     if ($opts{random}) { $s .= ' ORDER BY RAND()'; }

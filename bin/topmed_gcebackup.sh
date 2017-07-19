@@ -15,7 +15,7 @@ if [ "$1" = "-submit" ]; then
   MayIRun $me  $bamid
   realhost=topmed                   # Force to this node cause the others are wonky
   #RandomRealHost $bamid
-  SubmitJob $bamid "topmed-$me" '2G' "$0 $*"
+  SubmitJob $bamid "topmed-$me" '4G' "$0 $*"
   exit
 fi
 
@@ -29,7 +29,7 @@ fi
 bamid=$1
 
 Started
-GetNWDID $bamid
+nwdid=`GetNWDID $bamid`
 stime=`date +%s`
 
 file=`GetDB $bamid bamname`

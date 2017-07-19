@@ -41,59 +41,29 @@ our %opts = (
     topmedcmd => "$topmedbin/topmedcmd.pl",
     sacct => '/usr/cluster/bin/sacct',
     realm => '/usr/cluster/topmed/etc/.db_connections/topmed',
-    topdir => '/net/topmed/incoming/topmed',
     centers_table => 'centers',
     runs_table => 'runs',
     bamfiles_table => 'bamfiles',
     outdir => '/net/topmed/working/topmed-output',
-    maxjobs => 50,
     verbose => 0,                       # Must be defined for My_DB
-    sqlprefix => '',                    # Convenience for development
-    sqlsuffix => '',
 );
 
 my $STARTED   = 3;                      # Task started
-my $FAILED    = 99;                     # Task failed
-my %col2name = (
-    verify => 'verify',
-    qplot => 'qplot',
-    cram => 'cram',
-    ncbiexpt => 'sexpt',
-    ncbiorig => 'sorig',
-    ncbib37 => 'sb37',
-);
-my @cols2check = keys %col2name;
-my @astatecols = ();                    # Array of state column names
-my $statecolsstarted = '';              # State cols with started value for SQL
-foreach my $c (@cols2check) {
-    my $s = "state_" . $c;
-    push @astatecols, $s;
-    $statecolsstarted .= "$s=$STARTED || ";
-}
-my $statecols = join(',',@astatecols);  # String of state column names
-$statecolsstarted = substr($statecolsstarted,0, length($statecolsstarted)-4);
-
-
-
-#   This is a map of part of a column name to the name in the log file
-my %col2logname = (
-    verify => 'verify',
-    cram => 'cram',
-    qplot => 'qplot',
-);
-my %col2verb = (                    # Mark job as failed with topmedcmd.pl
-    verify => 'verified',
-    cram => 'cramed',
-    qplot => 'qploted',
-);
-my @colnames = keys %col2logname;   # Used in *_Failure functions
-my $sqlors = '';                    # Build OR string for SQL
-foreach my $c (@colnames) { $sqlors .= 'date' . $c . '=-1 OR '; }
-$sqlors = substr($sqlors,0,-4);     # Drop ' OR '
+my @statecols =                         #   States to be checked
+    qw/ state_verify
+    state_gcebackup
+    state_cram
+    state_qplot
+    state_gce38push
+    state_gce38pull
+    state_gce38bcf_push
+    state_gce38bcf_pull
+    state_gce38bcf
+    state_gce38copy
+/;
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose center=s runs=s mark sqlprefix=s sqlsuffix=s
-    memory=s partition=s qos=s noprompt
+    help realm=s verbose center=s runs=s fail requeue
     )) || die "Failed to parse options\n";
 
 #   Simple help if requested
@@ -105,37 +75,44 @@ if ($#ARGV < 0 || $opts{help}) {
     exit 1;
 }
 my $fcn = shift(@ARGV);
-
 my $dbh = DBConnect($opts{realm});
-
 my $nowdate = strftime('%Y/%m/%d %H:%M', localtime);
+
+#   User might provide runid rather than name of run
+if (exists($opts{runs}) &&  $opts{runs} =~ /^\d+$/) {
+    my $sql = "SELECT dirname from $opts{runs_table} WHERE runid=$opts{runs}";
+    my $sth = DoSQL($sql);
+    if ($sth) {
+        my $href = $sth->fetchrow_hashref;
+        $opts{runs} = $href->{dirname};
+    }
+}
 
 #--------------------------------------------------------------
 #   Get a list of jobs that have been submitted, see if any failed
 #--------------------------------------------------------------
 if ($fcn =~ /^show/) {
-    #   Remove these comments and change runid for testing on a single run
-    #$opts{sqlprefix} = ' runid=387 && (';   # Set for development
-    #$opts{sqlprefix} = ' bamid=59941 && (';   # Set for development
-    #$opts{sqlsuffix} = ') LIMIT 100';
-    my $sql = "SELECT bamid,bamname,$statecols FROM $opts{bamfiles_table} WHERE " .
-        $opts{sqlprefix} . $statecolsstarted . $opts{sqlsuffix};
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "$nowdate $Script - No jobs are running\n"; }
-    $opts{job_count} = 0;
-    #   For each bamid with something started, check each task state
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        for (my $j=0; $j<=$#astatecols; $j++) {
-            my $kstate = $astatecols[$j];
-            my $k = $cols2check[$j];
-            if (defined($href->{$kstate}) && $href->{$kstate} ne $STARTED) { next; }
-            if (! $col2name{$k}) { die "$Script - Got lost. No col2name for '$k'\n"; }
-            #   We have a task that is started for this bamid
-            $opts{job_count}++;
-            #   Find failure for this href, state_ncbib37, ncbib37, b37 
-            Find_Failure($href, $kstate, $k, $col2name{$k});
+    foreach my $statecol (@statecols) {
+        my $sql = BuildSQL("SELECT bamid,bamname,$statecol FROM $opts{bamfiles_table}", 
+            "WHERE $statecol=$STARTED");
+        my $sth = DoSQL($sql);
+        my $rowsofdata = $sth->rows();
+        if (! $rowsofdata) {
+            if ($opts{verbose}) { print "No jobs running for '$statecol'\n"; }
+            next;
+        }
+        #   For each bamid with something started, check each task state
+        for (my $i=1; $i<=$rowsofdata; $i++) {
+            my $href = $sth->fetchrow_hashref;
+            $opts{"job_$statecol"}++;
+            #   Find failure for this sample
+            my $s = $statecol;
+            $s =~ s/state_//;               # state_cram becomes cram
+            if ($s eq 'gce38push') { $s = 'gcepush'; }
+            if ($s eq 'gce38pull') { $s = 'gcepull'; }
+            if ($s eq 'gce38bcf')  { $s = 'bcf'; }
+            if ($s eq 'gce38copy') { $s = 'gcecopy'; }
+            Find_Failure($href, $s);
         }
     }
     #   Give summary of what we found out   Stats start with job_
@@ -144,7 +121,7 @@ if ($fcn =~ /^show/) {
         if ($k !~ /^job_/) { next; }
         my $kmsg = $k;
         $kmsg =~ s/_/ /g;
-        print "  $kmsg = $opts{$k}";
+        print "  $k = $opts{$k}";
     }
     print "\n";
     exit;
@@ -154,7 +131,7 @@ die "Invalid request '$fcn'. Try '$Script --help'\n";
 
 #==================================================================
 # Subroutine:
-#   Find_Failure - Check state of jobs that have started
+#   Find_Failure - Check state of a job that has started
 #
 #       see if the job has failed in SLURM
 #       Mark any failed step in the database
@@ -167,32 +144,38 @@ die "Invalid request '$fcn'. Try '$Script --help'\n";
 #
 # Arguments:
 #   href - hash reference to columns in a database row
+#   task - name of task that is running, e.g. cram
 #
 # Returns:
 #   nothing
 #==================================================================
 sub Find_Failure {
-    my ($h, $cstate, $c, $cname) = @_;  # href, state_ncbib37, ncbib37, b37 
+    my ($h, $task) = @_;
 
     #   See if there is a log file laying around for this task. If so, the job is
     #   recent and we can check it. No log file and and started is a bad thing.    
-    my $f = $opts{outdir} . "/$h->{bamid}-$cname.out";
-    if (! open(IN,$f)) { $opts{job_no_log_file}++; return; }
-    #$opts{job_found_log_file}++;
+    my $f = $opts{outdir} . "/$h->{bamid}-$task.out";
+    if (! open(IN,$f)) {
+        $opts{job_no_log_file}++;
+        if ($opts{verbose}) { print "Job started but no log found for $task bamid=$h->{bamid}\n"; }
+        return;
+    }
     #   Read log file, searching for line with slurm Jobid
     my $slurmid;
     while (<IN>) {
         #   Maybe the job was cancelled by SLURM right away
         if (/CANCELLED AT \S+\s+(.+)/) {
-            my $msg = "$c job (bamid=$h->{bamid}) never got started, cancelled by SLURM $1\n";
+            my $msg = "$task job (bamid=$h->{bamid}) never got started, cancelled by SLURM $1\n";
             print $msg;
             $opts{job_started_and_failed}++;
-            if ($opts{mark}) {
-                my $cmd = "$opts{topmedcmd} set $h->{bamid} $cstate $FAILED";
+            if ($opts{fail}) {
+                my $cmd = "$opts{topmedcmd} mark $h->{bamid} $task failed";
                 my $rc = system($cmd);
-                if (! $rc) { print "$h->{bamid} $cstate marked as failed\n"; }
-                else { print "Unable to mark $h->{bamid} $cstate as failed: $cmd\n"; }
+                if (! $rc) { print "$h->{bamid} $task marked as failed\n"; }
+                else { print "Unable to mark $h->{bamid} $task as failed: $cmd\n"; }
+                $opts{job_started_and_failed}++;
             }
+            else { $opts{job_started_and_failed}++; }   # Just count it as failed
             close(IN);
             return;
         }
@@ -208,12 +191,12 @@ sub Find_Failure {
         return;
     }
 
-    #   See what SLURM thinks of this job
+    #   See what SLURM thinks of job $slurmid
     my $cmd = $opts{sacct} . ' -j ' . $slurmid;
     my @lines = split("\n", `$cmd 2>&1`);
     my @words = split(' ', $lines[2]);
     if ($words[0] ne $slurmid) { next; }
-    my $msg = "We think $c job is running, but it is $words[5]: " .
+    my $msg = "We think $task job is running, but it was $words[5]: " .
         "bamid=$h->{bamid} slurmid=$slurmid status=$words[6]\n";
     if ($words[5] eq 'COMPLETED') {         # Running job succeeded
         print $msg;
@@ -223,11 +206,18 @@ sub Find_Failure {
     if ($words[5] =~ /CANCELLED|NODE_FAIL|FAILED|TIMEOUT/) {    # Running job failed
         print $msg;
         $opts{job_started_and_failed}++;
-        if ($opts{mark}) {
-            $cmd = "$opts{topmedcmd} set $h->{bamid} $cstate $FAILED";
+        if ($opts{fail}) {
+            $cmd = "$opts{topmedcmd} mark $h->{bamid} $task failed";
             my $rc = system($cmd);
-            if (! $rc) { print "$h->{bamid} $cstate marked as failed\n"; }
-            else { print "Unable to mark $h->{bamid} $cstate as failed: $cmd\n"; }
+            if (! $rc) { print "$h->{bamid} $task marked as failed\n"; }
+            else { print "Unable to mark $h->{bamid} $task as failed: $cmd\n"; }
+        }
+       if ($opts{requeue}) {
+            my $cmd = "$opts{topmedcmd} mark $h->{bamid} $task requested";
+            my $rc = system($cmd);
+            if (! $rc) { print "$h->{bamid} $task marked as requested\n"; }
+            else { print "Unable to mark $h->{bamid} $task as requested: $cmd\n"; }
+            $opts{job_started_and_requested}++;
         }
         return;
     }
@@ -235,6 +225,52 @@ sub Find_Failure {
     $opts{jobs_still_running}++;
     return;
 }
+
+#==================================================================
+# Subroutine:
+#   BuildSQL - Complete SQL statement based on options
+#
+# Arguments:
+#   sql - initial sql
+#   where - optional WHERE clause, without WHERE
+#
+# Returns
+#   Completed SQL statement
+#==================================================================
+sub BuildSQL {
+    my ($sql, $where) = @_;
+    my $s = $sql;
+
+    #   For a specific center
+    if ($opts{center}) {
+        $s = $sql . " as b JOIN $opts{runs_table} AS r on b.runid=r.runid " .
+            "JOIN $opts{centers_table} AS c on r.centerid=c.centerid " .
+            "WHERE c.centername='$opts{center}'";
+        if ($opts{datayear}) { $s .= " AND b.datayear=$opts{datayear}"; }
+        $opts{datayear} = '';
+        $where =~ s/where //i;          # Remove WHERE from caller
+    }
+    #   For a specific run (overrides center)
+    if ($opts{runs}) {
+        $s = $sql . " as b JOIN $opts{runs_table} AS r on b.runid=r.runid " .
+            "WHERE r.dirname='$opts{runs}'";
+        if ($opts{datayear}) { $s .= " AND b.datayear=$opts{datayear}"; }
+        $opts{datayear} = '';
+        $where =~ s/where //i;          # Remove WHERE from caller
+    }
+
+    #   Add in caller's WHERE
+    if ($where =~ /\s*WHERE\s/) { $s .= ' ' . $where; }
+    else { $s .= " AND $where"; }
+
+    #   Add support for datayear
+    if ($opts{datayear}) { $s .= " AND datayear=$opts{datayear}"; }
+
+    #   Support randomization
+    if ($opts{random}) { $s .= ' ORDER BY RAND()'; }
+    return $s;
+}
+
 
 #==================================================================
 #   Perldoc Documentation
@@ -248,14 +284,15 @@ topmed_failures.pl - Find runs that had a failure
 =head1 SYNOPSIS
 
   topmed_failures.pl show
-  topmed_failures.pl -mark show
+  topmed_failures.pl -fail show
+  topmed_failures.pl -requeue show
 
 =head1 DESCRIPTION
 
 Use program as a crontab job to find runs that have failed
 (sometimes cancelled by SLURM).
 When one is found the database will be corrected to show a failure
-so it will be resubmitted for another try.
+or perhaps even be requeued to try again.
 
 
 =head1 OPTIONS
@@ -268,17 +305,21 @@ Specifies a specific center name on which to run the action, e.g. B<uw>.
 This is useful for testing.
 The default is to run against all centers.
 
+=item B<-fail>
+
+If a job has failed and we thought it was running, mark it as failed in the database.
+
 =item B<-help>
 
 Generates this output.
 
-=item B<-mark>
-
-If a job has failed and we thought it was running, mark it as failed in the database.
-
 =item B<-realm NAME>
 
 Specifies the database realm to read data from. This defaults to B<topmed>;
+
+=item B<-requeue>
+
+If a job has failed and we thought it was running, mark it as requested in the database.
 
 =item B<-runs NAME[,NAME,...]>
 
@@ -287,17 +328,6 @@ e.g. B<2015jun05.weiss.02,2015jun05.weiss.03>.
 This is useful for testing.
 The default is to run against all runs for the center.
 
-=item B<-sqlprefix=string>
-
-Use this to in debugging to more precisely control which jobs are checked for failures.
-For instance you might want to specify B<-sqlprefix runid=387 && (>.
-If you specify this option, you must also specify B<sqlsuffix>.
-
-=item B<-sqlsuffix=string>
-
-Use this to in debugging to more precisely control which jobs are checked for failures.
-For instance you might want to specify B<-sqlprefix )>.
-If you specify this option, you must also specify B<sqlprefix>.
 
 =item B<-verbose>
 
@@ -325,7 +355,7 @@ return code of 0. Any error will set a non-zero return code.
 
 =head1 AUTHOR
 
-Written by Terry Gliedt I<E<lt>tpg@umich.eduE<gt>> in 2015-2016 and is
+Written by Terry Gliedt I<E<lt>tpg@umich.eduE<gt>> in 2015-2017 and is
 is free software; you can redistribute it and/or modify it under the
 terms of the GNU General Public License as published by the Free Software
 Foundation; See http://www.gnu.org/copyleft/gpl.html

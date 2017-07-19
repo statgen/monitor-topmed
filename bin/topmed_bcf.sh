@@ -12,9 +12,23 @@ markverb=$me
 if [ "$1" = "-submit" ]; then
   shift
   bamid=`GetDB $1 bamid`
+  datayear=`$topmedcmd show $bamid datayear`
+  mem=32G
+  if [ "$datayear" = "3" ]; then     # Year three can require LOTS of memory
+    bamsize=`$topmedcmd show $bamid bamsize`
+    if [ "$bamsize" -gt "40255183256" ]; then
+      mem=128G
+    elif [ "$bamsize" -gt "35044692321" ]; then
+      mem=78G
+    elif [ "$bamsize" -gt "31848365056" ]; then
+      mem=64G
+    elif [ "$bamsize" -gt "23023087355" ]; then
+      mem=48G
+    fi
+  fi
   MayIRun $me $bamid
   MyRealHost $bamid b$build
-  SubmitJob $bamid "topmed-$me" '24G' "$0 $*"
+  SubmitJob $bamid "topmed-$me" $mem "$0 $*"
   exit
 fi
 
@@ -28,7 +42,7 @@ fi
 bamid=$1
 
 Started
-GetNWDID $bamid
+nwdid=`GetNWDID $bamid`
 stime=`date +%s`
 crampath=`$topmedpath wherepath $bamid b$build`
 if [ "$crampath" = "" ]; then
@@ -51,7 +65,7 @@ fi
 
 #   Create crai for cram if it does not exist
 crai="$cramfile.crai"
-if [ ! -f $crai ]; then
+if [ -z $crai -o ! -f $crai ]; then
   echo "Creating index file '$cramfile'"
   $samtools index $cramfile 2>&1
   if [ "$?" != "0" ]; then
