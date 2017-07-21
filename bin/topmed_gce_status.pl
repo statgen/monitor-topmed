@@ -348,7 +348,7 @@ sub CheckState {
             die "$Script - Unable to get list of Google remapped files.  CMD=$cmd\n";
         while (<$in>) {
             if (/\/(NWD\d*)\.recab\.cram$/) { $localfiles{$1} = 1; }
-            else { print "$Script - cannot parse $_"; }
+            #else { print "$Script - cannot parse $_"; }
             $n-- || last;
         }
         $in->close();
@@ -377,7 +377,7 @@ sub CheckState {
     my %gcefiles = ();
     while (<$in>) {
         if (/\/(NWD\d*)\.recab\.cram$/) { $gcefiles{$1} = 1; }
-        else { print "$Script - cannot parse $_"; }
+        #else { print "$Script - cannot parse $_"; }
         $n-- || last;
     }
     $in->close();
@@ -568,7 +568,7 @@ sub CacheGSData {
     while (my $l = <$in>) {
         chomp($l);
         if ($l !~ /^gs.*\/(NWD\d+)\/NWD\d*\.recab\.cram\.flagstat/) {
-            if ($opts{verbose}) { print "$Script - cannot parse $l\n"; }
+            if ($opts{verbose} && $l =~ /NWD/) { print "$Script - cannot parse $l\n"; }
             next;
         }
         if ($1 eq 'NWD000') { next; }
