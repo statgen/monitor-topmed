@@ -210,6 +210,12 @@ __PACKAGE__->table("bamfiles");
   default_value: 0
   is_nullable: 1
 
+=head2 state_gcebackup
+
+  data_type: 'integer'
+  default_value: 0
+  is_nullable: 1
+
 =head2 state_gce38backup
 
   data_type: 'integer'
@@ -294,11 +300,24 @@ __PACKAGE__->table("bamfiles");
   default_value: 0
   is_nullable: 1
 
+=head2 state_gce38copy
+
+  data_type: 'integer'
+  default_value: 0
+  is_nullable: 1
+
 =head2 gce38bcf_opid
 
   data_type: 'varchar'
   is_nullable: 1
   size: 255
+
+=head2 offsite
+
+  data_type: 'char'
+  default_value: 'N'
+  is_nullable: 1
+  size: 1
 
 =head2 state_38cp2gce
 
@@ -415,6 +434,8 @@ __PACKAGE__->add_columns(
   { data_type => "integer", default_value => 0, is_nullable => 1 },
   "state_verify",
   { data_type => "integer", default_value => 0, is_nullable => 1 },
+  "state_gcebackup",
+  { data_type => "integer", default_value => 0, is_nullable => 1 },
   "state_gce38backup",
   { data_type => "integer", default_value => 0, is_nullable => 1 },
   "state_cram",
@@ -443,8 +464,12 @@ __PACKAGE__->add_columns(
   { data_type => "integer", default_value => 0, is_nullable => 1 },
   "state_gce38bcf",
   { data_type => "integer", default_value => 0, is_nullable => 1 },
+  "state_gce38copy",
+  { data_type => "integer", default_value => 0, is_nullable => 1 },
   "gce38bcf_opid",
   { data_type => "varchar", is_nullable => 1, size => 255 },
+  "offsite",
+  { data_type => "char", default_value => "N", is_nullable => 1, size => 1 },
   "state_38cp2gce",
   { data_type => "integer", default_value => 0, is_nullable => 1 },
   "datearrived",
@@ -541,8 +566,8 @@ __PACKAGE__->has_many(
 );
 
 
-# Created by DBIx::Class::Schema::Loader v0.07046 @ 2017-05-01 14:56:31
-# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:5aho/HvYdsqKqbYfUXMEcw
+# Created by DBIx::Class::Schema::Loader v0.07046 @ 2017-07-19 14:49:03
+# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:HiIuv7HmrGRkAmdbdkwn1A
 
 
 # You can replace this text with custom code or comments, and it will be preserved on regeneration
