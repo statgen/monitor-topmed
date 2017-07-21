@@ -141,7 +141,7 @@ fi
 #   Original input file was a BAM, convert to a CRAM
 #======================================================================
 cramdir=`$topmedpath wherepath $bamid cram`
-if [ "$cramdir" = "" ]; then
+if [ "$cramdir" = "" -o ! -d $cramdir ]; then
   Fail "Unable to CD $cramdir. This directory must be created first." 
 fi
 cd $cramdir
