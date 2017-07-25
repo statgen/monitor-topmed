@@ -1,6 +1,26 @@
-FROM topmed-base
+FROM ubuntu:16.04
 
 LABEL maintainer "Chris Scheller <schelcj@umich.edu>"
+
+RUN apt-get update && apt-get install -y \
+    autoconf \
+    build-essential \
+    cmake \
+    curl \
+    git \
+    liblzma5 \
+    liblzma-dev \
+    libbz2-1.0 \
+    libbz2-dev \
+    libcrypto++-dev \
+    libcurl3 \
+    libcurl3-gnutls \
+    libcurl3-gnutls-dev \
+    libncurses-dev \
+    libssl-dev \
+    wget \
+    unzip \
+    zlib1g-dev
 
 ENV BUILD_PREFIX  /usr/local
 ENV BUILD_BIN_DIR ${BUILD_PREFIX}/bin
