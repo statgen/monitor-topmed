@@ -176,12 +176,12 @@ if ($iammgr) {
 print doheader($HDR['title'], 1);
 
 if ($iammgr) {
-    $s = "<b>See TOPMed monitor docs " .
+    $s = "See TOPMed monitor docs " .
         "<a href='https://statgen.sph.umich.edu/wiki/NHLBI_automation_steps' target='_blank'>" .
-        "here</a>.</b>\n" .
-        "<i>If this page appears with no colors, you are at the wrong web site, " .
-        "Move to the correct website " .
-        "<a href='https://www-topmed1.sph.umich.edu/topmed/'>here</a>.</i>\n";
+        "here</a>.\n" .
+        "If this page appears with no colors, you are at the wrong web site, " .
+        "<b>Move to the correct website " .
+        "<a href='https://www-topmed1.sph.umich.edu/topmed/'>here</a>.</b>\n";
 }
 else {
     $s = '';
