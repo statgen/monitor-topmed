@@ -10,7 +10,7 @@ ascpcmd="$topmedcmd send2ncbi"
 me=ncbib37
 markverb=$me
 build=37
-version=secondary
+version=remap
 
 if [ "$1" = "-submit" ]; then
   shift
