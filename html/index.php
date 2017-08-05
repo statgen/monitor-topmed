@@ -49,6 +49,7 @@ $BAMNOTE = "<p><b>Note:</b><br>" .
     "<span class='cancelled'> cancelled </span>&nbsp;" .
     "<span class='completed'> completed </span>&nbsp;" .
     "<span class='delivered'> delivered </span>&nbsp;" .
+    "<span class='ignorethis'> ignore </span>&nbsp;" .
     "<span class='failedchecksum'> failed_checksum </span>&nbsp;" .
     "<span class='failed'> failed </span>&nbsp;" .
     "<span class='requested'> requested </span>&nbsp;" .
@@ -125,6 +126,7 @@ $SUBMITTED = 2;             // Task submitted to be run
 $STARTED   = 3;             // Task started
 $DELIVERED = 19;            // Data delivered, but not confirmed
 $COMPLETED = 20;            // Task completed successfully
+$IGNORETHIS = 80;           // Task is to be ignored
 $CANCELLED = 89;            // Task cancelled
 $FAILEDCHECKSUM = 98;       // Task failed, because checksum at NCBI bad
 $FAILED    = 99;            // Task failed
@@ -136,6 +138,7 @@ $state2str = array(         // Values here are class for SPAN tag
     $DELIVERED => 'delivered',
     $COMPLETED => 'completed',
     $CANCELLED => 'cancelled',
+    $IGNORETHIS => 'ignorethis',
     $FAILEDCHECKSUM => 'failedchecksum',
     $FAILED => 'failed'
 );
@@ -932,6 +935,7 @@ function GetCenters() {
 ---------------------------------------------------------------*/
 function QuickStatus($r, $url) {
     global $quickcols, $quickletter;
+    $separator_actions = array('Q','7','8','V', 'U');
     //  Add a small separator to 'group' certain actions
     $h = '';
     $col = '';
@@ -944,6 +948,7 @@ function QuickStatus($r, $url) {
         if ($val == 'failed' || $val == 'started') {
             $s = str_replace('XX', $quickletter[$c], $url);
         }
+        if (in_array($s, $separator_actions)) { $val .= " separator"; }
         $h .= "<span class='$val'>&nbsp;" . $s . "&nbsp;</span>";
     }
     return $h;
