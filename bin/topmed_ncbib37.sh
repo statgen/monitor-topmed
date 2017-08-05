@@ -22,7 +22,7 @@ if [ "$1" = "-submit" ]; then
   fi
   MayIRun $me  $bamid
   MyRealHost $bamid 'bam'
-  SubmitJob $bamid "topmed-redo" '2G' "$0 $*"
+  SubmitJob $bamid "topmed-$me" '2G' "$0 $*"
   exit
 fi
 
