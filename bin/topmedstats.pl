@@ -43,6 +43,8 @@ my %STEPS = (                       # List of steps we collect data for
     gcepull => 1,
     b38 => 1,
     bcf => 1,
+    gcebackup => 1,
+    gcecopy => 1,
 );
 my $NOTSET    = 0;            # Not set
 my $REQUESTED = 1;            # Task requested
