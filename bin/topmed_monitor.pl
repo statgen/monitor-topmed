@@ -267,7 +267,7 @@ if ($fcn eq 'qplot') {
 #--------------------------------------------------------------
 if ($fcn eq 'push') {
     #   Get list of all samples yet to process
-    my $sql = BuildSQL("SELECT bamid,state_cram,state_gce38push,poorquality FROM $opts{bamfiles_table}",
+    my $sql = BuildSQL("SELECT bamid,state_cram,state_gce38push FROM $opts{bamfiles_table}",
         "WHERE state_gce38push!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
@@ -275,7 +275,6 @@ if ($fcn eq 'push') {
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         #   Only send data if cram was done
-        if ($href->{poorquality} ne 'N') { next; }
         if ($href->{state_cram} != $COMPLETED) { next; }
         if ($opts{suberr} && $href->{state_gce38push} >= $FAILED) {
             $href->{state_gce38push} = $REQUESTED;
@@ -293,7 +292,7 @@ if ($fcn eq 'push') {
 #--------------------------------------------------------------
 if ($fcn eq 'pull') {
     #   Get list of all samples yet to process
-    my $sql = BuildSQL("SELECT bamid,state_gce38push,state_gce38pull,poorquality FROM $opts{bamfiles_table}", 
+    my $sql = BuildSQL("SELECT bamid,state_gce38push,state_gce38pull FROM $opts{bamfiles_table}", 
         "WHERE state_gce38pull!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
@@ -301,7 +300,6 @@ if ($fcn eq 'pull') {
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         #   Only get data if remap was done and requested
-        if ($href->{poorquality} ne 'N') { next; }
         if ($href->{state_gce38push} != $COMPLETED) { next; }
         if ($opts{suberr} && $href->{state_gce38pull} >= $FAILED) {
             $href->{state_gce38pull} = $REQUESTED;
@@ -318,7 +316,7 @@ if ($fcn eq 'pull') {
 #--------------------------------------------------------------
 if ($fcn eq 'post') {
     #   Get list of all samples yet to process
-    my $sql = BuildSQL("SELECT bamid,state_gce38pull,state_gce38post,poorquality FROM $opts{bamfiles_table}",
+    my $sql = BuildSQL("SELECT bamid,state_gce38pull,state_gce38post FROM $opts{bamfiles_table}",
         "WHERE state_gce38post!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
@@ -326,7 +324,6 @@ if ($fcn eq 'post') {
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         #   Only post process data that we already fetched
-        if ($href->{poorquality} ne 'N') { next; }
         if ($href->{state_gce38pull} != $COMPLETED) { next; }
         if ($opts{suberr} && $href->{state_gce38post} >= $FAILED) {
             $href->{state_gce38post} = $REQUESTED;
@@ -344,7 +341,7 @@ if ($fcn eq 'post') {
 #--------------------------------------------------------------
 if ($fcn eq 'pushbcf') {
     #   Get list of all samples yet to process
-    my $sql = BuildSQL("SELECT bamid,state_cram,state_gce38bcf_push,poorquality FROM $opts{bamfiles_table}",
+    my $sql = BuildSQL("SELECT bamid,state_cram,state_gce38bcf_push FROM $opts{bamfiles_table}",
         "WHERE state_gce38bcf_push!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
@@ -352,7 +349,6 @@ if ($fcn eq 'pushbcf') {
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         #   Only send data if cram was done
-        if ($href->{poorquality} ne 'N') { next; }
         if ($href->{state_cram} != $COMPLETED) { next; }
         if ($opts{suberr} && $href->{state_gce38push} >= $FAILED) {
             $href->{state_gce38bcf_push} = $REQUESTED;
@@ -370,7 +366,7 @@ if ($fcn eq 'pushbcf') {
 #--------------------------------------------------------------
 if ($fcn eq 'pullbcf') {
     #   Get list of all samples yet to process
-    my $sql = BuildSQL("SELECT bamid,state_gce38bcf_push,state_gce38bcf_pull,poorquality FROM $opts{bamfiles_table}",
+    my $sql = BuildSQL("SELECT bamid,state_gce38bcf_push,state_gce38bcf_pull FROM $opts{bamfiles_table}",
         "WHERE state_gce38bcf_pull!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
@@ -378,7 +374,6 @@ if ($fcn eq 'pullbcf') {
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         #   Only get data if bcf was done and requested
-        if ($href->{poorquality} ne 'N') { next; }
         if ($href->{state_gce38bcf_push} != $COMPLETED) { next; }
         if ($href->{state_gce38bcf_pull} != $COMPLETED) { next; }
         if ($opts{suberr} && $href->{state_gce38bcf_pull} >= $FAILED) {
@@ -416,18 +411,17 @@ if ($fcn eq 'bcf') {
 }
 
 #--------------------------------------------------------------
-#   Copy local data to GCE storage   NOT CORRECT
+#   Copy local data to GCE storage
 #--------------------------------------------------------------
 if ($fcn eq 'gcecopy') {
     #   Get list of all samples yet to process
-    my $sql = BuildSQL("SELECT bamid,state_b38,state_gce38bcf,state_gce38copy,poorquality FROM $opts{bamfiles_table}",
+    my $sql = BuildSQL("SELECT bamid,state_b38,state_gce38bcf,state_gce38copy FROM $opts{bamfiles_table}",
         "WHERE state_gce38copy!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { exit; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
-        if ($href->{poorquality} ne 'N') { next; }
         if ($href->{state_b38} != $COMPLETED) { next; }
         if ($href->{state_gce38bcf} != $COMPLETED) { next; }
         if ($href->{state_gce38copy} == $COMPLETED) { next; }
