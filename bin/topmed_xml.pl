@@ -206,7 +206,10 @@ sub CreateRun {
         $href->{datayear} eq '1') {
         $refname = $href->{expt_sampleid};
     }
-    my $xml = GenRUNXML($checksum, $title, $refname, $runlines, $filename, $checksum);
+    my($day, $month, $year)=(localtime)[3,4,5];
+    my $d = $day . ($month+1) . ($year+1900);
+
+    my $xml = GenRUNXML($d . $checksum, $title, $refname, $runlines, $filename, $checksum);
     print OUT $xml . "</RUN_SET>\n";
     close(OUT);
     print "  Created Run XML $f\n";
