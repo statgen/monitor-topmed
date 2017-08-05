@@ -59,6 +59,7 @@ my $SUBMITTED = 2;            # Task submitted to be run
 my $STARTED   = 3;            # Task started
 my $DELIVERED = 19;           # Data delivered, but not confirmed
 my $COMPLETED = 20;           # Task completed successfully
+my $IGNORETHIS = 80;          # Task is to be ignored
 my $CANCELLED = 89;           # Task cancelled
 my $FAILEDCHECKSUM = 98;      # Task failed, because checksum at NCBI bad
 my $FAILED    = 99;           # Task failed
@@ -120,6 +121,7 @@ if ($fcn eq 'runstatus') {
                     if ($href->{$a} == $CANCELLED)  { next; }    # cancelled
                     #   These go into done, processing or neither states
                     if ($href->{$a} ==  $COMPLETED)  { $counts{$a}{done}++;   next; } # yea!
+                    if ($href->{$a} ==  $IGNORETHIS) { $counts{$a}{done}++;   next; } # pretend yea !
                     if ($href->{$a} >= $FAILEDCHECKSUM) { $counts{$a}{failed}++; next; } # boo!
                     $counts{$a}{processing}++;
                 }
