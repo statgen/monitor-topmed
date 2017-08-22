@@ -8,7 +8,7 @@
 
 me=gcecopy
 markverb=$me
-stat="stat --printf=%s"
+stat="stat --printf=%s --dereference"
 
 if [ "$1" = "-submit" ]; then
   shift
@@ -45,10 +45,29 @@ sizerecabcram=`$stat $recabcram`
 recabcrai=$recabcram.crai
 
 #   Create the index file as necessary
-$topmedmakeindex $recabcram $console/$bamid-$me.out
+build=`GetDB $bamid build`
+$topmedmakeindex $recabcram $build $console/$bamid-$me.out
 if [ "$?" != "0" ]; then
   Fail Fail "Unable to create index file for '$recabcram'"
 fi
+
+#   Get checksum for b38 file or calculate it
+b38cramchecksum=`GetDB $bamid b38cramchecksum`
+if [ "$b38cramchecksum" = "" ]; then
+  echo "Calculating MD5 for $recabcram"
+  stime=`date +%s`
+  md5=(`md5sum $recabcram`)
+  b38cramchecksum=${md5[0]}
+  if [ "$b38cramchecksum" = "" ]; then
+    Fail "MD5sum for recab failed" ß
+  fi
+  etime=`date +%s`
+  etime=`expr $etime - $stime`
+  echo "MD5SUM for recab completed in $etime seconds"
+  SetDB $bamid b38cramchecksum $b38cramchecksum
+fi
+f=`basename $recabcram`
+echo "$b38cramchecksum $f" > $recabcram.md5
 
 baserecabcrai=`basename $recabcrai`
 sizerecabcrai=`$stat $recabcrai`
@@ -94,11 +113,11 @@ gcesize=${l[1]}
 if [ "$sizerecabcram" != "$gcesize" ]; then
   echo "$baserecabcram sizes= $sizerecabcram / $gcesize"
   if [ "$gcesize" = "" ]; then
-    cmissing="$cmissing $baserecabcram $baserecabcrai"
-    cmissinglist="$cmissinglist $recabcram $recabcrai"
+    cmissing="$cmissing $baserecabcram $baserecabcrai $recabcram.md5"
+    cmissinglist="$cmissinglist $recabcram $recabcrai $recabcram.md5"
   else
-    replacelist="$replacelist $recabcram $recabcrai"
-    rlist="$rlist $baserecabcram $baserecabcrai"
+    replacelist="$replacelist $recabcram $recabcrai $recabcram.md5"
+    rlist="$rlist $baserecabcram $baserecabcrai  $recabcram.md5"
   fi
 else
   l=(`$gsutil stat $copyuri/$baserecabcrai | grep Content-Length:`)
@@ -106,11 +125,11 @@ gcesize=${l[1]}
   if [ "$sizerecabcrai" != "$gcesize" ]; then
     echo "$baserecabcrai sizes= $sizerecabcrai / $gcesize"
     if [ "$gcesize" = "" ]; then
-      cmissing="$cmissing $baserecabcrai"
-      cmissinglist="$cmissinglist $recabcrai"
+      cmissing="$cmissing $baserecabcrai $recabcram.md5"
+      cmissinglist="$cmissinglist $recabcrai $recabcram.md5"
     else
-      replacelist="$replacelist $recabcrai"
-      rlist="$rlist $baserecabcrai"
+      replacelist="$replacelist $recabcrai $recabcram.md5"
+      rlist="$rlist $baserecabcrai $recabcram.md5"
     fi
   fi
 fi
