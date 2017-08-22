@@ -64,6 +64,7 @@ our %opts = (
     topmedgce38bcfpush => "$topmedbin/topmed_gcebcfpush.sh",
     topmedgce38bcfpull => "$topmedbin/topmed_gcebcfpull.sh",
     topmedgcecopy => "$topmedbin/topmed_gcecopy.sh",
+    topmedfix => "$topmedbin/topmed_fix.sh",
     topmedbcf  => "$topmedbin/topmed_bcf.sh",
     topmedxml    => "$topmedbin/topmed_xml.pl",
     netdir => '/net/topmed',
@@ -92,7 +93,7 @@ Getopt::Long::GetOptions( \%opts,qw(
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$Script [options] arrive|verify|qplot|cram|push|pull|post|pushbcf|pullbcf|gcecopy\n" .
+    warn "$Script [options] arrive|verify|qplot|cram|push|pull|post|pushbcf|pullbcf|gcecopy|fix\n" .
         "Find runs which need some action and queue a request to do it.\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
@@ -430,6 +431,29 @@ if ($fcn eq 'gcecopy') {
         }
         if ($href->{state_gce38copy} != $NOTSET && $href->{state_gce38copy} != $REQUESTED) { next; }
         if (! BatchSubmit("$opts{topmedgcecopy} -submit $href->{bamid}")) { last; }
+    }
+    ShowSummary($fcn);
+    exit;
+}
+
+#--------------------------------------------------------------
+#   Fix some screwup
+#--------------------------------------------------------------
+if ($fcn eq 'fix') {
+    #   Get list of all samples yet to process
+    my $sql = BuildSQL("SELECT bamid,state_fix FROM $opts{bamfiles_table}",
+        "WHERE state_fix!=$COMPLETED AND state_fix=$REQUESTED OR state_fix>=$FAILEDCHECKSUM");
+    my $sth = DoSQL($sql);
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { exit; }
+    for (my $i=1; $i<=$rowsofdata; $i++) {
+        my $href = $sth->fetchrow_hashref;
+        if ($href->{state_fix} == $COMPLETED) { next; }
+        if ($opts{suberr} && $href->{state_fix} >= $FAILEDCHECKSUM) {
+            $href->{state_fix} = $REQUESTED;
+        }
+        if ($href->{state_fix} != $REQUESTED) { next; }
+        if (! BatchSubmit("$opts{topmedfix} -submit $href->{bamid}")) { last; }
     }
     ShowSummary($fcn);
     exit;
