@@ -26,7 +26,8 @@ $STATUSLETTERS =  "<br/> " .
     "<b>7</b>=Remapped Build=37,<br/>" .
     "<b>s</b>=Push Build=38 to GCE, <b>r</b>=Pull Build=38 from GCE, <b>8</b>=Remapped Build=38,<br/>" .
     "<b>x</b>=Push BCF 38 to GCE, <b>y</b>=Pull BCF 38 from GCE, <b>V</b>=Completed BCF/VT 38,<br/>" .
-    "<b>X</b>=EXPT=>NCBI <b>S</b>=Orig BAM/CRAM=>NCBI, <b>P</b>=</b>B37=>NCBI";
+    "<b>X</b>=EXPT=>NCBI <b>S</b>=Orig BAM/CRAM=>NCBI, <b>P</b>=</b>B37=>NCBI<br/>" .
+    "<b>f</b>=FIX";
 
 $SHOWSTATUS = "STATUS: " .
     "<a onclick='javascript:window.location.reload()'><img src='refresh.png' alt='refresh'></a> &nbsp;" .
@@ -98,7 +99,8 @@ $quickcols = array(                     // Map of status column to topmedcmd ver
     'state_gce38copy'=> 'gcecopy',
     'state_ncbiexpt' => 'sendexpt',
     'state_ncbiorig' => 'sendorig',
-    'state_ncbib37'  => 'sendb37'
+    'state_ncbib37'  => 'sendb37',
+    'state_fix'      => 'fix'
 );
 $quickletter = array(                   // Map of status column to letter we see
     'state_arrive'   => 'A',
@@ -116,10 +118,11 @@ $quickletter = array(                   // Map of status column to letter we see
     'state_gce38copy'=> 'U',
     'state_ncbiexpt' => 'X',
     'state_ncbiorig' => 'S',
-    'state_ncbib37'  => 'P'
+    'state_ncbib37'  => 'P',
+    'state_fix'      => 'f'
 );
 $validfunctions = array('all', 'verify', 'cram', 'gcebackup', 'qplot',
-    'gcepush', 'gcepull', 'bcf', 'gcecopy');
+    'gcepush', 'gcepull', 'bcf', 'gcecopy', 'fix');
 $NOTSET = 0;                // Not set
 $REQUESTED = 1;             // Task requested
 $SUBMITTED = 2;             // Task submitted to be run
@@ -144,7 +147,7 @@ $state2str = array(         // Values here are class for SPAN tag
 );
 
 $TOPMEDJOBNAMES = array('verify', 'cram', 'backup', 'qplot', 'expt', 'orig', 'b37',
-    'push38', 'pull38', 'b38', 'pushbcf38', 'pullbcf38', 'bcf', 'gcecopy');
+    'push38', 'pull38', 'b38', 'pushbcf38', 'pullbcf38', 'bcf', 'gcecopy', 'fix');
 
 //  These columns are state values to be converted to people readable strings
 //  See DateState() for possible values
@@ -975,7 +978,7 @@ function DateState($t) {
 ---------------------------------------------------------------*/
 function CalcRunStatus($str) {
     global $quickletter;
-    $separator_actions = array('Q','7','8','V', 'U');
+    $separator_actions = array('Q','7','8','V', 'U', 'P');
     //return $str;          // To see original state
     $h = '';
     $cols = array_values($quickletter);

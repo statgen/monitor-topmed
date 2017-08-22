@@ -155,6 +155,8 @@ my $FAILED    = 99;           # Task failed
   state_ncbiorig INT DEFAULT 0,     /* Original input file as bam or cram (S) */
   state_ncbib37  INT DEFAULT 0,     /* Remapped cram build 37 as cram (P) */
 
+  state_fix INT DEFAULT 0,          /* Track efforts to fix screwups */
+
   PRIMARY KEY  (bamid)
 );
 
@@ -387,6 +389,9 @@ CREATE TABLE stepstats (
   count_gcecopy     INT DEFAULT 0,
   avetime_gcecopy   INT DEFAULT 0,
   ncbicount_gcecopy INT DEFAULT 0,
+  count_gcebackup     INT DEFAULT 0,
+  avetime_gcebackup   INT DEFAULT 0,
+  ncbicount_gcebackup INT DEFAULT 0,
   count_b38         INT DEFAULT 0,
   avetime_b38       INT DEFAULT 0,
   count_bcf         INT DEFAULT 0,

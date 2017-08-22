@@ -57,7 +57,7 @@ $sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE datayear=$datayear A
 $result = SQL_Query($sql);
 $row = SQL_Fetch($result);
 $totalcompletedbams .= $row['count(*)'] . '/';
-$sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE datayear=$datayear AND state_ncbib38=$COMPLETED";
+$sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE datayear=$datayear AND state_b38=$COMPLETED";
 $result = SQL_Query($sql);
 $row = SQL_Fetch($result);
 $totalcompletedbams .= $row['count(*)'];
@@ -95,7 +95,7 @@ if ($fcn == 'plot') {
           "days</td>" .
         "<td><b>Project:</b>" .
           "<select name='datayear'>" .
-          "<option value='2'>Year 2</option><option value='1'>Year 1</option></select>\n" . 
+          "<option value='3'>Year 3</option><option value='2'>Year 2</option><option value='1'>Year 1</option></select>\n" . 
           "</td>" .
         "<td align='right'>" .
         "<a href='$reshowurl'>Reshow Plots</a>" .
@@ -109,8 +109,8 @@ if ($fcn == 'plot') {
         "<font color='$COLORS[3]'>In Process</font> (submitted, running), or " .
         "<font color='$COLORS[4]'>Not Started</font> " .
         "</font></b></p>\n";
-    $legend = array('bcf', 'gce38post', 'gce38pull', 'gce38push',
-        'b38', 'b37', 'cram', 'qplot', 'bai');    // Reversed
+    $legend = array('bcf', 'b38', 'gce38pull', 'gce38push',
+        'b38', 'b37', 'cram', 'qplot', 'gce38bcf');    // Reversed
     $title = "Current Counts for Each Step [$totalbamcount Verified BAMs]";
     $plotdata = array();
     $s = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE datayear=$datayear AND";

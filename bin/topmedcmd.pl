@@ -59,6 +59,7 @@ my %VALIDVERBS = (                  # Valid verbs to database colum
     ncbiexpt   => 'state_ncbiexpt',
     ncbiorig   => 'state_ncbiorig',
     ncbib37    => 'state_ncbib37',
+    fix        => 'state_fix',
 );
 my %VALIDSTATUS = (                 # Valid status for the verbs
    notset    => $NOTSET,
@@ -160,7 +161,6 @@ exit;
 sub Mark {
     my ($bamid, $op, $state) = @_;
     $bamid = GetBamid($bamid);
-    if ($op eq 'fix') { return; }
     if ((! exists($VALIDVERBS{$op})) || (! exists($VALIDSTATUS{$state}))) {
         die "$Script - Invalid 'mark' syntax. Try '$Script -help'\n";
     }
