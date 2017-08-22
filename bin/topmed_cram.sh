@@ -109,12 +109,12 @@ if [ "$extension" = "cram" ]; then
     fi
   fi
 
-  echo "MD5 for cram, same as original file"
+  build=`GetDB $bamid build` 
+  bchecksum="b${build}cramchecksum"    # Name of column for remapped checksum
+  echo "MD5 for cram and $bchecksum is same as original file"
   v=`GetDB $bamid checksum`
-  SetDB $bamid 'cramchecksum' $v
-
-  v=`GetDB $bamid checksum`
-  SetDB $bamid 'cramchecksum' $v
+  SetDB $bamid cramchecksum $v
+  SetDB $bamid $bchecksum $v
 
   flagstat=`GetDB $bamid cramflagstat`
   if [ "$flagstat" = "" ]; then
@@ -183,8 +183,9 @@ fi
 s=`date +%s`; s=`expr $s - $now`; echo "Cram created in $s seconds"
 
 #   Create the index file as necessary
+build=`GetDB $bamid build`
 now=`date +%s`
-$topmedmakeindex $newname $console/$bamid-$me.out
+$topmedmakeindex $newname $build $console/$bamid-$me.out
 if [ "$?" != "0" ]; then
   Fail Fail "Unable to create index file for '$newname'"
 fi
