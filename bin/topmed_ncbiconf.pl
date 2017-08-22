@@ -362,7 +362,7 @@ sub CheckSummary {
     $sql = "SELECT bamid,bamname,expt_sampleid,cramchecksum,checksum from $opts{bamfiles_table} " .
         "WHERE state_ncbib37=$DELIVERED";
     #   Last three of extensions are from my bugs
-    LookFor($sql, 'b37', 'recal.37.cram recal.37.bam recal.cram recal.bam', \%stats);
+    LookFor($sql, 'b37', 'remap.37.cram recal.37.cram recal.37.bam recal.cram recal.bam', \%stats);
     print SummarizeStats(\%stats) . "\n";
 
     return;
