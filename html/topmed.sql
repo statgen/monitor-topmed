@@ -392,11 +392,17 @@ CREATE TABLE stepstats (
   count_gcebackup     INT DEFAULT 0,
   avetime_gcebackup   INT DEFAULT 0,
   ncbicount_gcebackup INT DEFAULT 0,
+
+  count_fix         INT DEFAULT 0,
+  avetime_fix       INT DEFAULT 0,
+  ncbicount_fix     INT DEFAULT 0,
+
   count_b38         INT DEFAULT 0,
   avetime_b38       INT DEFAULT 0,
+  ncbicount_b38     INT DEFAULT 0,
   count_bcf         INT DEFAULT 0,
   avetime_bcf       INT DEFAULT 0,
-  ncbicount_b38     INT DEFAULT 0,
+  ncbicount_bcf     INT DEFAULT 0,
 
   bamcount           INT DEFAULT 0,      /* Count of all arrived bams */
   errcount           INT DEFAULT 0,      /* Count of all errors for bams */
