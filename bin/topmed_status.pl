@@ -51,7 +51,7 @@ my %attributes2letter = (
     'state_ncbiexpt'  => 'X',
     'state_ncbiorig'  => 'S',
     'state_ncbib37'   => 'P',
-    'state_fix'       => 'f',
+    'state_fix'       => 'F',
 );
 
 my $NOTSET    = 0;            # Not set

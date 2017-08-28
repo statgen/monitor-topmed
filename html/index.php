@@ -27,7 +27,7 @@ $STATUSLETTERS =  "<br/> " .
     "<b>s</b>=Push Build=38 to GCE, <b>r</b>=Pull Build=38 from GCE, <b>8</b>=Remapped Build=38,<br/>" .
     "<b>x</b>=Push BCF 38 to GCE, <b>y</b>=Pull BCF 38 from GCE, <b>V</b>=Completed BCF/VT 38,<br/>" .
     "<b>X</b>=EXPT=>NCBI <b>S</b>=Orig BAM/CRAM=>NCBI, <b>P</b>=</b>B37=>NCBI<br/>" .
-    "<b>f</b>=FIX";
+    "<b>F</b>=FIX";
 
 $SHOWSTATUS = "STATUS: " .
     "<a onclick='javascript:window.location.reload()'><img src='refresh.png' alt='refresh'></a> &nbsp;" .
@@ -119,7 +119,7 @@ $quickletter = array(                   // Map of status column to letter we see
     'state_ncbiexpt' => 'X',
     'state_ncbiorig' => 'S',
     'state_ncbib37'  => 'P',
-    'state_fix'      => 'f'
+    'state_fix'      => 'F'
 );
 $validfunctions = array('all', 'verify', 'cram', 'gcebackup', 'qplot',
     'gcepush', 'gcepull', 'bcf', 'gcecopy', 'fix');
@@ -938,7 +938,7 @@ function GetCenters() {
 ---------------------------------------------------------------*/
 function QuickStatus($r, $url) {
     global $quickcols, $quickletter;
-    $separator_actions = array('Q','7','8','V', 'U');
+    $separator_actions = array('Q','7','8','V', 'U', 'P');
     //  Add a small separator to 'group' certain actions
     $h = '';
     $col = '';
