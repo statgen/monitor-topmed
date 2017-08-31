@@ -22,7 +22,7 @@ if [ "$1" = "-submit" ]; then
   fi
   MayIRun $me  $bamid
   MyRealHost $bamid 'bam'
-  SubmitJob $bamid "topmed-$me" '2G' "$0 $*"
+  SubmitJob $bamid "topmed-redo" '2G' "$0 $*"
   exit
 fi
 
@@ -34,6 +34,7 @@ if [ "$1" = "" ]; then
   exit 1
 fi
 bamid=$1
+bamid=`$topmedcmd show $1 bamid`
 
 Started
 
@@ -87,6 +88,29 @@ if [ "$checksum" = "" ]; then
   echo "MD5 calculated for CRAM in $etime seconds"
 else
   echo "Obtained b${build}cramchecksum for bamid $bamid from database ($checksum)"
+fi
+
+#   NCBI cannot process crams anymore, so we convert this CRAM to a BAM
+rmbam=''
+ext=${sendfile##*.}
+if [ "$ext" = "cram" ]; then
+  newbam=$console/$nwdid.recal.bam
+  echo "Converting CRAM $sendfile to $newbam"
+  $samtools view -b -@ 2 $sendfile > $newbam
+  if [ "$?" != "0" ]; then
+    Fail "Unable to convert $sendfile to $newbam"
+  fi
+  echo "Calculating checksum for converted CRAM"
+  md5=(`md5sum $newbam`)
+  checksum=${md5[0]}
+  if [ "$checksum" = "" ]; then
+    Fail "Unable to calculate MD5 for $newbam"
+  fi
+  echo "Checksum for converted CRAM is $checksum"
+  sendfile=`basename $newbam`
+  ln -sf $newbam $sendfile 
+  ls -l $sendfile $newbam
+  rmbam=$newbam              # Remove this file
 fi
 
 d=`date +%Y/%m/%d`

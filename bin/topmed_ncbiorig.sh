@@ -33,6 +33,7 @@ if [ "$1" = "" ]; then
   exit 1
 fi
 bamid=$1
+bamid=`$topmedcmd show $1 bamid`
 
 Started
 
@@ -109,6 +110,29 @@ else
   fi
 fi
 
+#   NCBI cannot process crams anymore, so we convert this CRAM to a BAM
+rmbam=''
+ext=${sendfile##*.}
+if [ "$ext" = "cram" ]; then
+  newbam=$console/$nwdid.src.bam
+  echo "Converting CRAM $sendfile to $newbam"
+  $samtools view -b -@ 2 $sendfile > $newbam
+  if [ "$?" != "0" ]; then
+    Fail "Unable to convert $sendfile to $newbam"
+  fi
+  echo "Calculating checksum for converted CRAM"
+  md5=(`md5sum $newbam`)
+  checksum=${md5[0]}
+  if [ "$checksum" = "" ]; then
+    Fail "Unable to calculate MD5 for $newbam"
+  fi
+  echo "Checksum for converted CRAM is $checksum"
+  sendfile=`basename $newbam`
+  ln -sf $newbam $sendfile 
+  ls -l $sendfile $newbam
+  rmbam=$newbam              # Remove this file
+fi
+
 if [ "$checksum" = "" ]; then
   Fail "Invalid bamid '$bamid' ($sendfile). CHECKSUM not known"
 fi
@@ -148,6 +172,9 @@ stime=`date +%s`
 $ascpcmd $sendfile
 rc=$?
 rm -f $sendfile
+if [ "$rmbam" != '' ]; then
+  rm -f $rmbam
+fi
 if [ "$rc" != "0" ]; then
   Fail "FAILED to send data file '$sendfile' (rc=$rc)"
 fi
