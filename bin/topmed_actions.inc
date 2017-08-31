@@ -154,16 +154,15 @@ function RandomRealHost {
   realhost=''
     # All hosts are equal, so try to spread it around
     n=`perl -e "{ print $bamid%10 }"`
-    #  n=`perl -e "{ print $bamid%7 }"`    # Cause Chris killed 9 and 10
     h="topmed$n"
     if [ "$h" = "topmed0" ]; then
-      h=topmed
+      h=topmed10
     fi
     if [ "$h" = "topmed8" ]; then     # May not use this
       h=topmed5
     fi
     if [ "$h" = "topmed1" ]; then
-      h=topmed2
+      h=topmed
     fi
     realhost=$h
 }
@@ -208,4 +207,47 @@ function SubmitJob {
   $topmedcmd mark $bamid $markverb submitted
   exit
 }
+
+#------------------------------------------------------------------
+# Subroutine:
+#   SubmitSRUN(bamid, qos, mem, cmdtorun)    Submit this script to SLURM
+#   Uses global variables: $me $markverb $console $slurp $realhost $cores
+#------------------------------------------------------------------
+function SubmitSRUN {
+  local bamid=$1
+  local qos=$2
+  local mem=$3
+  local cmdtorun="$4"
+  if [ "$qos" != "" ]; then        # Use value passed or caller must set it
+    q="--qos=$qos"
+  fi
+  if [ "$3" != "" ]; then          # Use value passed or caller must set it
+    mem="--mem=$mem"
+  fi
+  if [ "$realhost" != "" ]; then
+    r="--nodelist=$realhost"
+  else
+    r=''
+  fi
+  if [ "$cmdtorun" != "" ]; then
+    cmdtorun="$cmdtorun"
+  else
+    echo "No command to execute provided to SubmitJob"
+    exit 3
+  fi
+  cd $console || exit 5
+  l=(`/usr/cluster/bin/srun -p $slurmp $mem $r $cores $q -J $bamid-$me --output=$console/$bamid-$me.out $cmdtorun`)
+  if [ "$?" != "0" ]; then
+    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp $mem $r $cores $q --workdir=$console -J $bamid-$me --output=$console/$bamid-$me.out $cmdtorun" >> $console/$bamid-$me.out
+    Fail "Failed to submit command to SLURM - $l" | tee -a $console/$bamid-$me.out
+    exit 1
+  fi
+  # Job was submitted, save job details
+  if [ "${l[0]}" = "Submitted" ]; then      
+    echo `date` $me ${l[3]} $slurmp $qos $mem >> $console/$bamid.jobids
+  fi
+  $topmedcmd mark $bamid $markverb submitted
+  exit
+}
+
 
