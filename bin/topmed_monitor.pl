@@ -87,7 +87,7 @@ our %opts = (
     jobsfailedsubmission => 0,
 );
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose topdir=s center=s runs=s maxjobs=i random
+    help realm=s verbose topdir=s center=s runs=s piname=s maxjobs=i random
     dryrun suberr datayear=i
     )) || die "Failed to parse options\n";
 
@@ -671,6 +671,9 @@ sub BuildSQL {
 
     #   Add support for datayear
     if ($opts{datayear}) { $s .= " AND datayear=$opts{datayear}"; }
+
+    #   Add support for piname
+    if ($opts{piname}) { $s .= " AND piname='$opts{piname}'"; }
 
     #   Support randomization
     if ($opts{random}) { $s .= ' ORDER BY RAND()'; }
