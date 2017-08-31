@@ -48,7 +48,7 @@ function ProcessRuns {
     #   Run and Manifest must exist, not owned by $topuser
     if [ "${runs[$r]}" = "" -a "$owner" != "$topuser" ]; then
       newrun=/net/topmed/incoming/topmed/$center/$r
-      echo -n "Monitor knows about ${#runs[@]} runs for $center"
+      echo -n "Monitor knows about ${#runs[@]} runs for $center  "
       # Determine if this is year 2 (bam) or 3 (cram) - determines where the backup dir is
       year=0
       if [ -f $r/Manifest.txt ]; then
