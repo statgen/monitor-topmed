@@ -78,8 +78,6 @@ Getopt::Long::GetOptions( \%opts,qw(
 if ($#ARGV < 0 || $opts{help}) {
     my $m = "$Script [options] jobid yyyy/mm/dd";
     warn "$Script [options] jobid yyyy/mm/dd\n" .
-        "  or\n" .
-        "$Script [options] summary yyyy/mm/dd\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
     exit 1;
@@ -165,6 +163,7 @@ sub Jobids {
         my @c = split(' ',$l);          # Break into columns
         if ($c[6] eq 'redo') { next; }
         if ($c[6] eq 'ncbib37') { next; }
+        if ($c[6] eq 'ncbiorig') { next; }
         if (! exists($STEPS{$c[6]})) { warn "$Script - Ignoring step '$c[6]' from line:  $l"; }
         if ($c[6] eq 'sexpt') { $c[6] = 'expt'; }   # Correct dumb names
         if ($c[6] eq 'ncbiorig') { $c[6] = 'orig'; }
@@ -225,7 +224,8 @@ sub Jobids {
         }
         if ($sql) {
             chop($sql);                     # Remove ,
-            $sql = "UPDATE $opts{stats_table} SET $sql WHERE yyyymmdd='$d'";
+            $sql = "UPDATE $opts{stats_table} SET $sql WHERE yyyymmdd='" . 
+                substr($d,0,4) . '/' . substr($d,4,2) . '/' . substr($d,6,2) . "'";
             $sth = DoSQL($sql);
             print "Updated data for '$d' [$steps]\n";
         }
