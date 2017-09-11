@@ -114,11 +114,15 @@ fi
 rmbam=''
 ext=${sendfile##*.}
 if [ "$ext" = "cram" ]; then
-  newbam=$console/$nwdid.src.bam
-  echo "Converting CRAM $sendfile to $newbam"
-  $samtools view -b -@ 2 $sendfile > $newbam
-  if [ "$?" != "0" ]; then
-    Fail "Unable to convert $sendfile to $newbam"
+  newbam=/tmp/$nwdid.src.bam
+  if [ ! -f $newbam ]; then
+    echo "Converting CRAM $sendfile to $newbam"
+    $samtools view -b -@ 2 $sendfile > $newbam
+    if [ "$?" != "0" ]; then
+      Fail "Unable to convert $sendfile to $newbam"
+    fi
+  else
+    echo "Using existing file $newbam"
   fi
   echo "Calculating checksum for converted CRAM"
   md5=(`md5sum $newbam`)
