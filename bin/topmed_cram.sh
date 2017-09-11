@@ -185,10 +185,8 @@ s=`date +%s`; s=`expr $s - $now`; echo "Cram created in $s seconds"
 #   Create the index file as necessary
 build=`GetDB $bamid build`
 now=`date +%s`
-$topmedmakeindex $newname $build $console/$bamid-$me.out
-if [ "$?" != "0" ]; then
-  Fail Fail "Unable to create index file for '$newname'"
-fi
+CreateIndex $bamid $newname
+
 s=`date +%s`; s=`expr $s - $now`; echo "CRAM index created in $s seconds"
 
 #   Get flagstat for this cram

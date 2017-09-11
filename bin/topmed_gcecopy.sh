@@ -46,10 +46,7 @@ recabcrai=$recabcram.crai
 
 #   Create the index file as necessary
 build=`GetDB $bamid build`
-$topmedmakeindex $recabcram $build $console/$bamid-$me.out
-if [ "$?" != "0" ]; then
-  Fail Fail "Unable to create index file for '$recabcram'"
-fi
+CreateIndex $bamid $recabcram
 
 #   Get checksum for b38 file or calculate it
 b38cramchecksum=`GetDB $bamid b38cramchecksum`
