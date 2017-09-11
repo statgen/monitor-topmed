@@ -62,11 +62,7 @@ etime=`expr $etime - $stime`
 echo "Calculated bamflagstat in $etime seconds"
 
 #   Create the index file as necessary
-build=`GetDB $bamid build`
-$topmedmakeindex $bamfile $build $console/$bamid-$me.out
-if [ "$?" != "0" ]; then
-  Fail Fail "Unable to create index file for '$bamfile'"
-fi
+CreateIndex $bamid $bamfile
 
 #   If original file was cram, then some fields are the same for both cram and bam
 extension="${bamfile##*.}"
