@@ -181,7 +181,8 @@ sub SQueue {
         my %longjobs = ();
         foreach my $l (@{$running{$p}{data}}) {
             my @c = split(' ', $l);
-            if ($c[3] =~ /^NWD/) { next; }
+            if ($c[3] =~ /^NWD/) { next; }  # Ignore jobs I did not submit
+            if ($c[3] =~ /^nhlbi/) { next; }
             my $t = $c[6];                  # Normalize all times to dd-hh:mm:ss
             my $days = '00-';
             if ($t =~ /^(\d+\-)(.+)/) { $days = $1; $t = $2; }
