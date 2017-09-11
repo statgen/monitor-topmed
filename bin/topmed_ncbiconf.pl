@@ -344,7 +344,7 @@ sub CheckSummary {
     print "$nowdate Checking for loaded experiments:   "; 
     %stats = ();
     my $sql = "SELECT bamid,bamname,expt_sampleid from $opts{bamfiles_table} " .
-        "WHERE state_ncbiexpt=$DELIVERED";
+        "WHERE state_ncbiexpt=$DELIVERED ";
     LookFor($sql, 'expt', 'expt.xml', \%stats);
     print SummarizeStats(\%stats) . "\n";
 
@@ -362,7 +362,9 @@ sub CheckSummary {
     $sql = "SELECT bamid,bamname,expt_sampleid,cramchecksum,checksum from $opts{bamfiles_table} " .
         "WHERE state_ncbib37=$DELIVERED";
     #   Last three of extensions are from my bugs
-    LookFor($sql, 'b37', 'remap.37.cram recal.37.cram recal.37.bam recal.cram recal.bam', \%stats);
+#    LookFor($sql, 'b37', 'remap.37.cram recal.37.cram recal.37.bam recal.cram recal.bam', \%stats);
+    #   Do not look for CRAM entries since NCBI cannot handle them now
+    LookFor($sql, 'b37', 'recal.37.bam recal.bam', \%stats);
     print SummarizeStats(\%stats) . "\n";
 
     return;
@@ -486,7 +488,7 @@ sub SummarizeStats {
 sub GetSummaryStatus {
     my $sql = "SELECT file_name,file_status,file_error,upload_date,loaded_runs,file_md5sum from $opts{summary_table} WHERE";
     foreach my $f (@_) {
-        my $s = $sql . " file_name='$f'";
+        my $s = $sql . " file_name='$f' ORDER BY upload_date";
         my $sth = DoSQL($s);
         if (! $sth) { next; }
         my $rows = $sth->rows();
