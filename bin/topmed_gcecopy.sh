@@ -45,7 +45,6 @@ sizerecabcram=`$stat $recabcram`
 recabcrai=$recabcram.crai
 
 #   Create the index file as necessary
-build=`GetDB $bamid build`
 CreateIndex $bamid $recabcram
 
 #   Get checksum for b38 file or calculate it
@@ -53,11 +52,7 @@ b38cramchecksum=`GetDB $bamid b38cramchecksum`
 if [ "$b38cramchecksum" = "" ]; then
   echo "Calculating MD5 for $recabcram"
   stime=`date +%s`
-  md5=(`md5sum $recabcram`)
-  b38cramchecksum=${md5[0]}
-  if [ "$b38cramchecksum" = "" ]; then
-    Fail "MD5sum for recab failed" ß
-  fi
+  b38cramchecksum=`CalcMD5 $bamid $recabcram`
   etime=`date +%s`
   etime=`expr $etime - $stime`
   echo "MD5SUM for recab completed in $etime seconds"

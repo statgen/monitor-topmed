@@ -86,13 +86,11 @@ if [ "$sendcram" = "Y" ]; then
   if [ "$checksum" = "" ]; then
     echo "Calculating MD5 for CRAM"
     stime=`date +%s`
-    checksum=`calcmd5 $sendfile | awk '{print $1}'`
-    if [ "$checksum" != "" ]; then
-      $topmedcmd set $bamid cramchecksum $checksum
-      etime=`date +%s`
-      etime=`expr $etime - $stime`
-      echo "MD5 calculated for CRAM in $etime seconds"
-    fi
+    checksum=`CalcMD5 $bamid $newname`
+    SetDB $bamid cramchecksum $checksum
+    etime=`date +%s`
+    etime=`expr $etime - $stime`
+    echo "MD5 calculated for CRAM in $etime seconds"
   fi
 else
   sendfile=`$topmedpath wherefile $bamid bam`
@@ -125,11 +123,7 @@ if [ "$ext" = "cram" ]; then
     echo "Using existing file $newbam"
   fi
   echo "Calculating checksum for converted CRAM"
-  md5=(`md5sum $newbam`)
-  checksum=${md5[0]}
-  if [ "$checksum" = "" ]; then
-    Fail "Unable to calculate MD5 for $newbam"
-  fi
+  checksum=`CalcMD5 $bamid $newbam`
   echo "Checksum for converted CRAM is $checksum"
   sendfile=`basename $newbam`
   ln -sf $newbam $sendfile 

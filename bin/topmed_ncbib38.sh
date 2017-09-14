@@ -103,13 +103,8 @@ checksum=`$topmedcmd show $bamid b{$build}cramchecksum`
 if [ "$checksum" = "" ]; then
   echo "Calculating MD5 for CRAM"
   stime=`date +%s`
-  checksum=`md5sum $sendfile | awk '{print $1}'`
-  if [ "$checksum" = "" ]; then
-    echo "Unable to calculate the MD5 for CRAM: md5sum $sendfile"
-    $topmedcmd -persist mark $bamid $markverb failed
-    exit 3
-  fi
-  $topmedcmd set $bamid b{$build}cramchecksum $checksum
+  checksum=`CalcMD5 $bamid $sendfile`
+  SetDB $bamid b${build}cramchecksum $checksum
   etime=`date +%s`
   etime=`expr $etime - $stime`
   echo "MD5 calculated for CRAM in $etime seconds"

@@ -120,10 +120,8 @@ if [ "$extension" = "cram" ]; then
   if [ "$flagstat" = "" ]; then
     echo "New CRAM, calculate flagstat for $cramfile"
     now=`date +%s`
-    $topmedflagstat $cramfile $bamid cramflagstat
-    if [ "$?" != "0" ]; then
-      Fail "Command failed: $flagstat $bamfile"
-    fi
+    cramflagstat = `CalcFlagstat $bamid $cramfile`
+    SetDB $bamid cramflagstat $cramflagstat
     s=`date +%s`; s=`expr $s - $now`;
     echo "$flagstat for CRAM completed in $s seconds"
   else 
@@ -149,10 +147,8 @@ chkname=`basename $bamfile .bam`
 
 #   Get flagstat for original input file
 now=`date +%s`
-$topmedflagstat $bamfile $bamid bamflagstat /tmp/${chkname}.init.stat
-if [ "$?" != "0" ]; then
-  Fail "Command failed: $flagstat $bamfile"
-fi
+bamflagstat = `CalcFlagstat $bamid $bamfile`
+echo $bamflagstat > /tmp/${chkname}.init.stat
 s=`date +%s`; s=`expr $s - $now`; echo "$flagstat completed in $s seconds"
 
 #   Illumina cram files require a different fasta
@@ -191,34 +187,32 @@ s=`date +%s`; s=`expr $s - $now`; echo "CRAM index created in $s seconds"
 
 #   Get flagstat for this cram
 now=`date +%s`
-$topmedflagstat $newname $bamid cramflagstat /tmp/${chkname}.cram.stat
-if [ "$?" != "0" ]; then
-  Fail "Command failed: $flagstat $bamfile"
-fi
+
+cramflagstat=`CalcFlagstat $bamid $newname`
+echo $cramflagstat > /tmp/${chkname}.cram.stat
 s=`date +%s`; s=`expr $s - $now`; echo "$flagstat for CRAM completed in $s seconds"
 
 #   Did flagstat output for cram match that for the input bam?
 diff=`diff  /tmp/${chkname}.init.stat  /tmp/${chkname}.cram.stat | wc -l`
 if [ "$diff" != "0" ]; then
   diff  /tmp/${chkname}.init.stat  /tmp/${chkname}.cram.stat
-  Fail "Stat for backup CRAM file differs from that for original BAM"
+  Fail "Flagstat for backup CRAM file differs from that for original BAM"
 fi
-echo "Stat for CRAM file matches that of original"
+echo "Flagstat for CRAM file matches that of original"
+SetDB $bamid cramflagstat $cramflagstat
 rm -f /tmp/${chkname}.init.stat  /tmp/${chkname}.cram.stat
 
+#   Calculate the MD5 for the cram
 echo "Calculate MD5 for cram"
 now=`date +%s`
-#   Calculate the MD5 for the cram
-md5=`$calcmd5 $newname | awk '{print $1}'`
-if [ "$md5" = "" ]; then
-  Fail "Command failed: md5sum $newname"
-fi
-SetDB $bamid 'cramchecksum' $md5
-s=`date +%s`; s=`expr $s - $now`; echo "MD5 calculated in $s seconds"
+cramchecksum=`CalcMD5 $bamid $newname`
+SetDB $bamid cramchecksum $md5
+s=`date +%s`; s=`expr $s - $now`
+echo "MD5 calculated in $s seconds"
 
 here=`pwd`
 etime=`date +%s`
 etime=`expr $etime - $stime`
-echo "BAM to CRAM backup completed in $etime seconds, created $here/$newname"
+echo "CRAM $here/$newname created in $etime seconds"
 Successful
 Log $etime

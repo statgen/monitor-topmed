@@ -105,11 +105,7 @@ echo "Only one sample found in the header"
 
 #   Post processing needed here
 echo "Calculating MD5 for local file ($cramfile)"
-md5=(`md5sum $cramfile`)
-md5=${md5[0]}
-if [ "$md5" = "" ]; then
-  Fail "Unable to calculate MD5 for remapped '$bamid' [$nwdid] cramfile=$cramfile"
-fi
+md5=`CalcMD5 $bamid $cramfile`
 echo "Set checksum and flagstat for b$build file"
 SetDB $bamid b${build}cramchecksum $md5
 SetDB $bamid b${build}flagstat $cramflagstat

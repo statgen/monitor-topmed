@@ -78,11 +78,8 @@ checksum=`GetDB  $bamid b${build}cramchecksum`
 if [ "$checksum" = "" ]; then
   echo "Calculating MD5 for CRAM"
   stime=`date +%s`
-  checksum=`md5sum $sendfile | awk '{print $1}'`
-  if [ "$checksum" = "" ]; then
-    Fail "Unable to calculate the MD5 for CRAM: md5sum $sendfile"
-  fi
-  $topmedcmd set $bamid b${build}cramchecksum $checksum
+  checksum=`CalcMD5 $bamid $sendfile`
+  SetDB $bamid b${build}cramchecksum $checksum
   etime=`date +%s`
   etime=`expr $etime - $stime`
   echo "MD5 calculated for CRAM in $etime seconds"
@@ -94,18 +91,18 @@ fi
 rmbam=''
 ext=${sendfile##*.}
 if [ "$ext" = "cram" ]; then
-  newbam=$console/$nwdid.recal.bam
-  echo "Converting CRAM $sendfile to $newbam"
-  $samtools view -b -@ 2 $sendfile > $newbam
-  if [ "$?" != "0" ]; then
-    Fail "Unable to convert $sendfile to $newbam"
+  newbam=/tmp/$nwdid.recal.bam
+  if [ ! -f $newbam ]; then
+    echo "Converting CRAM $sendfile to $newbam"
+    $samtools view -b -@ 2 $sendfile > $newbam
+    if [ "$?" != "0" ]; then
+      Fail "Unable to convert $sendfile to $newbam"
+    fi
+  else
+    echo "Using existing file $newbam"
   fi
   echo "Calculating checksum for converted CRAM"
-  md5=(`md5sum $newbam`)
-  checksum=${md5[0]}
-  if [ "$checksum" = "" ]; then
-    Fail "Unable to calculate MD5 for $newbam"
-  fi
+  checksum=`CalcMD5 $bamid $newbam`
   echo "Checksum for converted CRAM is $checksum"
   sendfile=`basename $newbam`
   ln -sf $newbam $sendfile 
@@ -146,6 +143,9 @@ if [ "$xmlonly" != "Y" ]; then
   $ascpcmd $sendfile
   rc=$?
   #rm -f $sendfile
+  if [ "$rmbam" != '' ]; then
+    rm -f $rmbam
+  fi
   if [ "$rc" != "0" ]; then
     Fail "FAILED to send data file '$sendfile'"
   fi

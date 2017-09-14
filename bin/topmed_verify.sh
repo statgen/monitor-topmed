@@ -52,11 +52,8 @@ SetDB $bamid 'bamsize' $sz
 #   Get the paired reads count for this file
 stime=`date +%s`
 echo "Calculate flagstat"
-$topmedflagstat $bamfile $bamid bamflagstat
-if [ "$?" != "0" ]; then
-  Fail "$topmedflagstat $bamfile failed"
-  exit 1
-fi
+bamflagstat=`CalcFlagstat $bamid $bamfile`
+SetDB $bamid bamflagstat $bamflagstat
 etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "Calculated bamflagstat in $etime seconds"
