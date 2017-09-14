@@ -442,7 +442,7 @@ if ($fcn eq 'gcecopy') {
 if ($fcn eq 'fix') {
     #   Get list of all samples yet to process
     my $sql = BuildSQL("SELECT bamid,state_fix FROM $opts{bamfiles_table}",
-        "WHERE state_fix!=$COMPLETED AND state_fix=$REQUESTED OR state_fix>=$FAILEDCHECKSUM");
+        "WHERE (state_fix=$REQUESTED OR state_fix>=$FAILEDCHECKSUM)");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { exit; }
