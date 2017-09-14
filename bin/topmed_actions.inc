@@ -5,11 +5,10 @@ topmedcmd=/usr/cluster/topmed/bin/topmedcmd.pl
 topmedpermit=/usr/cluster/topmed/bin/topmedpermit.pl
 topmedpath=/usr/cluster/topmed/bin/topmedpath.pl
 topmedrename=/usr/cluster/topmed/bin/topmedrename.pl
-topmedflagstat=/usr/cluster/topmed/bin/topmed_flagstat.sh
-topmedmakeindex=/usr/cluster/topmed/bin/topmedmakeindex.sh
+#topmedflagstat=/usr/cluster/topmed/bin/topmed_flagstat.sh
 topmedqplot=/usr/cluster/topmed/bin/topmedqplot.pl
 bam=/usr/cluster/bin/bam
-calcmd5=/usr/cluster/topmed/bin/topmed_calcmd5.sh
+#calcmd5=/usr/cluster/topmed/bin/topmed_calcmd5.sh
 samtools=/usr/cluster/bin/samtools
 vt=/usr/cluster/software/trusty/topmed-year1-freeze3a/master/vt/vt
 vtref=/net/topmed/working/mapping/gotcloud/ref/hg38/hs38DH.fa
@@ -122,7 +121,7 @@ function GetDB {
 
 #------------------------------------------------------------------
 # Subroutine:
-#   GetNWDID(bamid)         Set $nwdid
+#   GetNWDID(bamid)         prints $nwdid
 #------------------------------------------------------------------
 function GetNWDID {
   local bamid=$1
@@ -165,6 +164,133 @@ function RandomRealHost {
       h=topmed
     fi
     realhost=$h
+}
+
+#------------------------------------------------------------------
+# Subroutine:
+#   CreateIndex(bamid,file)    Create CRAM or BAM index
+#
+#	samtools can fail in multiple ways and never tell us
+#   This script attempts to centralize all known attempts
+#   to check for samtools errors for an index file
+#   so we can possibly insure the index file will work  (POS)
+#
+#   Attempts to use global variable $me
+#------------------------------------------------------------------
+function CreateIndex {
+  local bamid=$1
+  local file=$2
+
+  #  To verify an index, we search for a string - depending on the extension
+  ext="${file##*.}"
+  buildstr='notset'
+  if [ "$ext" = "bam" ]; then
+    buildstr="3:148,100,000-148,110,000"
+  fi
+  if [ "$ext" = "cram" ]; then
+    buildstr="chr3:148,100,000-148,110,000"
+  fi
+  if [ "buildstr" = 'notset' ]; then
+    Fail "Unable to determine build for $file"
+  fi
+
+  extension="${file##*.}"
+  indexfile='notset'
+  if [ "$extension" = "bam" ]; then
+    indexfile=$file.bai
+  fi
+  if [ "$extension" = "cram" ]; then
+    indexfile=$file.crai
+  fi
+  if [ "$indexfile" = "notset" ]; then
+    Fail "Unknown extension '$extension' for $file"
+  fi
+
+  #   If index file is zero length, recreate it
+  if [ -z $indexfile ]; then
+    rm -f $indexfile
+  fi
+
+  #   Index exists, let's see if it is any good
+  if [ -f $indexfile ]; then
+    n=`$samtools view $file $buildstr | wc -l`
+    if [ "$n" = "" -o "$n" -lt "1000" ]; then
+      echo "Index file '$indexfile' is invalid"
+      rm -f $indexfile                  # Remove bad index
+      #   This might be a trashed reference index for samtools, if so remove it
+      consfile="$console/$bamid-$me.out"
+      a=`grep 'cram_ref_load: Assertion' $consfile`     # Could fail if $me not defined
+      if [ "$a" != "" ]; then
+        rm -rf $HOME/.cache/hts-ref/*/*
+        echo "Samtools cram_ref_load error, removed dirty reference cache and retrying"
+      fi
+    else
+      echo "Index file '$indexfile' is valid apparently"
+      return
+    fi
+  fi
+
+  #   Create the index file
+  echo "Creating index file '$indexfile'"
+  $samtools index $file 2>&1
+  if [ "$?" = "0" ]; then
+    echo "Created index file '$indexfile'"
+  else
+    Fail "Unable to create index file for '$file'"
+  fi
+}
+
+
+#------------------------------------------------------------------
+# Subroutine:
+#   CalcFlagstat(bamid,file)    Prints flagstat for a bam or cram
+#
+#	Calculate the flagstat paired in sequencing number for a bam or cram
+#------------------------------------------------------------------
+function CalcFlagstat {
+  local bamid=$1
+  local file=$2
+
+  # Special hack for this center
+  ref=/net/mario/gotcloud/gotcloud.ref/hs37d5.fa
+  c=`$topmedcmd show $bamid center`
+  if [ "$c" = "illumina" ]; then
+    ref=/net/topmed/incoming/study.reference/study.reference/illumina.hg19.fa
+  fi
+
+  #   Get flagstat values for input file
+  of=`basename $file`               # Calculate temp file for flagstat results
+  of="/tmp/$of.tmp"
+  echo "Calculating flagstat for $file"
+  $samtools flagstat  $file > $of
+  if [ "$?" != "0" ]; then
+    Fail "$samtools flagstat $file failed. Results in $of"
+  fi
+
+  #   Outfile has results of flagstat call, get paired reads
+  a=(`grep 'paired in sequencing' $of`)
+  if [ "${a[0]}" = "" ]; then
+    Fail "Unable to get reads of paired in sequencing from '$of' for '$file'"
+  fi
+  rm -f $outfile
+  echo ${a[0]}
+}
+
+
+#------------------------------------------------------------------
+# Subroutine:
+#   CalcMD5(bamid, file)    Prints md5 for a file
+#------------------------------------------------------------------
+function CalcMD5 {
+  local bamid=$1
+  local file=$2
+
+  md5=`md5sum $file`
+  checksum=${md5[0]}
+  if [ "$checksum" = "" ]; then
+    Fail "Unable to calculate MD5 for '$file' [$bamid]"
+  fi
+  echo $checksum
 }
 
 #------------------------------------------------------------------
