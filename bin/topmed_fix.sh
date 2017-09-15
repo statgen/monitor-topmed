@@ -10,7 +10,7 @@ markverb=fix
 
 if [ "$1" = "-submit" ]; then
   shift
-  bamid=`$topmedcmd show $1 bamid`
+  bamid=`GetDB $1 bamid`
   #MayIRun $me  $bamid
   #h=(`$topmedpath wherepath $bamid b38 | sed -e 's:/: :g'`)
   #realhost=${h[1]}
@@ -127,7 +127,7 @@ markverb=$me
 
 if [ "$1" = "-submit" ]; then
   shift
-  bamid=`$topmedcmd show $1 bamid`
+  bamid=`GetDB $1 bamid`
   MayIRun $me  $bamid
   RandomRealHost $bamid
   SubmitJob $bamid "topmed-fix" '2G' "$0 $*"
@@ -173,7 +173,7 @@ exit
 
 
 nwdid=`GetNWDID $1`
-bamid=`$topmedcmd show $1 bamid`
+bamid=`GetDB $1 bamid`
 
 #   Get file to process
 bcffile=`$topmedpath wherefile $bamid bcf`

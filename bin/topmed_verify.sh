@@ -11,7 +11,7 @@ markverb=$me
 
 if [ "$1" = "-submit" ]; then
   shift
-  bamid=`$topmedcmd show $1 bamid`
+  bamid=`GetDB $1 bamid`
   MayIRun $me  $bamid
   MyRealHost $bamid 'bam'
   SubmitJob $bamid "$realhost-verify" '4G' "$0 $*"

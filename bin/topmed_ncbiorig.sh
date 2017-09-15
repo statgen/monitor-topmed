@@ -13,7 +13,7 @@ version=secondary
 
 if [ "$1" = "-submit" ]; then
   shift
-  bamid=`$topmedcmd show $1 bamid`
+  bamid=`GetDB $1 bamid`
   #   Do not allow this to play with anything except year one data
   year=`GetDB $1 datayear`
   if [ "$year" != "1" ]; then
@@ -33,7 +33,7 @@ if [ "$1" = "" ]; then
   exit 1
 fi
 bamid=$1
-bamid=`$topmedcmd show $1 bamid`
+bamid=`GetDB $1 bamid`
 
 Started
 

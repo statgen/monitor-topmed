@@ -55,19 +55,19 @@ bamid=$1
 shift
 $topmedcmd mark $bamid $markverb started
 #   Get some values from the database
-nwdid=`$topmedcmd show $bamid expt_sampleid`
+nwdid=`GetDB $bamid expt_sampleid`
 if [ "$nwdid" = "" ]; then
   echo "Invalid bamid '$bamid'. NWDID not known"
   $topmedcmd -persist mark $bamid $markverb failed
   exit 2
 fi
-center=`$topmedcmd show $bamid center`
+center=`GetDB $bamid center`
 if [ "$center" = "" ]; then
   echo "Invalid bamid '$bamid'. CENTER not known"
   $topmedcmd -persist mark $bamid $markverb failed
   exit 2
 fi
-piname=`$topmedcmd show $bamid piname`
+piname=`GetDB $bamid piname`
 if [ "$piname" = "" ]; then
   echo "Invalid bamid '$bamid'. PINAME not known"
   $topmedcmd -persist mark $bamid $markverb failed
@@ -99,7 +99,7 @@ if [ "$sendfile" = '' ]; then
   $topmedcmd -persist mark $bamid $markverb failed
   exit 2
 fi
-checksum=`$topmedcmd show $bamid b{$build}cramchecksum`
+checksum=`GetDB $bamid b{$build}cramchecksum`
 if [ "$checksum" = "" ]; then
   echo "Calculating MD5 for CRAM"
   stime=`date +%s`

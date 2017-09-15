@@ -12,10 +12,10 @@ markverb=$me
 if [ "$1" = "-submit" ]; then
   shift
   bamid=`GetDB $1 bamid`
-  datayear=`$topmedcmd show $bamid datayear`
+  datayear=$GetDB $bamid datayear`
   mem=48G
   #   Large crams can require LOTS of memory
-  bamsize=`$topmedcmd show $bamid bamsize`
+  bamsize=`GetGB $bamid bamsize`
   if [ "$bamsize" -gt "40255183256" ]; then
     mem=128G
   elif [ "$bamsize" -gt "35044692321" ]; then
