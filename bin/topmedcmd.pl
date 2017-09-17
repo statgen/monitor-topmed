@@ -408,6 +408,7 @@ sub Set {
     my ($sth, $rowsofdata, $href);
 
     if (! defined($val)) { $val = ''; }
+    chomp($val);                                # No trailing newlines please
     if ($val ne 'NULL') { $val = "'$val'"; }    # Use quotes unless this is NULL
 
     #   This could be a run name
