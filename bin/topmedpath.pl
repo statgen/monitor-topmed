@@ -362,9 +362,7 @@ sub WhereFile {
     if ($set eq 'qcresults') {
         my $qcdir = abs_path("$opts{netdir}/$opts{qcresultsdir}/$centername/$rundir") || '';
         if ($qcdir) { 
-            $bamname =~ s/\.bam//;                   # Remove the extension
-            $bamname =~ s/\.cram//;
-            print "$qcdir/$bamname.vb.selfSM\n";
+            print "$qcdir/$nwdid.vb.selfSM\n";
         }
         else {
             warn "WhereFile: abs_path($opts{netdir}/$opts{qcresultsdir}/$centername/$rundir) failed\n";
