@@ -118,9 +118,9 @@ if ($#ARGV < 0 || $opts{help}) {
         "  or\n" .
         "$m send2ncbi files\n" .
         "  or\n" .
-        "$m whatbamid bamname\n" .
+        "$m whatnwdid bamid|nwdid\n" .
         "  or\n" .
-        "$m whatnwdid NWDnnnnn\n" .
+        "$m whatrun bamid|nwdid\n" .
         "  or\n" .
         "$m permit add operation center run\n" .
         "$m permit remove permitid\n" .
@@ -146,8 +146,8 @@ if ($fcn eq 'show')      { Show(@ARGV); exit; }
 if ($fcn eq 'list')      { List(@ARGV); exit; }
 if ($fcn eq 'export')    { Export(@ARGV); exit; }
 if ($fcn eq 'send2ncbi') { Send2NCBI(@ARGV); exit; }
-if ($fcn eq 'whatbamid') { WhatBAMID(@ARGV); exit; }
 if ($fcn eq 'whatnwdid') { WhatNWDID(@ARGV); exit; }
+if ($fcn eq 'whatrun')   { WhatRun(@ARGV); exit; }
 
 die "$Script  - Invalid function '$fcn'\n";
 exit;
@@ -303,22 +303,6 @@ sub Export {
 
 #==================================================================
 # Subroutine:
-#   WhatBAMID($bamname)
-#
-#   Print bamid for a bamfiles entry with this bamname
-#==================================================================
-sub WhatBAMID {
-    my ($bamname) = @_;
-
-    if ($bamname =~ /\/(\S+)$/) { $bamname = $1; }
-    my $sth = ExecSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE bamname='$bamname'");
-    if (! $sth) { exit 1; }
-    my $href = $sth->fetchrow_hashref;
-    if (defined($href->{bamid})) { print $href->{bamid} . "\n"; }
-}
-
-#==================================================================
-# Subroutine:
 #   WhatNWDID($nwdid)
 #
 #   Print interesting details about an NWDID
@@ -352,6 +336,35 @@ sub WhatNWDID {
     $href = $sth->fetchrow_hashref;
     my $center = uc($href->{centername});
     print "$nwdid $bamid can be found in run $run PI $piname for center $center year $datayear\n";
+}
+
+#==================================================================
+# Subroutine:
+#   WhatRun($bamid)
+#
+#   Print interesting details about an NWDID
+#==================================================================
+sub WhatRun {
+    my ($bamid) = @_;
+    my $sth;
+
+    if ($bamid =~ /^NWD\d+/) {              # If NWDID, get bamid
+        $sth = ExecSQL("SELECT runid FROM $opts{bamfiles_table} WHERE expt_sampleid='$bamid'");
+    }
+    else {
+        $sth = ExecSQL("SELECT runid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
+    }
+    if (! $sth) { die "$Script - Unknown '$bamid'\n"; }
+    my $href = $sth->fetchrow_hashref;
+    $sth = ExecSQL("SELECT centerid,runid,dirname,bamcount,datayear FROM $opts{runs_table} WHERE runid=$href->{runid}");
+    $href = $sth->fetchrow_hashref;
+    my $runid = $href->{runid};
+    my $dirname = $href->{dirname};
+    my $bamcount = $href->{bamcount};
+    $sth = ExecSQL("SELECT centername FROM $opts{centers_table} WHERE centerid=$href->{centerid}");
+    $href = $sth->fetchrow_hashref;
+    my $center = uc($href->{centername});
+    print "$bamid in center $center from run $dirname $runid which has $bamcount samples\n";
 }
 
 #==================================================================
@@ -713,9 +726,9 @@ topmedcmd.pl - Update the database for NHLBI TopMed
  
   topmedcmd.pl send2ncbi files             # Send files to NCBI
  
-  topmedcmd.pl whatbamid bamname           # Show bamid for a sample name
- 
   topmedcmd.pl whatnwdid bamid|nwdid       # Show details for a sample
+ 
+  topmedcmd.pl whatrun bamid|nwdid         # Show details of the run for a sample
  
 =head1 DESCRIPTION
 
@@ -797,11 +810,11 @@ B<unmark bamid|nwdid [verb]>
 Use this to reset the state for a particular BAM file to the default
 database value.
 
-B<whatbamid bamname>
-Use this to show the bamid for a sample using the name of the BAM or CRAM.
-
 B<whatnwdid bamid|nwdid>
 Use this to get some details for a particular bam.
+
+B<whatrun bamid|nwdid>
+Use this to get some details of a run for a particular bam.
 
 
 =head1 EXIT
