@@ -60,34 +60,35 @@ function ProcessRuns {
       #  With luck we have determined if this year 2 or 3
       if [ "$year" = "0" ]; then
         echo "Cannot figure out the year for '$r'"
-        return 4
+        ls -l $r/Manifest.txt
+      else
+        date
+        echo "New run '$r' year $year for '$center' found"
+        if [ "$myhost" != "topmed" ]; then
+          su $topuser -c "ln -s ../../../../$myhost/incoming/topmed/$center/$r $newrun"
+          echo "Set symlink to $newrun"
+        fi
+        #     Sort out backup directory for run
+        if [ "$year" = "2" ]; then
+          backuphost=topmed7          # Year 2 we make a directory elsewhere for backups
+          su $topuser -c "mkdir -p /net/$backuphost/working/backups/incoming/topmed/$center/$r"
+          masterbackuprun="../../../../../../$backuphost/working/backups/incoming/topmed/$center/$r"
+        fi
+        if [ "$year" = "3" ]; then
+          backuphost=$myhost          # Year 3 uses the incoming directory for 'backup'
+          masterbackuprun="../../../../../../$backuphost/incoming/topmed/$center/$r $newbackuprun"
+        fi
+        newbackuprun=/net/topmed/working/backups/incoming/topmed/$center/$r
+        su $topuser -c "ln -s $masterbackuprun $newbackuprun"
+        echo "BACKUP Symlink set to host '$backuphost' for $newbackuprun ($masterbackuprun)"
+        n=`expr $n + 1`
+        #     Force ownership of run and files since we are root
+        chown -R $topuser $r
+        chgrp -R $topgrp $r
+        chmod 770 $r
+        chmod 660 $r/Manifest.txt $r/*.md5 $r/*.cram $r/*.crai $r/*.bam $r/*.bai 2> /dev/null
+        echo "Ownership and permissions set for $center/$r"
       fi
-      date
-      echo "New run '$r' year $year for '$center' found"
-      if [ "$myhost" != "topmed" ]; then
-        su $topuser -c "ln -s ../../../../$myhost/incoming/topmed/$center/$r $newrun"
-        echo "Set symlink to $newrun"
-      fi
-      #     Sort out backup directory for run
-      if [ "$year" = "2" ]; then
-        backuphost=topmed7          # Year 2 we make a directory elsewhere for backups
-        su $topuser -c "mkdir -p /net/$backuphost/working/backups/incoming/topmed/$center/$r"
-        masterbackuprun="../../../../../../$backuphost/working/backups/incoming/topmed/$center/$r"
-      fi
-      if [ "$year" = "3" ]; then
-        backuphost=$myhost          # Year 3 uses the incoming directory for 'backup'
-        masterbackuprun="../../../../../../$backuphost/incoming/topmed/$center/$r $newbackuprun"
-      fi
-      newbackuprun=/net/topmed/working/backups/incoming/topmed/$center/$r
-      su $topuser -c "ln -s $masterbackuprun $newbackuprun"
-      echo "BACKUP Symlink set to host '$backuphost' for $newbackuprun ($masterbackuprun)"
-      n=`expr $n + 1`
-      #     Force ownership of run and files since we are root
-      chown -R $topuser $r
-      chgrp -R $topgrp $r
-      chmod 770 $r
-      chmod 660 $r/Manifest.txt $r/*.md5 $r/*.cram $r/*.crai $r/*.bam $r/*.bai 2> /dev/null
-      echo "Ownership and permissions set for $center/$r"
     fi
   done
   return
