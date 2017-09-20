@@ -53,6 +53,9 @@ SetDB $bamid 'bamsize' $sz
 stime=`date +%s`
 echo "Calculate flagstat"
 bamflagstat=`CalcFlagstat $bamid $bamfile`
+if [ "$bamflagstat" -lt "250000000" ]; then
+  Fail "Flagstat $bamflagstat seems too small, try again cause samtools is a flake"
+fi
 SetDB $bamid bamflagstat $bamflagstat
 etime=`date +%s`
 etime=`expr $etime - $stime`
