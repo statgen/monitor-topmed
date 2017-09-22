@@ -67,7 +67,7 @@ our %opts = (
     summary_table => 'ncbi_summary',
     summarydir => 'ncbisummaries',
     topdir  => '/net/topmed/incoming/topmed',
-    studystatusurl => 'http://www.ncbi.nlm.nih.gov/projects/gap/cgi-bin/GetSampleStatus.cgi?study_id=phs000954.v1.p1&rettype=xml',
+    studystatusurl => 'http://www.ncbi.nlm.nih.gov/projects/gap/cgi-bin/GetSampleStatus.cgi?study_id=phs000954&rettype=xml',
     xmlfilesdir => '/net/topmed/working/topmed-output/XMLfiles',
     ascpfiles => '/net/topmed/incoming/study.reference/send2ncbi/topmed-2-ncbi.pri ' .
         '-Q -l 200m -k 1 $ascphost:outgoing/Files',
