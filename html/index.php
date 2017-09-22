@@ -24,8 +24,7 @@ $qurl =  $_SERVER['SCRIPT_NAME'] . "?fcn=queue'";
 $STATUSLETTERS =  "<br/> " .
     "<i><b>A</b>=File Arrived, <b>5</b>=MD5 Verified, <b>B</b>=Remote Backup of CRAM, <b>C</b>=BAM=>CRAM, <b>Q</b>=qplot run,<br/>" .
     "<b>7</b>=Remapped Build=37,<br/>" .
-    "<b>s</b>=Push Build=38 to GCE, <b>r</b>=Pull Build=38 from GCE, <b>8</b>=Remapped Build=38,<br/>" .
-    "<b>x</b>=Push BCF 38 to GCE, <b>y</b>=Pull BCF 38 from GCE, <b>V</b>=Completed BCF/VT 38,<br/>" .
+    "<b>s</b>=Push Build=38 to GCE, <b>r</b>=Pull Build=38 from GCE, <b>8</b>=Remapped Build=38,<br/>V</b>=Completed BCF/VT 38,<br/>" .
     "<b>X</b>=EXPT=>NCBI <b>S</b>=Orig BAM/CRAM=>NCBI, <b>P</b>=</b>B37=>NCBI<br/>" .
     "<b>F</b>=FIX";
 
@@ -93,8 +92,6 @@ $quickcols = array(                     // Map of status column to topmedcmd ver
     'state_gce38push'=> 'gcepush',
     'state_gce38pull'=> 'gcepull',
     'state_b38'      => 'mapping38',
-    'state_gce38bcf_push'=> 'bcf',
-    'state_gce38bcf_pull'=> 'bcf',
     'state_gce38bcf' => 'bcf',
     'state_gce38copy'=> 'gcecopy',
     'state_ncbiexpt' => 'sendexpt',
@@ -112,8 +109,6 @@ $quickletter = array(                   // Map of status column to letter we see
     'state_gce38push'=> 's',
     'state_gce38pull'=> 'r',
     'state_b38'      => '8',
-    'state_gce38bcf_push'=> 'x',
-    'state_gce38bcf_pull'=> 'y',
     'state_gce38bcf' => 'V',
     'state_gce38copy'=> 'U',
     'state_ncbiexpt' => 'X',
@@ -221,17 +216,17 @@ if ($fcn == 'queue') {
 if ($fcn == 'runs') {
     print $infotext;
     print ViewRuns($center, $maxdir, $iammgr);        
+    print "<br/><br/><center>" . GetChooseLines() . "<br/>$SHOWSTATUS</center>\n";
     print dofooter($HDR['footer']);
     exit;
 }
 if ($fcn == 'rundetail') {
-    print $infotext;
     print ViewRunDetail($runid);
+    print "<br/><br/><center>" . GetChooseLines() . "<br/>$SHOWSTATUS</center>\n";
     print dofooter($HDR['footer']);
     exit;
 }
 if ($fcn == 'bams') {
-    print $infotext;
     print ViewBams($runid, $maxdir, $iammgr);
     print "<br/><br/><center>" . GetChooseLines() . "<br/>$SHOWSTATUS</center>\n";
     print dofooter($HDR['footer']);
@@ -390,7 +385,6 @@ function ViewRuns($center, $maxdirs, $iammgr) {
     //  Get list of centers doing:  select distinct(project) from status;
     $html = "<h3 align='center'>Summary of Runs</h3>\n" .
         "<center>" . GetChooseLines() . "<br/>$SHOWSTATUS</center>\n";
-
     $centers2show = array();                // Get list of centers for this query
     $yearstart = 3;
     $yearstop = 0;
@@ -864,16 +858,7 @@ function HandleRestartJobs($dirname, $samplestate, $op) {
     }
 
     $sql = "UPDATE " . $LDB['bamfiles'] . " SET ";
-    if ($op == 'bcf') {         # Special case to reset ALL states for an action
-        $sql .= "state_gce38bcf_push=0,state_gce38bcf_pull=0,state_gce38bcf=0,state_bcf=0 " .
-            "WHERE runid=$runid AND state_bcf=$samplestate OR " .
-            "state_gce38bcf_push=$samplestate OR " .
-            "state_gce38bcf_pull=$samplestate OR " .
-            "state_gce38bcf=$samplestate";
-    }
-    else {
-        $sql .= "state_$op=0  WHERE runid=$runid AND state_$op=$samplestate";
-    }
+    $sql .= "state_$op=0  WHERE runid=$runid AND state_$op=$samplestate";
     $html = "<h3>Changing State for Samples in '$dirname'</h3>\n" .
         "SQL=$sql<br>\n";
     $result = SQL_Query($sql);

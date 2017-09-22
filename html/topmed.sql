@@ -118,7 +118,6 @@ CREATE TABLE bamfiles (
   build        VARCHAR(4) DEFAULT '37', /* Build original input file user, 37, 38 etc */
   dateinit     VARCHAR(12),             /* Referenced in nhlbi_qc_metrics */
   bamname_orig VARCHAR(96) NOT NULL,
-  gce38bcf_opid   VARCHAR(255),         /* Google pipeline id */
   offsite      CHAR(1) DEFAULT 'N',     /* Original files kept offsite (N,Y,D) */
 
 /* Fields to track state for each step */
@@ -145,8 +144,6 @@ my $FAILED    = 99;           # Task failed
   state_gce38pull  INT DEFAULT 0,
   state_b38      INT DEFAULT 0,     /* Referenced in nhlbi_qc_metrics */
 
-  state_gce38bcf_push   INT DEFAULT 0,   /* Put CRAM into BCF bucket */
-  state_gce38bcf_pull   INT DEFAULT 0,   /* Pull BCF data to local store */
   state_gce38bcf  INT DEFAULT 0,    /* Created BCF data */
 
   state_gce38copy INT DEFAULT 0,    /* Copy local data to BCF buckets */
@@ -166,6 +163,9 @@ my $FAILED    = 99;           # Task failed
   state_gceb38ackup INT DEFAULT 0,
      Remove this from runs
   offsite      CHAR(1) DEFAULT 'N',
+  gce38bcf_opid   VARCHAR(255),         // Google pipeline id
+  state_gce38bcf_push   INT DEFAULT 0,   // Put CRAM into BCF bucket
+  state_gce38bcf_pull   INT DEFAULT 0,   // Pull BCF data to local store
 */
 
 

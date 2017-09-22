@@ -93,7 +93,7 @@ Getopt::Long::GetOptions( \%opts,qw(
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$Script [options] arrive|verify|qplot|cram|push|pull|post|pushbcf|pullbcf|gcecopy|fix\n" .
+    warn "$Script [options] arrive|verify|qplot|cram|backup|qplot|push|pull|bcf|gcecopy|fix\n" .
         "Find runs which need some action and queue a request to do it.\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
@@ -332,56 +332,6 @@ if ($fcn eq 'post') {
         if ($href->{state_gce38post} != $NOTSET &&
             $href->{state_gce38post} != $REQUESTED) { next; }
         if (! BatchSubmit("$opts{topmedgce38post} -submit $href->{bamid}")) { last; }
-    }
-    ShowSummary($fcn);
-    exit;
-}
-
-#--------------------------------------------------------------
-#   Push BCF data to Google Cloud for processing.  Maybe never used?
-#--------------------------------------------------------------
-if ($fcn eq 'pushbcf') {
-    #   Get list of all samples yet to process
-    my $sql = BuildSQL("SELECT bamid,state_cram,state_gce38bcf_push FROM $opts{bamfiles_table}",
-        "WHERE state_gce38bcf_push!=$COMPLETED");
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { exit; }
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        #   Only send data if cram was done
-        if ($href->{state_cram} != $COMPLETED) { next; }
-        if ($opts{suberr} && $href->{state_gce38push} >= $FAILED) {
-            $href->{state_gce38bcf_push} = $REQUESTED;
-        }
-        if ($href->{state_gce38bcf_push} != $NOTSET &&
-            $href->{state_gce38bcf_push} != $REQUESTED) { next; }
-        if (! BatchSubmit("$opts{topmedgce38bcfpush} -submit $href->{bamid} b38")) { last ; }
-    }
-    ShowSummary($fcn);
-    exit;
-}
-
-#--------------------------------------------------------------
-#   Pull BCF processed data from Google Cloud
-#--------------------------------------------------------------
-if ($fcn eq 'pullbcf') {
-    #   Get list of all samples yet to process
-    my $sql = BuildSQL("SELECT bamid,state_gce38bcf_push,state_gce38bcf_pull FROM $opts{bamfiles_table}",
-        "WHERE state_gce38bcf_pull!=$COMPLETED");
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { exit; }
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        #   Only get data if bcf was done and requested
-        if ($href->{state_gce38bcf_push} != $COMPLETED) { next; }
-        if ($href->{state_gce38bcf_pull} != $COMPLETED) { next; }
-        if ($opts{suberr} && $href->{state_gce38bcf_pull} >= $FAILED) {
-            $href->{state_gce38bcf_pull} = $REQUESTED;
-        }
-        if ($href->{state_gce38pull} != $REQUESTED) { next; }
-        if (! BatchSubmit("$opts{state_gce38bcf_pull} -submit $href->{bamid} b38")) { last; }
     }
     ShowSummary($fcn);
     exit;
@@ -775,9 +725,9 @@ In practice this is only useful for B<push>, B<pull>, B<post>, B<pushbcf> and B<
 
 Specifies the database realm to read data from. This defaults to B<topmed>;
 
-=item B<-runs NAME[,NAME,...]>
+=item B<-runs NAME>
 
-Specifies a specific set of runs on which to run the action,
+Specifies a run on which to run the action,
 e.g. B<2015jun05.weiss.02,2015jun05.weiss.03>.
 This is useful for testing.
 The default is to run against all runs for the center.
@@ -801,7 +751,8 @@ Provided for developers to see additional information.
 
 =over 4
 
-=item B<arrive | verify | qplot | cram | push | pull | post | pushbcf | pullbcf | gcecopy>
+=item B<arrive | verify | qplot | cram | backup | qplot | push | pull | bcf | gcecopy | fix\n" .
+y>
 
 Directs this program to look for runs that have not been through the process name
 you provided and to queue a request they be verified.

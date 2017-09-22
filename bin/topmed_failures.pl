@@ -56,8 +56,6 @@ my @statecols =                         #   States to be checked
     state_qplot
     state_gce38push
     state_gce38pull
-    state_gce38bcf_push
-    state_gce38bcf_pull
     state_gce38bcf
     state_gce38copy
 /;
