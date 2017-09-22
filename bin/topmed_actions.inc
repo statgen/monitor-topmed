@@ -64,7 +64,12 @@ function Log {
 #------------------------------------------------------------------
 function Fail {
   local msg="$1"
-  $topmedcmd -persist -emsg "$msg" mark $bamid $markverb failed
+  if [ "$markverb" != "" ]; then
+    $topmedcmd -persist -emsg "$msg" mark $bamid $markverb failed
+  else
+    echo $msg
+    echo "Task for $bamid FAILED, no markverb set"
+  fi
   exit 1
 }
 
@@ -74,7 +79,9 @@ function Fail {
 #   Uses global variables: $bamid $markverb
 #------------------------------------------------------------------
 function Started {
-  $topmedcmd -persist mark $bamid $markverb started
+  if [ "$markverb" != "" ]; then
+    $topmedcmd -persist mark $bamid $markverb started
+  fi
   d=`date +%Y/%m/%d`
   s=`hostname`
   echo "#==Started== '$d' host=$s $SLURM_JOB_ID $0 bamid=$bamid ========="
@@ -86,7 +93,11 @@ function Started {
 #   Uses global variables: $bamid $markverb
 #------------------------------------------------------------------
 function Successful {
-  $topmedcmd -persist -emsg "" mark $bamid $markverb completed
+  if [ "$markverb" != "" ]; then
+    $topmedcmd -persist -emsg "" mark $bamid $markverb completed
+  else
+    echo "Task for $bamid successful, no markverb set"
+  fi
 }
 
 #------------------------------------------------------------------
@@ -163,6 +174,18 @@ function RandomRealHost {
     fi
     realhost=$h
 }
+
+#------------------------------------------------------------------
+# Subroutine:
+#   CheckRGMap(bamid)     rc=0 if rgmap not needed, rc=1 if needed
+#------------------------------------------------------------------
+function CheckRGMap {
+  local bamid=$1
+  
+  /usr/cluster/topmed/bin/topmedrgmap.pl -check $bamid /dev/null
+  return $?
+}
+
 
 #------------------------------------------------------------------
 # Subroutine:
