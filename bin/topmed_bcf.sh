@@ -57,6 +57,19 @@ if [ "$?" != "0" ]; then
   Fail "Unable to CD to directory for remapped CRAM file '$bamid'"
 fi
 
+######### Temporary - sometimes remapping screwed up header, rebuild if needed
+CheckRGMap $bamid
+if [ "$?" != "0" ]; then
+  echo "#======================================================================"
+  echo "#    RGMAP for cramfile is broken, rebuild"
+  echo "#======================================================================"
+  /usr/cluster/topmed/topmed_rgmap.sh $bamid $markverb
+  if [ "$?" != "0" ]; then
+    Fail "RGMAP correction failed"
+  fi
+fi
+######### Remove this when we believe remapping is correct (2018)
+
 cramfile=`$topmedpath wherefile $bamid b$build`
 if [ ! -f $cramfile ]; then
   Fail "Unable to find remapped cram file '$cramfile'"
@@ -94,9 +107,6 @@ fi
 etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "Created BCF file for remapped CRAM ($crampath) completed in $etime seconds"
-SetDB $bamid 'state_gce38bcf_push' 20
-SetDB $bamid 'state_gce38bcf_pull' 20
-#markverb=$me
 SetDB $bamid 'state_gce38bcf' 20
 
 Successful
