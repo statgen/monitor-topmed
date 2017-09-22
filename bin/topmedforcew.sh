@@ -101,11 +101,11 @@ wait=$((1 + RANDOM % 20))
 sleep $wait                 # Wait a little bit to avoid messing up logs
 
 #   Capture output in local file and if there is something append to useful log
-locallog=/tmp/topmedforcew.log
+locallog=/tmp/topmedforcew.log.$$
 ProcessRuns baylor > $locallog
 ProcessRuns washu  >> $locallog
 if [ ! -z $locallog ]; then
   su $topuser -c "(cat $locallog >> /net/topmed/working/topmed-output/topmed_init.log)"
 fi
-rm -f $locallog
+#rm -f $locallog
 exit
