@@ -57,19 +57,6 @@ if [ "$?" != "0" ]; then
   Fail "Unable to CD to directory for remapped CRAM file '$bamid'"
 fi
 
-######### Temporary - sometimes remapping screwed up header, rebuild if needed
-CheckRGMap $bamid
-if [ "$?" != "0" ]; then
-  echo "#======================================================================"
-  echo "#    RGMAP for cramfile is broken, rebuild"
-  echo "#======================================================================"
-  /usr/cluster/topmed/topmed_rgmap.sh $bamid $markverb
-  if [ "$?" != "0" ]; then
-    Fail "RGMAP correction failed"
-  fi
-fi
-######### Remove this when we believe remapping is correct (2018)
-
 cramfile=`$topmedpath wherefile $bamid b$build`
 if [ ! -f $cramfile ]; then
   Fail "Unable to find remapped cram file '$cramfile'"
