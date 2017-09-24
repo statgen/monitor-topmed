@@ -33,12 +33,9 @@ b=`basename $recab`
 newrecab=$tmpdir/$b
 nwdid=`GetDB $bamid expt_sampleid`
 
-#   Build correct rg mapping file
+#   Build correct rg mapping file. No check of return code as we already know it
 rgmap=$tmpdir/$nwdid.rgmap
 /usr/cluster/topmed/bin/topmedrgmap.pl $bamid $rgmap
-if [ "$?" != "0" ]; then
-  Fail "Unable to create $rgmap"
-fi
 
 if [ ! -f $newrecab ]; then
   stime=`date +%s`
