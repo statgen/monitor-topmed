@@ -159,20 +159,21 @@ function MyRealHost {
 #------------------------------------------------------------------
 function RandomRealHost {
   local bamid=$1
+
   realhost=''
-    # All hosts are equal, so try to spread it around
-    n=`perl -e "{ print $bamid%10 }"`
-    h="topmed$n"
-    if [ "$h" = "topmed0" ]; then
-      h=topmed10
-    fi
-    if [ "$h" = "topmed8" ]; then     # May not use this
-      h=topmed5
-    fi
-    if [ "$h" = "topmed1" ]; then
-      h=topmed
-    fi
-    realhost=$h
+  # All hosts are equal, so try to spread it around
+  n=`perl -e "{ print $bamid%10 }"`
+  h="topmed$n"
+  if [ "$h" = "topmed0" ]; then
+    h=topmed10
+  fi
+  if [ "$h" = "topmed8" ]; then     # May not use this
+    h=topmed5
+  fi
+  if [ "$h" = "topmed1" ]; then
+    h=topmed
+  fi
+  realhost=$h
 }
 
 #------------------------------------------------------------------
