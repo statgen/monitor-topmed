@@ -91,7 +91,7 @@ while(<$in>) {
     
     my ($smtag,$smid) = split(/:/,$sm);
     if ( $smid ne $nwdid ) {
-        die "$Script - ERROR: Sample ID does not match for $nwdid -- $smid observed\n";
+        die "$Script - ERROR: Sample ID does not match for $nwdid -- $smid observed. This sample must be remapped.\n";
     }
     my $found = 0;
     $id =~ s/^ID://;
