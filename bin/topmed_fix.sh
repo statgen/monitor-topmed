@@ -14,6 +14,12 @@ if [ "$1" = "-submit" ]; then
   #MayIRun $me  $bamid
   #h=(`$topmedpath wherepath $bamid b38 | sed -e 's:/: :g'`)
   #realhost=${h[1]}
+  CheckRGMap $bamid
+  if [ "$?" = "0" ]; then
+    SetDB $bamid state_fix 20           # Mark sample as fixed so no rgmap needed
+    echo "No need to submit job for $1"
+    exit
+  fi
   #SubmitJob $bamid "$realhost-fix" '8G' "$0 $*"
   RandomRealHost $bamid
   SubmitJob $bamid "topmed-fix" '8G' "$0 $*"
