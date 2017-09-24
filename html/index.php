@@ -23,8 +23,9 @@ include_once "edit.php";
 $qurl =  $_SERVER['SCRIPT_NAME'] . "?fcn=queue'";
 $STATUSLETTERS =  "<br/> " .
     "<i><b>A</b>=File Arrived, <b>5</b>=MD5 Verified, <b>B</b>=Remote Backup of CRAM, <b>C</b>=BAM=>CRAM, <b>Q</b>=qplot run,<br/>" .
-    "<b>7</b>=Remapped Build=37,<br/>" .
-    "<b>s</b>=Push Build=38 to GCE, <b>r</b>=Pull Build=38 from GCE, <b>8</b>=Remapped Build=38,<br/>V</b>=Completed BCF/VT 38,<br/>" .
+    "<b>7</b>=Remapped Build=37, " .
+    "<b>s</b>=Push Build=38 to GCE, <b>r</b>=Pull Build=38 from GCE, <b>8</b>=Remapped Build=38," .
+    "<br/><b>V</b>=Completed BCF/VT 38,<b>G</b></b>=Upload ddata to GCE,<br/>" .
     "<b>X</b>=EXPT=>NCBI <b>S</b>=Orig BAM/CRAM=>NCBI, <b>P</b>=</b>B37=>NCBI<br/>" .
     "<b>F</b>=FIX";
 
@@ -110,7 +111,7 @@ $quickletter = array(                   // Map of status column to letter we see
     'state_gce38pull'=> 'r',
     'state_b38'      => '8',
     'state_gce38bcf' => 'V',
-    'state_gce38copy'=> 'U',
+    'state_gce38copy'=> 'G',
     'state_ncbiexpt' => 'X',
     'state_ncbiorig' => 'S',
     'state_ncbib37'  => 'P',
@@ -923,7 +924,7 @@ function GetCenters() {
 ---------------------------------------------------------------*/
 function QuickStatus($r, $url) {
     global $quickcols, $quickletter;
-    $separator_actions = array('Q','7','8','V', 'U', 'P');
+    $separator_actions = array('Q','7','8','V', 'G', 'P');
     //  Add a small separator to 'group' certain actions
     $h = '';
     $col = '';
@@ -963,7 +964,7 @@ function DateState($t) {
 ---------------------------------------------------------------*/
 function CalcRunStatus($str) {
     global $quickletter;
-    $separator_actions = array('Q','7','8','V', 'U', 'P');
+    $separator_actions = array('Q','7','8','V', 'G', 'P');
     //return $str;          // To see original state
     $h = '';
     $cols = array_values($quickletter);

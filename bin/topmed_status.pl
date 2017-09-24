@@ -37,7 +37,7 @@ use Getopt::Long;
 my %attributes2letter = (
     'state_arrive'    => 'A',
     'state_verify'    => '5',
-    'state_gcebackup'    => 'B',
+    'state_gcebackup' => 'B',
     'state_qplot'     => 'Q',
     'state_cram'      => 'C',
     'state_b37'       => '7',
@@ -45,7 +45,7 @@ my %attributes2letter = (
     'state_gce38pull' => 'r',
     'state_b38'       => '8',
     'state_gce38bcf'  => 'V',
-    'state_gce38copy' => 'U',
+    'state_gce38copy' => 'G',
     'state_ncbiexpt'  => 'X',
     'state_ncbiorig'  => 'S',
     'state_ncbib37'   => 'P',
