@@ -155,7 +155,7 @@ function MyRealHost {
 #------------------------------------------------------------------
 # Subroutine:
 #   RandomRealHost(bamid)   Set host based on bamid
-#   Sets $realhost
+#   Sets $realhost which may be used in the qos
 #------------------------------------------------------------------
 function RandomRealHost {
   local bamid=$1
@@ -167,7 +167,7 @@ function RandomRealHost {
   if [ "$h" = "topmed0" ]; then
     h=topmed10
   fi
-  if [ "$h" = "topmed8" ]; then     # May not use this
+  if [ "$h" = "topmed8" ]; then     # May not use this host
     h=topmed5
   fi
   if [ "$h" = "topmed1" ]; then
