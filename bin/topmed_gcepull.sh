@@ -148,6 +148,8 @@ fi
 ######### Remove this when we believe remapping is correct (2018)
 
 SetDB $bamid state_b${build} 20     # Mark b38 as done
+SetDB $bamid state_gce38bcf 1       # We need more reprocessing
+SetDB $bamid state_gce38copy 0
 Successful
 Log $etime
 exit
