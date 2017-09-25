@@ -20,9 +20,13 @@ if [ "$1" = "-submit" ]; then
     echo "No need to submit job for $1"
     exit
   fi
-  #SubmitJob $bamid "$realhost-fix" '8G' "$0 $*"
   RandomRealHost $bamid
-  SubmitJob $bamid "topmed-fix" '8G' "$0 $*"
+  qoshost=$realhost
+  if [ "$r" = "topmed" ]; then
+    qoshost=topmed1
+  fi
+  echo "Submitting $bamid to run on $realhost"
+  SubmitJob $bamid "$qoshost-fix" '8G' "$0 $*"
   exit
 fi
 
