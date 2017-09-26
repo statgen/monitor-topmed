@@ -22,7 +22,7 @@ if [ "$1" = "-submit" ]; then
   fi
   RandomRealHost $bamid
   qoshost=$realhost
-  if [ "$r" = "topmed" ]; then
+  if [ "$qoshost" = "topmed" ]; then
     qoshost=topmed1
   fi
   echo "Submitting $bamid to run on $realhost"
