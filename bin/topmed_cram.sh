@@ -147,9 +147,7 @@ chkname=`basename $bamfile .bam`
 
 #   Get flagstat for original input file
 now=`date +%s`
-bamflagstat = `CalcFlagstat $bamid $bamfile`
-echo $bamflagstat > /tmp/${chkname}.init.stat
-s=`date +%s`; s=`expr $s - $now`; echo "$flagstat completed in $s seconds"
+bamflagstat=`GetDB $bamid bamflagstat`
 
 #   Illumina cram files require a different fasta
 center=`GetDB $bamid center`
@@ -158,7 +156,6 @@ if [ "$center" = "illumina" ]; then
   echo "BAM to CRAM for '$center' requires a different fasta file '$ref'"
 fi
 
-now=`date +%s`
 #   Create the CRAM file
 #   Run 'bam squeeze' on .bam file with result written as .cram
 #   Checking with 'samtools flagstat' is quick, zero means success.
@@ -166,6 +163,7 @@ now=`date +%s`
 #   an explicit genome reference sequence, but 'samtools view' 
 #   does.  (And, 'samtools flagstat' does accept .sam input.)
 echo "Creating cram from $bamfile"
+now=`date +%s`
 newname=`$topmedpath wherefile $bamid cram`
 newname=`basename $newname`
 if [ "$squeezed" = "n" ]; then
@@ -179,38 +177,29 @@ fi
 s=`date +%s`; s=`expr $s - $now`; echo "Cram created in $s seconds"
 
 #   Create the index file as necessary
-build=`GetDB $bamid build`
 now=`date +%s`
 CreateIndex $bamid $newname
-
 s=`date +%s`; s=`expr $s - $now`; echo "CRAM index created in $s seconds"
 
 #   Get flagstat for this cram
 now=`date +%s`
-
 cramflagstat=`CalcFlagstat $bamid $newname`
-echo $cramflagstat > /tmp/${chkname}.cram.stat
 s=`date +%s`; s=`expr $s - $now`; echo "$flagstat for CRAM completed in $s seconds"
 
 #   Did flagstat output for cram match that for the input bam?
-diff=`diff  /tmp/${chkname}.init.stat  /tmp/${chkname}.cram.stat | wc -l`
-if [ "$diff" != "0" ]; then
-  diff  /tmp/${chkname}.init.stat  /tmp/${chkname}.cram.stat
-  Fail "Flagstat for backup CRAM file differs from that for original BAM"
+if [ "$bamflagstat" != "$cramflagstat" ]; then
+  Fail "Flagstat for CRAM ($cramflagstat) differs from BAM ($bamflagstat)"
 fi
 echo "Flagstat for CRAM file matches that of original"
 SetDB $bamid cramflagstat $cramflagstat
-rm -f /tmp/${chkname}.init.stat  /tmp/${chkname}.cram.stat
 
 #   Calculate the MD5 for the cram
 echo "Calculate MD5 for cram"
 now=`date +%s`
 cramchecksum=`CalcMD5 $bamid $newname`
-SetDB $bamid cramchecksum $md5
-s=`date +%s`; s=`expr $s - $now`
-echo "MD5 calculated in $s seconds"
+SetDB $bamid cramchecksum $cramchecksum
+s=`date +%s`; s=`expr $s - $now`; echo "MD5 calculated in $s seconds"
 
-here=`pwd`
 etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "CRAM $here/$newname created in $etime seconds"
