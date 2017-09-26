@@ -103,7 +103,7 @@ sub SQueue {
             push @{$queued{$c[1]}{data}},$l;
             $queued{$c[1]}{count}++;
             $qos{$c[2]}{queued}++;
-            if ($l =~ /held state/) { $qos{$c[2]}{held}++; }
+            if ($l =~ /held state/ || $l =~ /JobHeldUser/) { $qos{$c[2]}{held}++; }
             next;
         }
         if ($c[5] eq 'R') {         # Running
