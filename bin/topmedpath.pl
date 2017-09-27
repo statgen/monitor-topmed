@@ -30,7 +30,6 @@ use lib (
 );
 use feature qw(say);
 
-use TopMed_Get;
 use My_DB;
 use Getopt::Long;
 use Cwd qw(realpath abs_path);

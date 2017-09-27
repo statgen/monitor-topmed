@@ -2,7 +2,6 @@ package TopMed_Get;
 #==================================================================
 # TopMed_Get.pm
 #   Common functions for the various Topmed Perl programs
-#   This should live in the same directory as the pgm being called
 #==================================================================
 use strict;
 use warnings;
@@ -11,8 +10,8 @@ use vars qw(@EXPORT_OK @EXPORT @ISA);
 use Exporter;
 
 @ISA = qw(Exporter);
-@EXPORT_OK = qw(GetCenters GetRuns GetRunsCount GetDirs GetFiles);
-@EXPORT    = qw(GetCenters GetRuns GetRunsCount GetDirs GetFiles);
+@EXPORT_OK = qw(GetCenters GetRuns);
+@EXPORT    = qw(GetCenters GetRuns);
 
 #==================================================================
 # Subroutine:
@@ -88,83 +87,6 @@ sub GetRuns {
     return \%run2dir;
 }
 
-#==================================================================
-# Subroutine:
-#   GetRunsCount - Get list of runs for a center and the BAM count
-#
-# Arguments:
-#   cid = center id
-#
-# Returns:
-#   Reference to hash of run ids to run dirnames
-#==================================================================
-sub GetRunsCount {
-    my ($cid) = @_;
-    my %runs2count = ();
-
-    my $sql = "SELECT runid,dirname,bamcount FROM $main::opts{runs_table} WHERE centerid=$cid";
-    my $sth = My_DB::DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) {
-        if ($main::opts{verbose}) { warn "$main::Script Found no runs for center '$cid'\n"; }
-        return \%runs2count;
-    }
-    my %theseruns = ();
-    if ($main::opts{runs}) {              # We only want some runs
-        $main::opts{runs} =~ s/,/ /g;
-        foreach my $r (split(' ', $main::opts{runs})) {
-            $theseruns{$r} = 1;
-            print "$main::Script - Using only run '$r'\n";
-        }
-    }
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        if ($main::opts{runs} && (! exists($theseruns{$href->{dirname}}))) { next; }
-        $runs2count{$href->{runid}} = $href->{bamcount};
-    }
-    return \%runs2count;
-}
-
-#==================================================================
-# Subroutine:
-#   GetDirs - Get list of non-dotted directories
-#
-# Arguments:
-#   dirname
-#
-# Returns:
-#   Reference to array of dir names
-#==================================================================
-sub GetDirs {
-    my ($d) = @_;
-
-    opendir(DIR, $d) ||
-        die "Unable to read directory '$d': $!";
-    my @dirlist = grep { (/^\w/ && -d "$d/$_") } readdir(DIR);
-    closedir DIR;
-    return \@dirlist;
-}
-
-#==================================================================
-# Subroutine:
-#   GetFiles - Get list of files (non-dotted)
-#
-# Arguments:
-#   dirname
-#
-# Returns:
-#   Reference to array of file names
-#==================================================================
-sub GetFiles {
-    my ($d) = @_;
-
-    opendir(DIR, $d) ||
-        die "Unable to read directory '$d': $!";
-    my @filelist = grep { (/^\w/ && -f "$d/$_") } readdir(DIR);
-    closedir DIR;
-    return \@filelist;
-}
-
 1;
 
 #==================================================================
@@ -195,14 +117,6 @@ Returns a reference to an array of the TopMed Centers.
 =item B<GetRuns($cid)>
 
 Returns a reference to an array of run directories for a particular center-id.
-
-=item B<GetDirs($dir)>
-
-Returns a reference to an array of directories in the directory '$dir'.
-
-=item B<GetFiles($dir)>
-
-Returns a reference to an array of non-dotted files in the directory '$dir'.
 
 =back
 

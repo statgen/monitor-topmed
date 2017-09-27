@@ -351,6 +351,26 @@ sub NormalizeMD5Line {
 }
 
 #==================================================================
+# Subroutine:
+#   GetDirs - Get list of non-dotted directories
+#
+# Arguments:
+#   dirname
+#
+# Returns:
+#   Reference to array of dir names
+#==================================================================
+sub GetDirs {
+    my ($d) = @_;
+
+    opendir(DIR, $d) ||
+        die "Unable to read directory '$d': $!";
+    my @dirlist = grep { (/^\w/ && -d "$d/$_") } readdir(DIR);
+    closedir DIR;
+    return \@dirlist;
+}
+
+#==================================================================
 #   Perldoc Documentation
 #==================================================================
 __END__

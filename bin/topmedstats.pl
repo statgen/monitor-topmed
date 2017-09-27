@@ -26,7 +26,6 @@ use lib (
   qq(/usr/cluster/topmed/lib/perl5),
   qq(/usr/cluster/topmed/local/lib/perl5),
 );
-use TopMed_Get;
 use My_DB;
 use Getopt::Long;
 use Date::Parse;

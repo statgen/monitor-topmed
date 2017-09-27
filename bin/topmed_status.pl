@@ -166,6 +166,45 @@ if ($fcn eq 'runstatus') {
 die "Invalid request '$fcn'. Try '$Script --help'\n";
 
 #==================================================================
+# Subroutine:
+#   GetRunsCount - Get list of runs for a center and the BAM count
+#
+# Arguments:
+#   cid = center id
+#
+# Returns:
+#   Reference to hash of run ids to run dirnames
+#==================================================================
+sub GetRunsCount {
+    my ($cid) = @_;
+    my %runs2count = ();
+
+    my $sql = "SELECT runid,dirname,bamcount FROM $main::opts{runs_table} WHERE centerid=$cid";
+    my $sth = My_DB::DoSQL($sql);
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) {
+        if ($main::opts{verbose}) { warn "$main::Script Found no runs for center '$cid'\n"; }
+        return \%runs2count;
+    }
+    my %theseruns = ();
+    if ($main::opts{runs}) {              # We only want some runs
+        $main::opts{runs} =~ s/,/ /g;
+        foreach my $r (split(' ', $main::opts{runs})) {
+            $theseruns{$r} = 1;
+            print "$main::Script - Using only run '$r'\n";
+        }
+    }
+    for (my $i=1; $i<=$rowsofdata; $i++) {
+        my $href = $sth->fetchrow_hashref;
+        if ($main::opts{runs} && (! exists($theseruns{$href->{dirname}}))) { next; }
+        $runs2count{$href->{runid}} = $href->{bamcount};
+    }
+    return \%runs2count;
+}
+
+1;
+
+#==================================================================
 #   Perldoc Documentation
 #==================================================================
 __END__
