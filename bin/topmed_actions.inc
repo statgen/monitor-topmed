@@ -206,26 +206,23 @@ function CreateIndex {
   #  To verify an index, we search for a string - depending on the extension
   ext="${file##*.}"
   buildstr='notset'
+  indexfile='notset'
   if [ "$ext" = "bam" ]; then
+    indexfile=$file.bai
     buildstr="3:148,100,000-148,110,000"
   fi
   if [ "$ext" = "cram" ]; then
-    buildstr="chr3:148,100,000-148,110,000"
+    indexfile=$file.crai
+    build=`GetDB $bamid build`
+    if [ "$build" = "37" ]; then
+      buildstr="hs37d5:35,450,000-35,477,943"
+    fi
+    if [ "$build" = "38" ]; then
+      buildstr="chr19_KI270938v1_alt"
+    fi
   fi
   if [ "buildstr" = 'notset' ]; then
-    Fail "Unable to determine build for $file"
-  fi
-
-  extension="${file##*.}"
-  indexfile='notset'
-  if [ "$extension" = "bam" ]; then
-    indexfile=$file.bai
-  fi
-  if [ "$extension" = "cram" ]; then
-    indexfile=$file.crai
-  fi
-  if [ "$indexfile" = "notset" ]; then
-    Fail "Unknown extension '$extension' for $file"
+    Fail "Unable to determine string to search for in header for $file"
   fi
 
   #   If index file is zero length, recreate it
@@ -236,8 +233,8 @@ function CreateIndex {
   #   Index exists, let's see if it is any good
   if [ -f $indexfile ]; then
     n=`$samtools view $file $buildstr | wc -l`
-    if [ "$n" = "" -o "$n" -lt "1000" ]; then
-      echo "Index file '$indexfile' is invalid"
+    if [ "$n" = "" -o "$n" -lt "100" ]; then
+      echo "Index file '$indexfile' is invalid, force re-create"
       rm -f $indexfile                  # Remove bad index
       #   This might be a trashed reference index for samtools, if so remove it
       consfile="$console/$bamid-$me.out"
