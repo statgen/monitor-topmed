@@ -28,7 +28,6 @@ use lib (
 
 use Getopt::Long;
 use Cwd qw(realpath abs_path);
-use YAML;
 use POSIX qw(strftime);
 use My_DB;
 
@@ -108,13 +107,11 @@ if ($#ARGV < 0 || $opts{help}) {
         "  or\n" .
         "$m setdate bamid|nwdid colname file\n" .
         "  or\n" .
-        "$m show bamid|nwdid colname|run|center|yaml\n" .
+        "$m show bamid|nwdid colname|run|center\n" .
         "  or\n" .
         "$m list centers\n" .
         "$m list runs centername\n" .
         "$m [-with-id] list samples runname\n" .
-        "  or\n" .
-        "$m export\n" .
         "  or\n" .
         "$m send2ncbi files\n" .
         "  or\n" .
@@ -144,7 +141,6 @@ if ($fcn eq 'set')       { Set(@ARGV); exit; }
 if ($fcn eq 'setdate')   { SetDate(@ARGV); exit; }
 if ($fcn eq 'show')      { Show(@ARGV); exit; }
 if ($fcn eq 'list')      { List(@ARGV); exit; }
-if ($fcn eq 'export')    { Export(@ARGV); exit; }
 if ($fcn eq 'send2ncbi') { Send2NCBI(@ARGV); exit; }
 if ($fcn eq 'whatnwdid') { WhatNWDID(@ARGV); exit; }
 if ($fcn eq 'whatrun')   { WhatRun(@ARGV); exit; }
@@ -248,57 +244,6 @@ sub UnMark {
     my $col = $VALIDVERBS{$op};
     ExecSQL("UPDATE $opts{bamfiles_table} SET $col=$NOTSET WHERE bamid=$bamid");
     if ($opts{verbose}) { print "$Script  'unmark $bamid $op'  successful\n"; }
-}
-
-#==================================================================
-# Subroutine:
-#   Export()
-#
-#   Generate a CSV file of possibly interesting data to STDOUT
-#   This is incomplete and will need more attention, but works for Chris now
-#==================================================================
-sub Export {
-    #my ($center, $run) = @_;
-
-    #   Generate header for CSV file
-    my @cols = qw(cramname studyname piname expt_sampleid state_b37 state_b38 datayear
-        cramflagstat build checksum);
-    my $s = 'CENTER,DIRNAME,';
-    foreach (@cols) { $s .= uc($_) . ','; }
-    print $s . "FULLPATH\n";
-    
-    #   Get all the known centers in the database
-    my $centersref = GetCenters();
-    foreach my $cid (keys %{$centersref}) {
-        my $centername = $centersref->{$cid};
-        my $runsref = GetRuns($cid) || next;
-        #   For each run, see if there are bamfiles that arrived
-        foreach my $runid (keys %{$runsref}) {
-            my $dirname = $runsref->{$runid};
-            #   Get list of all bams that have not yet arrived properly
-            my $sql = "SELECT * FROM " .
-                $opts{bamfiles_table} . " WHERE runid='$runid'";
-            my $sth = ExecSQL($sql);
-            my $rowsofdata = $sth->rows();
-            if (! $rowsofdata) { next; }
-            for (my $i=1; $i<=$rowsofdata; $i++) {
-                my $href = $sth->fetchrow_hashref;
-                #   See if this has been verified
-                if ($href->{state_verify} != $COMPLETED) { next; }
-                #   Show data for this CRAM
-                my $f = "$opts{netdir}/$opts{backupsdir}/$centername/$dirname/" .
-                    $href->{cramname};
-                $s = "$centername,$dirname,";
-                foreach (@cols) {
-                    if (! defined($href->{$_})) { $s .= ','; }
-                    else { $s .= $href->{$_} . ','; }
-                 }
-                $s .= $f . ' ';
-                chop($s);
-                print $s . "\n";
-            }
-        }
-    }
 }
 
 #==================================================================
@@ -596,30 +541,6 @@ sub Show {
         return;
     }
 
-    #   Show everything in YAML format
-    if ($col eq 'yaml') {
-        $sth = ExecSQL("SELECT centerid,dirname FROM $opts{runs_table} WHERE runid=$runid");
-        $rowsofdata = $sth->rows();
-        if (! $rowsofdata) { die "$Script - RUNID '$runid' is unknown\n"; }
-        $href = $sth->fetchrow_hashref;
-        my $run = $href->{dirname};
-
-        $sth = ExecSQL("SELECT centername FROM $opts{centers_table} WHERE centerid=$href->{centerid}");
-        $rowsofdata = $sth->rows();
-        if (! $rowsofdata) { die "$Script - CENTERID '$href->centerid' is unknown\n"; }
-        $href = $sth->fetchrow_hashref;
-        my $center = $href->{centername};
-
-        $sth = ExecSQL("SELECT * FROM $opts{bamfiles_table} WHERE bamid=$bamid");
-        $rowsofdata = $sth->rows();
-        if (! $rowsofdata) { die "$Script - BAM '$bamid' or column '$col' is unknown\n"; }
-        $href = $sth->fetchrow_hashref;
-        $href->{run} = $run;
-        $href->{center} = $center;
-        print YAML::Dump($href);
-        return;
-    }
-
     #   Get value of column we asked for
     $sth = ExecSQL("SELECT $col FROM $opts{bamfiles_table} WHERE bamid=$bamid");
     $rowsofdata = $sth->rows();
@@ -713,7 +634,6 @@ topmedcmd.pl - Update the database for NHLBI TopMed
   topmedcmd.pl show 2199 center            # Show center 
   topmedcmd.pl show NWD00234 run           # Show run
   topmedcmd.pl show 2016apr20 offsite      # Show offsite for run
-  topmedcmd.pl show NWD00234 yaml          # Show everything known about a bamid
 
   topmedcmd.pl showrun 20150604            # Show all NWDID for run
   topmedcmd.pl -bamid showrun 20150604     # Show all NWDID and bamid for run
@@ -721,9 +641,7 @@ topmedcmd.pl - Update the database for NHLBI TopMed
   topmedcmd.pl list centers                # Show all known centers
   topmedcmd.pl list runs broad             # Show all runs for center broad
   topmedcmd.pl list samples 2015dec02      # Show all samples for a run
- 
-  topmedcmd.pl export                      # Dump the database in a form Chris wanted
- 
+  
   topmedcmd.pl send2ncbi files             # Send files to NCBI
  
   topmedcmd.pl whatnwdid bamid|nwdid       # Show details for a sample
@@ -780,9 +698,6 @@ Provided for developers to see additional information.
 Parameters to this program are grouped into several groups which are used
 to deal with specific sets of information in the monitor databases.
 
-B<export>
-Use this to create a CSV file of database columns for Chris.
-
 B<mark bamid|nwdid dirname  [verb] [state]>
 Use this to set the state for a particular BAM file.
 You may specify the bamid or the NWDID.
@@ -797,10 +712,9 @@ or run.
 B<send2ncbi filelist>
 Use this to copy data to NCBI with ascp.
 
-B<show bamid|nwdid|dirname colname|center|run|yaml>
+B<show bamid|nwdid|dirname colname|center|run>
 Use this to show information about a particular bamid (or expt_sampleid)
 or run name.
-Use 'yaml' to display everything known about the bam of interest.
 
 B<list centers|runs|samples  value>
 Use this to show a list of all centers, runs for a center or NWDIDs for a run.
