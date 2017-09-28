@@ -30,10 +30,10 @@ use lib (
   qq(/usr/cluster/topmed/local/lib/perl5),
 );
 
-use TopMed_Get;
-use My_DB;
 use Getopt::Long;
 use File::Basename;
+use Topmed::Get;
+use My_DB;
 
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters

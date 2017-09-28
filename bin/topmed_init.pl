@@ -26,7 +26,7 @@ use lib (
   qq(/usr/cluster/topmed/local/lib/perl5),
 );
 use My_DB;
-use TopMed_Get;
+use Topmed::Get;
 use Getopt::Long;
 
 use POSIX qw(strftime);
