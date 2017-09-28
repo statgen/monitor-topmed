@@ -22,10 +22,10 @@ include_once "edit.php";
 
 $qurl =  $_SERVER['SCRIPT_NAME'] . "?fcn=queue'";
 $STATUSLETTERS =  "<br/> " .
-    "<i><b>A</b>=File Arrived, <b>5</b>=MD5 Verified, <b>B</b>=Remote Backup of CRAM, <b>C</b>=BAM=>CRAM, <b>Q</b>=qplot run,<br/>" .
+    "<i><b>a</b>=File Arrived, <b>5</b>=MD5 Verified, <b>B</b>=Remote Backup of CRAM, <b>C</b>=BAM=>CRAM, <b>Q</b>=qplot run,<br/>" .
     "<b>7</b>=Remapped Build=37, " .
     "<b>s</b>=Push Build=38 to GCE, <b>r</b>=Pull Build=38 from GCE, <b>8</b>=Remapped Build=38," .
-    "<br/><b>V</b>=Completed BCF/VT 38,<b>G</b></b>=Upload ddata to GCE,<br/>" .
+    "<br/><b>V</b>=Completed BCF/VT 38,<b>G</b></b>=Upload data to GCE,<b>A</b></b>=Upload data to AWS,<br/>" .
     "<b>X</b>=EXPT=>NCBI <b>S</b>=Orig BAM/CRAM=>NCBI, <b>P</b>=</b>B37=>NCBI<br/>" .
     "<b>F</b>=FIX";
 
@@ -72,17 +72,6 @@ $RUNNOTE = "<p><b>Note:</b><br>" .
     "<b>N</b> Not to be copied<br>" .
     "</p>\n";
 
-//  How to add a column to this program
-//      Define state_ flag in SQL
-//      Add sql column name => topmedcmd verb in $quickcols (order matters)
-//      Add sql column name => letter in $quickletter (order matters)
-//      Add topmedverb in $validfunctions
-//      Add name in $TOPMEDJOBNAMES
-//  Make changes in topmedcmd.pl
-//  Make changes to topmed_status.pl
-//  Make changes to topmed_monitor.pl
-//  Make changes to topmedpermit.pl
-//  Create QOS for this new type of action
 $quickcols = array(                     // Map of status column to topmedcmd verb
     'state_arrive'   => 'arrived',
     'state_verify'   => 'verify',
@@ -95,13 +84,14 @@ $quickcols = array(                     // Map of status column to topmedcmd ver
     'state_b38'      => 'mapping38',
     'state_gce38bcf' => 'bcf',
     'state_gce38copy'=> 'gcecopy',
+    'state_aws38copy'=> 'awscopy',
     'state_ncbiexpt' => 'sendexpt',
     'state_ncbiorig' => 'sendorig',
     'state_ncbib37'  => 'sendb37',
     'state_fix'      => 'fix'
 );
 $quickletter = array(                   // Map of status column to letter we see
-    'state_arrive'   => 'A',
+    'state_arrive'   => 'a',
     'state_verify'   => '5',
     'state_cram'     => 'C',
     'state_gcebackup'=> 'B',
@@ -112,13 +102,14 @@ $quickletter = array(                   // Map of status column to letter we see
     'state_b38'      => '8',
     'state_gce38bcf' => 'V',
     'state_gce38copy'=> 'G',
+    'state_aws38copy'=> 'A',
     'state_ncbiexpt' => 'X',
     'state_ncbiorig' => 'S',
     'state_ncbib37'  => 'P',
     'state_fix'      => 'F'
 );
 $validfunctions = array('all', 'verify', 'cram', 'gcebackup', 'qplot',
-    'gcepush', 'gcepull', 'bcf', 'gcecopy', 'fix');
+    'gcepush', 'gcepull', 'bcf', 'gcecopy', 'awscopy', 'fix');
 $NOTSET = 0;                // Not set
 $REQUESTED = 1;             // Task requested
 $SUBMITTED = 2;             // Task submitted to be run
@@ -143,7 +134,7 @@ $state2str = array(         // Values here are class for SPAN tag
 );
 
 $TOPMEDJOBNAMES = array('verify', 'cram', 'backup', 'qplot', 'expt', 'orig', 'b37',
-    'push38', 'pull38', 'b38', 'pushbcf38', 'pullbcf38', 'bcf', 'gcecopy', 'fix');
+    'push38', 'pull38', 'b38', 'pushbcf38', 'pullbcf38', 'bcf', 'gcecopy', 'awscopy','fix');
 
 //  These columns are state values to be converted to people readable strings
 //  See DateState() for possible values
@@ -924,7 +915,7 @@ function GetCenters() {
 ---------------------------------------------------------------*/
 function QuickStatus($r, $url) {
     global $quickcols, $quickletter;
-    $separator_actions = array('Q','7','8','V', 'G', 'P');
+    $separator_actions = array('Q','7','8','V', 'A', 'P');
     //  Add a small separator to 'group' certain actions
     $h = '';
     $col = '';

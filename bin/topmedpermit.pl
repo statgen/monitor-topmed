@@ -51,6 +51,7 @@ my %VALIDOPS = (                    # Used for permit
     sb38 => 1,
     bcf => 1,
     gcecopy => 1,
+    awscopy => 1,
     sexpt => 1,
     sorig => 1,
 );

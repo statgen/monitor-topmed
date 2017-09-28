@@ -64,6 +64,7 @@ our %opts = (
     topmedgce38bcfpush => "$topmedbin/topmed_gcebcfpush.sh",
     topmedgce38bcfpull => "$topmedbin/topmed_gcebcfpull.sh",
     topmedgcecopy => "$topmedbin/topmed_gcecopy.sh",
+    topmedawscopy => "$topmedbin/topmed_awscopy.sh",
     topmedfix => "$topmedbin/topmed_fix.sh",
     topmedbcf  => "$topmedbin/topmed_bcf.sh",
     topmedxml    => "$topmedbin/topmed_xml.pl",
@@ -93,7 +94,7 @@ Getopt::Long::GetOptions( \%opts,qw(
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$Script [options] arrive|verify|qplot|cram|backup|qplot|push|pull|bcf|gcecopy|fix\n" .
+    warn "$Script [options] arrive|verify|qplot|cram|backup|qplot|push|pull|bcf|gcecopy|awscopy|fix\n" .
         "Find runs which need some action and queue a request to do it.\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
@@ -381,6 +382,31 @@ if ($fcn eq 'gcecopy') {
         }
         if ($href->{state_gce38copy} != $NOTSET && $href->{state_gce38copy} != $REQUESTED) { next; }
         if (! BatchSubmit("$opts{topmedgcecopy} -submit $href->{bamid}")) { last; }
+    }
+    ShowSummary($fcn);
+    exit;
+}
+
+#--------------------------------------------------------------
+#   Copy local data to AWS storage
+#--------------------------------------------------------------
+if ($fcn eq 'awscopy') {
+    #   Get list of all samples yet to process
+    my $sql = BuildSQL("SELECT bamid,state_b38,state_gce38bcf,state_aws38copy FROM $opts{bamfiles_table}",
+        "WHERE state_gce38copy!=$COMPLETED");
+    my $sth = DoSQL($sql);
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { exit; }
+    for (my $i=1; $i<=$rowsofdata; $i++) {
+        my $href = $sth->fetchrow_hashref;
+        if ($href->{state_b38} != $COMPLETED) { next; }
+        if ($href->{state_gce38bcf} != $COMPLETED) { next; }
+        if ($href->{state_aws38copy} == $COMPLETED) { next; }
+        if ($opts{suberr} && $href->{state_aws38copy} >= $FAILEDCHECKSUM) {
+            $href->{state_aws38copy} = $REQUESTED;
+        }
+        if ($href->{state_aws38copy} != $NOTSET && $href->{state_aws38copy} != $REQUESTED) { next; }
+        if (! BatchSubmit("$opts{topmedawscopy} -submit $href->{bamid}")) { last; }
     }
     ShowSummary($fcn);
     exit;

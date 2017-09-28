@@ -41,8 +41,16 @@ my $CANCELLED = 89;                 # Task cancelled
 my $FAILED    = 99;                 # Task failed
 
 #   How to add a column to this program
+#       Define the column in the database
+#       Create QOS for this new type of action
 #       Add verbname => db column name to %VALIDVERBS
-#       Add operation verb to %VALIDOPS
+#       Add operation verb to %VALIDOPS in topmedpermit.pl
+#       Add operation verb to statecols in topmed_failures.pl
+#       Create new shell script for operation (e.g. topmed_cram.sh)
+#       Add code for operation to topmed_monitor.pl
+#       Add operation,letter to $quickcols,quickletter,validfunctions,TOPMEDJOBNAMES arrays
+#           check letter in QuickStatus, update $STATUSLETTERS in index.php
+#       Add operation verb to attributes2letter in topmed_status.pl
 my %VALIDVERBS = (                  # Valid verbs to database colum
     arrive     => 'state_arrive',
     verify     => 'state_verify',
@@ -55,6 +63,7 @@ my %VALIDVERBS = (                  # Valid verbs to database colum
     b38        => 'state_b38',     
     bcf        => 'state_gce38bcf',     
     gcecopy    => 'state_gce38copy',     
+    awscopy    => 'state_aws38copy',     
     ncbiexpt   => 'state_ncbiexpt',
     ncbiorig   => 'state_ncbiorig',
     ncbib37    => 'state_ncbib37',

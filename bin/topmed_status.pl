@@ -35,7 +35,7 @@ use Getopt::Long;
 
 #   These represent states the run can be in. column name to letter
 my %attributes2letter = (
-    'state_arrive'    => 'A',
+    'state_arrive'    => 'a',
     'state_verify'    => '5',
     'state_gcebackup' => 'B',
     'state_qplot'     => 'Q',
@@ -46,6 +46,7 @@ my %attributes2letter = (
     'state_b38'       => '8',
     'state_gce38bcf'  => 'V',
     'state_gce38copy' => 'G',
+    'state_aws38copy' => 'A',
     'state_ncbiexpt'  => 'X',
     'state_ncbiorig'  => 'S',
     'state_ncbib37'   => 'P',

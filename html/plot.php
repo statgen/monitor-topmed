@@ -109,7 +109,7 @@ if ($fcn == 'plot') {
         "<font color='$COLORS[3]'>In Process</font> (submitted, running), or " .
         "<font color='$COLORS[4]'>Not Started</font> " .
         "</font></b></p>\n";
-    $legend = array('fix', 'gce38copy', 'gce38bcf', 'b38', 'gce38pull', 'gce38push',
+    $legend = array('fix', 'aws38copy', 'gce38copy', 'gce38bcf', 'b38', 'gce38pull', 'gce38push',
         'b37', 'qplot', 'gcebackup', 'cram', 'verify' );    // Reversed
     $title = "Current Counts for Each Step [$totalbamcount Verified BAMs]";
     $plotdata = array();

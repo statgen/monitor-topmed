@@ -147,6 +147,7 @@ my $FAILED    = 99;           # Task failed
   state_gce38bcf  INT DEFAULT 0,    /* Created BCF data */
 
   state_gce38copy INT DEFAULT 0,    /* Copy local data to BCF buckets */
+  state_aws38copy INT DEFAULT 0,    /* Copy local data to AWS buckets */
 
   state_ncbiexpt INT DEFAULT 0,     /* Year one, experiment defined at NCBI (X) */
   state_ncbiorig INT DEFAULT 0,     /* Original input file as bam or cram (S) */
