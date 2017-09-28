@@ -1,6 +1,6 @@
-package TopMed_Get;
+package Topmed::Get;
 #==================================================================
-# TopMed_Get.pm
+# Get.pm
 #   Common functions for the various Topmed Perl programs
 #==================================================================
 use strict;
@@ -96,11 +96,11 @@ __END__
 
 =head1 NAME
 
-TopMed_Get.pm
+Get.pm
 
 =head1 SYNOPSIS
 
-  use TopMed_Get;
+  use Topmed::Get;
   
 =head1 DESCRIPTION
 
@@ -122,7 +122,7 @@ Returns a reference to an array of run directories for a particular center-id.
 
 =head1 AUTHOR
 
-Written by Terry Gliedt I<E<lt>tpg@umich.eduE<gt>> in 2010 and is
+Written by Terry Gliedt I<E<lt>tpg@umich.eduE<gt>> in 2017 and is
 is free software; you can redistribute it and/or modify it under the
 terms of the GNU General Public License as published by the Free Software
 Foundation; See http://www.gnu.org/copyleft/gpl.html
