@@ -54,17 +54,13 @@ stime=`date +%s`
 
 #   Remapped cram could be > one place (arrgh!)  Figure out where it is
 inuri=''
-for i in $incominguri $bcfuri; do
-  p="$i/$nwdid/$nwdid.recab.cram"
-  $gsutil stat "$p"
-  if [ "$?" = "0" ]; then
-    inuri=$i
-    break
-  fi
-done
+p="$incominguri/$nwdid/$nwdid.recab.cram"
+$gsutil stat "$p"
+if [ "$?" = "0" ]; then
+  inuri=$p
+fi
 if [ "$inuri" = "" ]; then
   Fail "Unable to find $nwdid/$nwdid.recab.cram in: $incominguri $bcfuri"
-  exit 3
 fi
 
 #   Now know where to look for data. Check flagstat
