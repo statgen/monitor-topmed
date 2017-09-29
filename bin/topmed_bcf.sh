@@ -63,15 +63,7 @@ if [ ! -f $cramfile ]; then
 fi
 
 #   Create crai for cram if it does not exist
-crai="$cramfile.crai"
-if [ -z $crai -o ! -f $crai ]; then
-  echo "Creating index file '$cramfile'"
-  $samtools index $cramfile 2>&1
-  if [ "$?" != "0" ]; then
-    Fail "Unable to create index file for bamid '$bamid' [$nwdid]"
-  fi
-  echo "Created CRAI file for bamid '$bamid' [$nwdid]"
-fi
+CreateIndex $bamid $cramfile
 
 #   Create the BCF file
 bcfdir=`$topmedpath wherepath $bamid bcf`
