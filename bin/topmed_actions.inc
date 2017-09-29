@@ -65,10 +65,10 @@ function Log {
 function Fail {
   local msg="$1"
   if [ "$markverb" != "" ]; then
-    $topmedcmd -persist -emsg "$msg" mark $bamid $markverb failed
+    $topmedcmd -emsg "$msg" mark $bamid $markverb failed
   else
-    echo $msg
-    echo "Task for $bamid FAILED, no markverb set"
+    >&2 echo $msg
+    >&2 echo "Task for $bamid FAILED, no markverb set"
   fi
   exit 1
 }
@@ -187,6 +187,31 @@ function CheckRGMap {
   return $?
 }
 
+#------------------------------------------------------------------
+# Subroutine:
+#   GetBuild(bamid,file)    Determine build for a file
+#
+#   Attempts to use global variable $me
+#------------------------------------------------------------------
+function GetBuild {
+  local bamid=$1
+  local file=$2
+
+  build=''
+  l=(`$samtools view -H $file | grep '@SQ' | cut -f 1-3 2>/dev/null | head -2`)
+  if [ "${l[2]}" = "LN:249250621" -a "${l[5]}" = "LN:243199373" ]; then
+    build=37
+  else
+    if [ "${l[2]}" = "LN:248956422" -a "${l[5]}" = "LN:242193529" ]; then
+      build=38
+    fi
+  fi
+  if [ "$build" = "" ]; then
+    Fail "Unable to determine build for '$file' (L2=${l[2]} L5=${l[5]}"
+  fi
+  >&2 echo "File '$file' [$bamid] is from build $build"
+  echo $build
+}
 
 #------------------------------------------------------------------
 # Subroutine:
@@ -203,6 +228,10 @@ function CreateIndex {
   local bamid=$1
   local file=$2
 
+  if [ ! -f $file ]; then
+    Fail "File '$file' does not exist, no index can be created"
+  fi
+
   #  To verify an index, we search for a string - depending on the extension
   ext="${file##*.}"
   buildstr='notset'
@@ -213,7 +242,7 @@ function CreateIndex {
   fi
   if [ "$ext" = "cram" ]; then
     indexfile=$file.crai
-    build=`GetDB $bamid build`
+    build=`GetBuild $bamid $file`
     if [ "$build" = "37" ]; then
       buildstr="hs37d5:35,450,000-35,477,943"
     fi
@@ -222,7 +251,7 @@ function CreateIndex {
     fi
   fi
   if [ "buildstr" = 'notset' ]; then
-    Fail "Unable to determine string to search for in header for $file"
+    Fail "Unable to determine string to search for in header of $file"
   fi
 
   #   If index file is zero length, recreate it
@@ -234,14 +263,16 @@ function CreateIndex {
   if [ -f $indexfile ]; then
     n=`$samtools view $file $buildstr | wc -l`
     if [ "$n" = "" -o "$n" -lt "100" ]; then
-      echo "Index file '$indexfile' is invalid, force re-create"
+      echo "Index '$indexfile' is invalid, force re-create"
       rm -f $indexfile                  # Remove bad index
       #   This might be a trashed reference index for samtools, if so remove it
-      consfile="$console/$bamid-$me.out"
-      a=`grep 'cram_ref_load: Assertion' $consfile`     # Could fail if $me not defined
-      if [ "$a" != "" ]; then
-        rm -rf $HOME/.cache/hts-ref/*/*
-        echo "Samtools cram_ref_load error, removed dirty reference cache and retrying"
+      if [ "$me" != "" ]; then
+        consfile="$console/$bamid-$me.out"
+        a=`grep 'cram_ref_load: Assertion' $consfile`     # Could fail if $me not defined
+        if [ "$a" != "" ]; then
+          rm -rf $HOME/.cache/hts-ref/*/*
+          echo "Samtools cram_ref_load error, removed dirty reference cache and retrying"
+        fi
       fi
     else
       echo "Index file '$indexfile' is valid apparently"
@@ -252,10 +283,16 @@ function CreateIndex {
   #   Create the index file
   echo "Creating index file '$indexfile'"
   $samtools index $file 2>&1
-  if [ "$?" = "0" ]; then
-    echo "Created index file '$indexfile'"
+  if [ "$?" = "0" ]; then           # Successful, now see if it is valid
+    n=`$samtools view $file $buildstr | wc -l`
+    if [ "$n" = "" -o "$n" -lt "100" ]; then
+      #rm -f $indexfile              # Remove bad index
+      Fail "Newly created index '$indexfile' was invalid and was removed ($buildstr). Try, try again."
+    else
+      echo "Created and validated index '$indexfile'"
+    fi
   else
-    Fail "Unable to create index file for '$file'"
+    Fail "Unable to create index for '$file'"
   fi
 }
 
