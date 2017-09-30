@@ -12,17 +12,17 @@ markverb=$me
 if [ "$1" = "-submit" ]; then
   shift
   bamid=`GetDB $1 bamid`
-  datayear=$GetDB $bamid datayear`
+  cramfile=`$topmedpath wherefile $bamid b$build`
+  filesize=`stat --printf=%s $cramfile`
   mem=48G
   #   Large crams can require LOTS of memory
-  bamsize=`GetGB $bamid bamsize`
-  if [ "$bamsize" -gt "40255183256" ]; then
+  if [ "$filesize" -gt "40255183256" ]; then
     mem=128G
-  elif [ "$bamsize" -gt "35044692321" ]; then
+  elif [ "$filesize" -gt "35044692321" ]; then
     mem=78G
-  elif [ "$bamsize" -gt "31848365056" ]; then
+  elif [ "$filesize" -gt "31848365056" ]; then
     mem=64G
-  elif [ "$bamsize" -gt "23023087355" ]; then
+  elif [ "$filesize" -gt "23023087355" ]; then
     mem=48G
   fi
   MayIRun $me $bamid
@@ -43,15 +43,15 @@ bamid=$1
 Started
 nwdid=`GetNWDID $bamid`
 stime=`date +%s`
-crampath=`$topmedpath wherepath $bamid b$build`
-if [ "$crampath" = "" ]; then
-  Fail  "Unable to determine where remapped CRAM file should be for '$bamid'"
-fi
 
 #======================================================================
 #   Post process the remapped CRAM from Google Cloud
 #======================================================================
 #   CD to remapped cram file location
+crampath=`$topmedpath wherepath $bamid b$build`
+if [ "$crampath" = "" ]; then
+  Fail  "Unable to determine where remapped CRAM file should be for '$bamid'"
+fi
 cd $crampath
 if [ "$?" != "0" ]; then
   Fail "Unable to CD to directory for remapped CRAM file '$bamid'"
