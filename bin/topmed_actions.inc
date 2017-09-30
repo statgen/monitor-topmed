@@ -32,7 +32,7 @@ export BOTO_CONFIG=/net/topmed/working/shared/tpg_gsutil_config.txt
 
 #------------------------------------------------------------------
 # Subroutine:
-#   MayIRun(name, bamid)    Is bamid 'bamid' permitted to run for script 'name'
+#   MayIRun(name, bamid)    Is bamid permitted to run for script 'name'
 #
 #   Does not return if permission is denied
 #------------------------------------------------------------------
@@ -80,7 +80,7 @@ function Fail {
 #------------------------------------------------------------------
 function Started {
   if [ "$markverb" != "" ]; then
-    $topmedcmd -persist mark $bamid $markverb started
+    $topmedcmd mark $bamid $markverb started
   fi
   d=`date +%Y/%m/%d`
   s=`hostname`
@@ -94,7 +94,7 @@ function Started {
 #------------------------------------------------------------------
 function Successful {
   if [ "$markverb" != "" ]; then
-    $topmedcmd -persist -emsg "" mark $bamid $markverb completed
+    $topmedcmd -emsg "" mark $bamid $markverb completed
   else
     echo "Task for $bamid successful, no markverb set"
   fi
@@ -108,7 +108,7 @@ function SetDB {
   local bamid=$1
   local col=$2
   local val=$3
-  $topmedcmd -persist set $bamid $col "$val"
+  $topmedcmd set $bamid $col "$val"
   if [ "$?" != "0" ]; then
     Fail "Unable to set column '$col' to '$val' for bamid '$bamid'" 
   fi
@@ -117,7 +117,6 @@ function SetDB {
 #------------------------------------------------------------------
 # Subroutine:
 #   val=`GetDB(bamid, col)`
-#   Uses global variables: $bamid
 #------------------------------------------------------------------
 function GetDB {
   local bamid=$1
@@ -130,11 +129,11 @@ function GetDB {
 
 #------------------------------------------------------------------
 # Subroutine:
-#   GetNWDID(bamid)         prints $nwdid
+#   val=`GetNWDID(bamid)`       # Prints NWDID
 #------------------------------------------------------------------
 function GetNWDID {
   local bamid=$1
-  nwdid=`$topmedcmd -persist show $bamid expt_sampleid`
+  nwdid=`$topmedcmd show $bamid expt_sampleid`
   if [ "$nwdid" = "" ]; then
     Fail "Unable to find the NWDID for '$bamid'" 
   fi
@@ -143,8 +142,7 @@ function GetNWDID {
 
 #------------------------------------------------------------------
 # Subroutine:
-#   MyRealHost(bamid, type)   Set host where type of input file lives
-#   Sets $realhost  (--nodelist=hostname)
+#   MyRealHost(bamid, type)   Set realhost where type of input file lives
 #------------------------------------------------------------------
 function MyRealHost {
   local bamid=$1
@@ -154,8 +152,7 @@ function MyRealHost {
 
 #------------------------------------------------------------------
 # Subroutine:
-#   RandomRealHost(bamid)   Set host based on bamid
-#   Sets $realhost which may be used in the qos
+#   RandomRealHost(bamid)   Set realhost based on bamid
 #------------------------------------------------------------------
 function RandomRealHost {
   local bamid=$1
@@ -189,9 +186,7 @@ function CheckRGMap {
 
 #------------------------------------------------------------------
 # Subroutine:
-#   GetBuild(bamid,file)    Determine build for a file
-#
-#   Attempts to use global variable $me
+#   b=`GetBuild(bamid,file)`    Determine build for a file
 #------------------------------------------------------------------
 function GetBuild {
   local bamid=$1
@@ -221,8 +216,6 @@ function GetBuild {
 #   This script attempts to centralize all known attempts
 #   to check for samtools errors for an index file
 #   so we can possibly insure the index file will work  (POS)
-#
-#   Attempts to use global variable $me
 #------------------------------------------------------------------
 function CreateIndex {
   local bamid=$1
@@ -299,7 +292,7 @@ function CreateIndex {
 
 #------------------------------------------------------------------
 # Subroutine:
-#   CalcFlagstat(bamid,file)    Prints flagstat for a bam or cram
+#   v=`CalcFlagstat(bamid,file)`    Prints flagstat for a bam or cram
 #
 #	Calculate the flagstat paired in sequencing number for a bam or cram
 #------------------------------------------------------------------
@@ -332,10 +325,9 @@ function CalcFlagstat {
   echo ${a[0]}
 }
 
-
 #------------------------------------------------------------------
 # Subroutine:
-#   CalcMD5(bamid, file)    Prints md5 for a file
+#   v=`CalcMD5(bamid, file)`    Prints md5 for a file
 #------------------------------------------------------------------
 function CalcMD5 {
   local bamid=$1
@@ -431,5 +423,3 @@ function SubmitSRUN {
   $topmedcmd mark $bamid $markverb submitted
   exit
 }
-
-
