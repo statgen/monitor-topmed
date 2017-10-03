@@ -92,8 +92,6 @@ if [ "$datayear" = "3" ]; then
     echo "Set up $build CRAM in local storage completed in $etime seconds: $d"
     SetDB $bamid state_gce38pull 20     # Mark B38 remapping as completed
     SetDB $bamid state_b38 20
-    SetDB $bamid state_gce38bcf_push 0  # Mark bcf as not done yet
-    SetDB $bamid state_gce38bcf_pull 0
     SetDB $bamid state_gce38bcf 0
     SetDB $bamid state_gce38copy 0      # Mark copy files to GCE as not done yet
     Successful
@@ -135,8 +133,6 @@ etime=`date +%s`
 etime=`expr $etime - $stime`
 
 echo "Copy of CRAM to Google CLoud completed in $etime seconds"
-SetDB $bamid state_gce38bcf_push 0  # Mark bcf as not done yet
-SetDB $bamid state_gce38bcf_pull 0
 SetDB $bamid state_gce38bcf 0
 
 SetDB $bamid state_gce38pull 0      # Mark B38 remapping as not done yet
