@@ -159,14 +159,8 @@ my $FAILED    = 99;           # Task failed
 );
 
 /*   Remove this from bamfiles
-  state_38cp2gce  INT DEFAULT 0,
-  state_bcf        INT DEFAULT 0,
-  state_gceb38ackup INT DEFAULT 0,
      Remove this from runs
-  offsite      CHAR(1) DEFAULT 'N',
-  gce38bcf_opid   VARCHAR(255),         // Google pipeline id
-  state_gce38bcf_push   INT DEFAULT 0,   // Put CRAM into BCF bucket
-  state_gce38bcf_pull   INT DEFAULT 0,   // Pull BCF data to local store
+  offsite      CHAR(1) DEFAULT 'N',     Not too sure about this ??
 */
 
 
@@ -174,6 +168,8 @@ my $FAILED    = 99;           # Task failed
     ALTER TABLE bamfiles ADD COLUMN datebai VARCHAR(12) AFTER datebackup;
     ALTER TABLE runs ADD  COLUMN offsitebackup CHAR(1) DEFAULT 'N' AFTER datayear;
     ALTER TABLE bamfiles CHANGE expt_sampleid expt_sampleid VARCHAR(24);
+    
+    ALTER TABLE bamfiles DROP COLUMN colname;
 
 select bamid,bamname,runid,(select dirname from runs where runid=bamfiles.runid) from bamfiles where state_ncbib37=19;
 
