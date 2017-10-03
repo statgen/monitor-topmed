@@ -87,13 +87,12 @@ if [ "$bamfile" = "" ]; then
   Fail "Unable to get source file for '$bamid'; $bamfile"
 fi
 
-build=`$topmedcmd -persist show $bamid build`
+build=`GetDB $bamid build`
 if [ "$build" != "37" -a "$build" != "38" ]; then
   Fail "Unknown build '$build', cannot continue with qplot for '$bamfile'"
 fi
 
 #   Create the index file as necessary
-build=`GetDB $bamid build`
 CreateIndex $bamid $bamfile
 
 #   Create output directory and CD there

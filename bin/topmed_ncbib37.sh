@@ -165,5 +165,5 @@ fi
 echo "XML files '$files' sent to NCBI"
 etime=`date +%s`
 etime=`expr $etime - $stime`
-$topmedcmd -persist -emsg "" mark $bamid $markverb delivered    # Cannot use Successful
+$topmedcmd -emsg "" mark $bamid $markverb delivered    # Cannot use Successful
 Log $etime

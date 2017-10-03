@@ -88,7 +88,7 @@ our %opts = (
     jobsfailedsubmission => 0,
 );
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose topdir=s center=s runs=s piname=s maxjobs=i random
+    help verbose topdir=s center=s runs=s piname=s maxjobs=i random
     dryrun suberr datayear=i
     )) || die "Failed to parse options\n";
 
@@ -596,20 +596,6 @@ sub ShowSummary {
 
 #==================================================================
 # Subroutine:
-#   ExecSQL($sql, $die)
-#
-#   Execute SQL.  Keep trying if connection lost.
-#
-#   Returns handle for SQL
-#==================================================================
-sub ExecSQL {
-    my ($sql, $die) = @_;
-    if ($opts{persist}) { return PersistDoSQL($opts{realm}, $sql); }
-    return DoSQL($sql, $die);
-}
-
-#==================================================================
-# Subroutine:
 #   BuildSQL - Complete SQL statement based on options
 #
 # Arguments:
@@ -746,10 +732,6 @@ Randomly select data to be processed. This may not be used with B<-center> or B<
 This is intended for cases where a large set of data is to be selected
 and we want it to run over a wide set of hosts.
 In practice this is only useful for B<push>, B<pull>, B<post>, B<pushbcf> and B<pullbcf>.
-
-=item B<-realm NAME>
-
-Specifies the database realm to read data from. This defaults to B<topmed>;
 
 =item B<-runs NAME>
 

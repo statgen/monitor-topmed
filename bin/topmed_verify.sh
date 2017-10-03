@@ -67,9 +67,9 @@ CreateIndex $bamid $bamfile
 #   If original file was cram, then some fields are the same for both cram and bam
 extension="${bamfile##*.}"
 if [ "$extension" = "cram" ]; then
-  a=`$topmedcmd -persist show $bamid bamflagstat`
+  a=`GetDB $bamid bamflagstat`
   SetDB $bamid 'cramflagstat' $a
-  a=`$topmedcmd -persist show $bamid checksum`
+  a=`GetDB $bamid checksum`
   SetDB $bamid 'cramchecksum' $a
 else
   #   Rename the BAM file

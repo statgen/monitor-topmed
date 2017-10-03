@@ -58,19 +58,19 @@ $topmedcmd mark $bamid $markverb started
 nwdid=`GetDB $bamid expt_sampleid`
 if [ "$nwdid" = "" ]; then
   echo "Invalid bamid '$bamid'. NWDID not known"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd mark $bamid $markverb failed
   exit 2
 fi
 center=`GetDB $bamid center`
 if [ "$center" = "" ]; then
   echo "Invalid bamid '$bamid'. CENTER not known"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd mark $bamid $markverb failed
   exit 2
 fi
 piname=`GetDB $bamid piname`
 if [ "$piname" = "" ]; then
   echo "Invalid bamid '$bamid'. PINAME not known"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd mark $bamid $markverb failed
   exit 2
 fi
 
@@ -78,7 +78,7 @@ fi
 cd $console
 if [ "$?" != "0" ]; then
   echo "Unable to CD to '$console' to create XML file"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd mark $bamid $markverb failed
   exit 2
 fi
 mkdir XMLfiles 2>/dev/null
@@ -89,14 +89,14 @@ here=`pwd`
 $topmedpath wherefile $bamid b{$build}
 if [ "$?" = '1' ]; then
   echo "Multiple b{$build} crams were found - cannot send to NCBI"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd mark $bamid $markverb failed
   exit 2
 fi
 
 sendfile=`$topmedpath wherefile $bamid b{$build}`
 if [ "$sendfile" = '' ]; then
   echo "Remapped CRAM for Build $build for bamid '$bamid' not found ($sendfile)"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd mark $bamid $markverb failed
   exit 2
 fi
 checksum=`GetDB $bamid b{$build}cramchecksum`
@@ -119,7 +119,7 @@ echo "#========= $d $SLURM_JOB_ID $0 bamid=$bamid file=$sendfile ========="
 $topmedxml -xmlprefix $here/ -type $version -build $build $bamid $sendfile $checksum
 if [ "$?" != "0" ]; then
   echo "Unable to create $version run XML files"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd mark $bamid $markverb failed
   exit 2
 fi
 
@@ -128,7 +128,7 @@ files=''
 for f in $nwdid-$version.$build.submit.xml $nwdid-$version.$build.run.xml; do
   if [ ! -f $f ]; then
     echo "Missing XML file '$f'"   
-    $topmedcmd -persist mark $bamid $markverb failed
+    $topmedcmd mark $bamid $markverb failed
     exit 2
   fi
   files="$files $f"
@@ -138,7 +138,7 @@ done
 tar cf $nwdid-$version.$build.tar $files
 if [ "$?" != "0" ]; then
   echo "Unable to create TAR of XML files"
-  $topmedcmd -persist mark $bamid $markverb failed
+  $topmedcmd mark $bamid $markverb failed
   exit 2
 fi
 files=$nwdid-$version.$build.tar
@@ -153,7 +153,7 @@ if [ "$xmlonly" != "Y" ]; then
   rm -f $sendfile
   if [ "$rc" != "0" ]; then
     echo "FAILED to send data file '$sendfile'"
-    $topmedcmd -persist mark $bamid $markverb failed
+    $topmedcmd mark $bamid $markverb failed
     exit 2
   fi
   etime=`date +%s`
@@ -167,13 +167,13 @@ echo "Sending XML files to NCBI - $files"
 $ascpcmd $files
 if [ "$?" = "0" ]; then
   echo "XML files '$files' sent to NCBI"
-  $topmedcmd -persist mark $bamid $markverb delivered
+  $topmedcmd mark $bamid $markverb delivered
   echo `date` $jobname $SLURM_JOB_ID ok $etime secs >> $console/$bamid.jobids
   exit
 fi
 
 echo "FAILED to send data XML files to NCBI - $files"
-$topmedcmd -persist mark $bamid $markverb failed 
+$topmedcmd mark $bamid $markverb failed 
 exit 1
 
 

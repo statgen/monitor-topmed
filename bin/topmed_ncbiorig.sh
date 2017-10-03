@@ -79,7 +79,7 @@ if [ "$sendcram" = "Y" ]; then
   sendfile="${l[0]}"
   sf=$nwdid.src.cram
   ln -sf $sendfile $sf
-  checksum=`$topmedcmd -persist show $bamid cramchecksum`
+  checksum=`$topmedcmd show $bamid cramchecksum`
   sendfile=$sf
   echo "Sending backup cram instead of original file ($sendfile)"
   # It's not supposed to happen, but sometimes the CRAM checksum is missing
@@ -99,12 +99,12 @@ else
       echo "Attempting to send the CRAM, rather than the missing BAM"
       sendfile=`$topmedpath wherefile $bamid cram`
       ln -sf $sendfile $nwdid.src.cram
-      checksum=`$topmedcmd -persist show $bamid cramchecksum`
+      checksum=`$topmedcmd show $bamid cramchecksum`
       sendfile=$nwdid.src.cram
   else
     ln -sf $sendfile $nwdid.src.bam     # BAM file exists, send it
     sendfile=$nwdid.src.bam
-    checksum=`$topmedcmd -persist show $bamid checksum`
+    checksum=`$topmedcmd show $bamid checksum`
   fi
 fi
 
@@ -189,5 +189,5 @@ fi
 echo "XML files '$files' sent to NCBI"
 etime=`date +%s`
 etime=`expr $etime - $stime`
-$topmedcmd -persist -emsg "" mark $bamid $markverb delivered    # Cannot use Successful
+$topmedcmd -emsg "" mark $bamid $markverb delivered    # Cannot use Successful
 Log $etime
