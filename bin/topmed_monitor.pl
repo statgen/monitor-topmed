@@ -88,7 +88,7 @@ our %opts = (
     jobsfailedsubmission => 0,
 );
 Getopt::Long::GetOptions( \%opts,qw(
-    help verbose topdir=s center=s runs=s piname=s maxjobs=i random
+    help verbose topdir=s center=s runs=s piname=s studyname=s maxjobs=i random
     dryrun suberr datayear=i
     )) || die "Failed to parse options\n";
 
@@ -393,7 +393,7 @@ if ($fcn eq 'gcecopy') {
 if ($fcn eq 'awscopy') {
     #   Get list of all samples yet to process
     my $sql = BuildSQL("SELECT bamid,state_b38,state_gce38bcf,state_aws38copy FROM $opts{bamfiles_table}",
-        "WHERE state_gce38copy!=$COMPLETED");
+        "WHERE state_aws38copy!=$COMPLETED AND datayear!=3");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { exit; }
@@ -637,6 +637,9 @@ sub BuildSQL {
     #   Add support for piname
     if ($opts{piname}) { $s .= " AND piname='$opts{piname}'"; }
 
+    #   Add support for piname
+    if ($opts{studyname}) { $s .= " AND studyname='$opts{studyname}'"; }
+
     #   Support randomization
     if ($opts{random}) { $s .= ' ORDER BY RAND()'; }
     return $s;
@@ -726,6 +729,12 @@ Generates this output.
 Do not submit more than N jobs for this invocation.
 The default for B<-maxjobs> is B<100>.
 
+=item B<-piname NAME>
+
+Specifies a piname for runs on which to run the action,
+e.g. B<Ellinor>.
+The default is to run against all pinames.
+
 =item B<-random>
 
 Randomly select data to be processed. This may not be used with B<-center> or B<-runs>. 
@@ -739,6 +748,12 @@ Specifies a run on which to run the action,
 e.g. B<2015jun05.weiss.02,2015jun05.weiss.03>.
 This is useful for testing.
 The default is to run against all runs for the center.
+
+=item B<-studyname NAME>
+
+Specifies a study name for runs on which to run the action,
+e.g. B<MESA>.
+The default is to run against all studies.
 
 =item B<-suberr>
 
