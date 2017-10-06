@@ -178,7 +178,7 @@ if ($fcn == 'plot') {
     //-------------------------------------------------------------------
     print "<h4>Cloud Activity</h4>\n";
     $title = "Daily Count of Samples to/from Cloud";
-    $legend = array('gcepush', 'gcepull', 'gcecopy', 'awscopy');
+    $legend = array('gcebackup', 'gcepush', 'gcepull', 'gcecopy', 'awscopy');
     $title = "Daily Count of Steps Completed";
     $plotdata = array(); 
     for ($i=0; $i<$numrows; $i++) {
@@ -186,6 +186,7 @@ if ($fcn == 'plot') {
         if ($row['yyyymmdd'] < $NCBIBAMDATE) { continue; }
         $d = array();
         array_push($d, substr($row['yyyymmdd'],5,5));
+        array_push($d, $row['count_gcebackup']);
         array_push($d, $row['count_gcepush']);
         array_push($d, $row['count_gcepull']);
         array_push($d, $row['count_gcecopy']);
@@ -201,6 +202,7 @@ if ($fcn == 'plot') {
         if ($row['yyyymmdd'] < $NCBIBAMDATE) { continue; }
         $d = array();
         array_push($d, substr($row['yyyymmdd'],5,5));
+        array_push($d, $row['avetime_gcebackup']);
         array_push($d, $row['avetime_gcepush']);
         array_push($d, $row['avetime_gcepull']);
         array_push($d, $row['avetime_gcecopy']);
