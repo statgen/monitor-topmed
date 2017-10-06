@@ -98,7 +98,7 @@ replacelist=''
 rlist=''
 cmissinglist=''
 cmissing=''
-copyuri=`$topmedpath wherepath $nwdid upload`
+copyuri=`$topmedpath wherepath $nwdid gceupload`
 
 l=(`$gsutil stat $copyuri/$baserecabcram | grep Content-Length:`)
 gcesize=${l[1]}
@@ -181,10 +181,10 @@ if [ "$replacelist" != "" ]; then
       Fail "Failed to copy $basef to GCE"
     fi
   done
-else
-  echo "No more files to copy, everything for $bamid $nwdid is up to date"
-  $gsutil ls -l $copyuri
 fi
+
+echo "GCE files for $bamid $nwdid are up to date"
+$gsutil ls -l $copyuri
 
 etime=`date +%s`
 etime=`expr $etime - $stime`

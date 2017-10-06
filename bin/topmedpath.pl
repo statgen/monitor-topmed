@@ -64,6 +64,9 @@ our %opts = (
     gcebcfuri => 'gs://topmed-bcf',
     gceuploaduri => 'gs://topmed-bcf',
     gceremapuri => 'gs://topmed-incoming',
+    awsbucket => 'nih-nhlbi-datacommons',
+    awsbucketpath => 'UofM/crams/b38',
+    awsuploaduri => 's3://nih-nhlbi-datacommons/UofM/crams/b38',
     verbose => 0,
 );
 
@@ -79,7 +82,7 @@ if ($#ARGV < 0 || $opts{help}) {
         "$m whathost bamid|nwdid KEYWORD\n" .
         "  or\n" .
         "$m wherefile bamid|nwdid KEYWORD\n" .
-        "WHERE KEYWORD is one of bam|cram|localbackup|remotebackup|remotearchive|qcresults|console|b37|b38|bcf|upload\n" .
+        "\nWHERE KEYWORD is one of bam|cram|localbackup|remotebackup|remotearchive|qcresults|console|b37|b38|bcf|gceupload|awsupload|awsbucket|awsbucketpath\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
     exit 1;
@@ -195,13 +198,27 @@ sub WherePath {
         exit;
     }
  
-    if ($set eq 'upload') {
-        my $gceupload = "$opts{gceuploaduri}/$nwdid";
-        print "$gceupload\n";
+    if ($set eq 'gceupload' || $set eq 'upload') {
+        print "$opts{gceuploaduri}/$nwdid\n";
         exit;
     }
 
-    die "$Script - Unknown Where option '$set'\n";
+    if ($set eq 'awsupload') {
+        print "$opts{awsuploaduri}\n";
+        exit;
+    }
+
+    if ($set eq 'awsbucket') {
+        print "$opts{awsbucket}\n";
+        exit;
+    }
+
+    if ($set eq 'awsbucketpath') {
+        print "$opts{awsbucketpath}\n";
+        exit;
+    }
+
+    die "$Script - Unknown WherePath option '$set'\n";
 }
 
 #==================================================================
@@ -283,12 +300,7 @@ sub WhatHost {
         exit;
     }
 
-    if ($set eq 'remotebackup' || $set eq 'remotearchive' || $set eq 'upload' ) {
-        print "WhatHost_not_valid_for_$set\n";
-        exit;
-    }
-
-    die "$Script - Unknown Where option '$set'\n";
+    die "$Script - Unknown WhatHost option '$set'\n";
 }
 
 #==================================================================
@@ -385,13 +397,7 @@ sub WhereFile {
         exit;
     }
 
-    if ($set eq 'console' || $set eq 'upload' ) {
-        print "WhereFile_not_valid_for_$set\n";
-        exit;
-    }
-
-
-    die "$Script - Unknown Where option '$set'\n";
+    die "$Script - Unknown WhereFile option '$set'\n";
 }
 
 #==================================================================
@@ -493,7 +499,8 @@ topmedpath.pl - Show paths for data in the TopMed database
   topmedcmd.pl wherepath 2199 qcresults    # Returns path to directory for qc.results
   topmedcmd.pl wherepath 2199 console      # Returns path to directory for SLURM output
   topmedcmd.pl wherepath 2199 backup       # Returns GCE URI to where backup might be
-  topmedcmd.pl wherepath 2199 upload       # Returns GCE URI to where all files are copied
+  topmedcmd.pl wherepath 2199 gceupload    # Returns GCE URI to where all files are copied
+  topmedcmd.pl wherepath 2199 awsupload    # Returns AWS URI to where all files are copied
 
   topmedcmd.pl whathost 2199 bam           # Returns host for bam
   topmedcmd.pl whathost 2199 cram          # Returns host for cram directory
@@ -536,39 +543,45 @@ Provided for developers to see additional information.
 
 Parameters to this program are grouped into several groups which are used
 to deal with specific sets of information in the monitor databases.
+The paths returned may not exist.
 
-B<wherepath bamid|nwdid bam|cram|backup|qcresults|console|b37|b38>
+B<wherepath bamid|nwdid bam|cram|backup|qcresults|console|b37|b38bcf|gceupload|awsupload|awsbucket|awsbucketpath>
 If B<bam> was specified, display the path to the real bam file.
-This file may not exist.
 
 If B<cram> or B<localbackup> was specified, display the path to the backup directory.
-This file may not exist.
 
 If B<remotearchive> was specified, display the GCE path (e.g. gs://topmed-archives/...)
-This file may not exist.
 
 If B<remotebackup> was specified, display the GCE path (e.g. gs://topmed-backups/...)
-This file may not exist.
 
 If B<qcresults> was specified, display the path to the directory where
 the qc.results for this bamid will be.
-This file may not exist.
 
 If B<console> was specified, display the path to the directory where
 the SLURM console output.
 
 If B<b37> was specified, display the path to the directory of remapped data for build 37 results can be found.
-This file may not exist.
 
-If B<b38> was specified, display the path to the directory of remapped data for build 37 results can be found.
-This file may not exist.
+If B<b38> was specified, display the path to the directory of remapped data for build 38 results can be found.
 
-B<whathhost bamid|nwdid bam|cram|qcresults>
-returns the host for the bam, backup, cram or qc.results for the data.
+If B<bcf> was specified, display the path to the directory of BCF (vt-discover) data.
 
-B<wherefile bamid|nwdid bam|cram|backup|qcresults>
-returns the path to the file for the bam, backup. cram or qc.results.
-This file may not exist.
+If B<gceupload> was specified, display the path to the GCE data.
+
+If B<awsupload> was specified, display the path to the AWS data.
+This path may not exist.
+
+If B<awsupload> was specified, display the path to the AWS data.
+
+If B<awsbucket> was specified, display the bucket name for the AWS data.
+
+If B<awsbucketpath> was specified, display the path of data in the AWS bucket.
+
+B<whathhost bamid|nwdid key>
+returns the host for the key specified.
+
+B<wherefile bamid|nwdid key>
+returns the path to the file for the key specified.
 
 
 =head1 EXIT
