@@ -39,7 +39,7 @@ $COLORS = array('DarkGreen', 'red', 'orange', 'SlateBlue', 'gray');
 print doheader($HDR['title'], 1);
 
 //  Real parameters for each form, default is ''
-$parmcols = array('fcn', 'lastdays', 'datayear');
+$parmcols = array('fcn', 'lastdays', 'datayear');       // datayear is not used
 extract (isolate_parms($parmcols));
 
 
@@ -47,20 +47,6 @@ DB_Connect($LDB['realm']);
 if (! $fcn)    { $fcn = 'plot'; }
 if (! $lastdays)   { $lastdays = 20; }
 if (! $datayear)   { $datayear = 1; }
-
-$totalcompletedbams = '';
-$sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE datayear=$datayear AND state_ncbiorig=$COMPLETED";
-$result = SQL_Query($sql);
-$row = SQL_Fetch($result);
-$totalcompletedbams .= $row['count(*)'] . '/';
-$sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE datayear=$datayear AND state_ncbib37=$COMPLETED";
-$result = SQL_Query($sql);
-$row = SQL_Fetch($result);
-$totalcompletedbams .= $row['count(*)'] . '/';
-$sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE datayear=$datayear AND state_b38=$COMPLETED";
-$result = SQL_Query($sql);
-$row = SQL_Fetch($result);
-$totalcompletedbams .= $row['count(*)'];
 
 $sql = 'SELECT * FROM ' . $LDB['stepstats'];
 $result = SQL_Query($sql);
@@ -71,7 +57,8 @@ for ($i=0; $i<$numrows; $i++) {
     array_push($sqldata, $row);
 }
 
-$sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE datayear=$datayear AND state_verify=$COMPLETED";
+//$sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE datayear=$datayear AND state_verify=$COMPLETED";
+$sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE state_verify=$COMPLETED";
 $result = SQL_Query($sql);
 $row = SQL_Fetch($result);
 $totalbamcount = $row['count(*)'];
@@ -86,17 +73,18 @@ if ($fcn == 'plot') {
     //-------------------------------------------------------------------
     //  Details about steps for processing each BAM (non-NCBI)
     //-------------------------------------------------------------------
-    $reshowurl =  $_SERVER['SCRIPT_NAME'] . "?datayear=$datayear&amp;lastdays=$lastdays";
+    //$reshowurl =  $_SERVER['SCRIPT_NAME'] . "?datayear=$datayear&amp;lastdays=$lastdays";
+    $reshowurl =  $_SERVER['SCRIPT_NAME'] . "?lastdays=$lastdays";
     print "<table width='80%' align='center' border='0'> <tr>\n" .
         "<td align='left'>" .
           "<form action='" . $_SERVER['PHP_SELF'] . "' method='post'>\n" .
           "<b><input type='submit' value=' Generate Plots: '>\n" .
           "Last <input type='text' name='lastdays' value='$lastdays' size='2'>\n" .
           "days</td>" .
-        "<td><b>Project:</b>" .
-          "<select name='datayear'>" .
-          "<option value='3'>Year 3</option><option value='2'>Year 2</option><option value='1'>Year 1</option></select>\n" . 
-          "</td>" .
+        //"<td><b>Project:</b>" .
+        //  "<select name='datayear'>" .
+        //  "<option value='3'>Year 3</option><option value='2'>Year 2</option><option value='1'>Year 1</option></select>\n" . 
+        //  "</td>" .
         "<td align='right'>" .
         "<a href='$reshowurl'>Reshow Plots</a>" .
         "</td></tr></form></table></b></br>\n";   
@@ -111,9 +99,10 @@ if ($fcn == 'plot') {
         "</font></b></p>\n";
     $legend = array('fix', 'aws38copy', 'gce38copy', 'gce38bcf', 'b38', 'gce38pull', 'gce38push',
         'b37', 'qplot', 'gcebackup', 'cram', 'verify' );    // Reversed
-    $title = "Current Counts for Each Step [$totalbamcount Verified BAMs]";
+    $title = "Counts for All Verified Samples [$totalbamcount]";
     $plotdata = array();
-    $s = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE datayear=$datayear AND";
+    //$s = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE datayear=$datayear AND";
+    $s = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE ";
     foreach ($legend as &$c) {  
         $d = array();
         array_push($d, $c);
@@ -187,9 +176,9 @@ if ($fcn == 'plot') {
     //-------------------------------------------------------------------
     //  Details about steps sending data to NCBI
     //-------------------------------------------------------------------
-    print "<h4>Google Cloud Activity</h4>\n";
-    $title = "Daily Count of Samples PUSHed to GCE";
-    $legend = array('push', 'pull', 'post');
+    print "<h4>Cloud Activity</h4>\n";
+    $title = "Daily Count of Samples to/from Cloud";
+    $legend = array('gcepush', 'gcepull', 'gcecopy', 'awscopy');
     $title = "Daily Count of Steps Completed";
     $plotdata = array(); 
     for ($i=0; $i<$numrows; $i++) {
@@ -199,12 +188,13 @@ if ($fcn == 'plot') {
         array_push($d, substr($row['yyyymmdd'],5,5));
         array_push($d, $row['count_gcepush']);
         array_push($d, $row['count_gcepull']);
-        array_push($d, $row['count_gcepost']);
+        array_push($d, $row['count_gcecopy']);
+        array_push($d, $row['count_awscopy']);
         array_push($plotdata, $d);
     }
     MakePlot($plotdata, $title, $legend);
 
-    $title = "Ave Time for GCE-Related Steps";
+    $title = "Ave Time for Cloud Related Steps";
     $plotdata = array(); 
     for ($i=0; $i<$numrows; $i++) {
         $row = $sqldata[$i];
@@ -213,7 +203,8 @@ if ($fcn == 'plot') {
         array_push($d, substr($row['yyyymmdd'],5,5));
         array_push($d, $row['avetime_gcepush']);
         array_push($d, $row['avetime_gcepull']);
-        array_push($d, $row['avetime_gcepost']);
+        array_push($d, $row['avetime_gcecopy']);
+        array_push($d, $row['avetime_awscopy']);
         array_push($plotdata, $d);
     }
     MakePlot($plotdata, $title, $legend, 'Seconds', 'y');
@@ -229,6 +220,20 @@ Nice_Exit("How'd you do that?");
 exit;
 
 /*    DEAD CODE
+
+$totalcompletedbams = '';
+$sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE datayear=$datayear AND state_ncbiorig=$COMPLETED";
+$result = SQL_Query($sql);
+$row = SQL_Fetch($result);
+$totalcompletedbams .= $row['count(*)'] . '/';
+$sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE datayear=$datayear AND state_ncbib37=$COMPLETED";
+$result = SQL_Query($sql);
+$row = SQL_Fetch($result);
+$totalcompletedbams .= $row['count(*)'] . '/';
+$sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE datayear=$datayear AND state_b38=$COMPLETED";
+$result = SQL_Query($sql);
+$row = SQL_Fetch($result);
+$totalcompletedbams .= $row['count(*)'];
 
     //-------------------------------------------------------------------
     //  Details about steps sending data to NCBI
