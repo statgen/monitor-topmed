@@ -6,9 +6,7 @@
 #
 
 . /usr/cluster/topmed/bin/topmed_actions.inc
-aws="aws --profile nhlbi-data-commons s3"
-awsuri=`$topmedpath wherepath $nwdid awsupload`
-
+aws="/usr/local/bin/aws --profile nhlbi-data-commons s3"
 me=awscopy
 markverb=$me
 stat="stat --printf=%s --dereference"
@@ -34,6 +32,11 @@ bamid=$1
 Started
 nwdid=`GetNWDID $bamid`
 stime=`date +%s`
+
+awsuri=`$topmedpath wherepath $nwdid awsupload`
+if [ "$awsuri" = "" ]; then
+  Fail "Unable to figure out AWS URI"
+fi
 
 #   Get remapped cram file
 recabcram=`$topmedpath wherefile $bamid b38`
