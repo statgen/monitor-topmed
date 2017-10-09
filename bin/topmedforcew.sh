@@ -61,6 +61,7 @@ function ProcessRuns {
       if [ "$year" = "0" ]; then
         echo "Cannot figure out the year for '$r'"
         ls -l $r/Manifest.txt
+        return
       else
         date
         echo "New run '$r' year $year for '$center' found"
@@ -98,7 +99,7 @@ function ProcessRuns {
 #   Main line code
 #=========================================================
 wait=$((1 + RANDOM % 20))
-sleep $wait                 # Wait a little bit to avoid messing up logs
+sleep $wait                     # Wait a little bit to avoid messing up logs
 
 #   Capture output in local file and if there is something append to useful log
 locallog=/tmp/topmedforcew.log.$$
@@ -107,5 +108,6 @@ ProcessRuns washu  >> $locallog
 if [ ! -z $locallog ]; then
   su $topuser -c "(cat $locallog >> /net/topmed/working/topmed-output/topmed_init.log)"
 fi
+chown topmed $locallog          # Then I remove these
 #rm -f $locallog
 exit
