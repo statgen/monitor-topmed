@@ -53,6 +53,7 @@ fi
 stime=`date +%s`
 
 #   Remapped cram could be > one place (arrgh!)  Figure out where it is
+#   E.G. unuri=gs://topmed-recabs/NWD947950/NWD947950.recab.cram
 inuri=''
 p="$incominguri/$nwdid/$nwdid.recab.cram"
 $gsutil stat "$p"
@@ -65,15 +66,15 @@ fi
 
 #   Now know where to look for data. Check flagstat
 echo "Checking if flagstat is as we expect from $inuri"
-$gsutil cp  $inuri/$nwdid/$nwdid.recab.cram.flagstat $crampath
+$gsutil cp  $inuri.flagstat $crampath
 if [ "$?" != "0" ]; then
-  Fail "Failed to copy flagstat from GCE: $inuri/$nwdid/$nwdid.recab.cram.flagstat"
+  Fail "Failed to copy flagstat from GCE: $inuri.flagstat"
 fi
 #   Get number of interest from flagstat file and check it
 n=`grep 'paired in sequencing' $crampath/$nwdid.recab.cram.flagstat | awk '{print $1}'`
 if [ "$n" != "$cramflagstat" ]; then
   # Renaming the flagstat file stops pull from happening again
-  $gsutil mv $inuri/$nwdid/$nwdid.recab.cram.flagstat $inuri/$nwdid/$nwdid.recab.cram.flagstat.nomatch
+  $gsutil mv $inuri.flagstat $inuri.flagstat.nomatch
   Fail "Flagstat '$n' did not match cramflagstat '$cramflagstat' for bamid '$bamid' nwdid $nwdid  -- URL=$inuri"
 fi
 echo "Flagstat value is correct: $n"
@@ -86,9 +87,9 @@ if [ -f $f ]; then
 fi
 
 echo "Copying remapped CRAM to local file $crampath"
-$gsutil cp $inuri/$nwdid/$nwdid.recab.cram $crampath
+$gsutil cp $inuri $crampath
 if [ "$?" != "0" ]; then
-  Fail "Failed to copy file from GCE $inuri/$nwdid/$nwdid.recab.cram $crampath"
+  Fail "Failed to copy file from GCE $inuri $crampath"
 fi
 
 #   Remapping can still result in a trashed file
@@ -110,16 +111,12 @@ SetDB $bamid b${build}flagstat $cramflagstat
 $topmedcmd setdate $bamid datemapping_b38 $cramfile
 
 #   Clean up data in GCE if data found in incoming.  Move remapped data to bcf bucket
-if [ "$inuri" = "$incominguri" ]; then
-  $gsutil mv $incominguri/$nwdid/$cramfile.flagstat  $bcfuri/$nwdid/$cramfile.flagstat
-  $gsutil mv $incominguri/$nwdid/$cramfile           $bcfuri/$nwdid/$cramfile
-  echo "Moved $incominguri/$nwdid to $bcfuri/$nwdid"
-  #   Remove any left over cruft in recabs bucket
-  echo "Removing $incominguri/$nwdid"
-  $gsutil rm -r $incominguri/$nwdid
-else
-  echo "Data was not found in $incominguri so we leave it where it was"
-fi
+$gsutil mv $inuri.flagstat  $bcfuri/$nwdid
+$gsutil mv $inuri         $bcfuri/$nwdid
+echo "Moved $inuri files to $bcfuri/$nwdid"
+#   Remove any left over cruft in recabs bucket
+echo "Removing $incominguri/$nwdid"
+$gsutil rm -r $incominguri/$nwdid
 
 etime=`date +%s`
 etime=`expr $etime - $stime`
