@@ -3,8 +3,6 @@ package Topmed::Constants;
 use base qw(Exporter);
 use Readonly;
 
-use Topmed::Base;
-
 our @EXPORT = (
   qw(
     $EMPTY
