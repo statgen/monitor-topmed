@@ -61,6 +61,10 @@ fi
 f=`basename $recabcram`
 echo "$b38cramchecksum $f" > $recabcram.md5
 
+#   Pass along flagstat too
+flagstat=`GetDB $bamid cramflagstat`
+echo "$flagstat + 0 paired in sequencing" > $recabcram.flagstat
+
 baserecabcrai=`basename $recabcrai`
 sizerecabcrai=`$stat $recabcrai`
 
@@ -105,11 +109,11 @@ gcesize=${l[1]}
 if [ "$sizerecabcram" != "$gcesize" ]; then
   echo "$baserecabcram sizes= $sizerecabcram / $gcesize"
   if [ "$gcesize" = "" ]; then
-    cmissing="$cmissing $baserecabcram $baserecabcrai $recabcram.md5"
-    cmissinglist="$cmissinglist $recabcram $recabcrai $recabcram.md5"
+    cmissing="$cmissing $baserecabcram $baserecabcrai $recabcram.md5 $recabcram.flagstat"
+    cmissinglist="$cmissinglist $recabcram $recabcrai $recabcram.md5 $recabcram.flagstat"
   else
-    replacelist="$replacelist $recabcram $recabcrai $recabcram.md5"
-    rlist="$rlist $baserecabcram $baserecabcrai  $recabcram.md5"
+    replacelist="$replacelist $recabcram $recabcrai $recabcram.md5 $recabcram.flagstat"
+    rlist="$rlist $baserecabcram $baserecabcrai  $recabcram.md5 $recabcram.flagstat"
   fi
 else
   l=(`$gsutil stat $copyuri/$baserecabcrai | grep Content-Length:`)
@@ -117,11 +121,11 @@ gcesize=${l[1]}
   if [ "$sizerecabcrai" != "$gcesize" ]; then
     echo "$baserecabcrai sizes= $sizerecabcrai / $gcesize"
     if [ "$gcesize" = "" ]; then
-      cmissing="$cmissing $baserecabcrai $recabcram.md5"
-      cmissinglist="$cmissinglist $recabcrai $recabcram.md5"
+      cmissing="$cmissing $baserecabcrai $recabcram.md5 $recabcram.flagstat"
+      cmissinglist="$cmissinglist $recabcrai $recabcram.md5 $recabcram.flagstat"
     else
-      replacelist="$replacelist $recabcrai $recabcram.md5"
-      rlist="$rlist $baserecabcrai $recabcram.md5"
+      replacelist="$replacelist $recabcrai $recabcram.md5 $recabcram.flagstat"
+      rlist="$rlist $baserecabcrai $recabcram.md5 $recabcram.flagstat"
     fi
   fi
 fi
