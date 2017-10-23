@@ -58,6 +58,15 @@ function Log {
 
 #------------------------------------------------------------------
 # Subroutine:
+#   Warn(msg)
+#   Writes msg to stderr cause I can never remember how to in bash
+#------------------------------------------------------------------
+function Warn {
+  >&2 echo $*
+}
+
+#------------------------------------------------------------------
+# Subroutine:
 #   Fail(msg)             Mark database as failed, save error msg
 #   Uses global variables: $bamid $markverb
 #   Does not return
@@ -210,20 +219,15 @@ function GetBuild {
 
 #------------------------------------------------------------------
 # Subroutine:
-#   CreateIndex(bamid,file)    Create CRAM or BAM index
+#   ipath=`ValidateIndex(bamid,file)`
 #
-#	samtools can fail in multiple ways and never tell us
-#   This script attempts to centralize all known attempts
-#   to check for samtools errors for an index file
-#   so we can possibly insure the index file will work  (POS)
+#   file must exist
+#
+#	print indexfile_path valid_or_not
 #------------------------------------------------------------------
-function CreateIndex {
+function ValidateIndex {
   local bamid=$1
-  local file=$2
-
-  if [ ! -f $file ]; then
-    Fail "File '$file' does not exist, no index can be created"
-  fi
+  local file=$2         # BAM or CRAM
 
   #  To verify an index, we search for a string - depending on the extension
   ext="${file##*.}"
@@ -244,51 +248,80 @@ function CreateIndex {
     fi
   fi
   if [ "buildstr" = 'notset' ]; then
-    Fail "Unable to determine string to search for in header of $file"
+    Fail "ValidateIndex: Unable to determine string to search for in header of $file"
   fi
 
-  #   If index file is zero length, recreate it
-  if [ -z $indexfile ]; then
-    rm -f $indexfile
+  #   Index must exist and not be null
+  if [ ! -f $indexfile ]; then
+    echo "$indexfile invalid"
+    return
+  fi
+  if [ ! -s $indexfile ]; then
+    echo "$indexfile invalid"
+    return
   fi
 
   #   Index exists, let's see if it is any good
-  if [ -f $indexfile ]; then
-    n=`$samtools view $file $buildstr | wc -l`
-    if [ "$n" = "" -o "$n" -lt "100" ]; then
-      echo "Index '$indexfile' is invalid, force re-create"
-      rm -f $indexfile                  # Remove bad index
-      #   This might be a trashed reference index for samtools, if so remove it
-      if [ "$me" != "" ]; then
-        consfile="$console/$bamid-$me.out"
-        a=`grep 'cram_ref_load: Assertion' $consfile`     # Could fail if $me not defined
-        if [ "$a" != "" ]; then
-          rm -rf $HOME/.cache/hts-ref/*/*
-          echo "Samtools cram_ref_load error, removed dirty reference cache and retrying"
-        fi
+  n=`$samtools view $file $buildstr | wc -l`
+  if [ "$n" = "" -o "$n" -lt "100" ]; then
+    #   This might be a trashed reference index for samtools, if so remove it
+    if [ "$me" != "" ]; then
+      consfile="$console/$bamid-$me.out"
+      a=`grep 'cram_ref_load: Assertion' $consfile`     # Could fail if $me not defined
+      if [ "$a" != "" ]; then
+        rm -rf $HOME/.cache/hts-ref/*/*
+         >&2 echo "Samtools cram_ref_load error, removed dirty reference cache and retrying"
       fi
-    else
-      echo "Index file '$indexfile' is valid apparently"
-      return
-    fi
+    fi 
+    echo "$indexfile invalid"
+    return
+  fi
+  echo "$indexfile valid"
+  return
+}
+
+#------------------------------------------------------------------
+# Subroutine:
+#   CreateIndex(bamid,file)    Create CRAM or BAM index
+#
+#	samtools can fail in multiple ways and never tell us
+#   This script attempts to centralize all known attempts
+#   to check for samtools errors for an index file
+#   so we can possibly insure the index file will work  (POS)
+#------------------------------------------------------------------
+function CreateIndex {
+  local bamid=$1
+  local file=$2
+
+  if [ ! -f $file ]; then
+    Fail "File '$file' does not exist, no index can be created"
+  fi
+
+  s=(`ValidateIndex $bamid $file`)
+  indexfile="${s[0]}"           # Path to index file
+  status="${s[1]}"              # valid or invalid
+  if [ "$status" = "valid" ]; then
+    echo "Index file '$indexfile' is valid apparently"
+    return
   fi
 
   #   Create the index file
   echo "Creating index file '$indexfile'"
   $samtools index $file 2>&1
-  if [ "$?" = "0" ]; then           # Successful, now see if it is valid
-    n=`$samtools view $file $buildstr | wc -l`
-    if [ "$n" = "" -o "$n" -lt "100" ]; then
-      #rm -f $indexfile              # Remove bad index
-      Fail "Newly created index '$indexfile' was invalid and was removed ($buildstr). Try, try again."
-    else
-      echo "Created and validated index '$indexfile'"
-    fi
-  else
+  if [ "$?" != "0" ]; then
     Fail "Unable to create index for '$file'"
   fi
-}
 
+  #  Just because samtools gave zero return code, does not mean real success. Check again :-(
+  s=(`ValidateIndex $bamid $file`)
+  status="${s[1]}"               # valid or invalid
+  if [ "$status" = "valid" ]; then
+    echo "Created and validated index '$indexfile'"
+    return
+  fi
+  rm -f $indexfile
+  Fail "Newly created index '$indexfile' was invalid and was removed. Try, try again."
+}
 
 #------------------------------------------------------------------
 # Subroutine:
@@ -321,7 +354,7 @@ function CalcFlagstat {
   if [ "${a[0]}" = "" ]; then
     Fail "Unable to get reads of paired in sequencing from '$of' for '$file'"
   fi
-  rm -f $outfile
+  rm -f $of
   echo ${a[0]}
 }
 
@@ -378,7 +411,9 @@ function SubmitJob {
   if [ "${l[0]}" = "Submitted" ]; then      
     echo `date` $me ${l[3]} $slurmp $qos $mem >> $console/$bamid.jobids
   fi
-  $topmedcmd mark $bamid $markverb submitted
+  if [ "$markverb" != "" ]; then
+    $topmedcmd mark $bamid $markverb submitted
+  fi
   exit
 }
 
@@ -420,6 +455,8 @@ function SubmitSRUN {
   if [ "${l[0]}" = "Submitted" ]; then      
     echo `date` $me ${l[3]} $slurmp $qos $mem >> $console/$bamid.jobids
   fi
-  $topmedcmd mark $bamid $markverb submitted
+  if [ "$markverb" != "" ]; then
+    $topmedcmd mark $bamid $markverb submitted
+  fi
   exit
 }
