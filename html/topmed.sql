@@ -115,7 +115,7 @@ CREATE TABLE bamfiles (
   datearrived  VARCHAR(12),             /* Referenced in nhlbi_qc_metrics */
   bamsize      VARCHAR(16) DEFAULT 0,   /* Referenced in nhlbi_qc_metrics */
   datayear     INT DEFAULT 3,           /* Year of project: 1, 2 ... */\
-  build        VARCHAR(4) DEFAULT '37', /* Build original input file user, 37, 38 etc */
+  build        VARCHAR(4) DEFAULT '38', /* Build original input file user, 37, 38 etc */
   dateinit     VARCHAR(12),             /* Referenced in nhlbi_qc_metrics */
   bamname_orig VARCHAR(96) NOT NULL,
   offsite      CHAR(1) DEFAULT 'N',     /* Original files kept offsite (N,Y,D) */
