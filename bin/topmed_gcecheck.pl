@@ -100,6 +100,9 @@ sub MarkState {
             $countcannot++;
             next;
         }
+        if ($href->{state_gce38pull} == $REQUESTED) { next; }
+        if ($href->{state_gce38pull} == $SUBMITTED) { next; }
+        if ($href->{state_gce38pull} == $STARTED) { next; }
 
         #   Mark sample to be pulled
         $sql = "UPDATE $opts{bamfiles_table} SET state_gce38pull=$REQUESTED " .
