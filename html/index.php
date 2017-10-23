@@ -814,7 +814,8 @@ function RestartJobs($h) {
         "<option value='gce38pull'>pull</option>" .
         "<option value='gce38post'>post</option>" .
         "<option value='bcf'>bcf</option>" .
-        "<option value='gce38copy'>upload</option>" .
+        "<option value='gce38copy'>gcecopy</option>" .
+        "<option value='aws38copy'>awscopy</option>" .
         "</select></td>" .
         "<td><font color='green'>&nbsp; </font></td>" .
         "<td>&nbsp;</td>" .
