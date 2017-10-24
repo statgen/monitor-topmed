@@ -11,6 +11,12 @@ markverb=fix
 if [ "$1" = "-submit" ]; then
   shift
   bamid=`GetDB $1 bamid`
+  b38=`GetDB $bamid state_b38`
+  if [ "$b38" != "20" ]; then
+    SetDB $bamid state_fix 0            # We will do this later
+    echo "No B38 cram, do not submit job for $bamid"
+    exit
+  fi
   #MayIRun $me  $bamid
   #h=(`$topmedpath wherepath $bamid b38 | sed -e 's:/: :g'`)
   #realhost=${h[1]}
@@ -39,6 +45,13 @@ if [ "$1" = "" ]; then
 fi
 
 bamid=$1
+
+b38=`GetDB $bamid state_b38`
+if [ "$b38" != "20" ]; then
+  SetDB $bamid state_fix 0            # We will do this later
+  echo "No B38 cram, do not attempt fix for $bamid"
+  exit
+fi
 
 Started
 
