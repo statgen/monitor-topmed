@@ -429,7 +429,7 @@ if ($fcn eq 'fix') {
         if ($opts{suberr} && $href->{state_fix} >= $FAILEDCHECKSUM) {
             $href->{state_fix} = $REQUESTED;
         }
-        if ($href->{state_fix} != $REQUESTED && $href->{state_fix} != $NOTSET) { next; }
+        if ($href->{state_fix} != $REQUESTED) { next; }
         if (! BatchSubmit("$opts{topmedfix} -submit $href->{bamid}")) { last; }
     }
     ShowSummary($fcn);
