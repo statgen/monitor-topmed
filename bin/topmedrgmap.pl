@@ -97,13 +97,15 @@ while(<$in>) {
     $id =~ s/^ID://;
     foreach my $key (keys %h) {
 	    if ( $id eq $key ) { die "$Script - ERROR: Duplicate RG IDs observed.\n"; }
-	    if ( $id =~ /^$key/ ) { 	# if id contains key -- most common cases	
+        #  Jonathan thinks this should be the case:
+        if ( $id =~ /^$key\-[A-F0-9]{8}$/ ) { 
 	        push(@{$h{$key}}, $id);
 	        $found = 1;
 	        $uniq = 0;
 	        last;
 	    }
-	    if ( $key =~ /^$id/ ) {
+	    #  Jonathan thinks this should be the case:
+	    if ( $key =~ /^$id\-[A-F0-9]{8}$/ ) {
 	        die "$Script - ERROR: Strange order of RG observed: $id after $key\n"; }
     }
     if ( $found == 0 ) { $h{$id} = [$id]; }
@@ -132,7 +134,7 @@ foreach my $id (sort keys %h) {
 }
 close($out);
 print "RGMAP for '$cramfile' [$nwdid] is invalid. Created rgmap file '$rgmapfile'\n";
-exit(1);
+exit;
 
 #==================================================================
 #   Perldoc Documentation
@@ -145,7 +147,7 @@ topmedrgmap.pl - Create an rgmap file to correct headers in a cram
 
 =head1 SYNOPSIS
  
-  topmedrgmap.pl 2199 /tmp/2199.rgmap      # Creates rgmap for NWD433184  rc=1, rc=0 if ok
+  topmedrgmap.pl 2199 /tmp/2199.rgmap      # Creates rgmap for NWD433184
   topmedrgmap.pl NWD433184 /tmp/2199.rgmap      # Same
   
   topmedrgmap.pl -check 2199 /dev/null     # rc=1 if invalid, rc=0 if valid
@@ -159,7 +161,7 @@ If the input cram (identified by it's NWDID) is valid, no rgmap is created
 and the return code is zero.
 
 If the input cram header is NOT valid, an rgmap is created
-and the return code is one.
+and the return code is zero.
 
 
 =head1 OPTIONS
