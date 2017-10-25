@@ -41,7 +41,7 @@ our %opts = (
     netdir => '/net/topmed',
     bamfiles_table => 'bamfiles',
     runs_table => 'runs',
-    squeuecmd => "/usr/cluster/bin/squeue -a -o '%.9i %.15P %.18q %.14j %.8u %.2t %.8M %.6D %R %.9n' -p topmed-working",    
+    squeuecmd => "/usr/cluster/bin/squeue -a -o '%.9i %.15P %.18q %.15j %.8u %.2t %.8M %.6D %R %.9n' -p topmed-working",    
     verbose => 0,
     maxlongjobs => 6,
     consoledir => 'working/topmed-output',
@@ -93,8 +93,8 @@ sub SQueue {
             $mosixrunning{$c[4]}++;    # Count of running jobs for this user
             next;
         }
-        if ($c[1] !~ /^topmed/) { next; }    # Only want my partition of interest
-        if ($c[4] ne 'topmed' && $c[4] ne 'schelcj') {  # Save partition and not topmed user
+        if ($c[1] !~ /^topmed/) { next; }   # Only want my partition of interest
+        if ($c[4] ne 'topmed') {            # Save partition and not topmed user
             $nottopmed{$c[1]}{$c[4]} = 1;
             next;
         }
