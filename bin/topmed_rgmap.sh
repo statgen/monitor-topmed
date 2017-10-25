@@ -22,7 +22,7 @@ if [ "$2" != "" ]; then
 fi
 build=b38
 
-Started
+#Started
 
 echo "# $0 $bamid $nwdid  -- redo header for mis-mapped b38 crams"
 recab=`$topmedpath wherefile $bamid b38`
@@ -35,7 +35,15 @@ nwdid=`GetDB $bamid expt_sampleid`
 
 #   Build correct rg mapping file. No check of return code as we already know it
 rgmap=$tmpdir/$nwdid.rgmap
-/usr/cluster/topmed/bin/topmedrgmap.pl $bamid $rgmap
+efile=/tmp/$bamid.err
+/usr/cluster/topmed/bin/topmedrgmap.pl $bamid $rgmap 2> $efile
+if [ "$?" != "0" ]; then
+  e=`cat $efile`
+  rm -f $efile
+  Warn "Create rgmap failed: $e" 
+  exit 2
+fi
+rm -f $efile
 
 if [ ! -f $newrecab ]; then
   stime=`date +%s`
