@@ -53,16 +53,45 @@ if [ "$b38" != "20" ]; then
   exit
 fi
 
+
 Started
 
 echo "# $0 $bamid $nwdid  -- redo header for mis-mapped b38 crams"
 fixlog=$console/fix.log
-stime=`date +%s`
-/usr/cluster/topmed/bin/topmed_rgmap.sh $bamid $markverb
-if [ "$?" != "0" ]; then
-  echo "Unable to correct rgmap bamid=$bamid" >> $fixlog
-  Fail "Unable to correct rgmap" 
+CheckRGMap $bamid
+if [ "$?" = "0" ]; then
+  SetDB $bamid state_fix 20           # Mark sample as fixed so no rgmap needed
+  echo "No need to fix $bamid" >> $fixlog
+  echo "No need to fix $bamid"
+  Successful
+  exit
 fi
+
+stime=`date +%s`
+rgmapmsg=/tmp/$bamid.fixerr
+/usr/cluster/topmed/bin/topmed_rgmap.sh $bamid $markverb 2> $rgmapmsg
+if [ "$?" != "0" ]; then
+  remap=''
+  a=`grep 'Strange order' $rgmapmsg`        # Maybe this must be remapped
+  if [ "$a" = "" ]; then
+    a=`grep 'must be remapped' $rgmapmsg`
+  fi
+  if [ "$a" != "" ]; then
+    remap='Remap this sample'
+    SetDB $bamid state_fix 0
+    SetDB $bamid state_b38 0
+    SetDB $bamid state_gce38copy 0
+    SetDB $bamid state_aws38copy 0
+    SetDB $bamid state_gce38bcf 0
+    SetDB $bamid state_gce38pull 0
+    #SetDB $bamid state_gce38push 0
+  fi
+  e=`cat $rgmapmsg`
+  rm -f $rgmapmsg
+  echo "Unable to correct rgmap bamid=$bamid $remap: $e" >> $fixlog
+  Fail "$e"
+fi
+rm -f $rgmapmsg
 
 echo "Corrected rgmap for recab for $bamid" >> $fixlog
 Successful
