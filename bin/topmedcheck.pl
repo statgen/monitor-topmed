@@ -101,6 +101,7 @@ if (@ARGV) {                # Maybe one or a range of bamids specified
     for my $b (@input) {
         my $sql = "SELECT bamid,expt_sampleid FROM $opts{bamfiles_table} WHERE ";
         if ($b =~ /^NWD/) { $sql .= "expt_sampleid='$b'"; }
+        else { $sql .= "bamid=$b"; }
         if ($morewhere) { $sql .= ' ' . $morewhere; }
         my $sth = DoSQL($sql);
         GetArrayOfSamples($sth);
@@ -115,7 +116,7 @@ else {                      # Range specified by center or run
             #   Get bamid for every run
             foreach my $runid (keys %{$runsref}) {
                 my $sql = "SELECT bamid,expt_sampleid FROM $opts{bamfiles_table} " .
-                    "WHERE runid=$runid " . $morewhere;
+                    "WHERE runid=$runid AND state_cram=20 " . $morewhere;
                 my $sth = DoSQL($sql);
                 GetArrayOfSamples($sth);
             }
@@ -124,7 +125,7 @@ else {                      # Range specified by center or run
     #   Get all bamids for this run
     if ($opts{run}) {
         if ($opts{run}=~/\D+/) {               # Get runid from dirname
-            my $sql = "SELECT runid FROM $opts{runs_table} WHERE dirname='$opts{run}'";
+            my $sql = "SELECT runid FROM $opts{runs_table} WHERE state_cram=20 AND dirname='$opts{run}'";
             my $sth = DoSQL($sql);
             if (! $sth) { die "$Script - Unknown run '$opts{run}'\n"; }
             my $href = $sth->fetchrow_hashref;
@@ -239,10 +240,12 @@ sub Check_DB {
     $c = 'bamflagstat';
     if ($href->{$c} !~ /^\d+$/) { push @error,"Column $c $href->{$c} must be numeric"; }
 
-    $c = 'cramflagstat';
-    if ($href->{$c} !~ /^\d+$/) { push @error,"Column $c $href->{$c} must be numeric"; }
-    if ($href->{bamflagstat} ne $href->{$c}) {
-        push @error,"Column $c $href->{$c} must match bamflagstat $href->{bamflagstat}";
+    if ($href->{state_cram} == $COMPLETED) {
+        $c = 'cramflagstat';
+        if ($href->{$c} !~ /^\d+$/) { push @error,"Column $c $href->{$c} must be numeric"; }
+        if ($href->{bamflagstat} ne $href->{$c}) {
+            push @error,"Column $c $href->{$c} must match bamflagstat $href->{bamflagstat}";
+        }
     }
 
     if ($href->{state_b37} == $COMPLETED) {
@@ -513,7 +516,7 @@ sub VerifyFile {
     }
     my $filetime = $s[9];
     my $filesize = $s[7];
-    if (($ext eq 'bam' || $ext eq 'cram') && $filesize < 1e+10) {
+    if (($ext eq 'bam' || $ext eq 'cram') && $filesize < 7288450000) {
         return "File seems too small ($filesize)";
     }
 
@@ -540,19 +543,21 @@ sub VerifyFile {
 #==================================================================
 sub ShowErrors {
     my ($b, $nwd, $aref) = @_;
-    #   If there were problems, show messages
-    if (! @{$aref}) { return; }
     print "  Errors for BAMID=$b  NWD=$nwd -\n";
     foreach my $e (@{$aref}) {
-        print '    ';
-        if ($opts{fixer}) { print $opts{fixer} . ' '; }
-        print $bamid . ' ' . $e . "\n";
-        if ($opts{execfixer} && $opts{fixer}) {
-            my $cmd = "$opts{fixer} $e";
-            print "  EXECUTING: $cmd\n";
-            #system($cmd);
+        if ($opts{fixer}) {
+            my $cmd = $opts{fixer} . ' ' . $b . ' ' . $e;
+            if ($opts{execfixer}) { 
+                print "  EXECUTING: $cmd\n";
+                system($cmd);
+            }
+            else { print "  $cmd\n"; }
+        }
+        else {
+            print $b . ' ' . $e . "\n";
         }
     }
+my $a=$b;
 }
 
 #==================================================================
