@@ -52,7 +52,7 @@ if [ "$run" = "" ]; then
   Fail "Unable to get run for bamid '$bamid'"
 fi
 datayear=`GetDB $bamid datayear`
-if [ "$datayear" = "3" ]; then
+if [ "$datayear" = "4" ]; then          # Allow year 3 to be remapped
   build=`GetDB $bamid build`
   if [ "$build" = "38" ]; then
     stime=`date +%s`
@@ -104,7 +104,7 @@ fi
 
 stime=`date +%s`
 echo "Copying CRAM to $incominguri/$center/$run/$nwdid.src.cram"
-$gsutil cp $cramfile $incominguri/$center/$run/$nwdid.src.cram
+$gsutilbig cp $cramfile $incominguri/$center/$run/$nwdid.src.cram
 if [ "$?" != "0" ]; then
   Fail "Failed to copy file to GCE"
 fi
