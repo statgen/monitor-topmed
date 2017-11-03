@@ -13,7 +13,13 @@ if [ "$1" = "-submit" ]; then
   shift
   bamid=`GetDB $1 bamid`
   cramfile=`$topmedpath wherefile $bamid b$build`
+  if [ "$cramfile" = "" ]; then
+    Fail "Failed to find '$cramfile'"
+  fi
   filesize=`stat --printf=%s $cramfile`
+  if [ "$filesize" = "" ]; then
+    Fail "Unable to get filesize for '$cramfile'"
+  fi
   mem=48G
   #   Large crams can require LOTS of memory
   if [ "$filesize" -gt "40255183256" ]; then
