@@ -20,15 +20,14 @@ if [ "$#" -gt "5" ]; then
   # Figure out exactly what action to do, only pass relevent arguments to batch job
   if [ "$4 $5" = "must match" ]; then
     myargs="$bamid calcflagstat $2 $6 $7"   # e.g. redo.sh bamid calcflagstat b38flagstat bamflagstat 924109044
-    if [ "$7" = "0" ]; then
-      echo "No point in calculating flagstats for $2 since $6 = $7"
-      exit
-    fi
   fi
   if [ "$5 $6 $7" = "Index is older:" ]; then
     myargs="$bamid makeindex $8"            # e.g. redo.sh bamid makindex .../NWD219226-HG5J7ALXX-3.hgv.bam
   fi
   if [ "$2 $3" = "Index missing" ]; then
+    myargs="$bamid makeindex $7"
+  fi
+  if [ "$5 $6" = "Index missing:" ]; then    # .e.g. redo.sh 71297 CRAM index is invalid: Index missing: .../NWD381318.src.cram
     myargs="$bamid makeindex $7"
   fi
   if [ "$1 $2 $3 $4" = "GCE recab.cram.flagstat file missing:" ]; then
@@ -49,7 +48,8 @@ if [ "$#" -gt "5" ]; then
 
   if [ "$myargs" != "" ]; then
     echo "Submitting job to topmed-redo($realhost): $0 $myargs"
-    SubmitJob $bamid "topmed-redo" '4G' "$0 $myargs"
+    echo "$0 $myargs" >> /tmp/$realhost.runjobs.txt
+    #SubmitJob $bamid "topmed-redo" '4G' "$0 $myargs"
     exit
   else
     echo "$me - unable to determine exactly what action to redo: $*"
@@ -73,21 +73,40 @@ if [ "$action" = "calcflagstat" ]; then
   if [ "$3" = "b37flagstat" ]; then       # Figure out which file we want
     f=`$topmedpath wherefile $bamid b37`
   fi
+  if [ "$3" = "cramflagstat" ]; then      # Figure out which file we want
+    f=`$topmedpath wherefile $bamid cram`
+  fi
   if [ "$f" = "" ]; then
     Fail "$action - Could not determine file: $*"
   fi
-  b=`CalcFlagstat $bamid $f`
-  if [ "$b" = "" ]; then
-    Fail "$action - Unable to calculate flagstat for $bamid f=$f"
-  fi
-  #  If expected value is 0, pretend all is good, else compare
+  
+  #  If expected value is zero, must calculate that flagstat first
   if [ "$5" = "0" ]; then
-    echo "Setting $3 and $4 to $b for $bamid"
+    if [ "$4" != "bamflagstat" ]; then
+      Fail "Cannot figure out flagstat for $4"
+    fi
+    f=`$topmedpath wherefile $bamid bam`
+    b=`CalcFlagstat $bamid $f`
+    if [ "$b" = "" ]; then
+      Fail "$action - Unable to calculate flagstat for $bamid f=$f"
+    fi
     SetDB $bamid $3 $b
     SetDB $bamid $4 $b
     SetDB $bamid state_gce38copy 1
+    echo "Calculated and set flagstat [$b] for $3 and $4"
     exit
   fi
+  #  If this is year 3, no need to calculate a value
+  y=`GetDB $bamid datayear`
+  if [ "$y" = "3" ]; then
+    b=$5
+  else
+    b=`CalcFlagstat $bamid $f`
+    if [ "$b" = "" ]; then
+      Fail "$action - Unable to calculate flagstat for $bamid f=$f"
+    fi
+  fi
+  #  Compare flagstat we just calculated and set values
   if [ "$b" = "$5" ]; then
     SetDB $bamid $3 $b
     SetDB $bamid state_gce38copy 1
