@@ -79,12 +79,12 @@ if [ "$?" != "0" ]; then
   if [ "$a" != "" ]; then
     remap='Remap this sample'
     SetDB $bamid state_fix 0
-    SetDB $bamid state_b38 0
+##    SetDB $bamid state_b38 0          # Now we are doing this for year 3 data !
     SetDB $bamid state_gce38copy 0
     SetDB $bamid state_aws38copy 0
-    SetDB $bamid state_gce38bcf 0
-    SetDB $bamid state_gce38pull 0
-    #SetDB $bamid state_gce38push 0
+##    SetDB $bamid state_gce38bcf 0
+##    SetDB $bamid state_gce38pull 0
+##    SetDB $bamid state_gce38push 0
   fi
   e=`cat $rgmapmsg`
   rm -f $rgmapmsg
