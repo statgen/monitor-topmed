@@ -417,14 +417,15 @@ if ($fcn eq 'awscopy') {
 #--------------------------------------------------------------
 if ($fcn eq 'fix') {
     #   Get list of all samples yet to process
+    my $s = '';
+    if ($opts{center}) { $s = 'b.'; }   # Deal with quirk BuildSQL
     my $sql = BuildSQL("SELECT bamid,state_fix FROM $opts{bamfiles_table}",
-        "WHERE state_fix!=$COMPLETED AND datayear!=3");
+        "WHERE ${s}state_fix!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { exit; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
-        #if ($href->{datayear} == 3) { next; }
         if ($href->{state_fix} == $COMPLETED) { next; }
         if ($opts{suberr} && $href->{state_fix} >= $FAILEDCHECKSUM) {
             $href->{state_fix} = $REQUESTED;
