@@ -84,6 +84,7 @@ SetDB $bamid b38flagstat $n
 f=$crampath/$nwdid.recab.cram
 if [ -f $f ]; then
   echo "Replacing existing CRAM $f"
+  rm -f $f $f.crai
 fi
 
 echo "Copying remapped CRAM to local file $crampath"
@@ -123,21 +124,21 @@ etime=`expr $etime - $stime`
 echo "Copy of remapped CRAM from GCE to $crampath completed in $etime seconds"
 
 ######### Temporary - sometimes remapping screwed up header, rebuild if needed
-year=`GetDB $bamid datayear`
-if [ "$year" != "3" ]; then
-  CheckRGMap $bamid
-  if [ "$?" != "0" ]; then
-    echo "#======================================================================"
-    echo "#    RGMAP for cramfile is broken, rebuild"
-    echo "#======================================================================"
-    SetDB $bamid state_fix 2          # Fix action started
-    /usr/cluster/topmed/topmed_rgmap.sh $bamid $markverb
-    if [ "$?" != "0" ]; then
-      Fail "RGMAP correction failed"
-    fi
-  fi
-  SetDB $bamid state_fix 20           # Mark sample as fixed or no rgmap needed
-fi
+#year=`GetDB $bamid datayear`
+#if [ "$year" != "3" ]; then
+#  CheckRGMap $bamid
+#  if [ "$?" != "0" ]; then
+#    echo #"#======================================================================"
+#    echo "#    RGMAP for cramfile is broken, rebuild"
+#    echo #"#======================================================================"
+#    SetDB $bamid state_fix 2          # Fix action started
+#    /usr/cluster/topmed/topmed_rgmap.sh $bamid $markverb
+#    if [ "$?" != "0" ]; then
+#      Fail "RGMAP correction failed"
+#    fi
+#  fi
+#  SetDB $bamid state_fix 20           # Mark sample as fixed or no rgmap needed
+#fi
 ######### Remove this when we believe remapping is correct (2018)
 
 SetDB $bamid state_b${build} 20     # Mark b38 as done
