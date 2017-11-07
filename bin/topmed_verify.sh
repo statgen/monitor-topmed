@@ -14,7 +14,7 @@ if [ "$1" = "-submit" ]; then
   bamid=`GetDB $1 bamid`
   MayIRun $me  $bamid
   MyRealHost $bamid 'bam'
-  SubmitJob $bamid "$realhost-verify" '4G' "$0 $*"
+  SubmitJob $bamid "topmed" '4G' "$0 $*"
   exit
 fi
 
@@ -33,7 +33,7 @@ Started
 
 #   Verify the MD5
 stime=`date +%s`
-tmpfile=/tmp/$$.md5
+tmpfile=/run/shm/$$.md5
 echo "$checksum  $bamfile" > $tmpfile
 md5sum -c $tmpfile
 rc=$?
