@@ -808,10 +808,10 @@ function RestartJobs($h) {
         "<option value='arrive'>arrive</option>" .
         "<option value='verify'>verify</option>" .
         "<option value='cram'>cram</option>" .
-        "<option value='gcebackup'>backup</option>" .
+        "<option value='gcebackup'>gcebackup</option>" .
         "<option value='qplot'>qplot</option>" .
-        "<option value='gce38push'>push</option>" .
-        "<option value='gce38pull'>pull</option>" .
+        "<option value='gce38push'>gcepush</option>" .
+        "<option value='gce38pull'>gcepull</option>" .
         "<option value='gce38post'>post</option>" .
         "<option value='bcf'>bcf</option>" .
         "<option value='gce38copy'>gcecopy</option>" .

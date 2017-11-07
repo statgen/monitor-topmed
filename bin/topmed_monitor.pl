@@ -94,7 +94,7 @@ Getopt::Long::GetOptions( \%opts,qw(
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$Script [options] arrive|verify|qplot|cram|backup|qplot|push|pull|bcf|gcecopy|awscopy|fix\n" .
+    warn "$Script [options] arrive|verify|qplot|cram|gcebackup|qplot|gcepush|gcepull|bcf|gcecopy|awscopy|fix\n" .
         "Find runs which need some action and queue a request to do it.\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
@@ -140,7 +140,7 @@ if ($fcn eq 'arrive') {
             my $owner = getpwuid($stats[4]);
             my $gid = $stats[5];
             if ($owner ne 'topmed' || $gid ne '2307982') {
-                print "Ignoring run '$runsref->{$runid}' owned by $owner/$gid\n";
+                print "$nowdate Ignoring run '$runsref->{$runid}' owned by $owner/$gid\n";
             }
             #   See if we should mark this as arrived
             #   All BAMs must start with NWD. Only skip this if the BAM name
@@ -219,7 +219,7 @@ if ($fcn eq 'cram') {
 #--------------------------------------------------------------
 #   Backup some files offsite
 #--------------------------------------------------------------
-if ($fcn eq 'backup') {
+if ($fcn eq 'gcebackup' || $fcn eq 'backup') {
     #   Get list of all samples yet to process
     my $sql = BuildSQL("SELECT bamid,bamname,state_cram,state_gcebackup FROM $opts{bamfiles_table}",
         "WHERE state_gcebackup!=$COMPLETED");
@@ -267,7 +267,7 @@ if ($fcn eq 'qplot') {
 #--------------------------------------------------------------
 #   Push data to Google Cloud for processing
 #--------------------------------------------------------------
-if ($fcn eq 'push') {
+if ($fcn eq 'gcepush' || $fcn eq 'push') {
     #   Get list of all samples yet to process
     my $sql = BuildSQL("SELECT bamid,state_cram,state_gce38push FROM $opts{bamfiles_table}",
         "WHERE state_gce38push!=$COMPLETED");
@@ -292,7 +292,7 @@ if ($fcn eq 'push') {
 #--------------------------------------------------------------
 #   Pull processed data from Google Cloud
 #--------------------------------------------------------------
-if ($fcn eq 'pull') {
+if ($fcn eq 'gcepull' || $fcn eq 'pull') {
     #   Get list of all samples yet to process
     my $sql = BuildSQL("SELECT bamid,state_gce38push,state_gce38pull FROM $opts{bamfiles_table}", 
         "WHERE state_gce38pull!=$COMPLETED");
@@ -776,7 +776,7 @@ Provided for developers to see additional information.
 
 =over 4
 
-=item B<arrive | verify | qplot | cram | backup | qplot | push | pull | bcf | gcecopy | fix\n" .
+=item B<arrive | verify | qplot | cram | gcebackup | qplot | gcepush | gcepull | bcf | gcecopy | fix\n" .
 y>
 
 Directs this program to look for runs that have not been through the process name
