@@ -418,6 +418,16 @@ g  count_awscopy     INT DEFAULT 0,
 /* ####################################################
    View of Kevin's web interface columns
 
+This entire VIEW exists because Kevin was porting some messy Hyun code
+to make it faster to render and didn't want to completely rewrite
+Hyuns dashboard, although it should be at some point. To maintain the
+data structure that Hyun had I created the view from the imported qc
+data to match what he had in place so Kevin had an easier go of
+things. Presumably the conditions that are being tested could be
+redefined in the VIEW to get updated results without updating the data
+in the qc results table. That said, unless you are redoing the dashboard,
+I'd leave this VIEW alone.
+
 CREATE 
     ALGORITHM = UNDEFINED 
     DEFINER = `sqlnhlbi`@`%` 
