@@ -54,7 +54,7 @@ Getopt::Long::GetOptions( \%opts,qw(
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
     my $m = "$Script [options]";
-    warn "$m squeue\n" .
+    warn "$m squeue|summary\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
     exit 1;
@@ -65,9 +65,40 @@ my $fcn = shift @ARGV;
 #   Execute the command provided
 #--------------------------------------------------------------
 if ($fcn eq 'squeue')    { SQueue(@ARGV); exit; }
+if ($fcn eq 'summary')   { Summary(@ARGV); exit; }
 
 die "$Script  - Invalid function '$fcn'\n";
 exit;
+
+#==================================================================
+# Subroutine:
+#   Summary()
+#
+#   Print summary of jobs
+#==================================================================
+sub Summary {
+    #my ($bamid, $set) = @_;
+    my $cmd = $opts{squeuecmd};
+    my %jobtype = ();               # Has of jobtypes queued or running
+    foreach my $l (split("\n", `$cmd`)) {
+        my @c = split(' ', $l);
+        #   Should be none of these, but if so, we want to know about it
+        if ($c[4] ne 'topmed') { next; }    # Only interested in my jobs
+        if ($c[5] eq 'PD') {        # Queued
+            if ($c[3] =~ /\d+-(\S+)/) { $jobtype{$1}{queued}++; }
+            next;
+        }
+        if ($c[5] eq 'R') {         # Running
+            if ($c[3] =~ /\d+-(\S+)/) { $jobtype{$1}{running}++; }
+            next;
+        }
+    }
+    foreach my $jtype (sort keys %jobtype) {
+        if (! exists($jobtype{$jtype}{queued}))  { $jobtype{$jtype}{queued} = 0; }
+        if (! exists($jobtype{$jtype}{running})) { $jobtype{$jtype}{running} = 0; }
+        print "$jtype queued=$jobtype{$jtype}{queued} running=$jobtype{$jtype}{running}\n";
+    }
+}
 
 #==================================================================
 # Subroutine:
@@ -77,7 +108,7 @@ exit;
 #==================================================================
 sub SQueue {
     #my ($bamid, $set) = @_;
-    my $cmd = $opts{squeuecmd} . '| grep topmed';
+    my $cmd = $opts{squeuecmd};
     my %partitions = ();            # Unique partition names
     my %qos = ();                   # Unique QOS names
     my %qosheld = ();               # Count of held jobs in QOS
@@ -85,15 +116,17 @@ sub SQueue {
     my %mosixrunning = ();          # Counts of jobs by nomosix users
     my %queued = ();
     my %nottopmed = ();             # Not my user list
+    my %jobtype = ();               # If one QOS, we want to know types of jobs queued
 
     DBConnect($opts{realm});
     foreach my $l (split("\n", `$cmd`)) {
         my @c = split(' ', $l);
+        #   Should be none of these, but if so, we want to know about it
         if ($c[1] eq 'nomosix' && $c[8] =~ /topmed/) {    # nomosix on topmed node
             $mosixrunning{$c[4]}++;    # Count of running jobs for this user
             next;
         }
-        if ($c[1] !~ /^topmed/) { next; }   # Only want my partition of interest
+        #if ($c[1] !~ /^topmed/) { next; }   # Only want my partition of interest
         if ($c[4] ne 'topmed') {            # Save partition and not topmed user
             $nottopmed{$c[1]}{$c[4]} = 1;
             next;
@@ -103,7 +136,9 @@ sub SQueue {
             push @{$queued{$c[1]}{data}},$l;
             $queued{$c[1]}{count}++;
             $qos{$c[2]}{queued}++;
-            if ($l =~ /held state/ || $l =~ /JobHeldUser/) { $qos{$c[2]}{held}++; }
+            #if ($l =~ /held state/ || $l =~ /JobHeldUser/) { $qos{$c[2]}{held}++; }
+            if ($l =~ /held/i) { $qos{$c[2]}{held}++; }     # Job held somehow
+            if ($c[3] =~ /\d+-(\S+)/) { $jobtype{$1}++; }   # Count of types of jobs
             next;
         }
         if ($c[5] eq 'R') {         # Running
@@ -123,22 +158,29 @@ sub SQueue {
         my $k = scalar(keys %{$nottopmed{$p}});
         printf("  %-18s %3d running / %3d queued / %3d foreign user: $s \n",
             $p, $running{$p}{count}, $queued{$p}{count}, $k);
+        if (%jobtype) {
+            print '    queued: ';
+            foreach my $jtype ( sort keys %jobtype) {
+                print $jtype . ' [' . $jobtype{$jtype} . ']  ';
+            }
+            print "\n";
+        }
     }
     print "\n";
 
     #   Show summary of QOS
-    print "QOS Summary\n";
-    foreach my $q (sort keys %qos) {
-        my $s = $qos{$q}{held} || '';
-        if ($s) { $s .= ' jobs held'; }
-        if (! defined($qos{$q}{running}))  { $qos{$q}{running} = 0; }
-        if (! defined($qos{$q}{queued}))   { $qos{$q}{queued} = 0; }
-        my $qq = $q;                    # Patch normal to be something meaningful?
-        if ($q eq 'normal') { $qq = 'default_qos'; }
-        printf("  %-18s %3d running / %3d queued   %s\n",
-            $qq, $qos{$q}{running}, $qos{$q}{queued}, $s); 
-    }
-    print "\n";
+    #print "QOS Summary\n";
+    #foreach my $q (sort keys %qos) {
+    #    my $s = $qos{$q}{held} || '';
+    #    if ($s) { $s .= ' jobs held'; }
+    #    if (! defined($qos{$q}{running}))  { $qos{$q}{running} = 0; }
+    #    if (! defined($qos{$q}{queued}))   { $qos{$q}{queued} = 0; }
+    #    my $qq = $q;                    # Patch normal to be something meaningful?
+    #    if ($q eq 'normal') { $qq = 'default_qos'; }
+    #    printf("  %-18s %3d running / %3d queued   %s\n",
+    #        $qq, $qos{$q}{running}, $qos{$q}{queued}, $s); 
+    #}
+    #print "\n";
 
     #   Show summary of running on partitions
     print "Running jobs per host\n";
@@ -343,6 +385,7 @@ topmedcluster.pl - Query for cluster system information
 =head1 SYNOPSIS
 
   topmedcluster.pl squeue       # Show summary of queues
+  topmedcluster.pl summary      # Show summary of jobtypes
 
 
 =head1 DESCRIPTION
@@ -385,7 +428,7 @@ return code of 0. Any error will set a non-zero return code.
 
 =head1 AUTHOR
 
-Written by Terry Gliedt I<E<lt>tpg@umich.eduE<gt>> in 2017-2016 and is
+Written by Terry Gliedt I<E<lt>tpg@umich.eduE<gt>> in 2016-2017 and is
 is free software; you can redistribute it and/or modify it under the
 terms of the GNU General Public License as published by the Free Software
 Foundation; See http://www.gnu.org/copyleft/gpl.html
