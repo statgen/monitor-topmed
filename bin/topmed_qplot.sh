@@ -60,7 +60,7 @@ if [ "$1" = "-submit" ]; then
   bamid=`GetDB $1 bamid`
   MayIRun $me $bamid
   RandomRealHost $bamid 'bam'
-  SubmitJob $bamid "$realhost-$me" '8G' "$0 $*"
+  SubmitJob $bamid "topmed" '8G' "$0 $*"
   exit
 fi
 

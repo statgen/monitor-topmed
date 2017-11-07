@@ -33,7 +33,7 @@ if [ "$1" = "-submit" ]; then
   fi
   MayIRun $me $bamid
   MyRealHost $bamid b$build
-  SubmitJob $bamid "topmed-$me" $mem "$0 $*"
+  SubmitJob $bamid "topmed" $mem "$0 $*"
   exit
 fi
 
