@@ -15,7 +15,7 @@ if [ "$1" = "-submit" ]; then
   bamid=`GetDB $1 bamid`
   MayIRun $me  $bamid
   RandomRealHost $bamid
-  SubmitJob $bamid "topmed-$me" '4G' "$0 $*"
+  SubmitJob $bamid "topmed" '4G' "$0 $*"
   exit
 fi
 
@@ -52,7 +52,7 @@ if [ "$run" = "" ]; then
   Fail "Unable to get run for bamid '$bamid'"
 fi
 datayear=`GetDB $bamid datayear`
-if [ "$datayear" = "4" ]; then          # Allow year 3 to be remapped
+if [ "$datayear" = "34" ]; then          # Allow year 3 to be remapped for this nanesecond
   build=`GetDB $bamid build`
   if [ "$build" = "38" ]; then
     stime=`date +%s`
@@ -94,6 +94,7 @@ if [ "$datayear" = "4" ]; then          # Allow year 3 to be remapped
     SetDB $bamid state_b38 20
     SetDB $bamid state_gce38bcf 0
     SetDB $bamid state_gce38copy 0      # Mark copy files to GCE as not done yet
+    SetDB $bamid state_aws38copy 0
     Successful
     Log $etime
     exit
@@ -110,8 +111,8 @@ if [ "$?" != "0" ]; then
 fi
 
 #   Tell the Google Cloud processes that a new file has shown up
-tmperr=/tmp/$$.curlstderr
-tmpout=/tmp/$$.curloutput
+tmperr=/run/shm/$$.curlstderr
+tmpout=/run/shm/$$.curloutput
 
 curl -f -i -u `cat /usr/cluster/topmed/etc/.db_connections/104.198.71.226.cred` --insecure --data $nwdid --stderr $tmperr --output $tmpout  https://104.198.71.226/api/unprocessed-samples
 rc=$?
@@ -134,11 +135,10 @@ etime=`expr $etime - $stime`
 
 echo "Copy of CRAM to Google CLoud completed in $etime seconds"
 SetDB $bamid state_gce38bcf 0
-
 SetDB $bamid state_gce38pull 0      # Mark B38 remapping as not done yet
 SetDB $bamid state_b38 0
-
 SetDB $bamid state_gce38copy 0      # Mark copy files to GCE as not done yet
+SetDB $bamid state_aws38copy 0
 
 Successful
 Log $etime
