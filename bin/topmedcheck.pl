@@ -58,9 +58,9 @@ our %opts = (
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help db localfiles awsfiles gcefiles checkfiles
+    help db localfiles awsfiles gcefiles checkfiles b37files
     register checkfiles fixer=s execfixer random max=i redo verbose
-    center=s runs=s piname=s studyname=s datayear=i
+    center=s run=s piname=s studyname=s datayear=i
     )) || die "$Script - Failed to parse options\n";
 
 #   Simple help if requested
@@ -74,7 +74,7 @@ if ($opts{help} || ($#ARGV<0 && (! $opts{run}) && (! $opts{center}))) {
     if ($opts{help}) { system("perldoc $0"); }
     exit 1;
 }
-if (! ($opts{db} || $opts{localfiles} || $opts{awsfiles} || $opts{gcefiles})) {
+if (! ($opts{db} || $opts{localfiles} || $opts{awsfiles} || $opts{gcefiles} || $opts{b37files})) {
     die "$Script - Specify the type of check:  -db -localfiles -awsfiles or -gcefiles\n";
 }
 if ($opts{redo}) { $opts{fixer} = $opts{redotool}; }
@@ -90,6 +90,7 @@ my $morewhere = '';
 if ($opts{piname})    { $morewhere .= " AND piname='$opts{piname}'"; }
 if ($opts{studyname}) { $morewhere .= " AND studyname='$opts{studyname}'"; }
 if ($opts{datayear})  { $morewhere .= " AND datayear=$opts{datayear}"; }
+if ($opts{b37files})  { $morewhere .= " AND state_b37=20"; }
 if ($opts{random})    { $morewhere .= ' ORDER BY RAND()'; }
 if ($opts{max})       { $morewhere .= " LIMIT $opts{max}"; }
 
@@ -102,7 +103,7 @@ if (@ARGV) {                # Maybe one or a range of bamids specified
         my $sql = "SELECT bamid,expt_sampleid FROM $opts{bamfiles_table} WHERE ";
         if ($b =~ /^NWD/) { $sql .= "expt_sampleid='$b'"; }
         else { $sql .= "bamid=$b"; }
-        if ($morewhere) { $sql .= ' ' . $morewhere; }
+        $sql .= $morewhere;
         my $sth = DoSQL($sql);
         GetArrayOfSamples($sth);
     }
@@ -116,7 +117,7 @@ else {                      # Range specified by center or run
             #   Get bamid for every run
             foreach my $runid (keys %{$runsref}) {
                 my $sql = "SELECT bamid,expt_sampleid FROM $opts{bamfiles_table} " .
-                    "WHERE runid=$runid AND state_cram=20 " . $morewhere;
+                    "WHERE runid=$runid AND state_cram=20" . $morewhere;
                 my $sth = DoSQL($sql);
                 GetArrayOfSamples($sth);
             }
@@ -125,7 +126,7 @@ else {                      # Range specified by center or run
     #   Get all bamids for this run
     if ($opts{run}) {
         if ($opts{run}=~/\D+/) {               # Get runid from dirname
-            my $sql = "SELECT runid FROM $opts{runs_table} WHERE state_cram=20 AND dirname='$opts{run}'";
+            my $sql = "SELECT runid FROM $opts{runs_table} WHERE dirname='$opts{run}'";
             my $sth = DoSQL($sql);
             if (! $sth) { die "$Script - Unknown run '$opts{run}'\n"; }
             my $href = $sth->fetchrow_hashref;
@@ -133,7 +134,7 @@ else {                      # Range specified by center or run
         }
         #   Get bamid for this run
         my $sql = "SELECT bamid,expt_sampleid FROM $opts{bamfiles_table} " .
-            "WHERE runid=$opts{run} " . $morewhere;
+            "WHERE state_cram=20 AND runid=$opts{run}" . $morewhere;
         my $sth = DoSQL($sql);
         GetArrayOfSamples($sth);
     }
@@ -167,6 +168,12 @@ if ($opts{awsfiles}) {
     print "Verify Amazon files\n";
     for (my $i=0; $i<=$#bamidrange; $i++) {
         Check_AWSFiles($bamidrange[$i], $nwdids[$i]);
+    }
+}
+if ($opts{b37files}) {
+    print "Verify the local files for remapped b37 - patience!\n";
+    for (my $i=0; $i<=$#bamidrange; $i++) {
+        Check_B37Files($bamidrange[$i], $nwdids[$i]);
     }
 }
 if ($opts{checkfiles}) {
@@ -451,6 +458,30 @@ sub Check_AWSFiles {
     my ($bamid, $nwdid) = @_;
     my @error = ();
     my $filecmd = $opts{topmedpath} . " wherefile $bamid ";
+
+}
+
+#==================================================================
+# Subroutine:
+#   Check_B37Files()
+#   Verify all the B37 files exist
+#==================================================================
+sub Check_B37Files {
+    my ($bamid, $nwdid) = @_;
+    my @error = ();
+    my $filecmd = $opts{topmedpath} . " wherefile $bamid ";
+
+    #   Check local file 
+    my $f = `$filecmd b37`;
+    chomp($f);
+    my $e = VerifyFile($f);
+    if ($e) { push @error,"B37 cram/index is invalid: $e: $f"; }
+
+    #   If there were problems, show messages
+    if (@error) { ShowErrors($bamid, $nwdid, \@error); }
+    else {
+        if ($opts{verbose}) { print "BAMID=$bamid NWD=$nwdid B37 CRAM OK: $f\n"; }
+    }
 
 }
 
