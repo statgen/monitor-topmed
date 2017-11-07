@@ -48,8 +48,7 @@ if [ "$#" -gt "5" ]; then
 
   if [ "$myargs" != "" ]; then
     echo "Submitting job to topmed-redo($realhost): $0 $myargs"
-    echo "$0 $myargs" >> /tmp/$realhost.runjobs.txt
-    #SubmitJob $bamid "topmed-redo" '4G' "$0 $myargs"
+    SubmitJob $bamid "topmed" '128G' "$0 $myargs"    # Very few at a time/host
     exit
   else
     echo "$me - unable to determine exactly what action to redo: $*"
@@ -139,9 +138,9 @@ fi
 if [ "$action" = "gceflagstat" ]; then
   flagstat=`GetDB $bamid b38flagstat`
   nwdid=`GetNWDID $bamid`
-  echo "$flagstat + 0 paired in sequencing" > /tmp/$$
-  gsutil cp /tmp/$$ gs://topmed-bcf/$nwdid/$3
-  rm -f /tmp/$$
+  echo "$flagstat + 0 paired in sequencing" > /run/shm/$$
+  gsutil cp /run/shm/$$ gs://topmed-bcf/$nwdid/$3
+  rm -f /run/shm/$$
   echo "Successfully set flagstat in GCE for $nwdid / $bamid"
   exit
 fi
@@ -150,9 +149,9 @@ fi
 if [ "$action" = "gcemd5" ]; then
   md5=`GetDB $bamid b38cramchecksum`
   nwdid=`GetNWDID $bamid`
-  echo "$md5 $nwdid.recab.cram" > /tmp/$$
-  gsutil cp /tmp/$$ gs://topmed-bcf/$nwdid/$3
-  rm -f /tmp/$$
+  echo "$md5 $nwdid.recab.cram" > /run/shm/$$
+  gsutil cp /run/shm/$$ gs://topmed-bcf/$nwdid/$3
+  rm -f /run/shm/$$
   echo "Successfully set md5 in GCE for $nwdid / $bamid"
   exit
 fi
