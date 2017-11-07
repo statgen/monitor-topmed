@@ -12,7 +12,7 @@
 #
 topuser=topmed
 topgrp=topmed
-topdir=/incoming/topmed
+topdir=/net/topmed/incoming/topmed
 topmedcmd=/usr/cluster/topmed/bin/topmedcmd.pl
 
 myhost=`hostname`               # Where I am running
@@ -25,14 +25,14 @@ myhost=`hostname`               # Where I am running
 #------------------------------------------------------------------
 function ProcessRuns {
   local center=$1
-
+  now=`date '+%D %H:%M'`
   #   Get list of all known runs for this center
   declare -A runs
   for r in `$topmedcmd list runs $center`; do
   runs[$r]=1
   done
   if [ "${#runs[@]}" = "0" ]; then
-    echo "Center '$center' has no runs - really?"
+    echo "$now Center '$center' has no runs - really?"
     return 2
   fi
 
@@ -45,6 +45,10 @@ function ProcessRuns {
   n=0
   for r in `ls .`; do
     owner=$(stat -c '%U' $r/Manifest.txt 2>/dev/null)
+    if [ "$owner" = "" ]; then
+      echo "$now No Manifest.txt exists for $center/$r yet"
+      continue;
+    fi
     #   Run and Manifest must exist, not owned by $topuser
     if [ "${runs[$r]}" = "" -a "$owner" != "$topuser" ]; then
       newrun=/net/topmed/incoming/topmed/$center/$r
@@ -67,7 +71,7 @@ function ProcessRuns {
         echo "New run '$r' year $year for '$center' found"
         if [ "$myhost" != "topmed" ]; then
           su $topuser -c "ln -s ../../../../$myhost/incoming/topmed/$center/$r $newrun"
-          echo "Set symlink to $newrun"
+          echo "$now Set symlink to $newrun"
         fi
         #     Sort out backup directory for run
         if [ "$year" = "2" ]; then
@@ -81,14 +85,14 @@ function ProcessRuns {
         fi
         newbackuprun=/net/topmed/working/backups/incoming/topmed/$center/$r
         su $topuser -c "ln -s $masterbackuprun $newbackuprun"
-        echo "BACKUP Symlink set to host '$backuphost' for $newbackuprun ($masterbackuprun)"
+        echo "$now BACKUP Symlink set to host '$backuphost' for $newbackuprun ($masterbackuprun)"
         n=`expr $n + 1`
         #     Force ownership of run and files since we are root
         chown -R $topuser $r
         chgrp -R $topgrp $r
         chmod 770 $r
         chmod 660 $r/Manifest.txt $r/*.md5 $r/*.cram $r/*.crai $r/*.bam $r/*.bai 2> /dev/null
-        echo "Ownership and permissions set for $center/$r"
+        echo "$now Ownership and permissions set for $center/$r"
       fi
     fi
   done
