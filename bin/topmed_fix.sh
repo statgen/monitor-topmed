@@ -68,7 +68,7 @@ if [ "$?" = "0" ]; then
 fi
 
 stime=`date +%s`
-rgmapmsg=/tmp/$bamid.fixerr
+rgmapmsg=/run/shm/$bamid.fixerr
 /usr/cluster/topmed/bin/topmed_rgmap.sh $bamid $markverb 2> $rgmapmsg
 if [ "$?" != "0" ]; then
   remap=''
