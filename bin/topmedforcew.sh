@@ -25,7 +25,7 @@ myhost=`hostname`               # Where I am running
 #------------------------------------------------------------------
 function ProcessRuns {
   local center=$1
-  now=`date '+%D %H:%M'`
+  now=`date '+%Y/%m/%d %H:%M'`
   #   Get list of all known runs for this center
   declare -A runs
   for r in `$topmedcmd list runs $center`; do
@@ -44,31 +44,37 @@ function ProcessRuns {
 
   n=0
   for r in `ls .`; do
+    if [ ! -d $r ]; then            # If we cannot read directory, it is not local
+      echo "$r is not a local directory"
+      continue;
+    fi
+    #   Manifest must exist
     owner=$(stat -c '%U' $r/Manifest.txt 2>/dev/null)
     if [ "$owner" = "" ]; then
       echo "$now No Manifest.txt exists for $center/$r yet"
       continue;
     fi
-    #   Run and Manifest must exist, not owned by $topuser
-    if [ "${runs[$r]}" = "" -a "$owner" != "$topuser" ]; then
+
+    #   Run must exist, not owned by $topuser
+    if [ "$owner" != "$topuser" ]; then
       newrun=/net/topmed/incoming/topmed/$center/$r
-      echo -n "Monitor knows about ${#runs[@]} runs for $center  "
+      echo -n "$now Monitor knows about ${#runs[@]} runs for $center  "
       # Determine if this is year 2 (bam) or 3 (cram) - determines where the backup dir is
       year=0
       if [ -f $r/Manifest.txt ]; then
-        s=`grep cram $r/Manifest.txt 2> /dev/null`
+        s=`head -1 $r/Manifest.txt grep cram 2> /dev/null`
         if [ "$s" != "" ]; then year=3; fi
-        s=`grep bam $r/Manifest.txt 2> /dev/null`
+        s=`head -1 $r/Manifest.txt grep bam 2> /dev/null`
         if [ "$s" != "" ]; then year=2; fi
       fi
       #  With luck we have determined if this year 2 or 3
       if [ "$year" = "0" ]; then
-        echo "Cannot figure out the year for '$r'"
+        echo "$now Cannot figure out the year for '$r'"
         ls -l $r/Manifest.txt
         return
       else
         date
-        echo "New run '$r' year $year for '$center' found"
+        echo "$now New run '$r' year $year for '$center' found"
         if [ "$myhost" != "topmed" ]; then
           su $topuser -c "ln -s ../../../../$myhost/incoming/topmed/$center/$r $newrun"
           echo "$now Set symlink to $newrun"
