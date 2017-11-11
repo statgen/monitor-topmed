@@ -418,6 +418,54 @@ g  count_awscopy     INT DEFAULT 0,
 /* ####################################################
    View of Kevin's web interface columns
 
+DROP TABLE IF EXISTS qc_results;
+CREATE TABLE qc_results (
+  id      INT PRIMARY KEY AUTO_INCREMENT,
+  bam_id  int,
+  pct_freemix         float,
+  n_reads_m           float,
+  pct_mapped          float,
+  pct_mq0             float,
+  pct_paired          float,
+  pct_prop_paired     float,
+  mapped_gb           float,
+  q20_gb              float,
+  pct_q20_base        float,
+  mean_depth          float,
+  pct_genome_cov      float,
+  isize_mode          float,
+  isize_median        float,
+  pct_dups            float,
+  pct_genome_dp5      float,
+  pct_genome_dp10     float,
+  pct_genome_dp20     float,
+  pct_genome_dp30     float,
+  vmr_depth           float,
+  depth_q10           float,
+  depth_q20           float,
+  depth_q30           float,
+  raw_base_gb         float,
+  pct_overlap_reads   float,
+  pct_overlap_bases   float,
+  isize_iqr           float,
+  isize_stdev         float,
+  gc_depth_0_1        float,
+  gc_depth_1_5        float,
+  gc_depth_5_25       float,
+  gc_depth_25_75      float,
+  gc_depth_75_95      float,
+  gc_depth_95_99      float,
+  gc_depth_99_100     float,
+  library_size_m      float,
+  qc_fail             int  DEFAULT=0,
+  qc_pass             int  DEFAULT=0,
+  qc_flagged          int  DEFAULT=0,
+  created_at          datetime,                                
+  modified_at         timestamp,        
+  PRIMARY KEY  (id)
+);
+
+
 This entire VIEW exists because Kevin was porting some messy Hyun code
 to make it faster to render and didn't want to completely rewrite
 Hyuns dashboard, although it should be at some point. To maintain the

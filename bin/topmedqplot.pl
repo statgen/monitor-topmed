@@ -114,14 +114,36 @@ if ($opts{verbose}) { print "$nwdid parsed:\n"; foreach my $v (@metrics) { print
 
 my @colnames = parseQCColumns();
 if ($#colnames != $#metrics) {
-    die "$Script Number of columns [$#colnames] returned by parseQCFiles [$#metrics] did not match\n";
+    die "$Script - Number of columns [$#colnames] returned by parseQCFiles [$#metrics] did not match\n";
 }
+#   Figure out indexes to columns of interest
+my ($pct_freemix_index, $pct_genome_dp10_index, $mean_depth_index) = (-1, -1, -1);
+for (my $i=0; $i<=$#colnames; $i++) {
+    if ($colnames[$i] eq 'PCT_FREEMIX')     { $pct_freemix_index = $i; next; }
+    if ($colnames[$i] eq 'PCT_GENOME_DP10') { $pct_genome_dp10_index = $i; next; }
+    if ($colnames[$i] eq 'MEAN_DEPTH')      { $mean_depth_index = $i; }
+}
+foreach my $i ($pct_freemix_index, $pct_genome_dp10_index, $mean_depth_index) {
+    if ($i < 0) { die "$Script - Unable to find index to colname I need\n"; }
+}
+
+#   Now set the quality columns to be included in the SQL
+my ($qc_flagged, $qc_pass, $qc_fail) = (0, 0, 0);   # Default values for SQL columns
+if ($metrics[$mean_depth_index] < 30) { $qc_flagged = 1; }
+if (($metrics[$pct_freemix_index] < 3) &&
+    ($metrics[$pct_genome_dp10_index] > 95) &&
+    ($metrics[$mean_depth_index] > 30)) { $qc_pass = 1 }
+else { $qc_fail = 1; }
+push @colnames,'qc_fail','qc_pass','qc_flagged';
+push @metrics, $qc_fail,$qc_pass,$qc_flagged;
 
 #--------------------------------------------------------------
 #   Update database with values we obtained
 #--------------------------------------------------------------
+DBConnect($opts{realm});
+
 #   See if the NWDID we were provided is valid
-my $sth = PersistDoSQL($opts{realm},"SELECT bamid FROM $opts{bamfiles_table} WHERE expt_sampleid='$nwdid'");
+my $sth = DoSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE expt_sampleid='$nwdid'");
 my $rowsofdata = $sth->rows();
 if (! $rowsofdata) { die "$Script - NWDID '$nwdid' is unknown\n"; }
 my $href = $sth->fetchrow_hashref;
@@ -132,7 +154,7 @@ $_ = shift(@colnames);              # Ignore name of this first column
 my $sql;
 
 #   See if there already is a qc result for this NWDID
-$sth = PersistDoSQL($opts{realm},"SELECT bam_id FROM $opts{qcdata_table} WHERE bam_id=$bamid");
+$sth = DoSQL("SELECT bam_id FROM $opts{qcdata_table} WHERE bam_id=$bamid");
 $rowsofdata = $sth->rows();
 if ($rowsofdata) {                  # This already exists, do UPDATE
     $sql = "UPDATE $opts{qcdata_table} SET created_at='$date',";
@@ -153,7 +175,7 @@ else {                              # First time, do INSERT
     $sql .= ')';
 }
 if ($opts{verbose}) { print "SQL=$sql\n"; }
-$sth = PersistDoSQL($opts{realm},$sql);
+$sth = DoSQL($sql);
 if (! $sth) { die "$Script Failed to update database. SQL=$sql\n"; }
 
 print "Updated QC database data for '$nwdid'\n";
@@ -170,7 +192,7 @@ sub Dups {
     my @dups = ();
     
     $dbh = DBConnect($opts{realm}) ||
-        die "$Script - Unable to connect to database, realm=$opts{realm}\n";
+        die "$Script - Unable to connect to database\n";
     my $sth = DoSQL("SELECT count(bam_id) as count,bam_id FROM $opts{qcdata_table} group by bam_id having count > 1");
     my $rowsofdata = $sth->rows();
     if ($rowsofdata) {
