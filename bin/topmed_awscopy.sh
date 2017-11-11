@@ -11,6 +11,21 @@ me=awscopy
 markverb=$me
 stat="stat --printf=%s --dereference"
 
+#------------------------------------------------------------------
+# Subroutine:
+#   Copy2AWS(f, awsfile)
+#   Copy file to AWS as awsfile
+#------------------------------------------------------------------
+function Copy2AWS {
+  local f=$1
+  local awsfile=$2
+  echo "====> Copying $f"
+  $aws cp --quiet $metadata $f $copyuri/$awsfile
+  if [ "$?" != "0" ]; then
+    Fail "Failed to copy $f to AWS as $awsfile"
+  fi
+}
+
 if [ "$1" = "-submit" ]; then
   shift
   bamid=`$topmedcmd show $1 bamid`
@@ -46,12 +61,12 @@ fi
 if [ ! -f $recabcram ]; then
   Fail "CRAM file for '$bamid' does not exist: $recabcram"
 fi
-baserecabcram=`basename $recabcram`
 sizerecabcram=`$stat $recabcram`
-recabcrai=$recabcram.crai
 
 #   Create the index file as necessary
 CreateIndex $bamid $recabcram
+recabcrai=$recabcram.crai
+sizerecabcrai=`$stat $recabcrai`
 
 #   Get checksum for b38 file or calculate it
 b38cramchecksum=`GetDB $bamid b38cramchecksum`
@@ -64,20 +79,21 @@ if [ "$b38cramchecksum" = "" ]; then
   echo "MD5SUM for recab completed in $etime seconds"
   SetDB $bamid b38cramchecksum $b38cramchecksum
 fi
-f=`basename $recabcram`
-baserecabcrai=`basename $recabcrai`
-sizerecabcrai=`$stat $recabcrai`
+
+#   Get bcf file
+#recabvcf=`$topmedpath wherefile $bamid bcf`
+#if [ "$recabvcf" = "" ]; then
+#  Fail "Unable to determine BCF file for '$bamid'"
+#fi
+#if [ ! -f $recabvcf ]; then
+#  Fail "BCF file for '$bamid' does not exist: $recabvcf"
+#fi
+#sizerecabvcf=`$stat $recabvcf`
 
 #======================================================================
 #   All the files of interest exist locally
 #   Copy the file to the remote destination only if the size differs
-#   If cram is sent, copy the index too
 #======================================================================
-replacelist=''
-rlist=''
-cmissinglist=''
-cmissing=''
-
 studyname=`GetDB $bamid studyname`
 piname=`GetDB $bamid piname`
 datayear=`GetDB $bamid datayear`
@@ -86,67 +102,34 @@ metadata="--metadata sample-id=$nwdid,year=$datayear,study=$studyname,pi=$piname
 
 lcstudyname=${studyname,,}              # Force to lower case cause AWS wants it that way
 copyuri=$awsuri/$lcstudyname
-l=(`$aws ls $copyuri/$nwdid | grep cram`)
-awscramsize=''
-if [ "${l[3]}" = "$nwdid.cram" ]; then  # Found cram in AWS
-  awscramsize=${l[2]}                   # Size of cram
-fi
-awscraisize=''
-if [ "${l[7]}" = "$nwdid.cram.crai" ]; then  # Found crai in AWS
-  awscraisize=${l[6]}                   # Size of crai
-fi
 
-#sizerecabcrai=`expr $sizerecabcrai - 1`     # Force a small file to resend
+#   Now get the sizes of files of interest in AWS
+tmpf=/run/shm/$$
+$aws ls $copyuri/$nwdid > $tmpf
+l=(`grep -e $nwdid.cram\$ $tmpf`)
+awscramsize=${l[2]}
+l=(`grep $nwdid.cram.crai $tmpf`)
+awscraisize=${l[2]}
+#l=(`grep $nwdid.cram.vcf $tmpf`)
+#awsvcfsize=${l[2]}
+rm -f $tmpf
 
+#   Send files that have changed size
 if [ "$sizerecabcram" != "$awscramsize" ]; then
-  echo "$baserecabcram sizes= $sizerecabcram / $awscramsize"
-  if [ "$awscramsize" = "" ]; then
-    cmissing="$cmissing $baserecabcram $baserecabcrai"
-    cmissinglist="$cmissinglist $recabcram $recabcrai"
-  else
-    replacelist="$replacelist $recabcram $recabcrai"
-    rlist="$rlist $baserecabcram $baserecabcrai"
-  fi
+  Copy2AWS $recabcram $nwdid.cram
 else
-  if [ "$sizerecabcrai" != "$awscraisize" ]; then
-    echo "$baserecabcrai sizes= $sizerecabcrai / $awscraisize"
-    if [ "$awscraisize" = "" ]; then
-      cmissing="$cmissing $baserecabcrai"
-      cmissinglist="$cmissinglist $recabcrai"
-    else
-      replacelist="$replacelist $recabcrai"
-      rlist="$rlist $baserecabcrai"
-    fi
-  fi
+  echo "No need to send unchanged $nwdid.cram"
 fi
-
-#   First copy just the files that are missing
-if [ "$cmissing" != "" ]; then
-  echo ""
-  echo "====> Copying MISSING files to $copyuri:  $cmissing"
-  for f in $cmissinglist; do
-    basef=`basename $f | sed -e 's/.recab//'`    # Remove recab from our names
-    echo "Creating missing $basef"
-    $aws cp --quiet $metadata $f $copyuri/$basef
-    if [ "$?" != "0" ]; then
-      Fail "Failed to copy $basef to AWS"
-    fi
-  done
+if [ "$sizerecabcrai" != "$awscraisize" ]; then
+  Copy2AWS $recabcram.crai $nwdid.cram.crai
+else
+  echo "No need to send unchanged $nwdid.cram.crai"
 fi
-
-#   Now, copy all the files that need replacing
-if [ "$replacelist" != "" ]; then
-  echo ""
-  echo "====> Replace in $copyuri:  $rlist"
-  for f in $replacelist; do
-    basef=`basename $f | sed -e 's/.recab//'`    # Remove recab from our names
-    echo "Replacing $basef"
-    $aws cp --quiet $metadata $f $copyuri/$basef
-    if [ "$?" != "0" ]; then
-      Fail "Failed to copy $basef to AWS"
-    fi
-  done
-fi
+#if [ "$sizerecabvcf" != "$awsvcfsize" ]; then
+#  Copy2AWS $recabvcf $nwdid.cram.vcf
+#else
+#  echo "No need to send unchanged $nwdid.cram.vcf"
+#fi
 
 echo "AWS files for $bamid $nwdid are up to date"
 $aws ls $copyuri/$nwdid
