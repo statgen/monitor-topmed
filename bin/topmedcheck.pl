@@ -50,6 +50,8 @@ our %opts = (
     runs_table => 'runs',
     gceuri => 'gs://topmed-bcf',
     topmedpath => '/usr/cluster/topmed/bin/topmedpath.pl',
+    gsutil => 'gsutil',
+    b37gceuri => 'gs://topmed-irc-working/remapping/b37',
     gcels => 'gsutil ls',   # Add $opts{gceuri}/NWDxxxxxxx
     redotool => '/usr/cluster/topmed/bin/topmed_redo.sh',
     samtools => '/usr/cluster/bin/samtools',
@@ -68,6 +70,8 @@ if ($opts{help} || ($#ARGV<0 && (! $opts{run}) && (! $opts{center}))) {
     my $m = "$Script [options]";
     warn "$m bamid|bamid-bamid|nwdid\n" .
         " or\n" .
+        "$m -b37 2345    # Special case\n" .
+        " or\n" .        
         "$m -subsetkey value  (e.g. -center, -runs, -piname, -studyname, -datayear)\n" .
         "\n" .
         "More details available by entering: perldoc $0\n\n";
@@ -139,6 +143,7 @@ else {                      # Range specified by center or run
         GetArrayOfSamples($sth);
     }
 }
+
 if (! @bamidrange) { die "$Script - no Samples found\n"; }
 if ($opts{max}) { splice(@bamidrange,$opts{max}); } # We might have selected too many samples          
 print "Checking " . scalar(@bamidrange) . " samples\n";
@@ -170,11 +175,8 @@ if ($opts{awsfiles}) {
         Check_AWSFiles($bamidrange[$i], $nwdids[$i]);
     }
 }
-if ($opts{b37files}) {
-    print "Verify the local files for remapped b37 - patience!\n";
-    for (my $i=0; $i<=$#bamidrange; $i++) {
-        Check_B37Files($bamidrange[$i], $nwdids[$i]);
-    }
+if ($opts{b37files}) {              # This only checks ALL b37 files
+    Check_B37Files('', 'NWD*');
 }
 if ($opts{checkfiles}) {
     print "Verify the local files (md5 and flagstat) - patience!\n";
@@ -469,18 +471,79 @@ sub Check_AWSFiles {
 sub Check_B37Files {
     my ($bamid, $nwdid) = @_;
     my @error = ();
-    my $filecmd = $opts{topmedpath} . " wherefile $bamid ";
 
-    #   Check local file 
-    my $f = `$filecmd b37`;
-    chomp($f);
-    my $e = VerifyFile($f);
-    if ($e) { push @error,"B37 cram/index is invalid: $e: $f"; }
+    my $b37listing = "/tmp/Check_B37Files.txt";
+    if (-f $b37listing) {
+        print "Output file '$b37listing' exists. Shall I get a new copy? (y/n): ";
+        my $a = <STDIN>;
+        chomp($a);
+        if ($a eq 'y') { unlink($b37listing) }
+        else { print "Using existing file $b37listing\n"; }
+    }
+    if (! -f $b37listing) {
+        my $b37lscmd = "$opts{gsutil} ls -lr $opts{b37gceuri}";
+        print "Getting listing of ALL B37 files in GCE, this might take some time...\n";
+        system("$b37lscmd > $b37listing") &&
+            die "$Script - Unable to get listing of B7 files: $b37lscmd > $b37listing\n";
+        print "Created file $b37listing\n";
+    }
+
+    #   Parse the listing from GCE, collect NWDIDs and files for each
+    my $in;
+    open($in, $b37listing) ||
+        die "$Script - Unable to read $b37listing: $!\n";
+    my %nwd2aref = ();              # Hash of NWD to array of files
+    my $n = 0;
+    while (<$in>) {
+        if (! /^\s*(\d+)\s+20\S+\s+(gs:\S+)/) { next; }
+        my $f = $2;
+        if ("$1" eq "0") {
+            push @error,"File $f is zero bytes, remove it";
+            next;
+        }
+        if ($f !~ /(NWD\d+)(\S+)/) { die "$Script - Unable to find NWD in '$f'\n"; }
+        push @{$nwd2aref{$1}},"$1$2";
+        $n++;
+    }
+    close($in);
+    print "Found $n B37 files at $opts{b37gceuri}\n";
+
+    #   Now get all the samples we think should be there and look for missing/extra files
+    my $sql = "SELECT bamid,expt_sampleid FROM $opts{bamfiles_table} WHERE state_b37=$COMPLETED";
+    my $sth = DoSQL($sql);
+    my $href = $sth->fetchrow_hashref;
+    my $rowsofdata = $sth->rows();
+    for (my $i=1; $i<$rowsofdata; $i++) {
+        my $href = $sth->fetchrow_hashref;
+        my $nwd = $href->{expt_sampleid};
+        my $bamid = $href->{bamid};
+        if (! exists($nwd2aref{$nwd})) {
+            push @error,"$bamid Sample $nwd was not copied to $opts{b37gceuri}";
+            next;
+        }
+        my %files = (cram=>1, crai=>1, md5=>1, flagstat=>1);    # Must have all these
+        foreach my $f (@{$nwd2aref{$nwd}}) {
+            if ($f eq "$nwd.recal.cram")          { delete($files{cram}); next; }
+            if ($f eq "$nwd.recal.cram.crai")     { delete($files{crai}); next; }
+            if ($f eq "$nwd.recal.cram.md5")      { delete($files{md5}); next; }
+            if ($f eq "$nwd.recal.cram.flagstat") { delete($files{flagstat}); next; }
+            push @error,"$bamid Sample $nwd unwanted file found: $f";
+        }
+        foreach my $x (keys %files) {
+            push @error,"$bamid Missing file $nwd.recal.$x";
+        }
+        delete ($nwd2aref{$nwd});
+    }
+
+    #   If there is anything left, it was copied to GCE, but was not remapped
+    foreach my $nwd (keys %nwd2aref) {
+        push @error,"$bamid $nwd in was not remapped b37, remove from $opts{b37gceuri}";
+    }
 
     #   If there were problems, show messages
     if (@error) { ShowErrors($bamid, $nwdid, \@error); }
     else {
-        if ($opts{verbose}) { print "BAMID=$bamid NWD=$nwdid B37 CRAM OK: $f\n"; }
+        if ($opts{verbose}) { print "B37 data at $opts{b37gceuri} was correct\n"; }
     }
 
 }
