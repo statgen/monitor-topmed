@@ -45,7 +45,7 @@ function ProcessRuns {
   n=0
   for r in `ls .`; do
     if [ ! -d $r ]; then            # If we cannot read directory, it is not local
-      echo "$r is not a local directory"
+      #echo "$r is not a local directory"
       continue;
     fi
     #   Manifest must exist
