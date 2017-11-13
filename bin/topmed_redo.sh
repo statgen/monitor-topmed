@@ -45,10 +45,13 @@ if [ "$#" -gt "5" ]; then
   if [ "$1 $2 $3 $4" = "GCE bcf.csi file missing:" ]; then
     myargs="$bamid gcecsi $5"
   fi
+  if [ "$3 $4 $5 $6" = "was not found at" ]; then
+    myargs="$bamid b37copy $2 $7"
+  fi
 
   if [ "$myargs" != "" ]; then
     echo "Submitting job to topmed-redo($realhost): $0 $myargs"
-    SubmitJob $bamid "topmed" '128G' "$0 $myargs"    # Very few at a time/host
+    SubmitJob $bamid "topmed" '724G' "$0 $myargs"    # Very few at a time/host
     exit
   else
     echo "$me - unable to determine exactly what action to redo: $*"
@@ -180,6 +183,74 @@ if [ "$action" = "gcebcf" ]; then
   nwdid=`GetNWDID $bamid`
   gsutil cp $bcffile gs://topmed-bcf/$nwdid/$3
   echo "Successfully copied CSI to GCE for $nwdid / $bamid"
+  exit
+fi
+
+# /tmp/redo.sh 11673 Sample NWD887188 was not found at gs://topmed-irc-...
+if [ "$action" = "b37copy" ]; then
+  nwdid=`GetNWDID $bamid`
+  b37file=`$topmedpath wherefile $bamid b37`
+  b37flagstat=`GetDB $bamid b37flagstat`
+  studyname=`GetDB $bamid studyname`
+  lcstudyname=${studyname,,}
+  b37cramchecksum=`GetDB $bamid b37cramchecksum`
+
+  uri="gs://topmed-irc-working/remapping/b37"
+  crambase=`basename $b37file`
+  c=`echo $crambase|grep cram`
+  if [ "$c" = "" ]; then
+    Fail "$b37file is not a cram file"
+  fi
+
+  #   Correct MD5 and flagstat as necessary
+  if [ "$b37cramchecksum" = '' ]; then
+    echo "Calculating MD5 for $nwdid"
+    b37cramchecksum=`CalcMD5 $nwdid $b37file`
+    if [ "$b37cramchecksum" = "" ]; then
+      Fail "Unable to do MD5 on $b37file"
+    fi
+    echo "Calculated MD5 for $nwdid - $b37cramchecksum"
+    SetDB $nwdid b37cramchecksum $b37cramchecksum
+  fi
+  if [ "$b37flagstat" = '' ]; then
+    b37flagstat=`CalcFlagstat $nwdid $b37file`
+    if [ "$b37flagstat" = "" ]; then
+      Fail "Unable to do flagstat on $b37file"
+    fi
+    echo "Calculated FLAGSTAT for $nwdid - $b37flagstat"
+    SetDB $nwdid b37flagstat $b37flagstat
+  fi
+
+  #   Copy existing cram and crai
+  $gsutilbig cp $b37file $uri/$lcstudyname/$crambase
+  if [ "$?" != "0" ]; then
+    Fail "Unable to copy $b37file $uri/$lcstudyname/$crambase"
+  fi
+  echo "Copied $crambase"
+  CreateIndex $bamid $b37file
+  $gsutil cp $b37file.crai $uri/$lcstudyname/$crambase.crai
+  if [ "$?" != "0" ]; then
+    Fail "Unable to copy $b37file.crai $uri/$lcstudyname/$crambase.crai"
+  fi
+  echo "Copied $crambase.crai"
+
+  #   Set additional information
+  echo "$b37flagstat + 0 paired in sequencing" > /run/shm/$$
+  $gsutil cp /run/shm/$$ $uri/$lcstudyname/$crambase.flagstat
+  if [ "$?" != "0" ]; then
+    Fail "Unable to set $uri/$lcstudyname/$crambase.flagstat"
+  fi
+  echo "Set $crambase.flagstat ($b37flagstat)"
+
+  echo "$b37cramchecksum $crambase" > /run/shm/$$
+  $gsutil cp /run/shm/$$ $uri/$lcstudyname/$crambase.md5
+  if [ "$?" != "0" ]; then
+    Fail "Unable to set $uri/$lcstudyname/$crambase.md5"
+  fi
+  echo "Set $crambase.md5 ($md5)"
+  rm -f /run/shm/$$
+
+  echo "Successfully copied $b37file file to $uri"
   exit
 fi
 
