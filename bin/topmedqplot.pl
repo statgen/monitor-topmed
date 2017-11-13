@@ -129,11 +129,22 @@ foreach my $i ($pct_freemix_index, $pct_genome_dp10_index, $mean_depth_index) {
 
 #   Now set the quality columns to be included in the SQL
 my ($qc_flagged, $qc_pass, $qc_fail) = (0, 0, 0);   # Default values for SQL columns
-if ($metrics[$mean_depth_index] < 30) { $qc_flagged = 1; }
-if (($metrics[$pct_freemix_index] < 3) &&
-    ($metrics[$pct_genome_dp10_index] > 95) &&
-    ($metrics[$mean_depth_index] > 30)) { $qc_pass = 1 }
-else { $qc_fail = 1; }
+if ($metrics[$pct_freemix_index]<=3 &&
+    $metrics[$pct_genome_dp10_index]>=95 &&
+    $metrics[$mean_depth_index]>=25 &&
+    $metrics[$mean_depth_index]<30) {
+    $qc_flagged = 1;
+}
+if ($metrics[$pct_freemix_index]<=3 &&
+    $metrics[$pct_genome_dp10_index]>=95 &&
+    $metrics[$mean_depth_index]>=25) {
+    $qc_pass = 1;
+}
+if ($metrics[$pct_freemix_index]>3 ||
+    $metrics[$pct_genome_dp10_index]<95 ||
+    $metrics[$mean_depth_index]<25) {
+    $qc_fail = 1;
+}
 push @colnames,'qc_fail','qc_pass','qc_flagged';
 push @metrics, $qc_fail,$qc_pass,$qc_flagged;
 
