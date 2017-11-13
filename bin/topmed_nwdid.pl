@@ -151,6 +151,10 @@ if (! $pi_name) { die "Unable to find pi_name for '$smvalue' in '$opts{lookuptab
 #   Update database with this info if bamid provided
 #--------------------------------------------------------------
 if ($opts{bamid}) {
+    $cmd = "$opts{topmedcmd} set $opts{bamid} expt_sampleid $smvalue";
+    system($cmd) &&                 # Update NWDID, watch for duplicate
+        die "$Script - Unable to set NWDID for $opts{bamid}\n";
+
     $cmd = "$opts{topmedcmd} set $opts{bamid} library_name $library_name";
     system($cmd);
     $cmd = "$opts{topmedcmd} set $opts{bamid} nominal_length $nominal_length";
@@ -163,8 +167,6 @@ if ($opts{bamid}) {
     system($cmd);
     $cmd = "$opts{topmedcmd} set $opts{bamid} studyname $study";
     system($cmd);
-    $cmd = "$opts{topmedcmd} set $opts{bamid} expt_sampleid $smvalue";
-    system($cmd);               # Update NWDID, weird database name
     $cmd = "$opts{topmedcmd} set $opts{bamid} cramname $smvalue.src.cram";
     system($cmd);
 }
