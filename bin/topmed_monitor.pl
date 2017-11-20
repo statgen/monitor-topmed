@@ -86,10 +86,11 @@ our %opts = (
     jobcount => 0,              # Not actually an option, but stats
     jobsnotpermitted => 0,
     jobsfailedsubmission => 0,
+    realhost => '',             # Provides a way to force the job on a particular host
 );
 Getopt::Long::GetOptions( \%opts,qw(
     help verbose topdir=s center=s runs=s piname=s studyname=s maxjobs=i random
-    dryrun suberr datayear=i
+    dryrun suberr datayear=i realhost=s
     )) || die "Failed to parse options\n";
 
 #   Simple help if requested
@@ -185,7 +186,7 @@ if ($fcn eq 'verify') {
             $href->{state_verify} = $REQUESTED;
         }
         if ($href->{state_verify} != $NOTSET && $href->{state_verify} != $REQUESTED) { next; }
-        if (! BatchSubmit("$opts{topmedverify} -submit $href->{bamid}")) { last; }
+        if (! BatchSubmit("$opts{topmedverify} -submit $href->{bamid} $opts{realhost}")) { last; }
     }
     ShowSummary($fcn);
     exit;
@@ -209,7 +210,7 @@ if ($fcn eq 'cram') {
             $href->{state_cram} = $REQUESTED;
         }
         if ($href->{state_cram} != $NOTSET && $href->{state_cram} != $REQUESTED) { next; }
-        if (! BatchSubmit("$opts{topmedcram} -submit $href->{bamid}")) { last; }
+        if (! BatchSubmit("$opts{topmedcram} -submit $href->{bamid} $opts{realhost}")) { last; }
     }
     ShowSummary($fcn);
     exit;
@@ -234,7 +235,7 @@ if ($fcn eq 'gcebackup' || $fcn eq 'backup') {
             $href->{state_gcebackup} = $REQUESTED;
         }
         if ($href->{state_gcebackup} != $NOTSET && $href->{state_gcebackup} != $REQUESTED) { next; }
-        if (! BatchSubmit("$opts{topmedbackup} -submit $href->{bamid}")) { last; }
+        if (! BatchSubmit("$opts{topmedbackup} -submit $href->{bamid} $opts{realhost}")) { last; }
     }
     ShowSummary($fcn);
     exit;
@@ -258,7 +259,7 @@ if ($fcn eq 'qplot') {
             $href->{state_qplot} = $REQUESTED;
         }
         if ($href->{state_qplot} != $NOTSET && $href->{state_qplot} != $REQUESTED) { next; }
-        if (! BatchSubmit("$opts{topmedqplot} -submit $href->{bamid}")) { last; }
+        if (! BatchSubmit("$opts{topmedqplot} -submit $href->{bamid} $opts{realhost}")) { last; }
     }
     ShowSummary($fcn);
     exit;
@@ -283,7 +284,7 @@ if ($fcn eq 'gcepush' || $fcn eq 'push') {
         }
         if ($href->{state_gce38push} != $NOTSET &&
             $href->{state_gce38push} != $REQUESTED) { next; }
-        if (! BatchSubmit("$opts{topmedgce38push} -submit $href->{bamid}")) { last ; }
+        if (! BatchSubmit("$opts{topmedgce38push} -submit $href->{bamid} $opts{realhost}")) { last ; }
     }
     ShowSummary($fcn);
     exit;
@@ -307,32 +308,7 @@ if ($fcn eq 'gcepull' || $fcn eq 'pull') {
             $href->{state_gce38pull} = $REQUESTED;
         }
         if ($href->{state_gce38pull} != $REQUESTED) { next; }
-        if (! BatchSubmit("$opts{topmedgce38pull} -submit $href->{bamid}")) { last; }
-    }
-    ShowSummary($fcn);
-    exit;
-}
-
-#--------------------------------------------------------------
-#   Post process data we fetched from Google Cloud
-#--------------------------------------------------------------
-if ($fcn eq 'post') {
-    #   Get list of all samples yet to process
-    my $sql = BuildSQL("SELECT bamid,state_gce38pull,state_gce38post FROM $opts{bamfiles_table}",
-        "WHERE state_gce38post!=$COMPLETED");
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { exit; }
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        #   Only post process data that we already fetched
-        if ($href->{state_gce38pull} != $COMPLETED) { next; }
-        if ($opts{suberr} && $href->{state_gce38post} >= $FAILED) {
-            $href->{state_gce38post} = $REQUESTED;
-        }
-        if ($href->{state_gce38post} != $NOTSET &&
-            $href->{state_gce38post} != $REQUESTED) { next; }
-        if (! BatchSubmit("$opts{topmedgce38post} -submit $href->{bamid}")) { last; }
+        if (! BatchSubmit("$opts{topmedgce38pull} -submit $href->{bamid} $opts{realhost}")) { last; }
     }
     ShowSummary($fcn);
     exit;
@@ -356,7 +332,7 @@ if ($fcn eq 'bcf') {
             $href->{state_gce38bcf} = $REQUESTED;
         }
         if ($href->{state_gce38bcf} != $NOTSET && $href->{state_gce38bcf} != $REQUESTED) { next; }
-        if (! BatchSubmit("$opts{topmedbcf} -submit $href->{bamid}")) { last; }
+        if (! BatchSubmit("$opts{topmedbcf} -submit $href->{bamid} $opts{realhost}")) { last; }
     }
     ShowSummary($fcn);
     exit;
@@ -381,7 +357,7 @@ if ($fcn eq 'gcecopy') {
             $href->{state_gce38copy} = $REQUESTED;
         }
         if ($href->{state_gce38copy} != $NOTSET && $href->{state_gce38copy} != $REQUESTED) { next; }
-        if (! BatchSubmit("$opts{topmedgcecopy} -submit $href->{bamid}")) { last; }
+        if (! BatchSubmit("$opts{topmedgcecopy} -submit $href->{bamid} $opts{realhost}")) { last; }
     }
     ShowSummary($fcn);
     exit;
@@ -406,7 +382,7 @@ if ($fcn eq 'awscopy') {
             $href->{state_aws38copy} = $REQUESTED;
         }
         if ($href->{state_aws38copy} != $NOTSET && $href->{state_aws38copy} != $REQUESTED) { next; }
-        if (! BatchSubmit("$opts{topmedawscopy} -submit $href->{bamid}")) { last; }
+        if (! BatchSubmit("$opts{topmedawscopy} -submit $href->{bamid} $opts{realhost}")) { last; }
     }
     ShowSummary($fcn);
     exit;
@@ -431,7 +407,7 @@ if ($fcn eq 'fix') {
             $href->{state_fix} = $REQUESTED;
         }
         if ($href->{state_fix} != $REQUESTED) { next; }
-        if (! BatchSubmit("$opts{topmedfix} -submit $href->{bamid}")) { last; }
+        if (! BatchSubmit("$opts{topmedfix} -submit $href->{bamid} $opts{realhost}")) { last; }
     }
     ShowSummary($fcn);
     exit;
@@ -742,7 +718,11 @@ The default is to run against all pinames.
 Randomly select data to be processed. This may not be used with B<-center> or B<-runs>. 
 This is intended for cases where a large set of data is to be selected
 and we want it to run over a wide set of hosts.
-In practice this is only useful for B<push>, B<pull>, B<post>, B<pushbcf> and B<pullbcf>.
+
+=item B<-realhost HOST>
+
+You may force the host the action will be run on with this option.
+This requires the script to be run detects the extra parameter and takes the right action.
 
 =item B<-runs NAME>
 
