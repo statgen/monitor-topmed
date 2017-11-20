@@ -13,7 +13,8 @@ if [ "$1" = "-submit" ]; then
   shift
   bamid=`GetDB $1 bamid`
   MayIRun $me  $bamid
-  MyRealHost $bamid 'bam'
+  #MyRealHost $bamid 'bam'
+  RandomRealHost $bamid
   SubmitJob $bamid "topmed" '4G' "$0 $*"
   exit
 fi
@@ -80,6 +81,7 @@ else
   fi
 fi
 
+rm -f $bamfile.tmp          # Some pgm creates this crap file
 Successful
 Log $etime
 exit

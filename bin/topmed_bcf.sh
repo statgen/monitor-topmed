@@ -32,7 +32,8 @@ if [ "$1" = "-submit" ]; then
     mem=48G
   fi
   MayIRun $me $bamid
-  MyRealHost $bamid b$build
+  #MyRealHost $bamid b$build
+  RandomRealHost $bamid
   SubmitJob $bamid "topmed" $mem "$0 $*"
   exit
 fi
