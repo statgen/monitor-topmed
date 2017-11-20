@@ -59,7 +59,7 @@ our %opts = (
     wresults37dir => 'working/schelcj/results',
     iresults37dir => 'incoming/schelcj/results',
     results38dir => 'working/mapping/results',
-    gcebackupuri => 'gs://topmed-backups',
+    gcebackupuri => 'gs://topmed-irc-working/archives',   # Was topmed-backups
     gcearchiveuri => 'gs://topmed-archives',
     gcebcfuri => 'gs://topmed-bcf',
     gceuploaduri => 'gs://topmed-bcf',
@@ -114,11 +114,12 @@ sub WherePath {
     $bamid = GetBamid($bamid);
 
     #   Get values of interest from the database
-    my $sth = DoSQL("SELECT runid,piname,expt_sampleid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
+    my $sth = DoSQL("SELECT runid,piname,datayear,expt_sampleid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
     my $href = $sth->fetchrow_hashref;
     my $piname = $href->{piname};
+    my $datayear = $href->{datayear};
     my $nwdid = $href->{expt_sampleid};
     my $runid = $href->{runid};
     $sth = DoSQL("SELECT centerid,dirname FROM $opts{runs_table} WHERE runid=$runid");
@@ -184,7 +185,7 @@ sub WherePath {
     }
 
     if ($set eq 'b38') {
-        my $file = FindB38($centername, $piname, $nwdid, $bamid);
+        my $file = FindB38($centername, $piname, $nwdid, $bamid, $datayear);
         print dirname($file)  . "\n";
         exit;
     }
@@ -234,13 +235,14 @@ sub WhatHost {
     $bamid = GetBamid($bamid);
 
     #   Get values of interest from the database
-    my $sth = DoSQL("SELECT runid,piname,expt_sampleid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
+    my $sth = DoSQL("SELECT runid,piname,datayear,expt_sampleid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
     my $href = $sth->fetchrow_hashref;
     my $nwdid = $href->{expt_sampleid};
     my $runid = $href->{runid};
     my $piname = $href->{piname};
+    my $datayear = $href->{datayear};
     $sth = DoSQL("SELECT centerid,dirname FROM $opts{runs_table} WHERE runid=$runid");
     $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' run '$runid' is unknown\n"; }
@@ -285,7 +287,7 @@ sub WhatHost {
     }
 
     if ($set eq 'b38') {
-        my $file = FindB38($centername, $piname, $nwdid, $bamid);
+        my $file = FindB38($centername, $piname, $nwdid, $bamid, $datayear);
         if ($file =~ /\/net\/([^\/]+)\//){ print $1 . "\n"; }
         exit;
     }
@@ -315,13 +317,14 @@ sub WhereFile {
     $bamid = GetBamid($bamid);
 
     #   Get values of interest from the database
-    my $sth = DoSQL("SELECT runid,bamname,cramname,piname,expt_sampleid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
+    my $sth = DoSQL("SELECT runid,bamname,cramname,piname,datayear,expt_sampleid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
     my $href = $sth->fetchrow_hashref;
     my $bamname = $href->{bamname};
     my $cramname = $href->{cramname} || 'CRAMNAME_not_SET';
     my $piname = $href->{piname};
+    my $datayear = $href->{datayear};
     my $nwdid = $href->{expt_sampleid};
     my $runid = $href->{runid};
     $sth = DoSQL("SELECT centerid,dirname FROM $opts{runs_table} WHERE runid=$runid");
@@ -384,7 +387,7 @@ sub WhereFile {
 
     #   Try to guess where the b38 remapped CRAM lives
     if ($set eq 'b38') {
-        print FindB38($centername, $piname, $nwdid, $bamid) . "\n";
+        print FindB38($centername, $piname, $nwdid, $bamid, $datayear) . "\n";
         exit;
     }
  
@@ -433,6 +436,7 @@ sub GetBamid {
 #==================================================================
 sub FindB37 {
     my ($centername, $piname, $nwdid, $bamid) = @_;
+    die "$Script - there are no local B37 files. See gs://topmed-irc-working/remapping/b37\n";
     my %files = ();
     foreach my $n ('', '2', '3', '4', '5', '6', '7', '9', '10') {     # All possible topmed hosts
         my $p = abs_path("$opts{netdir}$n/$opts{wresults37dir}/$centername/$piname/$nwdid/bams/$nwdid.recal.cram") || '';
@@ -450,7 +454,7 @@ sub FindB37 {
 
 #==================================================================
 # Subroutine:
-#   FindB38($centername, $piname, $nwdid, $bamid)
+#   FindB38($centername, $piname, $nwdid, $bamid, $datayear)
 #
 #   The path returned here is more convoluted than we want
 #   because we started allocating b38 files on 9 and 10
@@ -458,27 +462,46 @@ sub FindB37 {
 #   realized we needed more space.
 #   Hence we must support two schemes to determine the path.
 #
+#   Then came a decision to remap year 3 samples, requiring
+#   even more space. Ugh!
+#
 #   Return full path to B38 cram or null
 #   Caller must make the directory tree
 #==================================================================
 sub FindB38 {
-    my ($centername, $piname, $nwdid, $bamid) = @_;
-    my @host_partialpath = (
-        [ qw/topmed10 topmed9 topmed6  topmed7  topmed9  topmed10/ ],
-        [ qw/working  working incoming incoming incoming incoming/ ]
-    );
-  
-    # First determine the old path and if that directory exists, use it
-    my $mod = $bamid % 2;
-    my $file = "/net/$host_partialpath[0][$mod]/$host_partialpath[1][$mod]/" .
-        "mapping/results/$centername/$piname/b38/$nwdid/$nwdid.recab.cram";
-    if ( -f $file) { return $file; }        # If file exists, return that
+    my ($centername, $piname, $nwdid, $bamid, $datayear) = @_;
+    if (! defined($datayear)) { $datayear=''; }
 
-    # File does not exist, allocate using the new scheme
-    $mod = $bamid % 6;
-    $file = "/net/$host_partialpath[0][$mod]/$host_partialpath[1][$mod]/" .
-        "mapping/results/$centername/$piname/b38/$nwdid/$nwdid.recab.cram";
-    return $file;
+    if ("$datayear" ne '3') {
+        my @host_partialpath = (
+            [ qw/topmed10 topmed9 topmed6  topmed7  topmed9  topmed10/ ],
+            [ qw/working  working incoming incoming incoming incoming/ ]
+        );
+        # First determine the old path and if that directory exists, use it
+        my $mod = $bamid % 2;
+        my $file = "/net/$host_partialpath[0][$mod]/$host_partialpath[1][$mod]/" .
+            "mapping/results/$centername/$piname/b38/$nwdid/$nwdid.recab.cram";
+        if ( -f $file) { return $file; }        # If file exists, return that
+
+        # File does not exist, allocate using the new scheme
+        $mod = $bamid % 6;
+        $file = "/net/$host_partialpath[0][$mod]/$host_partialpath[1][$mod]/" .
+            "mapping/results/$centername/$piname/b38/$nwdid/$nwdid.recab.cram";
+        return $file;
+    }
+    #   Yet another brand new scheme invented for year 3
+    if ("$datayear" eq '3') {
+        my @host_partialpath = (
+            [ qw/topmed  topmed2 topmed3 topmed7 topmed5  topmed6  topmed7 topmed9/ ],
+            [ qw/working working working working incoming incoming incoming incoming/ ]
+        );
+        # First determine the old path and if that directory exists, use it
+        my $mod = $bamid % 8;
+        my $file = "/net/$host_partialpath[0][$mod]/$host_partialpath[1][$mod]/" .
+            "mapping/results/$centername/$piname/b38/$nwdid/$nwdid.recab.cram";
+        return $file;
+    }
+    die "$Script - FindB38 did not know about datayear=$datayear\n";
 }
 
 1;
