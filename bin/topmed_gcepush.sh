@@ -118,7 +118,7 @@ curl -f -i -u `cat /usr/cluster/topmed/etc/.db_connections/104.198.71.226.cred` 
 rc=$?
 cat $tmpout $tmperr                         # So curl results are in log
 a=`grep 'Unprocessable Entity' $tmperr`     # Ignore errors we do not care about
-rm $tmperr $tmpout
+rm -f $tmperr $tmpout
 if [ "$a" = "" ]; then
   if [ "$rc" != "0" ]; then
     Fail "Failed to notify Google Cloud that new file arrived"
