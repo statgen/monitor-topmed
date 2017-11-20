@@ -14,7 +14,7 @@ if [ "$1" = "-submit" ]; then
   shift
   bamid=`GetDB $1 bamid`
   MayIRun $me  $bamid
-  MyRealHost $bamid "b$build"
+  RandomRealHost $bamid "b$build"
   SubmitJob $bamid "topmed" '4G' "$0 $*"
   exit
 fi
@@ -117,7 +117,7 @@ $gsutil mv $inuri         $bcfuri/$nwdid
 echo "Moved $inuri files to $bcfuri/$nwdid"
 #   Remove any left over cruft in recabs bucket
 echo "Removing $incominguri/$nwdid"
-$gsutil rm -r $incominguri/$nwdid
+$gsutil rm -rf $incominguri/$nwdid
 
 etime=`date +%s`
 etime=`expr $etime - $stime`
