@@ -152,7 +152,7 @@ sub Jobids {
     #     10164.jobids:DOW 01 06 12:12:12 EST 2016 sexpt 17999839 ok 1 secs
     #   Get all jobids because some jobs take more than one day to complete
     #   This scales because old jobids files are eventually deleted
-    system("grep EDT *.jobids > $tmpfile") &&
+    system("grep -e E.T *.jobids > $tmpfile") &&
         die "$Script - Unable to get a list of *.jobids\n";
     open(IN, $tmpfile) ||
         die "$Script - Unable to read file '$tmpfile'\n";
