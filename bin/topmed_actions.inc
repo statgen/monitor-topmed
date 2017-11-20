@@ -77,7 +77,7 @@ function Fail {
     $topmedcmd -emsg "$msg" mark $bamid $markverb failed
   else
     >&2 echo $msg
-    >&2 echo "Task for $bamid FAILED, no markverb set"
+    #>&2 echo "Task for $bamid FAILED, no markverb set"
   fi
   exit 1
 }
@@ -165,21 +165,30 @@ function MyRealHost {
 #------------------------------------------------------------------
 function RandomRealHost {
   local bamid=$1
-
-  realhost=''
-  # All hosts are equal, so try to spread it around
-  n=`perl -e "{ print $bamid%10 }"`
-  h="topmed$n"
-  if [ "$h" = "topmed0" ]; then
-    h=topmed10
+  declare -A bamid2host
+  bamid2host[0]=topmed
+  bamid2host[1]=topmed2
+  bamid2host[2]=topmed3
+  bamid2host[3]=topmed4
+  bamid2host[4]=topmed5
+  bamid2host[5]=topmed6
+  bamid2host[6]=topmed7
+  bamid2host[7]=topmed9
+  bamid2host[8]=topmed10
+  
+  #   See if anything is down
+  f=/tmp/RandomRealHost.down
+  while read l; do
+    ll=($l)
+    bamid2host[${ll[0]}]=DOWN
+    echo "Marked index ${ll[0]} [${ll[1]}] as DOWN"
+  done < $f
+  n=`perl -e "{ print $bamid%9 }"`
+  #   See this entry is down, use first entry. If topmed down, cannot submit jobs
+  if [ "${bamid2host[$n]}" = "" -o "${bamid2host[$n]}" = "DOWN" ]; then
+    n=0
   fi
-  if [ "$h" = "topmed8" ]; then     # May not use this host
-    h=topmed5
-  fi
-  if [ "$h" = "topmed1" ]; then
-    h=topmed
-  fi
-  realhost=$h
+  realhost=${bamid2host[$n]}
 }
 
 #------------------------------------------------------------------
