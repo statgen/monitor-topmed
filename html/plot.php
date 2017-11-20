@@ -97,8 +97,8 @@ if ($fcn == 'plot') {
         "<font color='$COLORS[3]'>In Process</font> (submitted, running), or " .
         "<font color='$COLORS[4]'>Not Started</font> " .
         "</font></b></p>\n";
-    $legend = array('fix', 'aws38copy', 'gce38copy', 'gce38bcf', 'b38', 'gce38pull', 'gce38push',
-        'b37', 'qplot', 'gcebackup', 'cram', 'verify' );    // Reversed
+    $legend = array('aws38copy', 'gce38copy', 'gce38bcf', 'b38', 'gce38pull', 'gce38push',
+        'b37', 'qplot', 'gcebackup', 'cram', 'verify', 'fix' );    // Reversed
     $title = "Counts for All Verified Samples [$totalbamcount]";
     $plotdata = array();
     //$s = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE datayear=$datayear AND";
@@ -140,19 +140,19 @@ if ($fcn == 'plot') {
     MakePlot($plotdata, $title, $legend, '', '', 'stackedbars', 'text-data-yx');
     $XMAX = $xtmp;
 
-    $legend = array('cram', 'qplot', 'verify', 'bcf', 'fix');
+    $legend = array('fix', 'cram', 'qplot', 'verify', 'bcf');
     $title = "Daily Count of Steps Completed";
     $plotdata = array(); 
     for ($i=0; $i<$numrows; $i++) {
         $row = $sqldata[$i];
         if ($row['yyyymmdd'] < $NCBIBAMDATE) { continue; }
         $d = array();
+        array_push($d, $row['count_fix']);
         array_push($d, substr($row['yyyymmdd'],5,5));
         array_push($d, $row['count_cram']);
         array_push($d, $row['count_qplot']);
         array_push($d, $row['count_verify']);
         array_push($d, $row['count_bcf']);
-        array_push($d, $row['count_fix']);
         array_push($plotdata, $d);
     }
     MakePlot($plotdata, $title, $legend);
@@ -168,8 +168,8 @@ if ($fcn == 'plot') {
         array_push($d, $row['avetime_qplot']);
         array_push($d, $row['avetime_verify']);
         array_push($d, $row['avetime_bcf']);
-        array_push($d, $row['avetime_fix']);
         array_push($plotdata, $d);
+        array_push($d, $row['avetime_fix']);
     }
     MakePlot($plotdata, $title, $legend, 'Seconds');
 
