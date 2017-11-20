@@ -523,7 +523,28 @@ VIEW `nhlbi_qc_metrics` AS
         `q`.`gc_depth_95_99` AS `gc_depth_95_99`,
         `q`.`gc_depth_99_100` AS `gc_depth_99_100`,
         `q`.`library_size_m` AS `library_size_m`,
-        0 AS `qc`,
+        
+        `q`.`qc_pass` AS `qc_pass`,             // New rules from Tom, Nov 13, 2017
+        `q`.`qc_flagged` AS `qc_flagged`,
+        `q`.`qc_fail` AS `qc_fail`,
+        
+        FROM_UNIXTIME(`b`.`datearrived`) AS `recieved`,
+        `b`.`bamsize` AS `size`,
+        `s_qplot`.`name` AS `status_qplot`,
+        `s_b37`.`name` AS `status_remap_hg37`,
+        `s_b38`.`name` AS `status_remap_hg38`,
+        `b`.`datemapping_b37` AS `mapped_b37`,
+        `b`.`datemapping_b38` AS `mapped_b38`
+    FROM
+        ((((((`bamfiles` `b`
+        JOIN `runs` `r` ON ((`b`.`runid` = `r`.`runid`)))
+        JOIN `centers` `c` ON ((`r`.`centerid` = `c`.`centerid`)))
+        JOIN `states` `s_qplot` ON ((`b`.`state_qplot` = `s_qplot`.`id`)))
+        LEFT JOIN `qc_results` `q` ON ((`q`.`bam_id` = `b`.`bamid`)))
+        JOIN `states` `s_b37` ON ((`b`.`state_b37` = `s_b37`.`id`)))
+        JOIN `states` `s_b38` ON ((`b`.`state_b38` = `s_b38`.`id`)));
+
+        0 AS `qc`,                              // Start of removed code
         IF(((`q`.`pct_freemix` < 3)
                 AND (`q`.`pct_genome_dp10` > 95)
                 AND (`q`.`mean_depth` > 30)),
@@ -534,20 +555,6 @@ VIEW `nhlbi_qc_metrics` AS
                 OR (`q`.`pct_genome_dp10` < 95)),
             1,
             0) AS `qc_fail`,
-        FROM_UNIXTIME(`b`.`datearrived`) AS `recieved`,
-        `b`.`bamsize` AS `size`,
-        `s_qplot`.`name` AS `status_qplot`,
-        `s_b37`.`name` AS `status_remap_hg37`,
-        `s_b38`.`name` AS `status_remap_hg38`,
-        FROM_UNIXTIME(`b`.`datemapping`) AS `mapped_b37`,
-        `b`.`datemapping_b38` AS `mapped_b38`
-    FROM
-        ((((((`bamfiles` `b`
-        JOIN `runs` `r` ON ((`b`.`runid` = `r`.`runid`)))
-        JOIN `centers` `c` ON ((`r`.`centerid` = `c`.`centerid`)))
-        JOIN `states` `s_qplot` ON ((`b`.`state_qplot` = `s_qplot`.`id`)))
-        LEFT JOIN `qc_results` `q` ON ((`q`.`bam_id` = `b`.`bamid`)))
-        JOIN `states` `s_b37` ON ((`b`.`state_b37` = `s_b37`.`id`)))
-        JOIN `states` `s_b38` ON ((`b`.`state_b38` = `s_b38`.`id`)))
+                                                // End of removed code
 */
 
