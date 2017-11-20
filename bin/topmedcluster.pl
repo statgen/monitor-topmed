@@ -85,18 +85,34 @@ sub Summary {
         #   Should be none of these, but if so, we want to know about it
         if ($c[4] ne 'topmed') { next; }    # Only interested in my jobs
         if ($c[5] eq 'PD') {        # Queued
-            if ($c[3] =~ /\d+-(\S+)/) { $jobtype{$1}{queued}++; }
+            if ($c[3] =~ /\d+-(\S+)/) {
+                my $act = $1;
+                $jobtype{$act}{queued}++;
+                $jobtype{$act}{qhosts}{$c[9]}++;
+            }
             next;
         }
         if ($c[5] eq 'R') {         # Running
-            if ($c[3] =~ /\d+-(\S+)/) { $jobtype{$1}{running}++; }
+            if ($c[3] =~ /\d+-(\S+)/) {
+                my $act = $1;
+                $jobtype{$act}{running}++;
+                $jobtype{$act}{rhosts}{$c[9]}++;
+            }
             next;
         }
     }
     foreach my $jtype (sort keys %jobtype) {
         if (! exists($jobtype{$jtype}{queued}))  { $jobtype{$jtype}{queued} = 0; }
         if (! exists($jobtype{$jtype}{running})) { $jobtype{$jtype}{running} = 0; }
-        print "$jtype queued=$jobtype{$jtype}{queued} running=$jobtype{$jtype}{running}\n";
+        my $r = '';
+        foreach my $h (sort keys %{$jobtype{$jtype}{rhosts}}) {
+            $r .= "$h $jobtype{$jtype}{rhosts}{$h} ";
+        }
+        my $q = '';
+        foreach my $h (sort keys %{$jobtype{$jtype}{qhosts}}) {
+            $q .= "$h $jobtype{$jtype}{qhosts}{$h} ";
+        }
+        print "$jtype queued=$jobtype{$jtype}{queued} running=$jobtype{$jtype}{running} qhosts=$q rhosts=$r\n";
     }
 }
 
