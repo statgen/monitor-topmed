@@ -108,9 +108,10 @@ CREATE TABLE bamfiles (
   phs_sra_data_details VARCHAR(255),
   emsg         VARCHAR(255),
   checksum     VARCHAR(96) NOT NULL,
-  expt_sampleid VARCHAR(24),            /* Referenced in nhlbi_qc_metrics, NWDID */
+  expt_sampleid VARCHAR(24),            /* Referenced in nhlbi_qc_dometrics, NWDID */
   nwdid_known  CHAR(1) DEFAULT 'N',     /* Sample is known to NCBI */
   poorquality  CHAR(1) DEFAULT 'N',     /* Quality of sample is poor, do not use */
+  send2aws     CHAR(1) DEFAULT 'Y',     /* Send this sample to AWS */
 
   datearrived  VARCHAR(12),             /* Referenced in nhlbi_qc_metrics */
   bamsize      VARCHAR(16) DEFAULT 0,   /* Referenced in nhlbi_qc_metrics */
