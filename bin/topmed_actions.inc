@@ -38,7 +38,9 @@ export BOTO_CONFIG=/net/topmed/working/shared/tpg_gsutil_config.txt
 #------------------------------------------------------------------
 function MayIRun {
   $topmedpermit permit test $1 $2 $3 | tee $console/$2-$1.out
-  exit $?
+  if [ "$?" = "4" ]; then
+    exit 4
+  fi
 }
 
 #------------------------------------------------------------------
@@ -177,12 +179,14 @@ function RandomRealHost {
   bamid2host[8]=topmed10
   
   #   See if anything is down
-  f=/tmp/RandomRealHost.down
-  while read l; do
-    ll=($l)
-    bamid2host[${ll[0]}]=DOWN
-    echo "Marked index ${ll[0]} [${ll[1]}] as DOWN"
-  done < $f
+  f=/run/shm/RandomRealHost.down
+  if [ -f $f ]; then
+    while read l; do
+      ll=($l)
+      bamid2host[${ll[0]}]=DOWN
+      echo "Marked index ${ll[0]} [${ll[1]}] as DOWN"
+    done < $f
+  fi
   n=`perl -e "{ print $bamid%9 }"`
   #   See this entry is down, use first entry. If topmed down, cannot submit jobs
   if [ "${bamid2host[$n]}" = "" -o "${bamid2host[$n]}" = "DOWN" ]; then
