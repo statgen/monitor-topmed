@@ -13,8 +13,8 @@ markverb=$me
 if [ "$1" = "-submit" ]; then
   shift
   bamid=`GetDB $1 bamid`
-  MayIRun $me  $bamid
-  RandomRealHost $bamid "b$build"
+  RandomRealHost $bamid
+  MayIRun $me $bamid $realhost
   SubmitJob $bamid "topmed" '4G' "$0 $*"
   exit
 fi
@@ -61,7 +61,7 @@ if [ "$?" = "0" ]; then
   inuri=$p
 fi
 if [ "$inuri" = "" ]; then
-  Fail "Unable to find $nwdid/$nwdid.recab.cram in: $incominguri $bcfuri"
+  Fail "Unable to find $nwdid/$nwdid.recab.cram in: $incominguri"
 fi
 
 #   Now know where to look for data. Check flagstat

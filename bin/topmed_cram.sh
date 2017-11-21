@@ -16,9 +16,8 @@ squeezed=n
 if [ "$1" = "-submit" ]; then
   shift
   bamid=`GetDB $1 bamid`
-  MayIRun $me $bamid
-  #MyRealHost $bamid 'bam'
   RandomRealHost $bamid
+  MayIRun $me $bamid $realhost
   #  Is this squeezed or not?  For now this is only files from the Broad usually,
   #  however, not quite always.  $qual is the number of distinct base call quality 
   #  score values plus one if the bam is not squeezed.  (from Tom)

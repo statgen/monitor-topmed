@@ -58,8 +58,8 @@ function RC_Check {
 if [ "$1" = "-submit" ]; then
   shift
   bamid=`GetDB $1 bamid`
-  MayIRun $me $bamid
   RandomRealHost $bamid
+  MayIRun $me $bamid $realhost
   SubmitJob $bamid "topmed" '8G' "$0 $*"
   exit
 fi

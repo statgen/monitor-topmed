@@ -20,8 +20,8 @@ if [ "$1" = "-submit" ]; then
   if [ "$year" != "1" ]; then
     Fail "$0 $* must be year ONE data, not '$year'"
   fi
-  MayIRun $me  $bamid
-  MyRealHost $bamid 'bam'
+  RandomRealHost $bamid
+  MayIRun $me $bamid $realhost
   SubmitJob $bamid "topmed-redo" '2G' "$0 $*"
   exit
 fi

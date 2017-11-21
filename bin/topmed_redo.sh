@@ -15,7 +15,8 @@ markverb=''
 if [ "$#" -gt "5" ]; then
   bamid=`GetDB $1 bamid`
   shift
-  RandomRealHost $bamid 'bam'         # Sets random $realhost
+  RandomRealHost $bamid
+  MayIRun $me $bamid $realhost
   myargs=''
   # Figure out exactly what action to do, only pass relevent arguments to batch job
   if [ "$4 $5" = "must match" ]; then

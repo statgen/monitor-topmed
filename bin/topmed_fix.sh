@@ -11,6 +11,95 @@ markverb=fix
 if [ "$1" = "-submit" ]; then
   shift
   bamid=`GetDB $1 bamid`
+  RandomRealHost $bamid
+  MayIRun $me $bamid $realhost
+  echo "Submitting $bamid to run on $realhost"
+  SubmitJob $bamid "topmed" '2G' "$0 $*"
+  exit
+fi
+
+if [ "$2" = "" ]; then
+  me=`basename $0`
+  echo "Usage: $me [-submit] nwdid gcepath"
+  echo ""
+  echo "Fix some sort of problem."
+  exit 1
+fi
+
+nwdid=$1
+gcefile=$2
+
+b37flagstat=`GetDB $nwdid b37flagstat`
+studyname=`GetDB $nwdid studyname`
+lcstudyname=${studyname,,}
+b37flagstat=`GetDB $nwdid b37flagstat`
+b37cramchecksum=`GetDB $nwdid b37cramchecksum`
+
+uri="gs://topmed-irc-working/remapping/b37"
+crambase=`basename $gcefile`
+c=`echo $crambase|grep cram`
+if [ "$c" = "" ]; then
+  Fail "$gccefile is not a cram file"
+fi
+
+#   Correct MD5 and flagstat as necessary
+localdir=/net/topmed6/working/schelcj/results/illumina/Blangero
+if [ "$b37cramchecksum" = '' ]; then
+  echo "Calculating MD5 for $nwdid"
+  b37cramchecksum=`CalcMD5 $nwdid $localdir/$nwdid/bams/$nwdid.recal.cram`
+  if [ "$b37cramchecksum" = "" ]; then
+    Fail "Unable to do MD5 on $localdir/$nwdid/bams/$nwdid.recal.cram"
+  fi
+  echo "Calculated MD5 for $nwdid - $b37cramchecksum"
+  SetDB $nwdid b37cramchecksum $b37cramchecksum
+fi
+if [ "$b37flagstat" = '' ]; then
+  b37flagstat=`CalcFlagstat $nwdid $localdir/$nwdid/bams/$nwdid.recal.cram`
+  if [ "$b37flagstat" = "" ]; then
+    Fail "Unable to do flagstat on $localdir/$nwdid/bams/$nwdid.recal.cram"
+  fi
+  echo "Calculated FLAGSTAT for $nwdid - $b37flagstat"
+  SetDB $nwdid b37flagstat $b37flagstat
+fi
+
+#   Move existing cram and crai
+$gsutil mv $gcefile $uri/$lcstudyname/$crambase
+if [ "$?" != "0" ]; then
+  Fail "Unable to move $gcefile $uri/$lcstudyname/$crambase"
+fi
+echo "Moved $crambase"
+$gsutil mv $gcefile.crai $uri/$lcstudyname/$crambase.crai
+if [ "$?" != "0" ]; then
+  Fail "Unable to move $gcefile.crai $uri/$lcstudyname/$crambase.crai"
+fi
+echo "Moved $crambase.crai"
+
+#   Set additional information
+echo "$b37flagstat + 0 paired in sequencing" > /run/shm/$$
+gsutil cp /run/shm/$$ $uri/$lcstudyname/$crambase.flagstat
+if [ "$?" != "0" ]; then
+  Fail "Unable to set $uri/$lcstudyname/$crambase.flagstat"
+fi
+echo "Set $crambase.flagstat ($b37flagstat)"
+
+echo "$b37cramchecksum $crambase" > /run/shm/$$
+gsutil cp /run/shm/$$ $uri/$lcstudyname/$crambase.md5
+if [ "$?" != "0" ]; then
+  Fail "Unable to set $uri/$lcstudyname/$crambase.md5"
+fi
+echo "Set $crambase.md5 ($md5)"
+rm -f /run/shm/$$
+
+echo "Corrected GCE path for $gcefile"
+SetDB $nwdid state_fix 20
+
+exit
+
+#================= Old run =================#
+
+if [ "$1" = "-submit" ]; then
+  shift
+  bamid=`GetDB $1 bamid`
   b38=`GetDB $bamid state_b38`
   if [ "$b38" != "20" ]; then
     SetDB $bamid state_fix 0            # We will do this later
@@ -26,13 +115,9 @@ if [ "$1" = "-submit" ]; then
     echo "No need to submit job for $1"
     exit
   fi
-  RandomRealHost $bamid
-  qoshost=$realhost
-  if [ "$qoshost" = "topmed" ]; then
-    qoshost=topmed1
-  fi
+  RandomRealHost $bamid $2
   echo "Submitting $bamid to run on $realhost"
-  SubmitJob $bamid "$qoshost-fix" '8G' "$0 $*"
+  SubmitJob $bamid "$topmed" '8G' "$0 $*"
   exit
 fi
 
@@ -100,18 +185,13 @@ etime=`expr $etime - $stime`
 Log $etime
 exit
 
-#================= Old runs =================#
-exit
-
-. /usr/cluster/topmed/bin/topmed_actions.inc
-me=fix
-markverb=$me
+#================= Old run =================#
 
 if [ "$1" = "-submit" ]; then
   shift
   bamid=`GetDB $1 bamid`
   MayIRun $me  $bamid
-  RandomRealHost $bamid
+  RandomRealHost $bamid $2
   SubmitJob $bamid "topmed-fix" '2G' "$0 $*"
   exit
 fi
@@ -153,6 +233,7 @@ Successful
 Log $etime
 exit
 
+#================= Old run =================#
 
 nwdid=`GetNWDID $1`
 bamid=`GetDB $1 bamid`
@@ -179,7 +260,8 @@ if [ "$?" != "0" ]; then
 fi
 echo "Created index BCF file for $bcffile"
 exit
-#================= Old runs =================#
+
+#================= Old run =================#
 Started
 bamid=$1
 b=b37

@@ -33,8 +33,8 @@ function Copy2GCE {
 if [ "$1" = "-submit" ]; then
   shift
   bamid=`$topmedcmd show $1 bamid`
-  MayIRun $me  $bamid
   RandomRealHost $bamid
+  MayIRun $me $bamid $realhost
   SubmitJob $bamid "topmed" '3G' "$0 $*"
   exit
 fi

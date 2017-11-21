@@ -31,9 +31,8 @@ if [ "$1" = "-submit" ]; then
   elif [ "$filesize" -gt "23023087355" ]; then
     mem=48G
   fi
-  MayIRun $me $bamid
-  #MyRealHost $bamid b$build
   RandomRealHost $bamid
+  MayIRun $me $bamid $realhost
   SubmitJob $bamid "topmed" $mem "$0 $*"
   exit
 fi
