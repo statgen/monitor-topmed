@@ -32,18 +32,13 @@ export BOTO_CONFIG=/net/topmed/working/shared/tpg_gsutil_config.txt
 
 #------------------------------------------------------------------
 # Subroutine:
-#   MayIRun(name, bamid)    Is bamid permitted to run for script 'name'
+#   MayIRun(name, bamid, host)    Is bamid permitted to run for script 'name'
 #
 #   Does not return if permission is denied
 #------------------------------------------------------------------
 function MayIRun {
-  local name=$1
-  local bamid=$2
-  $topmedpermit permit test $name $bamid
-  if [ "$?" = "0" ]; then
-    echo "$name $bamid not permitted" | tee $console/$bamid-$name.out
-    exit 4
-  fi 
+  $topmedpermit permit test $1 $2 $3 | tee $console/$2-$1.out
+  exit $?
 }
 
 #------------------------------------------------------------------
@@ -161,10 +156,15 @@ function MyRealHost {
 
 #------------------------------------------------------------------
 # Subroutine:
-#   RandomRealHost(bamid)   Set realhost based on bamid
+#   RandomRealHost(bamid, realhost)   Set realhost based on bamid
 #------------------------------------------------------------------
 function RandomRealHost {
-  local bamid=$1
+  if [ "$2" != "" ]; then       # If a hostname is passed, use that
+    realhost=$2
+    return
+  fi
+
+  local bamid=$1                # Normal processing, pick realhost from bamid
   declare -A bamid2host
   bamid2host[0]=topmed
   bamid2host[1]=topmed2

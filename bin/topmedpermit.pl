@@ -86,15 +86,14 @@ exit;
 #
 #   Permit ('test', $op, $bamid)
 #
-#   Returns a boolean if an operation for a center/run is allowed
+#   Returns zero if an operation for a center/run is allowed, one for failure
 #==================================================================
 sub Permit {
     my ($fcn) = @_;
     my ($sql, $sth, $href, $rowsofdata);
     shift(@_);
 
-    #   Test is some operation is allowed
-    #   topmedcmd.pl permit test qlpot 4955
+    #   Test is some operation is allowed, e.g.  #   topmedpermit.pl permit test qlpot 4955
     if ($fcn eq 'test') {
         my ($op, $bamid) = @_;
 
@@ -104,20 +103,20 @@ sub Permit {
         #   This is a small table, read it all
         $sth = DoSQL("SELECT runid,centerid,datayear,operation FROM $opts{permissions_table}");
         $rowsofdata = $sth->rows();
-        if (! $rowsofdata) { exit(1); }             # Table empty, permitted
+        if (! $rowsofdata) { exit; }        # Table empty, permitted
         for (my $i=1; $i<=$rowsofdata; $i++) {
             $href = $sth->fetchrow_hashref;
             if ($centerid eq $href->{centerid} || $href->{centerid} eq '0') {
                 if ($runid eq $href->{runid} || $href->{runid} eq '0') {
                     if ($datayear eq $href->{datayear} || $href->{datayear} eq '0') {
                         if ($op eq $href->{operation} || $href->{operation} eq 'all') {
-                            exit;                   # Operation not permitted
+                            exit(4);        # Operation not permitted, special return code
                         }
                     }
                 }
             }
         }
-        exit(1);                                    # TRUE, permitted  
+        exit;                               # Permitted  
     }
 
     #   Enable a permission by deleting a database entry
@@ -295,7 +294,7 @@ Use B<all> for all datayears, centers or all runs or all actions.
 
 B<permit test action bamid>
 Use this to test if an action (e.g. backup, verify etc) may be submitted 
-for a particular bam.
+for a particular bam. Returns 4 for failure (e.g. not permitted)
 
 =head1 EXIT
 
