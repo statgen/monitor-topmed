@@ -38,7 +38,6 @@ our %opts = (
     realm => '/usr/cluster/topmed/etc/.db_connections/topmed',
     bamfiles_table => 'bamfiles',
     runs_table => 'runs',
-    squeuecmd => "/usr/cluster/bin/squeue -a -o '%.9i %.15P %.18q %.18j %.8u %.2t %.8M %.6D %R %.9n' -p topmed-working",    
     conf => "$Bin/../etc/topmedthrottle.conf",
     topmedcluster => '/usr/cluster/topmed/bin/topmedcluster.pl summary',
     topmedmonitor => '/usr/cluster/topmed/bin/topmed_monitor.pl',
@@ -61,7 +60,6 @@ my $fcn = shift @ARGV;
 #--------------------------------------------------------------
 #   Execute the command provided
 #--------------------------------------------------------------
-my %GROUPS = ();                # Groups allow us to set a max for a set of jobs
 my %JOBS = ();                  # All the type of jobs we know how to run
 if ($fcn eq 'submit') { SubmitJobs(@ARGV); exit; }
 
@@ -77,29 +75,37 @@ exit;
 sub SubmitJobs {
     #my ($p1, $p2) = @_;
     my %jobsqueued = ();
+    my %countbyhost = ();
 
-    ParseConf($opts{conf});         # Sets GROUP and JOBS
+    ParseConf($opts{conf});         # Sets JOBS
     if (! %JOBS) { die "$Script - No jobtypes found in '$opts{conf}'\n"; }
 
-    #   Get details about jobs that are running
+    #   Get details about jobs that are running and how many per host
     my $in;
     open($in, "$opts{topmedcluster} |") ||
         die "$Script - Unable to get details about jobs: $!\n";
-    while (<$in>) {                 # jobtype queued=N running=N
-        if (/\s*(\S+) queued=(\d+) running=(\d+)/) {
+    while (my $l = <$in>) {         # jobtype queued=N running=N qhosts= h n... rhosts= h n ...
+        if ($l =~ /\s*(\S+) queued=(\d+) running=(\d+)/) {
             $jobsqueued{$1} = $2+$3;
+        }
+        if ($l =~ /qhosts=(.*)\s+rhosts=(.*)/) {
+            my $q = $1;
+            my $r = $2;
+            my @w = split(' ',$q);          # Get all queued 'host count' pairs
+            for (my $i=0; $i<$#w; $i=$i+2) { $countbyhost{$w[$i]} += $w[$i+1]; }
+            @w = split(' ',$r);          # Get all running 'host count' pairs
+            for (my $i=0; $i<$#w; $i=$i+2) { $countbyhost{$w[$i]} += $w[$i+1]; }
         }
     }
     close($in);
 
-    #   %jobs has list of jobtypes and total number of running and queued
+    #   %JOBS has list of jobtypes and total number of running and queued
     #   Now go through the limits specified in the conf file and
     #   generate a call to submit jobs if there is the need
     foreach my $j (keys %JOBS) {    # Calculate jobs to be submitted
         if (! exists($jobsqueued{$j})) { $jobsqueued{$j} = 0; }   # None of these running
         my $max = 0;                    # Maybe submit this many
         if ($jobsqueued{$j} < $JOBS{$j}{max}) { $max = $JOBS{$j}{max} - $jobsqueued{$j}; }
-        if ($max <= 0 && $JOBS{$j}{min}) { $max = $JOBS{$j}{min}; }
         if ($max > 0) {                 # Submit more jobs 
             my $cmd = $opts{topmedmonitor} . " -max $max";
             if ($opts{verbose}) { $cmd .= ' -v'; }
@@ -125,7 +131,7 @@ sub SubmitJobs {
 # Subroutine:
 #   ParseConf(file)
 #
-#   Parse config file setting GROUPS and JOBS
+#   Parse config file setting JOBS
 #==================================================================
 sub ParseConf {
     my ($file) = @_;
@@ -152,12 +158,7 @@ sub ParseConf {
     }
     close($in);
     if ($opts{verbose}) {
-        my @k = keys %GROUPS;
-        print "Defined " . scalar(@k) . " groups:\n";
-        foreach my $g (@k) {
-            print "  $g jobs=" . join(' ', keys %{$GROUPS{$g}}) . "\n";
-        }
-        @k = keys %JOBS;
+        my @k = keys %JOBS;
         print "Defined " . scalar(@k) . " jobs:\n";
         foreach my $j (@k) {
             print "  $j ";
@@ -217,7 +218,7 @@ Provided for developers to see additional information.
 
 =head1 PARAMETERS
 
-Parameters to this program are grouped into several groups which are used
+Parameters to this program are used
 to deal with specific sets of information in the monitor databases.
 
 B<submit>
