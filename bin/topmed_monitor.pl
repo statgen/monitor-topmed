@@ -368,7 +368,7 @@ if ($fcn eq 'gcecopy') {
 if ($fcn eq 'awscopy') {
     #   Get list of all samples yet to process
     my $sql = BuildSQL("SELECT bamid,state_b38,state_gce38bcf,state_aws38copy FROM $opts{bamfiles_table}",
-        "WHERE state_aws38copy!=$COMPLETED AND datayear!=3");
+        "WHERE state_aws38copy!=$COMPLETED AND datayear!=3 AND send2aws='Y'");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { exit; }
