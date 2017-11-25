@@ -39,13 +39,14 @@ our %opts = (
     bamfiles_table => 'bamfiles',
     runs_table => 'runs',
     conf => "$Bin/../etc/topmedthrottle.conf",
+    topmedsummary => '/run/shm/Slurm.summary',
     topmedcluster => '/usr/cluster/topmed/bin/topmedcluster.pl summary',
     topmedmonitor => '/usr/cluster/topmed/bin/topmed_monitor.pl',
     verbose => 0,
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help verbose conf=s dry-run
+    help verbose conf=s dry-run action=s
     )) || die "$Script - Failed to parse options\n";
 
 #   Simple help if requested
@@ -81,9 +82,20 @@ sub SubmitJobs {
     if (! %JOBS) { die "$Script - No jobtypes found in '$opts{conf}'\n"; }
 
     #   Get details about jobs that are running and how many per host
+    #   This should already be waiting, but if not get it dynamically
+    #   $opts{topmedsummary} might be created about the same time as we start.
+    #   If so, wait a little so the file might be updated.
+    my @s = stat($opts{topmedsummary});
+    my $fileage = time();               # How old is file to read
+    if (@s) { $fileage = $fileage - $s[9]; }
+    if ($fileage > 295 && $fileage < 303) { sleep(10); }  # Wait for update of file
+    if ($fileage > 320) {               # Older than ~5 min
+        $opts{topmedsummary} = "$opts{topmedcluster} |";    # Invoke pgm to get info
+    }
+    if ($opts{verbose}) { print "Reading SLURM summary from $opts{topmedsummary}\n"; }
     my $in;
-    open($in, "$opts{topmedcluster} |") ||
-        die "$Script - Unable to get details about jobs: $!\n";
+    open($in, $opts{topmedsummary}) ||
+        die "$Script - Unable to get details about jobs from '$opts{topmedsummary}': $!\n";
     while (my $l = <$in>) {         # jobtype queued=N running=N qhosts= h n... rhosts= h n ...
         if ($l =~ /\s*(\S+) queued=(\d+) running=(\d+)/) {
             $jobsqueued{$1} = $2+$3;
@@ -103,6 +115,7 @@ sub SubmitJobs {
     #   Now go through the limits specified in the conf file and
     #   generate a call to submit jobs if there is the need
     foreach my $j (keys %JOBS) {    # Calculate jobs to be submitted
+        if ($opts{action} && $opts{action} ne $j) { next; }
         if (! exists($jobsqueued{$j})) { $jobsqueued{$j} = 0; }   # None of these running
         my $max = 0;                    # Maybe submit this many
         if ($jobsqueued{$j} < $JOBS{$j}{max}) { $max = $JOBS{$j}{max} - $jobsqueued{$j}; }
@@ -147,7 +160,7 @@ sub ParseConf {
         if (/^job\s+(\S+)\s+$OPENAMP/i) {
             my $job = $1;
             while (<$in>) {
-                if (/\s*$CLOSEAMP/) { last; }   # End of job
+                if (/\s*$CLOSEAMP/) { last; }       # End of job
                 if (/\s*(\S+)\s*=\s*(.+)\s*$/) {    # Capture key = value
                     $JOBS{$job}{$1} = $2;
                 }
@@ -196,6 +209,10 @@ overwhelming the filesystem, NFS or the network
 =head1 OPTIONS
 
 =over 4
+
+=item B<-action NAME>
+
+Use this to restrict any jobs to be submitted to only one action, e.g. cram, gcecopy etc.
 
 =item B<-conf PATH>
 
