@@ -13,6 +13,7 @@ if [ "$1" = "-submit" ]; then
   shift
   bamid=`GetDB $1 bamid`
   RandomRealHost $bamid
+  #MyRealHost $bamid cram
   MayIRun $me $bamid $realhost
   SubmitJob $bamid "topmed" '4G' "$0 $*"
   exit
@@ -49,13 +50,22 @@ if [ "$extension" = "cram" -a "$datayear" = "3" -a "$build" = "38" ]; then
   f=`$topmedpath wherefile $bamid cram`
   if [ ! -f $f ]; then
     echo "Set up local working directory so we can always find the cram"
-    bamdir=`$topmedpath wherepath $bamid bam`
-    cramdir=`$topmedpath wherepath $bamid cram`
-    if [ "$cramdir" = "" -o "$bamdir" = "" ]; then
-      Fail "Unable to determine BAM or CRAm directory for '$bamid'"
+    center=`$topmedcmd show $bamid center`
+    if [ "$center" = "washu" ]; then      # Hack because washu is never set up right
+      run=`$topmedcmd show $bamid center`
+      here=`cwd`
+      cd /net/topmed/working/backups/incoming/topmed/washu
+      ln -s ../../../../../../topmed/incoming/topmed/washu/$run $run
+       echo "Create symlink to original run for $center/$run"
+    else
+      bamdir=`$topmedpath wherepath $bamid bam`
+      cramdir=`$topmedpath wherepath $bamid cram`
+      if [ "$cramdir" = "" -o "$bamdir" = "" ]; then
+        Fail "Unable to determine BAM or CRAm directory for '$bamid'"
+      fi
+      echo "Create symlink to original run since backup will be offsite"
+      ln -s $bamdir $cramdir
     fi
-    echo "Create symlink to original run since backup will be offsite"
-    ln -s $bamdir $cramdir
   fi
 
   # Now backup the file offsite

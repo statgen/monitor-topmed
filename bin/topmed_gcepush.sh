@@ -13,6 +13,7 @@ incominguri='gs://topmed-incoming'
 if [ "$1" = "-submit" ]; then
   shift
   bamid=`GetDB $1 bamid`
+  #MyRealHost $bamid cram
   RandomRealHost $bamid
   MayIRun $me $bamid $realhost
   SubmitJob $bamid "topmed" '4G' "$0 $*"
