@@ -37,8 +37,8 @@ export BOTO_CONFIG=/net/topmed/working/shared/tpg_gsutil_config.txt
 #   Does not return if permission is denied
 #------------------------------------------------------------------
 function MayIRun {
-  $topmedpermit permit test $1 $2 $3 | tee $console/$2-$1.out
-  if [ "$?" = "4" ]; then
+  $topmedpermit test $1 $2 $3 | tee $console/$2-$1.out
+  if [ "${PIPESTATUS[0]}" = "4" ]; then
     exit 4
   fi
 }
@@ -161,11 +161,6 @@ function MyRealHost {
 #   RandomRealHost(bamid, realhost)   Set realhost based on bamid
 #------------------------------------------------------------------
 function RandomRealHost {
-  if [ "$2" != "" ]; then       # If a hostname is passed, use that
-    realhost=$2
-    return
-  fi
-
   local bamid=$1                # Normal processing, pick realhost from bamid
   declare -A bamid2host
   bamid2host[0]=topmed
@@ -184,7 +179,7 @@ function RandomRealHost {
     while read l; do
       ll=($l)
       bamid2host[${ll[0]}]=DOWN
-      echo "Marked index ${ll[0]} [${ll[1]}] as DOWN"
+      #echo "Marked index ${ll[0]} [${ll[1]}] as DOWN"
     done < $f
   fi
   n=`perl -e "{ print $bamid%9 }"`
