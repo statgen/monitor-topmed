@@ -232,11 +232,14 @@ if ($fcn == 'bamdetail') {
 if ($fcn == 'showout') {                // Show output from a SLURM job
     $s='none';
     if ($samplestate == '5') { $s = 'verify'; }
-    if ($samplestate == 'B') { $s = 'bcf'; }
+    if ($samplestate == 'B') { $s = 'gcebackup'; }
     if ($samplestate == 'Q') { $s = 'qplot'; }
     if ($samplestate == 'C') { $s = 'cram'; }
     if ($samplestate == 's') { $s = 'gcepush'; }
     if ($samplestate == 'r') { $s = 'gcepull'; }
+    if ($samplestate == 'V') { $s = 'bcf'; }
+    if ($samplestate == 'A') { $s = 'awscopy'; }
+    if ($samplestate == 'G') { $s = 'gcecopy'; }
     // Hardcoded path cause mario won't play with topmedpath.pl
     $ss = '/net/topmed/working/topmed-output';
     $a = $ss . '/' . $bamid . "-$s.out";
@@ -743,7 +746,7 @@ function HandlePermit($op, $datayear, $center, $run, $id) {
 
     //  Delete a permission
     if ($op == 'del') {
-        $cmd = escapeshellcmd("/usr/cluster/topmed/bin/topmedpermit.pl permit remove $id");
+        $cmd = escapeshellcmd("/usr/cluster/topmed/bin/topmedpermit.pl remove $id");
         $s = `$cmd 2>&1`;
         return "<pre>$s</pre>\n";
         //return "<pre>cmd=$cmd\n$s</pre>\n";
@@ -753,7 +756,7 @@ function HandlePermit($op, $datayear, $center, $run, $id) {
     if (! in_array($op, $validfunctions)) {
         return Emsg("Invalid operation '$op' - How'd you do that?", 1);
     }
-    $cmd = escapeshellcmd("/usr/cluster/topmed/bin/topmedpermit.pl permit add $op $datayear $center $run");
+    $cmd = escapeshellcmd("/usr/cluster/topmed/bin/topmedpermit.pl add $op $datayear $center $run");
     $s = `$cmd 2>&1`;
     return "<pre>$s</pre>\n";
 }
