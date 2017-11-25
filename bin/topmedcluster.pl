@@ -200,9 +200,10 @@ sub SQueue {
 
     #   Show summary of running on partitions
     print "Running jobs per host\n";
-    my $format = '    %-11s  %s';
     foreach my $p (sort keys %partitions) {
+        my $format = '    %-9s  %s';
         my %hosts = ();
+        my %total = ();                     # Get counts of number of each jobname
         foreach my $l (@{$running{$p}{data}}) {
             my @c = split(' ', $l);
             $c[3] =~ s/\d+\-//;             # Remove bamid from jobname
@@ -210,19 +211,25 @@ sub SQueue {
             $hosts{$c[8]}{$c[3]}++;         # Increment $hosts{topmed2}{cram}
         }
         print "   Partition $p:\n";
-        my $format = '    %-11s  %s';
         printf ($format . "\n", 'Host', 'Job types and count');
         foreach my $h (sort keys %hosts) {
             my $s = '';
             foreach my $jobname (sort keys %{$hosts{$h}}) {
-                $s .= sprintf('  %-12s', $jobname . "  [" . $hosts{$h}{$jobname} . '] ');
+                $s .= sprintf('  %-10s', $jobname . "  [" . $hosts{$h}{$jobname} . '] ');
+                $total{$jobname} += $hosts{$h}{$jobname};
             }
             printf ($format . "\n", $h, $s);
         }
+        #   Show total number of jobs per action
+        my $s = '';
+        foreach my $jobname (sort keys %total) {
+            $s .= sprintf('  %-10s', $jobname . " [" . $total{$jobname} . '] ');
+        }
+        printf ($format . "\n", 'Totals:', $s);
     }
     print "\n";
     if (%mosixrunning) {
-        $format = "    %-8s  %s\n";
+        my $format = "    %-8s  %s\n";
         print "  Partition nomosix jobs on topmed hosts:\n";
         printf ($format, 'User', 'Job count');
         foreach my $u (sort keys %mosixrunning) {
