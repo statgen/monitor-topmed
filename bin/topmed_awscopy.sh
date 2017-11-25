@@ -30,6 +30,7 @@ if [ "$1" = "-submit" ]; then
   shift
   bamid=`$topmedcmd show $1 bamid`
   RandomRealHost $bamid
+  #MyRealHost $bamid b$build
   MayIRun $me $bamid $realhost
   SubmitJob $bamid "topmed" '2G' "$0 $*"
   exit
@@ -47,6 +48,11 @@ bamid=$1
 Started
 nwdid=`GetNWDID $bamid`
 stime=`date +%s`
+
+send2aws=`GetDB $bamid send2aws`
+if [ "$send2aws" != "Y" ]; then
+  Fail "May not copy $bamid to AWS, send2aws=$send2aws"
+fi
 
 awsuri=`$topmedpath wherepath $nwdid awsupload`
 if [ "$awsuri" = "" ]; then

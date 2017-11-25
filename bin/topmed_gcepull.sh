@@ -13,7 +13,7 @@ markverb=$me
 if [ "$1" = "-submit" ]; then
   shift
   bamid=`GetDB $1 bamid`
-  RandomRealHost $bamid
+  MyRealHost $bamid b$build
   MayIRun $me $bamid $realhost
   SubmitJob $bamid "topmed" '4G' "$0 $*"
   exit
@@ -52,15 +52,9 @@ fi
 
 stime=`date +%s`
 
-#   Remapped cram could be > one place (arrgh!)  Figure out where it is
-#   E.G. unuri=gs://topmed-recabs/NWD947950/NWD947950.recab.cram
-inuri=''
-p="$incominguri/$nwdid/$nwdid.recab.cram"
-$gsutil stat "$p"
-if [ "$?" = "0" ]; then
-  inuri=$p
-fi
-if [ "$inuri" = "" ]; then
+inuri="$incominguri/$nwdid/$nwdid.recab.cram"
+$gsutil stat "$inuri"
+if [ "$?" != "0" ]; then
   Fail "Unable to find $nwdid/$nwdid.recab.cram in: $incominguri"
 fi
 
