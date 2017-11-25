@@ -9,9 +9,10 @@
 #
 #   This was originally part of topmedcmd.pl, but had to be broken
 #   into a separate program because of all the dependencies
-#   that topmedcmd.pl now has.
+#   that topmedcmd.pl had.
 #
-#   This has the minimum dependencies possible.
+#   This has the minimum dependencies possible, even though
+#   that means there is duplicated code here.
 #
 # ChangeLog:
 #   $Log: topmedpermit.pl,v $
@@ -37,6 +38,8 @@ our %opts = (
     centers_table => 'centers',
     runs_table => 'runs',
     permissions_table => 'permissions',
+    conf => "/usr/cluster/topmed/etc/topmedthrottle.conf",
+    topmedsummary => '/run/shm/Slurm.summary',
     verbose => 0,
 );
 my %VALIDOPS = (                    # Used for permit
@@ -57,16 +60,17 @@ my %VALIDOPS = (                    # Used for permit
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help verbose
+    help conf=s verbose
     )) || die "$Script - Failed to parse options\n";
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$Script [options] permit test action bamid\n" .
-        "$Script [options] permit remove id\n" .
-        "$Script [options] permit add action datayear center run\n" .
-        "Returns boolean if an action is permitted or not\n" .
-        "or can be used to add or remove a permit-rule\n" .
+    warn "$Script [options] test action bamid [host]\n" .
+        "$Script [options] remove id\n" .
+        "$Script [options] add action datayear center run\n" .
+        "\n" .
+        "Return code indicates if an action is permitted or not.\n" .
+        "You may also add or remove a permit-rule.\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
     exit 1;
@@ -74,73 +78,146 @@ if ($#ARGV < 0 || $opts{help}) {
 
 my $fcn = shift @ARGV;
 DBConnect($opts{realm});
-if ($fcn eq 'permit')    { Permit(@ARGV); exit; }
+
+if ($fcn eq 'test')    { Test(@ARGV); exit; }
+if ($fcn eq 'remove')  { Remove(@ARGV); exit; }
+if ($fcn eq 'add')     { Add(@ARGV); exit; }
+
 die "$Script - Invalid function '$fcn'\n";
 exit;
 
 #==================================================================
 # Subroutine:
-#   Permit ($fcn, $op, $center, $run)
+#   Test ($op, $center, $run)
 #
-#   Controls a database of enabled or disabled operations for a center/run
+#   Is operation allowed
+#       e.g. topmedpermit.pl permit test qplot 4955 [HOST]
+#   Can fail because too many jobs for host or database rule#
 #
-#   Permit ('test', $op, $bamid)
-#
-#   Returns zero if an operation for a center/run is allowed, one for failure
+#   Returns zero if an operation for a center/run is allowed, else failure
 #==================================================================
-sub Permit {
-    my ($fcn) = @_;
-    my ($sql, $sth, $href, $rowsofdata);
-    shift(@_);
+sub Test {
+    my ($op, $bamid, $h) = @_;
 
-    #   Test is some operation is allowed, e.g.  #   topmedpermit.pl permit test qlpot 4955
-    if ($fcn eq 'test') {
-        my ($op, $bamid) = @_;
+    #   The maxperhost setting is in the topmedthrottle conf file.
+    #   Figure how how many actions are permitted on this host
+    #
+    #   Then figure out how many jobs are running on each host
+    #   by parsing the output of topmedcluster.pl summary
+    #   and calculate the number of jobs permitted for this host
+    my $systemmax = 0;
+    my $actionmax = 0;
+    my ($in, $in2);
+    if ($h && open($in, $opts{topmedsummary}) && open($in2, $opts{conf})) {
+        my $OPENAMP = '{';
+        my $CLOSEAMP = '}';
+        while (<$in2>) {
+            chomp();
+            if (/^#/) { next; }
+            if (! /\S/) { next; }
+            if (/^job\s+(\S+)\s+$OPENAMP/i) {
+                my $action = $1;
+                if ($action ne $op) { next; }
+                while (<$in2>) {
+                    if (/\s*$CLOSEAMP/) { last; }
+                    if (/\s*max\s*=\s*(\S+)/) { $systemmax = $1; }
+                    if (/\s*maxperhost\s*=\s*(\S+)/) { $actionmax = $1; }
+                }
+            }
+        }
+        close($in2);
+        #   Now how many are running for each action
+        #   Looks like:  bcf queued=0 running=126 qhosts= h1 A ... hn B rhosts=h1 C ... hn D
+        my ($queued, $running, $maxjobs, $maxthishost) = (0, 0, 0, 0);
+        while (my $l = <$in>) {
+            if ($l !~ /\s*(\S+)\s+queued=(\d+)\s+running=(\d+)\s+qhosts=(.*)\s+rhosts=(.*)/) { next; }
+            if ($1 ne $op) { next; }                # Not my action
+            ($queued, $running) = ($2, $3);
+            my ($q, $r) = ($4, $5);
+            my @w = split(' ', $q);
+            for (my $i=0; $i<$#w; $i=$i+2) {
+                if ($h ne $w[$i]) { next; }
+                $maxthishost += $w[$i+1];
+                last;
+            }
+            @w = split(' ', $r);
+            for (my $i=0; $i<$#w; $i=$i+2) {
+                if ($h ne $w[$i]) { next; }
+                $maxthishost += $w[$i+1];
+                last;
+            }
+        }
+        close($in);
 
-        #   Get runid and centerid for this bam
-        my ($centerid, $runid, $datayear) = GetBamidInfo($bamid);
+        #   We now know how many $op actions may run concurrently and how many ARE running
+        #   If we're overloaded, this submit is not permitted
+        if ($actionmax && $maxthishost >= $actionmax) {
+            if ($opts{verbose}) { print "Too many $op jobs [$maxthishost] running/queued on $h $actionmax\n"; }
+            exit(4);                        # Operation not permitted, special return code
+        }
+        my $n = $queued + $running;
+        if ($systemmax && $n >= $systemmax) {
+            if ($opts{verbose}) { print "Too many $op jobs [$n} running/queued system wide $systemmax\n"; }
+            exit(4);                        # Operation not permitted, special return code
+        }
+    }
 
-        #   This is a small table, read it all
-        $sth = DoSQL("SELECT runid,centerid,datayear,operation FROM $opts{permissions_table}");
-        $rowsofdata = $sth->rows();
-        if (! $rowsofdata) { exit; }        # Table empty, permitted
-        for (my $i=1; $i<=$rowsofdata; $i++) {
-            $href = $sth->fetchrow_hashref;
-            if ($centerid eq $href->{centerid} || $href->{centerid} eq '0') {
-                if ($runid eq $href->{runid} || $href->{runid} eq '0') {
-                    if ($datayear eq $href->{datayear} || $href->{datayear} eq '0') {
-                        if ($op eq $href->{operation} || $href->{operation} eq 'all') {
-                            exit(4);        # Operation not permitted, special return code
-                        }
+    #   Get runid and centerid for this bam
+    my ($centerid, $runid, $datayear) = GetBamidInfo($bamid);
+
+    #   This is a small table, read it all
+    my $sth = DoSQL("SELECT runid,centerid,datayear,operation FROM $opts{permissions_table}");
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { exit; }        # Table empty, permitted
+    for (my $i=1; $i<=$rowsofdata; $i++) {
+        my $href = $sth->fetchrow_hashref;
+        if ($centerid eq $href->{centerid} || $href->{centerid} eq '0') {
+            if ($runid eq $href->{runid} || $href->{runid} eq '0') {
+                if ($datayear eq $href->{datayear} || $href->{datayear} eq '0') {
+                    if ($op eq $href->{operation} || $href->{operation} eq 'all') {
+                        print "Operation $op blocked by $opts{permissions_table} table\n";
+                        exit(4);        # Operation not permitted, special return code
                     }
                 }
             }
         }
-        exit;                               # Permitted  
     }
+    exit;                               # Permitted  
+}
 
-    #   Enable a permission by deleting a database entry
-    #   e.g. topmedcmd.pl permit remove id
-    if ($fcn eq 'remove') {
-        my ($id) = @_;
-        $sql = "SELECT * FROM $opts{permissions_table} WHERE id=$id";
-        $sth = DoSQL($sql);
-        $rowsofdata = $sth->rows();
-        if (! $rowsofdata) { die "Permission '$id' does not exist\n"; }
-        $href = $sth->fetchrow_hashref;
-        my $s = "$href->{datayear} /$href->{centername} / $href->{dirname} / $href->{operation}";
-        $sql = "DELETE FROM $opts{permissions_table} WHERE id='$id'";
-        $sth = DoSQL($sql);
-        if (! $sth) { die "Failed to remove permission '$fcn' for 'id=$id $s'\nSQL=$sql"; }
-        print "Deleted permission control for '$s'\n";
-        exit;
-    }
+#==================================================================
+# Subroutine:
+#   Remove($id)
+#
+#   Enable a permission by deleting a database entry
+#   e.g. topmedcmd.pl permit remove id
+#==================================================================
+sub Remove {
+    my ($id) = @_;
+    my $sql = "SELECT * FROM $opts{permissions_table} WHERE id=$id";
+    my $sth = DoSQL($sql);
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { die "Permission '$id' does not exist\n"; }
+    my $href = $sth->fetchrow_hashref;
+    my $s = "$href->{datayear} /$href->{centername} / $href->{dirname} / $href->{operation}";
+    $sql = "DELETE FROM $opts{permissions_table} WHERE id='$id'";
+    $sth = DoSQL($sql);
+    if (! $sth) { die "Failed to remove permission '$fcn' for 'id=$id $s'\nSQL=$sql"; }
+    print "Deleted permission control for '$s'\n";
+    exit;
+}
 
-    if ($fcn ne 'add') { die "Unknown function '$fcn'\n"; }
-
-    #   Disable a permission by adding to the database entry
-    #   e.g. # topmedcmd.pl permit add [qplot [broad [2015sep18]]]
+#==================================================================
+# Subroutine:
+#   Add($op, $datayear, $center, $run)
+#
+#   Disable a permission by adding to the database entry
+#   e.g. ... add [qplot [broad [2015sep18]]]
+#==================================================================
+sub Add {
     my ($op, $datayear, $center, $run) = @_;
+    my ($sql, $sth, $href, $rowsofdata);
+
     if (! $op)       { $op = 'all'; }           # Set defaults
     if (! $datayear) { $datayear = 'all'; }
     if (! $center)   { $center = 'all'; }
@@ -267,34 +344,49 @@ __END__
 
 =head1 NAME
 
-topmedpermit.pl - Determine if an action is allowed
+topmedpermit.pl - Control if one may submit a job for an action
 
 =head1 SYNOPSIS
 
   #  Stop qplot job submissions for a particular run
-  topmedpermit.pl permit add all qplot broad 2015oct18
+  topmedpermit.pl add all qplot broad 2015oct18
   #  Stop qplot job submissions for a particular center
-  topmedpermit.pl permit add all qplot broad
+  topmedpermit.pl add all qplot broad
   #  Stop qplot job submissions for a particular datayear
-  topmedpermit.pl permit add 3 qplot 
+  topmedpermit.pl add 3 qplot 
 
-  topmedpermit.pl permit remove 12          # Remove a permit control
-  topmedpermit.pl permit test cram 4567     # Test if we should submit a cram job for this sampleid
+  topmedpermit.pl remove 12          # Remove a permit control
+  topmedpermit.pl test cram 4567     # Test if we should submit a cram job for this sampleid
+  topmedpermit.pl test cram 4567 topmed5   # Test if submit okay for topmed5
 
 =head1 OPTIONS
 
-No options are supported.
+=over 4
+
+=item B<-conf PATH>
+
+Specifies the path to a topmedthrottle configuration file
+
+=item B<-help>
+
+Generates this output.
+
+=item B<-verbose>
+
+Provided for developers to see additional information.
+
+=back
 
 =head1 PARAMETERS
 
-B<permit enable/disable action center run>
+B<add/remove enable/disable action center run>
 Use this to control the database which allows one enable or disable topmed actions
 (e.g. backup, verify etc) for a center or run.
 Use B<all> for all datayears, centers or all runs or all actions.
 
-B<permit test action bamid>
+B<test action bamid host>
 Use this to test if an action (e.g. backup, verify etc) may be submitted 
-for a particular bam. Returns 4 for failure (e.g. not permitted)
+for a particular bam. Returns 4 for not permitted.
 
 =head1 EXIT
 
