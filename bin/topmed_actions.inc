@@ -32,14 +32,32 @@ export BOTO_CONFIG=/net/topmed/working/shared/tpg_gsutil_config.txt
 
 #------------------------------------------------------------------
 # Subroutine:
+#   Trap SIGTERM signals forced by a timeout
+#   Generate a Fail message so we know this timed out and can restart it
+#------------------------------------------------------------------
+trap "finish" USR1
+function finish {
+  #   Derive bamid from jobname
+  l=(`echo $SLURM_JOB_NAME|sed -e 's/-/ /'`)
+  bamid=${l[0]}
+  m="Job timed out  bamid=$bamid jobid=$SLURM_JOB_ID `date`"
+  Fail "$m"
+}
+
+#------------------------------------------------------------------
+# Subroutine:
 #   MayIRun(name, bamid, host)    Is bamid permitted to run for script 'name'
 #
 #   Does not return if permission is denied
 #------------------------------------------------------------------
 function MayIRun {
-  $topmedpermit test $1 $2 $3 | tee $console/$2-$1.out
-  if [ "${PIPESTATUS[0]}" = "4" ]; then
+  $topmedpermit test $1 $2 $3
+  rc=$?
+  if [ "$rc" = "4" ]; then
     exit 4
+  fi
+  if [ "$rc" = "5" ]; then
+    exit 5
   fi
 }
 
@@ -385,7 +403,7 @@ function CalcMD5 {
 #------------------------------------------------------------------
 # Subroutine:
 #   SubmitJob(bamid, qos, mem, cmdtorun)    Submit this script to SLURM
-#   Uses global variables: $me $markverb $console $slurp $realhost $cores
+#   Uses global variables: $me $markverb $console $slurp $realhost $cores $timeout
 #------------------------------------------------------------------
 function SubmitJob {
   local bamid=$1
@@ -403,13 +421,18 @@ function SubmitJob {
   else
     r=''
   fi
+  if [ "$timeout" != "" ]; then
+    t="--time=$timeout --signal=B:USR1@60"
+  else
+    t=''
+  fi
   if [ "$cmdtorun" != "" ]; then
     cmdtorun="$cmdtorun"
   else
     echo "No command to execute provided to SubmitJob"
     exit 3
   fi
-  l=(`/usr/cluster/bin/sbatch -p $slurmp $mem $r $cores $q --workdir=$console -J $bamid-$me --output=$console/$bamid-$me.out $cmdtorun`)
+  l=(`/usr/cluster/bin/sbatch -p $slurmp $mem $r $t $cores $q --workdir=$console -J $bamid-$me --output=$console/$bamid-$me.out $cmdtorun`)
   if [ "$?" != "0" ]; then
     echo "CMD=/usr/cluster/bin/sbatch -p $slurmp $mem $r $cores $q --workdir=$console -J $bamid-$me --output=$console/$bamid-$me.out $cmdtorun" >> $console/$bamid-$me.out
     Fail "Failed to submit command to SLURM - $l" | tee -a $console/$bamid-$me.out
