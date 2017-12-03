@@ -107,7 +107,7 @@ sub PersistCallBack {
 sub DoSQL {
     my ($sql, $die) = @_;
     if (! defined($die)) { $die = 1; }
-    if ($main::opts{verbose} > 1) { warn "DEBUG: SQL=$sql\n"; }
+    if (defined($main::opts{verbose}) && $main::opts{verbose} > 1) { warn "DEBUG: SQL=$sql\n"; }
     my $sth = $DBH->prepare($sql);
     if (! $die) { $DBH->{RaiseError} = 0; $DBH->{PrintError} = 0; }
     $sth->execute();
@@ -138,7 +138,7 @@ sub DoSQL {
 sub PersistDoSQL {
     my ($realm, $sql) = @_;
     my $emsg;
-    if ($main::opts{verbose} > 1) { warn "DEBUG: SQL=$sql\n"; }
+    if (defined($main::opts{verbose}) && $main::opts{verbose} > 1) { warn "DEBUG: SQL=$sql\n"; }
 
     for (my $maxsleep=120; $maxsleep>0; $maxsleep-=5) {   
         if (! $DBH) { PersistDBConnect($realm); }
@@ -153,7 +153,7 @@ sub PersistDoSQL {
             die "SQL failure: $emsg\n  SQL=$sql\n";
         }
         undef($DBH);                    # Force reconnect to server
-        if ($main::opts{verbose} > 1) { warn "PersistDoSQL: $emsg, wait and retry\n"; }
+        if (defined($main::opts{verbose}) && $main::opts{verbose} > 1) { warn "PersistDoSQL: $emsg, wait and retry\n"; }
         sleep(5);
     }
      die "SQL failure: $emsg\n  SQL=$sql\n";
