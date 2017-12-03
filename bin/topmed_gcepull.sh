@@ -15,6 +15,7 @@ if [ "$1" = "-submit" ]; then
   bamid=`GetDB $1 bamid`
   MyRealHost $bamid b$build
   MayIRun $me $bamid $realhost
+  timeout='4:00:00'
   SubmitJob $bamid "topmed" '4G' "$0 $*"
   exit
 fi
@@ -106,8 +107,8 @@ SetDB $bamid b${build}flagstat $cramflagstat
 $topmedcmd setdate $bamid datemapping_b38 $cramfile
 
 #   Clean up data in GCE if data found in incoming.  Move remapped data to bcf bucket
-$gsutil mv $inuri.flagstat  $bcfuri/$nwdid
-$gsutil mv $inuri         $bcfuri/$nwdid
+$gsutil mv $inuri.flagstat  $bcfuri/$nwdid/$nwdid.recab.cram.flagstat
+$gsutil mv $inuri         $bcfuri/$nwdid/$nwdid.recab.cram
 echo "Moved $inuri files to $bcfuri/$nwdid"
 #   Remove any left over cruft in recabs bucket
 echo "Removing $incominguri/$nwdid"
