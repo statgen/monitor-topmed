@@ -50,17 +50,17 @@ our %opts = (
     runs_table => 'runs',
     gceuri => 'gs://topmed-bcf',
     topmedpath => '/usr/cluster/topmed/bin/topmedpath.pl',
-    gsutil => 'gsutil',
+    gsutil => '/usr/bin/gsutil',
     b37gceuri => 'gs://topmed-irc-working/remapping/b37',
-    gcels => 'gsutil ls',   # Add $opts{gceuri}/NWDxxxxxxx
+    gcels => '/usr/bin/gsutil ls',   # Add $opts{gceuri}/NWDxxxxxxx
     redotool => '/usr/cluster/topmed/bin/topmed_redo.sh',
     samtools => '/usr/cluster/bin/samtools',
-    #db => 1,                # Always check the database values
+    remapstatus => 'curl --silent --insecure https://104.198.71.226/api/sample-status\\?ids=',
     verbose => 0,
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help db localfiles awsfiles gcefiles checkfiles b37files
+    help db localfiles awsfiles gcefiles checkfiles b37files recabfiles
     register checkfiles fixer=s execfixer random max=i redo verbose
     center=s run=s piname=s studyname=s datayear=i
     )) || die "$Script - Failed to parse options\n";
@@ -78,7 +78,7 @@ if ($opts{help} || ($#ARGV<0 && (! $opts{run}) && (! $opts{center}))) {
     if ($opts{help}) { system("perldoc $0"); }
     exit 1;
 }
-if (! ($opts{db} || $opts{localfiles} || $opts{awsfiles} || $opts{gcefiles} || $opts{b37files})) {
+if (! ($opts{db} || $opts{localfiles} || $opts{awsfiles} || $opts{gcefiles} || $opts{b37files} || $opts{recabfiles})) {
     die "$Script - Specify the type of check:  -db -localfiles -awsfiles or -gcefiles\n";
 }
 if ($opts{redo}) { $opts{fixer} = $opts{redotool}; }
@@ -95,6 +95,7 @@ if ($opts{piname})    { $morewhere .= " AND piname='$opts{piname}'"; }
 if ($opts{studyname}) { $morewhere .= " AND studyname='$opts{studyname}'"; }
 if ($opts{datayear})  { $morewhere .= " AND datayear=$opts{datayear}"; }
 if ($opts{b37files})  { $morewhere .= " AND state_b37=20"; }
+#if ($opts{recabfiles}){ $morewhere .= " AND state_gce38push=20 AND state_gce38pull!=20"; }
 if ($opts{random})    { $morewhere .= ' ORDER BY RAND()'; }
 if ($opts{max})       { $morewhere .= " LIMIT $opts{max}"; }
 
@@ -155,6 +156,12 @@ if ($opts{db}) {
     print "Verify database values\n";
     for (my $i=0; $i<=$#bamidrange; $i++) {
         Check_DB($bamidrange[$i], $nwdids[$i]);
+    }
+}
+if ($opts{recabfiles}) {
+    print "Verify remapped files GCE recabs\n";
+    for (my $i=0; $i<=$#bamidrange; $i++) {
+        Check_RecabFiles($bamidrange[$i], $nwdids[$i]);
     }
 }
 if ($opts{localfiles}) {
@@ -453,6 +460,78 @@ sub Check_GCEFiles {
 
 #==================================================================
 # Subroutine:
+#   Check_RecabFiles()
+#   Verify files to be remapped
+#==================================================================
+sub Check_RecabFiles {
+    my ($bamid, $nwdid) = @_;
+    my @error = ();
+    my $filecmd = $opts{topmedpath} . " wherefile $bamid ";
+    my $tmpfile = '/run/shm/topmedcheck.tmp';
+
+    my $sql = "SELECT * FROM $opts{bamfiles_table} WHERE bamid=$bamid";
+    my $sth = DoSQL($sql);
+    my $href = $sth->fetchrow_hashref;
+
+    my ($center, $dirname) = GetCenterRun($href->{runid});
+
+    my %summary = ( bamid => $bamid, nwdid => $nwdid );
+
+    if ($href->{state_gce38push} = $COMPLETED) { $summary{gcepush} = 'pushed'; }
+    else { $summary{gcepush} = 'not_pushed'; }
+    
+    if ($href->{state_gce38pull} = $COMPLETED) {$summary{gcepull} = 'pulled'; }
+    else { $summary{gcepull} = 'not_pulled'; }
+
+    my $s = $opts{remapstatus} . $nwdid . " | grep NWD";
+    $s = `$s`;
+    if (! $s) { $summary{remapstatus} = $nwdid . "_unknown"; }
+    else {
+        if ($s =~ /post-aligned/) { $summary{remapstatus} = 'remapped_done'; }
+        else {
+            if ($s =~ /failed-pre-align/) { $summary{remapstatus} = "failed-pre-align"; }
+            else { $summary{remapstatus} = "unknown_status"; }
+        }
+    }
+
+    my $f = `$filecmd b38`;
+    chomp($f);
+    if (-f $f) { $summary{local_file} = 'local_exists'; }
+    else { $summary{local_file} = 'local_missing'; }
+
+    my $rc = system("$opts{gcels} gs://topmed-incoming/$center/$dirname/$nwdid.src.cram > $tmpfile 2>/dev/null");
+    if ($rc == 0) { $summary{to_be_remapped} = 'incoming_exists';}
+    else { $summary{to_be_remapped} = 'incoming_missing'; }
+
+    $rc = system("$opts{gcels} gs://topmed-recabs/$nwdid > $tmpfile 2>/dev/null");
+    if ($rc == 0) { $summary{to_be_pulled} = 'recab_exists'; }
+    else { $summary{to_be_pulled} = 'recab_missing'; }
+
+    $rc = system("$opts{gcels} gs://topmed-bcf/$nwdid > $tmpfile 2>/dev/null");
+    if ($rc == 0) { $summary{gcecopy} = 'gcecopy_exists'; }
+    else { $summary{gcecopy} = 'gcecopy_missing'; }
+
+    my @cols = sort keys %summary;
+    print join(',',@cols) . "\n";
+    $s = '';
+    foreach my $k (@cols) { $s .= $summary{$k} . ','; }
+    chop($s);
+    print "$s\n";
+    return;
+
+    print "    gcepush state:  $href->{state_gce38push}\n";
+    print "    gcepull state:  $href->{state_gce38pull}\n";
+    print "     remap status: "; system($opts{remapstatus} . $nwdid);
+    print "       local file: "; system("ls -l $f");
+    print "   to be remapped: ";
+      system("$opts{gcels} gs://topmed-incoming/$center/$dirname/$nwdid.src.cram");
+    print "     to be pulled: "; system("$opts{gcels} gs://topmed-recabs/$nwdid");
+    print "          gcecopy: "; system("$opts{gcels} gs://topmed-bcf/$nwdid\\*");
+    print "\n";
+}
+
+#==================================================================
+# Subroutine:
 #   Check_AWSFiles()
 #   Verify files in Amazon Environment
 #==================================================================
@@ -627,6 +706,27 @@ sub VerifyFile {
         #do ValidateIndex bamid bamorcram
     }
     return '';
+}
+
+#==================================================================
+# Subroutine:
+#   ($center, $dirname) = GetCenterRun($runid)
+#
+#   Return center and run name for a runid
+#==================================================================
+sub GetCenterRun {
+    my ($runid) = @_;
+
+    my $sth = DoSQL("SELECT centerid,dirname FROM $opts{runs_table} WHERE runid=$runid");
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { die "$Script - Run '$runid' unknown, how'd that happen?\n"; }
+    my $href = $sth->fetchrow_hashref;
+    my $dirname = $href->{dirname};
+    $sth = DoSQL("SELECT centername FROM $opts{centers_table} WHERE centerid=$href->{centerid}");
+    $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { die "$Script - Center for '$dirname', how'd that happen?\n"; }
+    $href = $sth->fetchrow_hashref;
+    return ($href->{centername}, $dirname);
 }
 
 #==================================================================
