@@ -15,6 +15,7 @@ if [ "$1" = "-submit" ]; then
   RandomRealHost $bamid
   #MyRealHost $bamid cram
   MayIRun $me $bamid $realhost
+  timeout='2:00:00'
   SubmitJob $bamid "topmed" '4G' "$0 $*"
   exit
 fi
