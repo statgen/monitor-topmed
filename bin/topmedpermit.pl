@@ -27,6 +27,8 @@ use FindBin qw($Bin $Script);
 use Getopt::Long;
 use DBIx::Connector;
 
+use POSIX qw(strftime);
+
 our ($DBC, $DBH);
 
 #--------------------------------------------------------------
@@ -38,8 +40,7 @@ our %opts = (
     centers_table => 'centers',
     runs_table => 'runs',
     permissions_table => 'permissions',
-    conf => "/usr/cluster/topmed/etc/topmedthrottle.conf",
-    topmedsummary => '/run/shm/Slurm.summary',
+    squeuedata => '/run/shm/squeue.results',
     verbose => 0,
 );
 my %VALIDOPS = (                    # Used for permit
@@ -88,7 +89,7 @@ exit;
 
 #==================================================================
 # Subroutine:
-#   Test ($op, $center, $run)
+#   Test ($op, $bamid, $run)
 #
 #   Is operation allowed
 #       e.g. topmedpermit.pl permit test qplot 4955 [HOST]
@@ -99,90 +100,74 @@ exit;
 sub Test {
     my ($op, $bamid, $h) = @_;
 
-    #   The maxperhost setting is in the topmedthrottle conf file.
-    #   Figure how how many actions are permitted on this host
-    #
-    #   Then figure out how many jobs are running on each host
-    #   by parsing the output of topmedcluster.pl summary
-    #   and calculate the number of jobs permitted for this host
+    #   To start, get the the system and host maximums permitted
+    #       e.g. action= bcf sysmax= 350 hostmax= 35
     my $systemmax = 0;
-    my $actionmax = 0;
-    my ($in, $in2);
-    if ($h && open($in, $opts{topmedsummary}) && open($in2, $opts{conf})) {
-        my $OPENAMP = '{';
-        my $CLOSEAMP = '}';
-        while (<$in2>) {
-            chomp();
-            if (/^#/) { next; }
-            if (! /\S/) { next; }
-            if (/^job\s+(\S+)\s+$OPENAMP/i) {
-                my $action = $1;
-                if ($action ne $op) { next; }
-                while (<$in2>) {
-                    if (/\s*$CLOSEAMP/) { last; }
-                    if (/\s*max\s*=\s*(\S+)/) { $systemmax = $1; }
-                    if (/\s*maxperhost\s*=\s*(\S+)/) { $actionmax = $1; }
-                }
+    my $hostmax = 0;
+    my ($in);
+    if ($h && open($in, $opts{squeuedata})) {
+        while (<$in>) {
+            if (/JOBID/) { last; }
+            my @c = split(' ', $_);
+            if ($c[1] eq $op && $c[2] eq 'sysmax=' && $c[4] eq 'hostmax=') {
+                $systemmax = $c[3];
+                $hostmax = $c[5];
             }
         }
-        close($in2);
-        #   Now how many are running for each action
-        #   Looks like:  bcf queued=0 running=126 qhosts= h1 A ... hn B rhosts=h1 C ... hn D
-        my ($queued, $running, $maxjobs, $maxthishost) = (0, 0, 0, 0);
-        while (my $l = <$in>) {
-            if ($l !~ /\s*(\S+)\s+queued=(\d+)\s+running=(\d+)\s+qhosts=(.*)\s+rhosts=(.*)/) { next; }
-            if ($1 ne $op) { next; }                # Not my action
-            ($queued, $running) = ($2, $3);
-            my ($q, $r) = ($4, $5);
-            my @w = split(' ', $q);
-            for (my $i=0; $i<$#w; $i=$i+2) {
-                if ($h ne $w[$i]) { next; }
-                $maxthishost += $w[$i+1];
-                last;
-            }
-            @w = split(' ', $r);
-            for (my $i=0; $i<$#w; $i=$i+2) {
-                if ($h ne $w[$i]) { next; }
-                $maxthishost += $w[$i+1];
-                last;
-            }
+        #print "op=$op host=$h systemmax=$systemmax hostmax=$hostmax\n";
+        #   Data we read is like this:
+        #   3896779  topmed-working topmed 91398-bcf.3  topmed PD 0:00 1 (None)   topmed4
+        #   3798393  topmed-working topmed 104073-bcf.6 topmed  R 3:24:57 1 topmed7   topmed7
+        my $queued = 0;                 # How many are queued on this host
+        my $running = 0;                # How many are running on this host
+        my $opcount = 0;                # How many of these operations are queued/running anywhere
+        while (<$in>) {
+            my @c = split(' ', $_);
+            if ($c[1] ne 'topmed-working') { next; }
+            if ($c[3] !~ /\d+-$op/) { next; }
+            $opcount++;
+            if ($c[9] ne $h) { next; }
+            if ($c[5] eq 'R') { $running++; }
+            if ($c[5] eq 'PD') { $queued++; }
         }
         close($in);
-
-        #   We now know how many $op actions may run concurrently and how many ARE running
-        #   If we're overloaded, this submit is not permitted
-        if ($actionmax && $maxthishost >= $actionmax) {
-            if ($opts{verbose}) { print "Too many $op jobs [$maxthishost] running/queued on $h $actionmax\n"; }
-            exit(4);                        # Operation not permitted, special return code
+        #print "op=$op host=$h queued=$queued running=$running opcount=$opcount\n";
+        
+        #   See if this would overload the host or the system
+        my $now = strftime('%Y/%m/%d %H:%M', localtime);
+        if ($opcount >= $systemmax) {
+            print "$now Too many $op jobs [$opcount] running/queued system wide [$systemmax]\n";
+            exit(5);                        # Don't ask again, special return code
         }
         my $n = $queued + $running;
-        if ($systemmax && $n >= $systemmax) {
-            if ($opts{verbose}) { print "Too many $op jobs [$n} running/queued system wide $systemmax\n"; }
+        if ($n >= $hostmax) {
+            print "$now Too many $op jobs [$n] running/queued on $h [$hostmax]\n";
             exit(4);                        # Operation not permitted, special return code
         }
     }
 
-    #   Get runid and centerid for this bam
-    my ($centerid, $runid, $datayear) = GetBamidInfo($bamid);
-
     #   This is a small table, read it all
     my $sth = DoSQL("SELECT runid,centerid,datayear,operation FROM $opts{permissions_table}");
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { exit; }        # Table empty, permitted
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        if ($centerid eq $href->{centerid} || $href->{centerid} eq '0') {
-            if ($runid eq $href->{runid} || $href->{runid} eq '0') {
-                if ($datayear eq $href->{datayear} || $href->{datayear} eq '0') {
-                    if ($op eq $href->{operation} || $href->{operation} eq 'all') {
-                        print "Operation $op blocked by $opts{permissions_table} table\n";
-                        exit(4);        # Operation not permitted, special return code
+    if ($rowsofdata) {
+        #   Get runid and centerid for this bam
+        my ($centerid, $runid, $datayear) = GetBamidInfo($bamid);
+        for (my $i=1; $i<=$rowsofdata; $i++) {
+            my $href = $sth->fetchrow_hashref;
+            if ($centerid eq $href->{centerid} || $href->{centerid} eq '0') {
+                if ($runid eq $href->{runid} || $href->{runid} eq '0') {
+                    if ($datayear eq $href->{datayear} || $href->{datayear} eq '0') {
+                        if ($op eq $href->{operation} || $href->{operation} eq 'all') {
+                            print "Operation $op blocked by $opts{permissions_table} table\n";
+                            exit(4);        # Operation not permitted, special return code
+                        }
                     }
                 }
             }
         }
     }
-    exit;                               # Permitted  
+    sleep(2);                               # Try to avoid possible race in SLURM ??
+    exit;                                   # Permitted
 }
 
 #==================================================================
@@ -390,8 +375,9 @@ for a particular bam. Returns 4 for not permitted.
 
 =head1 EXIT
 
-If no fatal errors are detected, the program exits with a
-return code of 0. Any error will set a non-zero return code.
+When testing, a return code of 4 means the task is not permitted.
+A return code of 5 means no more of these are permitted.
+When not testing an error returns a non-zero return code.
 
 =head1 AUTHOR
 
