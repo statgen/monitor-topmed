@@ -14,6 +14,7 @@ if [ "$1" = "-submit" ]; then
   bamid=`GetDB $1 bamid`
   RandomRealHost $bamid
   MayIRun $me $bamid $realhost
+  timeout='4:00:00'
   SubmitJob $bamid "topmed" '4G' "$0 $*"
   exit
 fi
