@@ -41,10 +41,13 @@ our %opts = (
     netdir => '/net/topmed',
     bamfiles_table => 'bamfiles',
     runs_table => 'runs',
-    squeuecmd => "/usr/cluster/bin/squeue -a -o '%.9i %.15P %.18q %.18j %.8u %.2t %.8M %.6D %R %.9n' -p topmed-working",    
-    verbose => 0,
+    squeuecmd => "/usr/cluster/bin/squeue -a -o '%.9i %.15P %.18q %.18j %.8u %.2t %.8M %.6D %R %.9n' -p topmed-working",
     maxlongjobs => 6,
+    conf => "/usr/cluster/topmed/etc/topmedthrottle.conf",
     consoledir => 'working/topmed-output',
+    squeuefile => '/run/shm/squeue.results',
+    verbose => 0,
+    squeuefiletime => 30,               # Refresh file if older than this seconds
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
@@ -54,21 +57,100 @@ Getopt::Long::GetOptions( \%opts,qw(
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
     my $m = "$Script [options]";
-    warn "$m squeue|summary\n" .
+    warn "$m squeue|summary|newcache\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
     exit 1;
 }
 my $fcn = shift @ARGV;
+my @squeuelines = ();                   # Global data for functions
 
 #--------------------------------------------------------------
-#   Execute the command provided
+#   Get squeue results, save in memory file every so often
 #--------------------------------------------------------------
+if ($fcn eq 'newcache')  { CacheFile('new'); exit; }
+
+CacheFile('read');          # Read/create new cache
 if ($fcn eq 'squeue')    { SQueue(@ARGV); exit; }
 if ($fcn eq 'summary')   { Summary(@ARGV); exit; }
 
 die "$Script  - Invalid function '$fcn'\n";
 exit;
+
+#==================================================================
+# Subroutine:
+#   CacheFile('new')
+#
+#   Read cachefile into @squeuelines. If 'new' provided, create it new
+#==================================================================
+sub CacheFile {
+    my $flag = $_[0] || 'read';
+    my $file = $opts{squeuefile};
+
+    my $in;
+    my $filetime;
+    if (-f $file) {
+        $filetime = time() - (stat($file))[9];       # How old is file
+        if ($filetime > $opts{squeuefiletime}) { $flag = 'new'; }   # Old, force create
+    }
+    else { $flag = 'new'; }                 # No file, force create of file
+
+    #   If recent file, read and return
+    if ($flag ne 'new') {
+        open($in, $file) ||
+            die "$Script - Unable to open file '$file': $!\n";
+        while (<$in>) {
+            if (/^#/) { next; }
+            push @squeuelines,$_;
+        }
+        close($in);
+        return;
+    }
+
+    #   Create a new file, start with squeue data
+    $file = "$opts{squeuecmd} |";
+    open($in, $file) ||
+        die "$Script - Unable to open file '$file': $!\n";
+    while (<$in>) {
+        if (/^#/) { next; }
+        push @squeuelines,$_;
+    }   
+    close($in);
+
+    #   Now read the conf file so we can get intended max values
+    my @maxes = ();
+    open($in, $opts{conf}) ||
+        die "$Script - Unable to open file '$opts{conf}': $!\n";
+    my %hostmaxperaction = ();
+    my %systemmaxperaction = ();
+    my $OPENAMP = '{';
+    my $CLOSEAMP = '}';
+    while (<$in>) {
+        if (/^#/) { next; }
+        if (! /\S/) { next; }
+        if (/^job\s+(\S+)\s+$OPENAMP/i) {
+            my $action = $1;
+            while (<$in>) {
+                if (/\s*$CLOSEAMP/) { last; }
+                if (/\s*max\s*=\s*(\S+)/) { $systemmaxperaction{$action} = $1; }
+                if (/\s*maxperhost\s*=\s*(\S+)/) { $hostmaxperaction{$action} = $1; }
+            }
+        }
+    }
+    close($in);
+
+    #   Make summary of maxes per action
+    foreach my $action (keys %hostmaxperaction) {
+        push @maxes,"action= $action sysmax= $systemmaxperaction{$action} hostmax= $hostmaxperaction{$action}\n";
+    }
+
+    #   Write out summary of all data of interest
+    my $out;
+    open($out, '>'. $opts{squeuefile}) ||
+        die "$Script - Unable to create file '$opts{squeuefile}': $!\n";
+    foreach (@maxes, @squeuelines) { print $out $_; }
+    close($out);
+} 
 
 #==================================================================
 # Subroutine:
@@ -78,14 +160,13 @@ exit;
 #==================================================================
 sub Summary {
     #my ($bamid, $set) = @_;
-    my $cmd = $opts{squeuecmd};
     my %jobtype = ();               # Has of jobtypes queued or running
-    foreach my $l (split("\n", `$cmd`)) {
+    foreach my $l (@squeuelines) {
         my @c = split(' ', $l);
         #   Should be none of these, but if so, we want to know about it
         if ($c[4] ne 'topmed') { next; }    # Only interested in my jobs
         if ($c[5] eq 'PD') {        # Queued
-            if ($c[3] =~ /\d+-(\S+)/) {
+            if ($c[3] =~ /\d+-([a-z]+)/) {
                 my $act = $1;
                 $jobtype{$act}{queued}++;
                 $jobtype{$act}{qhosts}{$c[9]}++;
@@ -93,7 +174,7 @@ sub Summary {
             next;
         }
         if ($c[5] eq 'R') {         # Running
-            if ($c[3] =~ /\d+-(\S+)/) {
+            if ($c[3] =~ /\d+-([a-z]+)/) {
                 my $act = $1;
                 $jobtype{$act}{running}++;
                 $jobtype{$act}{rhosts}{$c[9]}++;
@@ -135,7 +216,7 @@ sub SQueue {
     my %jobtype = ();               # If one QOS, we want to know types of jobs queued
 
     DBConnect($opts{realm});
-    foreach my $l (split("\n", `$cmd`)) {
+    foreach my $l (@squeuelines) {
         my @c = split(' ', $l);
         #   Should be none of these, but if so, we want to know about it
         if ($c[1] eq 'nomosix' && $c[8] =~ /topmed/) {    # nomosix on topmed node
@@ -152,9 +233,8 @@ sub SQueue {
             push @{$queued{$c[1]}{data}},$l;
             $queued{$c[1]}{count}++;
             $qos{$c[2]}{queued}++;
-            #if ($l =~ /held state/ || $l =~ /JobHeldUser/) { $qos{$c[2]}{held}++; }
-            if ($l =~ /held/i) { $qos{$c[2]}{held}++; }     # Job held somehow
-            if ($c[3] =~ /\d+-(\S+)/) { $jobtype{$1}++; }   # Count of types of jobs
+            if ($l =~ /held/i) { $queued{$c[1]}{held}++; }     # Job held somehow
+            if ($c[3] =~ /\d+-([a-z]+)/) { $jobtype{$1}++; }   # Count of types of jobs
             next;
         }
         if ($c[5] eq 'R') {         # Running
@@ -172,8 +252,8 @@ sub SQueue {
         if (! defined($running{$p}{count})) { $running{$p}{count} = 0; }
         my $s = join(' ',sort keys %{$nottopmed{$p}});
         my $k = scalar(keys %{$nottopmed{$p}});
-        printf("  %-18s %3d running / %3d queued / %3d foreign user: $s \n",
-            $p, $running{$p}{count}, $queued{$p}{count}, $k);
+        printf("  %-18s %3d running / %3d queued / %3d held / %3d foreign user: $s \n",
+            $p, $running{$p}{count}, $queued{$p}{count}, $queued{$p}{held}, $k);
         if (%jobtype) {
             print '    queued: ';
             foreach my $jtype ( sort keys %jobtype) {
@@ -184,7 +264,7 @@ sub SQueue {
     }
     print "\n";
 
-    #   Show summary of QOS
+    #   Show summary of QOS   Only one QOS, no need for a summary
     #print "QOS Summary\n";
     #foreach my $q (sort keys %qos) {
     #    my $s = $qos{$q}{held} || '';
@@ -206,8 +286,8 @@ sub SQueue {
         my %total = ();                     # Get counts of number of each jobname
         foreach my $l (@{$running{$p}{data}}) {
             my @c = split(' ', $l);
-            $c[3] =~ s/\d+\-//;             # Remove bamid from jobname
-            $c[3] =~ s/^NWD\d+/NWD/;        # This is remapping job
+            if ($c[3] =~ /\d+-([a-z]+)/) { $c[3] = $1; }
+            #$c[3] =~ s/^NWD\d+/NWD/;       # This is remapping job
             $hosts{$c[8]}{$c[3]}++;         # Increment $hosts{topmed2}{cram}
         }
         print "   Partition $p:\n";
@@ -259,6 +339,7 @@ sub SQueue {
         my $i = $opts{maxlongjobs};
         foreach my $t (reverse sort keys %longjobs) {
             foreach (split("\n", $longjobs{$t})) {
+                if (! $_) { next; }
                 print ReFormatPartitionData($_);
                 $i--;
                 if ($i <= 0) { last; }
@@ -409,6 +490,7 @@ topmedcluster.pl - Query for cluster system information
 
   topmedcluster.pl squeue       # Show summary of queues
   topmedcluster.pl summary      # Show summary of jobtypes
+  topmedcluster.pl newcache     # Create new cache file, nothing else
 
 
 =head1 DESCRIPTION
@@ -440,8 +522,14 @@ Provided for developers to see additional information.
 Parameters to this program are grouped into several groups which are used
 to deal with specific sets of information in the monitor databases.
 
+B<summary>
+Use this to provide a short summary. No longer used I think.
+
 B<squeue>
 Use this to provide a smart summary of SLURM queues.
+
+B<newcache>
+Use this to force creation of a new cache file. No output.
 
 
 =head1 EXIT
