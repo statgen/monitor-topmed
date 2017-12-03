@@ -447,7 +447,7 @@ if ($fcn eq 'sexpt') {
         if ($opts{suberr} && $href->{state_ncbiexpt} >= $FAILEDCHECKSUM) { $href->{state_ncbiexpt} = $REQUESTED; }
         if ($href->{state_ncbiexpt} != $NOTSET && $href->{state_ncbiexpt} != $REQUESTED) { next; }
         #   Tell NCBI about this NWDID experiment
-        BatchSubmit("$opts{topmedexpt} -submit $href->{bamid}");
+        if (! BatchSubmit("$opts{topmedexpt} -submit $href->{bamid}")) { last; }
     }
     ShowSummary($fcn);
     exit;
@@ -482,7 +482,7 @@ if ($fcn eq 'sorig') {
         if ($opts{suberr} && $href->{state_ncbiorig} >= $FAILEDCHECKSUM) { $href->{state_ncbiorig} = $REQUESTED; }
         if ($href->{state_ncbiorig} != $NOTSET && $href->{state_ncbiorig} != $REQUESTED) { next; }
         #   Send the secondary BAM to NCBI
-        BatchSubmit("$opts{topmedncbiorig} -submit $href->{bamid}");
+        if (! BatchSubmit("$opts{topmedncbiorig} -submit $href->{bamid}")) { last; }
     }
     ShowSummary($fcn);
     exit;
@@ -514,7 +514,7 @@ if ($fcn eq 'sb37') {
         if ($opts{suberr} && $href->{state_ncbib37} >= $FAILEDCHECKSUM) { $href->{state_ncbib37} = $REQUESTED; }
         if ($href->{state_ncbib37} != $NOTSET && $href->{state_ncbib37} != $REQUESTED) { next; }
         #   Send the remapped CRAM to NCBI
-        BatchSubmit("$opts{topmedncbib37} -submit $href->{bamid}");
+        if (! BatchSubmit("$opts{topmedncbib37} -submit $href->{bamid}")) { last; }
     }
     ShowSummary($fcn);
     exit;
@@ -540,17 +540,27 @@ sub BatchSubmit {
     if ($opts{maxjobs} < 0) { return 0; }
     if ($opts{maxjobs} == 0 && $opts{verbose}) { print "Limit of jobs to be submitted has been reached\n"; }
     if ($opts{dryrun}) { print "dryrun => $cmd\n"; return -1; }
-    my $rc = system("$cmd 2>&1 | tee $opts{submitlog}");
+    my $rc = system("$cmd 2>&1 >> $opts{submitlog}");
     $rc = $rc >> 8;
     if ($rc == 0) {
         $opts{jobcount}++;
         if ($opts{verbose}) { print "submitted => $cmd\n"; }
         return -1;
     }
-    $opts{maxjobs}++;                   # Submit failed, keep trying
-    if ($rc == 4) { $opts{jobsnotpermitted}++; }
-    else { $opts{jobsfailedsubmission}++; }
-    return $rc;                         # Pass failing return code too
+    if ($rc == 4) {
+        $opts{jobsnotpermitted}++;
+        if ($opts{verbose}) { print "Too many on host => $cmd\n"; }
+        return 1;
+    }
+    if ($rc == 5) {
+        $opts{jobsnotpermitted}++;
+        $opts{maxjobs} = 0;
+        if ($opts{verbose}) { print "Too many on system => $cmd\n"; }
+        return 0;
+    }
+    $opts{jobsfailedsubmission}++;
+    print "Submit failed => $cmd\n";
+    return 1;
 }
 
 #==================================================================
