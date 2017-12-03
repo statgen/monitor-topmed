@@ -42,6 +42,7 @@ our %opts = (
     topmedsummary => '/run/shm/Slurm.summary',
     topmedcluster => '/usr/cluster/topmed/bin/topmedcluster.pl summary',
     topmedmonitor => '/usr/cluster/topmed/bin/topmed_monitor.pl',
+    newcache => '/usr/cluster/topmed/bin/topmedcluster.pl newcache',
     verbose => 0,
 );
 
@@ -75,68 +76,30 @@ exit;
 #==================================================================
 sub SubmitJobs {
     #my ($p1, $p2) = @_;
-    my %jobsqueued = ();
-    my %countbyhost = ();
 
+    system($opts{newcache}) &&
+        die "$Script - unable to create new cache file: $opts{newcache}\n";
     ParseConf($opts{conf});         # Sets JOBS
     if (! %JOBS) { die "$Script - No jobtypes found in '$opts{conf}'\n"; }
 
-    #   Get details about jobs that are running and how many per host
-    #   This should already be waiting, but if not get it dynamically
-    #   $opts{topmedsummary} might be created about the same time as we start.
-    #   If so, wait a little so the file might be updated.
-    my @s = stat($opts{topmedsummary});
-    my $fileage = time();               # How old is file to read
-    if (@s) { $fileage = $fileage - $s[9]; }
-    if ($fileage > 295 && $fileage < 303) { sleep(10); }  # Wait for update of file
-    if ($fileage > 320) {               # Older than ~5 min
-        $opts{topmedsummary} = "$opts{topmedcluster} |";    # Invoke pgm to get info
-    }
-    if ($opts{verbose}) { print "Reading SLURM summary from $opts{topmedsummary}\n"; }
-    my $in;
-    open($in, $opts{topmedsummary}) ||
-        die "$Script - Unable to get details about jobs from '$opts{topmedsummary}': $!\n";
-    while (my $l = <$in>) {         # jobtype queued=N running=N qhosts= h n... rhosts= h n ...
-        if ($l =~ /\s*(\S+) queued=(\d+) running=(\d+)/) {
-            $jobsqueued{$1} = $2+$3;
-        }
-        if ($l =~ /qhosts=(.*)\s+rhosts=(.*)/) {
-            my $q = $1;
-            my $r = $2;
-            my @w = split(' ',$q);          # Get all queued 'host count' pairs
-            for (my $i=0; $i<$#w; $i=$i+2) { $countbyhost{$w[$i]} += $w[$i+1]; }
-            @w = split(' ',$r);          # Get all running 'host count' pairs
-            for (my $i=0; $i<$#w; $i=$i+2) { $countbyhost{$w[$i]} += $w[$i+1]; }
-        }
-    }
-    close($in);
-
     #   %JOBS has list of jobtypes and total number of running and queued
     #   Now go through the limits specified in the conf file and
-    #   generate a call to submit jobs if there is the need
+    #   generate a call to submit that many jobs
     foreach my $j (keys %JOBS) {    # Calculate jobs to be submitted
         if ($opts{action} && $opts{action} ne $j) { next; }
-        if (! exists($jobsqueued{$j})) { $jobsqueued{$j} = 0; }   # None of these running
-        my $max = 0;                    # Maybe submit this many
-        if ($jobsqueued{$j} < $JOBS{$j}{max}) { $max = $JOBS{$j}{max} - $jobsqueued{$j}; }
-        if ($max > 0) {                 # Submit more jobs 
-            my $cmd = $opts{topmedmonitor} . " -max $max";
-            if ($opts{verbose}) { $cmd .= ' -v'; }
-            if (exists($JOBS{$j}{'mon-options'})) { $cmd .= ' ' . $JOBS{$j}{'mon-options'}; }
-            $cmd .= ' ' . $j;
-            if (exists($JOBS{$j}{'mon-log'})) { $cmd .= ' | tee -a ' . $JOBS{$j}{'mon-log'} . ' 2>&1'; }
-            if ($opts{verbose}) { print "==>$cmd\n"; }
-            if ($opts{'dry-run'}) { print "DRYRUN: $cmd\n"; }               
-            else {
-                system($cmd) &&
-                    die "$Script - Submit failed: $cmd\n";
-            }
-        }
+        my $cmd = $opts{topmedmonitor} . ' -max ' . $JOBS{$j}{maxperhost};
+        if ($opts{verbose}) { $cmd .= ' -v'; }
+        if (exists($JOBS{$j}{'mon-options'})) { $cmd .= ' ' . $JOBS{$j}{'mon-options'}; }
+        $cmd .= ' ' . $j;
+        if (exists($JOBS{$j}{'mon-log'})) { $cmd .= ' >> ' . $JOBS{$j}{'mon-log'} . ' 2>&1'; }
+        if ($opts{'dry-run'}) { print "DRYRUN: $cmd\n"; }               
         else {
-            if ($opts{verbose}) { print "May not submit job for '$j'\n"; }
+            if ($opts{verbose}) { print "==>$cmd\n"; }
+            system($cmd) &&
+                die "$Script - Submit failed: $cmd\n";
         }
-    }
 
+    }
     return;
 }
 
