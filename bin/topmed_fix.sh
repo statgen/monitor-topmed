@@ -13,10 +13,23 @@ if [ "$1" = "-submit" ]; then
   bamid=`GetDB $1 bamid`
   RandomRealHost $bamid
   MayIRun $me $bamid $realhost
+  
+  timeout='0:01:10'; realhost=topmed
   echo "Submitting $bamid to run on $realhost"
   SubmitJob $bamid "topmed" '2G' "$0 $*"
   exit
 fi
+
+exit
+Started
+echo "$SLURM_JOB_ID waiting"
+date
+sleep 600 &              # See http://thread.gmane.org/gmane.comp.distributed.slurm.devel/9514
+wait
+echo "$SLURM_JOB_ID All done"
+date
+exit
+
 
 if [ "$2" = "" ]; then
   me=`basename $0`
@@ -139,7 +152,7 @@ if [ "$b38" != "20" ]; then
 fi
 
 
-Started
+Started           # Do this so we get trap set
 
 echo "# $0 $bamid $nwdid  -- redo header for mis-mapped b38 crams"
 fixlog=$console/fix.log
