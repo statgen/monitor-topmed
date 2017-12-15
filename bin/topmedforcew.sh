@@ -12,7 +12,7 @@
 #
 topuser=topmed
 topgrp=topmed
-topdir=/net/topmed/incoming/topmed
+topdir=/incoming/topmed
 topmedcmd=/usr/cluster/topmed/bin/topmedcmd.pl
 
 myhost=`hostname`               # Where I am running
@@ -45,7 +45,6 @@ function ProcessRuns {
   n=0
   for r in `ls .`; do
     if [ ! -d $r ]; then            # If we cannot read directory, it is not local
-      #echo "$r is not a local directory"
       continue;
     fi
     #   Manifest must exist
@@ -87,7 +86,7 @@ function ProcessRuns {
         fi
         if [ "$year" = "3" ]; then
           backuphost=$myhost          # Year 3 uses the incoming directory for 'backup'
-          masterbackuprun="../../../../../../$backuphost/incoming/topmed/$center/$r $newbackuprun"
+          masterbackuprun="../../../../../../$backuphost/incoming/topmed/$center/$r"
         fi
         newbackuprun=/net/topmed/working/backups/incoming/topmed/$center/$r
         su $topuser -c "ln -s $masterbackuprun $newbackuprun"
@@ -97,9 +96,32 @@ function ProcessRuns {
         chown -R $topuser $r
         chgrp -R $topgrp $r
         chmod 770 $r
-        chmod 660 $r/Manifest.txt $r/*.md5 $r/*.cram $r/*.crai $r/*.bam $r/*.bai 2> /dev/null
+        chmod 660 $r/Manifest.txt $r/*.cram $r/*.bam 2> /dev/null
         echo "$now Ownership and permissions set for $center/$r"
       fi
+    fi
+  done
+
+  #  Because ownership of files still might be wrong, we must find all
+  #  files in all directories that are not owned by topmed and force ownership
+  for r in `ls .`; do
+    if [ ! -d $r ]; then            # If we cannot read directory, it is not local
+      continue;
+    fi
+    #   Manifest must exist
+    stat $r/Manifest.txt 2>/dev/null >/dev/null
+    if [ "$?" != "0" ]; then
+      echo "$now No Manifest.txt exists for $center/$r yet"
+      continue;
+    fi
+    #   Any files owned by not-topmed?  If so, force ownership again
+    n=`ls -l  $r/ |grep -v 'topmed topmed'|grep -v total|grep -v /:|wc -l`
+    if [ "$n" != "0" ]; then
+      chown -R $topuser $r 
+      chgrp -R $topgrp $r
+      chmod 770 $r
+      chmod 660 $r/Manifest.txt $r/*.cram $r/*.bam 2> /dev/null
+      echo "$now Forced ownership of '$r'"
     fi
   done
   return
