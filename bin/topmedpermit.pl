@@ -116,8 +116,8 @@ sub Test {
         }
         #print "op=$op host=$h systemmax=$systemmax hostmax=$hostmax\n";
         #   Data we read is like this:
-        #   3896779  topmed-working topmed 91398-bcf.3  topmed PD 0:00 1 (None)   topmed4
-        #   3798393  topmed-working topmed 104073-bcf.6 topmed  R 3:24:57 1 topmed7   topmed7
+        #   3896779  topmed-working topmed 91398-bcf  topmed PD 0:00 1 (None)   topmed4
+        #   3798393  topmed-working topmed 104073-bcf topmed  R 3:24:57 1 topmed7   topmed7
         my $queued = 0;                 # How many are queued on this host
         my $running = 0;                # How many are running on this host
         my $opcount = 0;                # How many of these operations are queued/running anywhere
@@ -166,7 +166,7 @@ sub Test {
             }
         }
     }
-    sleep(2);                               # Try to avoid possible race in SLURM ??
+    #sleep(2);                               # Try to avoid possible race in SLURM ??
     exit;                                   # Permitted
 }
 
