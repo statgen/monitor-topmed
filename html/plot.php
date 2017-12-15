@@ -163,13 +163,13 @@ if ($fcn == 'plot') {
         $row = $sqldata[$i];
         if ($row['yyyymmdd'] < $NCBIBAMDATE) { continue; }
         $d = array();
+        array_push($d, $row['avetime_fix']);
         array_push($d, substr($row['yyyymmdd'],5,5));
         array_push($d, $row['avetime_cram']);
         array_push($d, $row['avetime_qplot']);
         array_push($d, $row['avetime_verify']);
         array_push($d, $row['avetime_bcf']);
         array_push($plotdata, $d);
-        array_push($d, $row['avetime_fix']);
     }
     MakePlot($plotdata, $title, $legend, 'Seconds');
 
