@@ -652,7 +652,7 @@ sub GetUnArrivedRuns {
     $sql .= $where;
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "$Script - Run does not exist   $where\n"; }
+    if (! $rowsofdata) { die "$Script - Run does not exist $sql\n"; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         $run2dir{$href->{runid}} = $href->{dirname};
