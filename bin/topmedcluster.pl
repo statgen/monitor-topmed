@@ -51,7 +51,7 @@ our %opts = (
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help verbose maxlongjobs=i
+    help verbose maxlongjobs=i force
     )) || die "$Script - Failed to parse options\n";
 
 #   Simple help if requested
@@ -70,7 +70,8 @@ my @squeuelines = ();                   # Global data for functions
 #--------------------------------------------------------------
 if ($fcn eq 'newcache')  { CacheFile('new'); exit; }
 
-CacheFile('read');          # Read/create new cache
+if ($opts{force}) { CacheFile('new'); }         # Create new cache
+else { CacheFile('read'); }                     # Just cache
 if ($fcn eq 'squeue')    { SQueue(@ARGV); exit; }
 if ($fcn eq 'summary')   { Summary(@ARGV); exit; }
 
@@ -79,7 +80,7 @@ exit;
 
 #==================================================================
 # Subroutine:
-#   CacheFile('new')
+#   CacheFile(flag)
 #
 #   Read cachefile into @squeuelines. If 'new' provided, create it new
 #==================================================================
@@ -89,7 +90,7 @@ sub CacheFile {
 
     my $in;
     my $filetime;
-    if (-f $file) {
+    if ($flag eq 'read' && -f $file) {
         $filetime = time() - (stat($file))[9];       # How old is file
         if ($filetime > $opts{squeuefiletime}) { $flag = 'new'; }   # Old, force create
     }
@@ -250,8 +251,9 @@ sub SQueue {
     foreach my $p (sort keys %partitions) {
         if (! defined($queued{$p}{count}))  { $queued{$p}{count} = 0; }
         if (! defined($running{$p}{count})) { $running{$p}{count} = 0; }
+        if (! defined($queued{$p}{held}))   { $queued{$p}{held} = 0; }
         my $s = join(' ',sort keys %{$nottopmed{$p}});
-        my $k = scalar(keys %{$nottopmed{$p}});
+        my $k = scalar(keys %{$nottopmed{$p}}) || 0;
         printf("  %-18s %3d running / %3d queued / %3d held / %3d foreign user: $s \n",
             $p, $running{$p}{count}, $queued{$p}{count}, $queued{$p}{held}, $k);
         if (%jobtype) {
@@ -488,9 +490,10 @@ topmedcluster.pl - Query for cluster system information
 
 =head1 SYNOPSIS
 
-  topmedcluster.pl squeue       # Show summary of queues
-  topmedcluster.pl summary      # Show summary of jobtypes
-  topmedcluster.pl newcache     # Create new cache file, nothing else
+  topmedcluster.pl squeue           # Show summary of queues
+  topmedcluster.pl -force squeue    # Create new cache and show summary of queues
+  topmedcluster.pl summary          # Show summary of jobtypes
+  topmedcluster.pl newcache         # Create new cache file, nothing else
 
 
 =head1 DESCRIPTION
@@ -501,6 +504,10 @@ This program supports simple commands to show information about the cluster syst
 =head1 OPTIONS
 
 =over 4
+
+=item B<-force>
+
+Forces the creation of a new cache file.
 
 =item B<-help>
 
