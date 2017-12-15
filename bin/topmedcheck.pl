@@ -60,20 +60,20 @@ our %opts = (
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help db localfiles awsfiles gcefiles checkfiles b37files recabfiles
-    register checkfiles fixer=s execfixer random max=i redo verbose
+    db localfiles awsfiles gcefiles checkfiles b37files recabfiles
+    help register checkfiles fixer=s execfixer random max=i redo verbose
     center=s run=s piname=s studyname=s datayear=i
     )) || die "$Script - Failed to parse options\n";
 
 #   Simple help if requested
 if ($opts{help} || ($#ARGV<0 && (! $opts{run}) && (! $opts{center}))) {
     my $m = "$Script [options]";
-    warn "$m bamid|bamid-bamid|nwdid\n" .
+    warn "$m -todo bamid|bamid-bamid|nwdid\n" .
         " or\n" .
-        "$m -b37 2345    # Special case\n" .
-        " or\n" .        
         "$m -subsetkey value  (e.g. -center, -runs, -piname, -studyname, -datayear)\n" .
         "\n" .
+        "-todo must be: -db -localfiles -awsfiles -gcefiles -b37 or -recabfiles\n" .
+        "\n" .        
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
     exit 1;
@@ -363,10 +363,11 @@ sub Check_LocalFiles {
 
     #   B37 crams should exist for ALL year 1 samples
     #   Some other year samples were also mapped
-    if ($year eq '1' && $href->{state_b37} != $COMPLETED) {
+    #   Note, b37 files have been moved to GCE gs://topmed-irc-working/remapping/b37
+    if (0 && $year eq '1' && $href->{state_b37} != $COMPLETED) {
         push @error,"Warning: Year $year sample was not mapped for build B37";
     }
-    if ($href->{state_b37} == $COMPLETED) {
+    if (0 && $href->{state_b37} == $COMPLETED) {
         $f = `$filecmd b37`;
         chomp($f);
         my $e = VerifyFile($f);
@@ -765,16 +766,12 @@ topmedcheck.pl - Check all the monitor information for a set of samples
 
 =head1 SYNOPSIS
 
-  topmedcheck.pl 34567                      # Check single sample
-  topmedcheck.pl 34567-24577                # Check a small set of samples
-  topmedcheck.pl -run 2015Sep05             # Check samples in a run
-  topmedcheck.pl -center nygc               # Check samples in a center
-  topmedcheck.pl -center nygc -pi MESA      # Check samples in a center for a PI
-  topmedcheck.pl -center nygc -datayear 1   # Check samples in a center for a year
-
-  topmedcheck.pl -local 34567               # Check local files for a sample
-  topmedcheck.pl -aws 34567                 # Check AWS files for a sample
-
+  topmedcheck.pl -gcefiles 34567            # Check files in GCE for a single sample
+  topmedcheck.pl -awsfiles 34567-24577      # Check files in AWS for a small set of samples
+  topmedcheck.pl -localfiles -run 2015Sep05 # Check localfiles for samples in a run
+  topmedcheck.pl -db -center nygc           # Check database for samples in a center
+  topmedcheck.pl -recabfiles -center nygc -pi MESA  # Check recab files 
+  topmedcheck.pl -db -center nygc -datayear 1   # Check database  for samples in center/year
  
 =head1 DESCRIPTION
 
@@ -808,6 +805,10 @@ This will slow down the check quite a bit.
 =item B<-datayear N>
 
 Selects samples from a particular year.
+
+=item B<-db>
+
+Checks the database for the selected samples.
 
 =item B<-fixer COMMANDSTRING>
 
