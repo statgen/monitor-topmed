@@ -120,8 +120,8 @@ if ($fcn eq 'runstatus') {
                     if ($href->{$a} == $NOTSET) { next; }
                     if ($href->{$a} == $CANCELLED)  { next; }    # cancelled
                     #   These go into done, processing or neither states
-                    if ($href->{$a} ==  $COMPLETED)  { $counts{$a}{done}++;   next; } # yea!
-                    if ($href->{$a} ==  $IGNORETHIS) { $counts{$a}{done}++;   next; } # pretend yea !
+                    if ($href->{$a} == $COMPLETED)  { $counts{$a}{done}++; next; } # yea!
+                    if ($href->{$a} == $IGNORETHIS) { $counts{$a}{done}++; next; }
                     if ($href->{$a} >= $FAILEDCHECKSUM) { $counts{$a}{failed}++; next; } # boo!
                     $counts{$a}{processing}++;
                 }
@@ -136,6 +136,7 @@ if ($fcn eq 'runstatus') {
                 if (! exists($counts{$a}{failed}))     { $counts{$a}{failed} = 0; }
                 if (! exists($counts{$a}{done}))       { $counts{$a}{done} = 0; }
                 if (! exists($counts{$a}{processing})) { $counts{$a}{processing} = 0; }
+                if (! exists($counts{$a}{ignored}))    { $counts{$a}{ignored} = 0; }
                 #   If we have done all these, it's done
                 if ($counts{$a}{failed} > 0) {
                     $s .= "$attributes2letter{$a}=failed,";
