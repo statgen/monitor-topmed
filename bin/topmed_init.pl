@@ -136,6 +136,13 @@ sub CreateRun {
     #   Runs with a magic name are ignored
     if ($d eq 'upload' || $d eq 'slots') { return undef(); }
 
+    #   Do nothing until this is owned by the right user
+    my @s = stat($d);
+    if ($s[5] != 2307982) {
+        if ($opts{verbose}) { print "$Script - Ignoring directory '$d' until it is owned by topmed\n"; }
+        return undef();
+    }
+
     #   Try to write in this directory. Can't trust the users
     my $touchfile = '.test';
     if ( ! open(TOUCH, '>' . $touchfile)) {
