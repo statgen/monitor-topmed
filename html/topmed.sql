@@ -14,8 +14,8 @@ flush hosts;
 #   Verify it works by connecting on host that is having the problem
 
 #   Clone the old database to the new
-mysqldump -u sqlnhlbi --password=g9X+6iaO -h f-db nhlbi > /tmp/nhlbi.sql
-mysql -u sqlnhlbi --password=g9X+6iaO -h localhost nhlbi < /tmp/nhlbi.sql
+mysqldump -u sqlnhlbi --password=pw -h f-db nhlbi > /tmp/nhlbi.sql
+mysql -u sqlnhlbi --password=pw -h localhost nhlbi < /tmp/nhlbi.sql
 */
 
 /* --------------------------------------------------------------
@@ -322,7 +322,7 @@ CREATE INDEX index_freeze  ON freezes(freeze);
     The NCBI data is loaded into this table to make it easier for us to garner
     the state of data sent there.
 
-    mysql -h f-db.sph.umich.edu -u sqlnhlbi --password=g9X+6iaO --local-infile=1 nhlbi    
+    mysql -h f-db.sph.umich.edu -u sqlnhlbi --password=pw --local-infile=1 nhlbi    
     load data local infile 'ncbi_summary' into table ncbi_summary;
 
 */
