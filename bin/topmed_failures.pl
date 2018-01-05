@@ -194,7 +194,7 @@ sub Find_Failure {
     my $cmd = $opts{sacct} . ' -j ' . $slurmid;
     my @lines = split("\n", `$cmd 2>&1`);
     my @words = split(' ', $lines[2]);
-    if ($words[0] ne $slurmid) { next; }
+    if ($words[0] ne $slurmid) { return; }
     my $msg = "We think $task job is running, but it was $words[5]: " .
         "bamid=$h->{bamid} slurmid=$slurmid status=$words[6]\n";
     if ($words[5] eq 'COMPLETED') {         # Running job succeeded
