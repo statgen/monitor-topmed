@@ -53,57 +53,6 @@ run=`GetDB $bamid run`
 if [ "$run" = "" ]; then
   Fail "Unable to get run for bamid '$bamid'"
 fi
-datayear=`GetDB $bamid datayear`
-if [ "$datayear" = "34" ]; then          # Allow year 3 to be remapped for this nanesecond
-  build=`GetDB $bamid build`
-  if [ "$build" = "38" ]; then
-    stime=`date +%s`
-    #======================================================================
-    #   No remapping is done for CRAMs with datayear=3 and build=38
-    #   Just make symlinks and set states
-    #======================================================================
-    recabcram=`$topmedpath wherefile $bamid b38`
-    if [ "$recabcram" = "" ]; then
-      Fail "Unable to figure out b38 path for $bamid"
-    fi
-    origcram=`$topmedpath wherefile $bamid bam`     # Original source cram
-    if [ ! -f $origcram ]; then
-      Fail "Unable to find original source file for $bamid"
-    fi
-    d=`dirname $recabcram`
-    mkdir -p $d
-    if [ "$?" != "0" ]; then
-      Fail "Unable to create path for recab cram: $d"
-    fi
-    base=`basename $recabcram`
-
-    ln -sf $origcram $recabcram
-    if [ "$?" != "0" ]; then
-      Fail "Unable to create symlink for recab cram: $recabcram"
-    fi
-    echo "Created symlink for $base"
-    ln -sf $origcram.crai $recabcram.crai
-    if [ "$?" != "0" ]; then
-      Fail "Unable to create symlink for recab crai: $recabcram.crai"
-    fi
-    echo "Created symlink for $base.crai"
-
-    etime=`date +%s`
-    etime=`expr $etime - $stime`
-
-    echo "Set up $build CRAM in local storage completed in $etime seconds: $d"
-    SetDB $bamid state_gce38pull 20     # Mark B38 remapping as completed
-    SetDB $bamid state_b38 20
-    SetDB $bamid state_gce38bcf 0
-    SetDB $bamid state_gce38copy 0      # Mark copy files to GCE as not done yet
-    SetDB $bamid state_aws38copy 0
-    Successful
-    Log $etime
-    exit
-  else
-    echo "Datayear $datayear build $build needs remapping"
-  fi
-fi
 
 stime=`date +%s`
 echo "Copying CRAM to $incominguri/$center/$run/$nwdid.src.cram"
