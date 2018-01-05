@@ -262,6 +262,7 @@ sub UnMark {
 #==================================================================
 sub WhatNWDID {
     my ($nwdid) = @_;
+    my $orignwdid = $nwdid;
 
     if ($nwdid =~ /^\d+/) {             # If bamid, get NWDID
         my $sth = DoSQL("SELECT expt_sampleid FROM $opts{bamfiles_table} WHERE bamid=$nwdid");
@@ -269,10 +270,12 @@ sub WhatNWDID {
             my $href = $sth->fetchrow_hashref;
             $nwdid = $href->{expt_sampleid};
         }
+        else { die "$Script - NWDID '$nwdid' is unknown\n"; } 
     }
     else {                              # Extrace NWD from whatever was provided
         if ($nwdid =~ /(nwd\d+)/i) { $nwdid = uc($1); }
     }
+    if (! $nwdid) { die "$Script - NWDID/BAMID '$orignwdid' is unknown\n"; }
 
     #   Reconstruct partial path to BAM
     my $sth = DoSQL("SELECT runid,bamid,piname,datayear FROM $opts{bamfiles_table} WHERE expt_sampleid='$nwdid'");
