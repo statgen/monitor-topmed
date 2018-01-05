@@ -98,6 +98,15 @@ if ($opts{remove}) {
     exit;
 }
 
+#   See if the NWDID we were provided is valid
+DBConnect($opts{realm});
+my $sth = DoSQL("SELECT bamid,build FROM $opts{bamfiles_table} WHERE expt_sampleid='$nwdid'");
+my $rowsofdata = $sth->rows();
+if (! $rowsofdata) { die "$Script - NWDID '$nwdid' is unknown\n"; }
+my $href = $sth->fetchrow_hashref;
+my $bamid = $href->{bamid};
+my $build = $href->{build};
+
 #--------------------------------------------------------------
 #   Extract qplot values or die trying
 #--------------------------------------------------------------
@@ -117,33 +126,58 @@ if ($#colnames != $#metrics) {
     die "$Script - Number of columns [$#colnames] returned by parseQCFiles [$#metrics] did not match\n";
 }
 #   Figure out indexes to columns of interest
-my ($pct_freemix_index, $pct_genome_dp10_index, $mean_depth_index) = (-1, -1, -1);
+my ($pct_freemix_index, $pct_genome_dp10_index, $pct_genome_dp20_index, $mean_depth_index) = (-1, -1, -1, -1);
 for (my $i=0; $i<=$#colnames; $i++) {
     if ($colnames[$i] eq 'PCT_FREEMIX')     { $pct_freemix_index = $i; next; }
     if ($colnames[$i] eq 'PCT_GENOME_DP10') { $pct_genome_dp10_index = $i; next; }
+    if ($colnames[$i] eq 'PCT_GENOME_DP20') { $pct_genome_dp20_index = $i; next; }
     if ($colnames[$i] eq 'MEAN_DEPTH')      { $mean_depth_index = $i; }
 }
-foreach my $i ($pct_freemix_index, $pct_genome_dp10_index, $mean_depth_index) {
+foreach my $i ($pct_freemix_index, $pct_genome_dp10_index, $pct_genome_dp20_index, $mean_depth_index) {
     if ($i < 0) { die "$Script - Unable to find index to colname I need\n"; }
 }
 
+#   The new qplot introduces pct_genome_dp20_index which does not apply when build!=38
 #   Now set the quality columns to be included in the SQL
 my ($qc_flagged, $qc_pass, $qc_fail) = (0, 0, 0);   # Default values for SQL columns
-if ($metrics[$pct_freemix_index]<=3 &&
-    $metrics[$pct_genome_dp10_index]>=95 &&
-    $metrics[$mean_depth_index]>=25 &&
-    $metrics[$mean_depth_index]<30) {
-    $qc_flagged = 1;
+if ($build >= 38) {
+    if ($metrics[$pct_freemix_index]<=3 &&
+        $metrics[$pct_genome_dp10_index]>=95 &&
+        $metrics[$pct_genome_dp20_index]>=90 &&         # For new qplot
+        $metrics[$mean_depth_index]>=25 &&
+        $metrics[$mean_depth_index]<30) {
+        $qc_flagged = 1;
+    }
+    if ($metrics[$pct_freemix_index]<=3 &&
+        $metrics[$pct_genome_dp10_index]>=95 &&
+        $metrics[$pct_genome_dp20_index]>=90 &&         # For new qplot
+        $metrics[$mean_depth_index]>=25) {
+        $qc_pass = 1;
+    }
+    if ($metrics[$pct_freemix_index]>3 ||
+        $metrics[$pct_genome_dp10_index]<95 ||
+        $metrics[$pct_genome_dp20_index]<90 ||         # For new qplot
+        $metrics[$mean_depth_index]<25) {
+        $qc_fail = 1;
+    }
 }
-if ($metrics[$pct_freemix_index]<=3 &&
-    $metrics[$pct_genome_dp10_index]>=95 &&
-    $metrics[$mean_depth_index]>=25) {
-    $qc_pass = 1;
-}
-if ($metrics[$pct_freemix_index]>3 ||
-    $metrics[$pct_genome_dp10_index]<95 ||
-    $metrics[$mean_depth_index]<25) {
-    $qc_fail = 1;
+else {          # This applies to build 37 etc.
+    if ($metrics[$pct_freemix_index]<=3 &&
+        $metrics[$pct_genome_dp10_index]>=95 &&
+        $metrics[$mean_depth_index]>=25 &&
+        $metrics[$mean_depth_index]<30) {
+        $qc_flagged = 1;
+    }
+    if ($metrics[$pct_freemix_index]<=3 &&
+        $metrics[$pct_genome_dp10_index]>=95 &&
+        $metrics[$mean_depth_index]>=25) {
+        $qc_pass = 1;
+    }
+    if ($metrics[$pct_freemix_index]>3 ||
+        $metrics[$pct_genome_dp10_index]<95 ||
+        $metrics[$mean_depth_index]<25) {
+        $qc_fail = 1;
+    }
 }
 push @colnames,'qc_fail','qc_pass','qc_flagged';
 push @metrics, $qc_fail,$qc_pass,$qc_flagged;
@@ -151,15 +185,6 @@ push @metrics, $qc_fail,$qc_pass,$qc_flagged;
 #--------------------------------------------------------------
 #   Update database with values we obtained
 #--------------------------------------------------------------
-DBConnect($opts{realm});
-
-#   See if the NWDID we were provided is valid
-my $sth = DoSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE expt_sampleid='$nwdid'");
-my $rowsofdata = $sth->rows();
-if (! $rowsofdata) { die "$Script - NWDID '$nwdid' is unknown\n"; }
-my $href = $sth->fetchrow_hashref;
-my $bamid = $href->{bamid};
-
 my $date = shift(@metrics);
 $_ = shift(@colnames);              # Ignore name of this first column
 my $sql;
