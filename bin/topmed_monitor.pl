@@ -89,7 +89,7 @@ our %opts = (
 );
 Getopt::Long::GetOptions( \%opts,qw(
     help verbose topdir=s center=s runs=s piname=s studyname=s maxjobs=i random
-    dryrun suberr datayear=i
+    dryrun suberr datayear=i build=i
     )) || die "Failed to parse options\n";
 
 #   Simple help if requested
@@ -242,6 +242,7 @@ if ($fcn eq 'gcebackup' || $fcn eq 'backup') {
 
 #--------------------------------------------------------------
 #   Run QPLOT on BAMs
+#   Special hook using state_fix so we know when a sample has run the new aplot for Tom
 #--------------------------------------------------------------
 if ($fcn eq 'qplot') {
     #   Get list of all samples yet to process
@@ -252,7 +253,7 @@ if ($fcn eq 'qplot') {
     if (! $rowsofdata) { exit; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
-        #   Only do qplot if verify finished
+        #   Only do qplot if backup finished
         if ($href->{state_gcebackup} != $COMPLETED) { next; }
         if ($opts{suberr} && $href->{state_qplot} >= $FAILEDCHECKSUM) {
             $href->{state_qplot} = $REQUESTED;
@@ -392,24 +393,43 @@ if ($fcn eq 'awscopy') {
 #--------------------------------------------------------------
 if ($fcn eq 'fix') {
     #   Get list of all samples yet to process
-    my $s = '';
-    if ($opts{center}) { $s = 'b.'; }   # Deal with quirk BuildSQL
-    my $sql = BuildSQL("SELECT bamid,state_fix FROM $opts{bamfiles_table}",
-        "WHERE ${s}state_fix!=$COMPLETED");
+    my $sql = BuildSQL("SELECT bamid,state_gcebackup,state_qplot FROM $opts{bamfiles_table}",
+        "WHERE state_fix!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { exit; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
-        if ($href->{state_fix} == $COMPLETED) { next; }
-        if ($opts{suberr} && $href->{state_fix} >= $FAILEDCHECKSUM) {
-            $href->{state_fix} = $REQUESTED;
+        #   Only do qplot if backup finished
+        if ($href->{state_gcebackup} != $COMPLETED) { next; }
+        if ($opts{suberr} && $href->{state_qplot} >= $FAILEDCHECKSUM) {
+            $href->{state_qplot} = $REQUESTED;
         }
-        if ($href->{state_fix} != $REQUESTED) { next; }
-        if (! BatchSubmit("$opts{topmedfix} -submit $href->{bamid}")) { last; }
+        if ($href->{state_qplot} == $STARTED || $href->{state_qplot} == $SUBMITTED) { next; }
+        if (! BatchSubmit("$opts{topmedqplot} -submit $href->{bamid}")) { last; }
     }
     ShowSummary($fcn);
     exit;
+
+    #   Get list of all samples yet to process
+    #my $s = '';
+    #if ($opts{center}) { $s = 'b.'; }   # Deal with quirk BuildSQL
+    #my $sql = BuildSQL("SELECT bamid,state_fix FROM $opts{bamfiles_table}",
+    #    "WHERE ${s}state_fix!=$COMPLETED");
+    #my $sth = DoSQL($sql);
+    #my $rowsofdata = $sth->rows();
+    #if (! $rowsofdata) { exit; }
+    #for (my $i=1; $i<=$rowsofdata; $i++) {
+    #    my $href = $sth->fetchrow_hashref;
+    #    if ($href->{state_fix} == $COMPLETED) { next; }
+    #    if ($opts{suberr} && $href->{state_fix} >= $FAILEDCHECKSUM) {
+    #        $href->{state_fix} = $REQUESTED;
+    #    }
+    #    if ($href->{state_fix} != $REQUESTED) { next; }
+    #    if (! BatchSubmit("$opts{topmedfix} -submit $href->{bamid}")) { last; }
+    #}
+    #ShowSummary($fcn);
+    #exit;
 }
 
 #--------------------------------------------------------------
@@ -603,6 +623,8 @@ sub BuildSQL {
             "WHERE c.centername='$opts{center}'";
         if ($opts{datayear}) { $s .= " AND b.datayear=$opts{datayear}"; }
         $opts{datayear} = '';
+        if ($opts{build}) { $s .= " AND b.build=$opts{build}"; }
+        $opts{build} = '';
         $where =~ s/where //i;          # Remove WHERE from caller
     }
     #   For a specific run (overrides center)
@@ -611,6 +633,8 @@ sub BuildSQL {
             "WHERE r.dirname='$opts{runs}'";
         if ($opts{datayear}) { $s .= " AND b.datayear=$opts{datayear}"; }
         $opts{datayear} = '';
+        if ($opts{build}) { $s .= " AND b.build=$opts{build}"; }
+        $opts{build} = '';
         $where =~ s/where //i;          # Remove WHERE from caller
     }
 
@@ -620,6 +644,9 @@ sub BuildSQL {
 
     #   Add support for datayear
     if ($opts{datayear}) { $s .= " AND datayear=$opts{datayear}"; }
+
+    #   Add support for build
+    if ($opts{build}) { $s .= " AND build=$opts{build}"; }
 
     #   Add support for piname
     if ($opts{piname}) { $s .= " AND piname='$opts{piname}'"; }
@@ -692,6 +719,10 @@ might expect all the data has arrived.
 =head1 OPTIONS
 
 =over 4
+
+=item B<-build N>
+
+Submit only jobs for samples from a specific build.
 
 =item B<-center NAME>
 
