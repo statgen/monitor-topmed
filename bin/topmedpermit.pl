@@ -100,6 +100,9 @@ exit;
 sub Test {
     my ($op, $bamid, $h) = @_;
 
+    #   Sometimes we just do not want to check for limits
+    if ($ENV{IGNORE_PERMIT}) { exit; }
+
     #   To start, get the the system and host maximums permitted
     #       e.g. action= bcf sysmax= 350 hostmax= 35
     my $systemmax = 0;
