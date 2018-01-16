@@ -94,6 +94,7 @@ CREATE TABLE bamfiles (
   cramchecksum VARCHAR(96) NOT NULL,
   b37cramchecksum VARCHAR(96) NOT NULL,
   b38cramchecksum VARCHAR(96) NOT NULL,
+  b38craichecksum VARCHAR(96) NOT NULL,
   bamflagstat  BIGINT UNSIGNED DEFAULT NULL,
   cramflagstat BIGINT UNSIGNED DEFAULT NULL,
   b37flagstat  BIGINT UNSIGNED DEFAULT NULL,
@@ -146,6 +147,7 @@ my $FAILED    = 99;           # Task failed
   state_b38      INT DEFAULT 0,     /* Referenced in nhlbi_qc_metrics */
 
   state_gce38bcf  INT DEFAULT 0,    /* Created BCF data */
+  state_gce38cpbcf  INT DEFAULT 0,  /* Copy BCF data to GCE*/
 
   state_gce38copy INT DEFAULT 0,    /* Copy local data to BCF buckets */
   state_aws38copy INT DEFAULT 0,    /* Copy local data to AWS buckets */
