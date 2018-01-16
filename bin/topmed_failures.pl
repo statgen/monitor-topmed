@@ -193,6 +193,7 @@ sub Find_Failure {
     #   See what SLURM thinks of job $slurmid
     my $cmd = $opts{sacct} . ' -j ' . $slurmid;
     my @lines = split("\n", `$cmd 2>&1`);
+    if (! defined($lines[2])) { return; }
     my @words = split(' ', $lines[2]);
     if ($words[0] ne $slurmid) { return; }
     my $msg = "We think $task job is running, but it was $words[5]: " .
