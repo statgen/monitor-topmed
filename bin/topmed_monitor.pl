@@ -89,7 +89,7 @@ our %opts = (
 );
 Getopt::Long::GetOptions( \%opts,qw(
     help verbose topdir=s center=s runs=s piname=s studyname=s maxjobs=i random
-    dryrun suberr datayear=i build=i
+    dryrun suberr datayear=i build=i nopermit
     )) || die "Failed to parse options\n";
 
 #   Simple help if requested
@@ -104,6 +104,8 @@ my $fcn = shift(@ARGV);
 
 my $dbh = DBConnect($opts{realm});
 my $nowdate = strftime('%Y/%m/%d %H:%M', localtime);
+
+if ($opts{nopermit}) { $ENV{IGNORE_PERMIT} = 1; }   # Stop topmedpermit.pl
 
 #   User might provide runid rather than name of run
 if (exists($opts{runs}) &&  $opts{runs} =~ /^\d+$/) {
@@ -746,6 +748,10 @@ Generates this output.
 
 Do not submit more than N jobs for this invocation.
 The default for B<-maxjobs> is B<100>.
+
+=item B<-nopermit>
+
+Disable topmedpermit.pl check.  Useful to overwhelm SLURM some more.
 
 =item B<-piname NAME>
 
