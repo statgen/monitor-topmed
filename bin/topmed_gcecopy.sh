@@ -8,7 +8,6 @@
 
 me=gcecopy
 markverb=$me
-stat="stat --printf=%s --dereference"
 
 #------------------------------------------------------------------
 # Subroutine:
@@ -52,6 +51,7 @@ bamid=$1
 
 Started
 nwdid=`GetNWDID $bamid`
+bamid=`GetNWDID $bamid`
 stime=`date +%s`
 
 #   Get remapped cram file
@@ -62,12 +62,10 @@ fi
 if [ ! -f $recabcram ]; then
   Fail "CRAM file for '$bamid' does not exist: $recabcram"
 fi
-sizerecabcram=`$stat $recabcram`
 
 #   Create the index file as necessary
 CreateIndex $bamid $recabcram
 recabcrai=$recabcram.crai
-sizerecabcrai=`$stat $recabcrai`
 
 #   Get checksum for b38 file or calculate it
 b38cramchecksum=`GetDB $bamid b38cramchecksum`
@@ -82,85 +80,42 @@ if [ "$b38cramchecksum" = "" ]; then
 fi
 
 #   Get bcf file for remapped cram file
-#recabbcf=`$topmedpath wherefile $bamid bcf`
-#if [ "$recabbcf" = "" ]; then
-#  Fail "Unable to determine BCF file for '$bamid'"
-#fi
-#if [ ! -f $recabbcf ]; then
-#  Fail "BCF file for '$bamid' does not exist: $recabbcf"
-#fi
-#sizerecabbcf=`$stat $recabbcf`
+recabbcf=`$topmedpath wherefile $bamid bcf`
+if [ "$recabbcf" = "" ]; then
+  Fail "Unable to determine BCF file for '$bamid'"
+fi
+if [ ! -f $recabbcf ]; then
+  Fail "BCF file for '$bamid' does not exist: $recabbcf"
+fi
 
-#recabcsi=$recabbcf.csi
-#if [ ! -f $recabcsi ]; then
-#  echo "CSI missing, trying to create it"
-#  $bcftools index $recabbcf
-#  if [ "$?" != "0" ]; then
-#    Fail "Unable to create CSI for $bamid' for: $recabbcf"
-#  fi
-#fi
-#if [ ! -f $recabcsi ]; then
-#  Fail "CSI file for '$bamid' does not exist: $recabcsi"
-#fi
-#sizerecabcsi=`$stat $recabcsi`
+CreateBCFIndex $bamid $recabbcf
+recabcsi=$recabbcf.csi
+
+#   Create metadata, same place where other remapped data is
+p=`$topmedpath wherepath $bamid b38`
+metafile=$p/$nwdid.metadata.txt
+crammd5=`GetDB $bamid b${build}cramchecksum`
+craimd5=`GetDB $bamid b${build}craichecksum`
+flagstat=`GetDB $bamid b${build}flagstat`
+studyname=`GetDB $bamid studyname`
+
+echo "$nwdid.b$build.irc.cram-md5 $crammd5 $nwdid.b$build.irc.crai-md5 $craimd5 $nwdid.b$build.irc.nonredundant_sequence_reads $flagstat studyname $studyname" > $metafile
 
 #======================================================================
 #   All the files of interest exist locally
-#   Copy the file to the remote destination only if the size differs
+#   Copy is very fast to GCE, so don't try to be too clever
+#   When a file does not change name, copy as a group
 #======================================================================
 copyuri=`$topmedpath wherepath $nwdid gceupload`
-
-#   Now get the sizes of files of interest in AWS
-baserecabcram=`basename $recabcram`
-l=(`$gsutil stat $copyuri/$baserecabcram | grep Content-Length:`)
-gcesizerecabcram=${l[1]}
-
-baserecabcrai=$baserecabcram.crai
-l=(`$gsutil stat $copyuri/$baserecabcrai | grep Content-Length:`)
-gcesizerecabcrai=${l[1]}
-
-#baserecabbcf=`basename $recabbcf`
-#l=(`$gsutil stat $copyuri/$baserecabbcf | grep Content-Length:`)
-#gcesizerecabbcf=${l[1]}
-
-#baserecabcsi=$baserecabbcf.csi
-#l=(`$gsutil stat $copyuri/$baserecabcsi | grep Content-Length:`)
-#gcesizerecabcsi=${l[1]}
-
-#   Force everthing to be sent, usually for testing
-#gcesizerecabcram=`expr $gcesizerecabcram - 1`
-#gcesizerecabcrai=`expr $gcesizerecabcrai - 1`
-#gcesizerecabbcf=`expr $gcesizerecabbcf - 1`
-#gcesizerecabcsi=`expr $gcesizerecabcsi - 1`
-
-#   Send files that have changed size
-if [ "$sizerecabcram" != "$gcesizerecabcram" ]; then
-  tmpf=/run/shm/$$
-  Copy2GCE $recabcram $baserecabcram
-  echo "$b38cramchecksum $baserecabcram" > $tmpf
-  Copy2GCE $tmpf $baserecabcram.md5
-  flagstat=`GetDB $bamid b38flagstat`
-  echo "$flagstat + 0 paired in sequencing" > $tmpf
-  Copy2GCE $tmpf $baserecabcram.flagstat
-  rm -f $tmpf
-else
-  echo "No need to send unchanged $baserecabcram"
+Copy2GCE $recabcram `basename $recabcram`
+$gsutil cp $recabcrai $recabbcf $recabcsi $metafile $copyuri 
+if [ "$?" != "0" ]; then
+  Fail "Failed to copy files to GCE as $gcefile"
 fi
-if [ "$sizerecabcrai" != "$gcesizerecabcrai" ]; then
-  Copy2GCE $recabcrai $baserecabcrai
-else
-  echo "No need to send unchanged $baserecabcrai"
-fi
-#if [ "$sizerecabbcf" != "$gcesizerecabbcf" ]; then
-#  Copy2GCE $recabbcf $baserecabbcf
-#else
-#  echo "No need to send unchanged $baserecabbcf"
-#fi
-#if [ "$sizerecabcsi" != "$gcesizerecabcsi" ]; then
-#  Copy2GCE $recabcsi $baserecabcsi
-#else
-#  echo "No need to send unchanged $baserecabcsi"
-#fi
+
+#   For a few months, clean out files we no longer want
+$gsutil rm $copyuri/\*.md5 $copyuri/\*.flagstat
+rm -f $p/*.md5 $p/*.flagstat
 
 echo "GCE files for $bamid $nwdid are up to date"
 $gsutil ls -l $copyuri
