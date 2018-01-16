@@ -316,37 +316,90 @@ function ValidateIndex {
 #   so we can possibly insure the index file will work  (POS)
 #------------------------------------------------------------------
 function CreateIndex {
+  stat="stat --printf=%Y --dereference"
+
   local bamid=$1
   local file=$2
+  craifile=$file.crai
 
-  if [ ! -f $file ]; then
-    Fail "File '$file' does not exist, no index can be created"
+  timecram=`$stat $file 2>/dev/null`
+  timecrai=`$stat $craifile 2>/dev/null`
+
+  if [ "$timecram" = "" ]; then
+    Fail "CRAM file for '$bamid' does not exist: $file"
+  fi
+  #   Check if existing CRAI is valid
+  if [ "$timecrai" != "" ]; then
+    s=(`ValidateIndex $bamid $file`)
+    craifile="${s[0]}"            # Path to index file
+    status="${s[1]}"              # valid or invalid
+    if [ "$status" != "valid" ]; then
+      echo "Index file '$indexfile' was invalid, attempt to re-create it"
+      rm -f $craifile
+    fi
   fi
 
+  #   CRAI must be older than CRAM
+  calcchecksum=n
+  if [ "$timecrai" = "" ]; then
+    timecrai=`expr $timecram - 10`
+  fi
+  if [ "$timecram" -ge "$timecrai" ]; then
+    echo "No CRAI or old CRAI, creating index file '$craifile'"
+    $samtools index $file 2>&1
+    if [ "$?" != "0" ]; then
+      Fail "Unable to create CRAI index for '$file'"
+    fi
+    echo "Created CRAI index for CRAM '$file'"
+    calcchecksum=y
+  fi
+ 
   s=(`ValidateIndex $bamid $file`)
-  indexfile="${s[0]}"           # Path to index file
   status="${s[1]}"              # valid or invalid
-  if [ "$status" = "valid" ]; then
-    echo "Index file '$indexfile' is valid apparently"
-    return
+  if [ "$status" != "valid" ]; then
+    rm -f $craifile
+    Fail "Index file '$craifile' remains invalid. I give up"
   fi
 
-  #   Create the index file
-  echo "Creating index file '$indexfile'"
-  $samtools index $file 2>&1
-  if [ "$?" != "0" ]; then
-    Fail "Unable to create index for '$file'"
-  fi
-
-  #  Just because samtools gave zero return code, does not mean real success. Check again :-(
-  s=(`ValidateIndex $bamid $file`)
-  status="${s[1]}"               # valid or invalid
-  if [ "$status" = "valid" ]; then
-    echo "Created and validated index '$indexfile'"
+  md5=`GetDB $bamid b38craichecksum`
+  #  Calculate checksum?
+  if [ "$calcchecksum" = "n" -a "$md5" != "" ]; then
     return
   fi
-  rm -f $indexfile
-  Fail "Newly created index '$indexfile' was invalid and was removed. Try, try again."
+  v=`CalcMD5 $bamid $craifile`
+  SetDB $bamid b38craichecksum $v
+  echo "Calculated checksum for CRAI"
+}
+
+#------------------------------------------------------------------
+# Subroutine:
+#   CreateBCFIndex(bamid,bcffile)    Create BCF index for remapped bcf, update db
+#------------------------------------------------------------------
+function CreateBCFIndex {
+  stat="stat --printf=%Y --dereference"
+
+  local bamid=$1
+  local bcffile=$2
+  csifile=$bcffile.csi
+
+  timebcf=`$stat $bcffile 2>/dev/null`
+  timecsi=`$stat $csifile 2>/dev/null`
+
+  if [ "$timebcf" = "" ]; then
+    Fail "BCF file for '$bamid' does not exist: $bcffile"
+  fi
+  #   CSI must be older than BCF
+  if [ "$timecsi" = "" ]; then
+    timecsi=`expr $timebcf - 10`
+  fi
+  if [ "$timebcf" -ge "$timecsi" ]; then
+    echo "No CSI or old CSI, creating index file '$csifile'"
+    $bcftools index $bcffile
+    if [ "$?" != "0" ]; then
+      Fail "Unable to create CSI for $bamid' for: $bcffile"
+    fi
+    echo "Created CSI index for BCF '$bcffile'"
+  fi
 }
 
 #------------------------------------------------------------------
