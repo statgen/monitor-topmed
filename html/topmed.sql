@@ -9,7 +9,7 @@ flush privileges;
 #   When you see instruction to do:  mysqladmin flush-hosts do:
 ssh d
 ssh root@g
-mysql -h f-db -p    (Use FuS password)
+mysql -h f-db -p
 flush hosts;
 #   Verify it works by connecting on host that is having the problem
 
@@ -147,10 +147,10 @@ my $FAILED    = 99;           # Task failed
   state_b38      INT DEFAULT 0,     /* Referenced in nhlbi_qc_metrics */
 
   state_gce38bcf  INT DEFAULT 0,    /* Created BCF data */
-  state_gce38cpbcf  INT DEFAULT 0,  /* Copy BCF data to GCE*/
+  state_gce38cpbcf  INT DEFAULT 0,  /* Copy BCF data to GCE BCF bucket */
 
-  state_gce38copy INT DEFAULT 0,    /* Copy local data to BCF buckets */
-  state_aws38copy INT DEFAULT 0,    /* Copy local data to AWS buckets */
+  state_gce38copy INT DEFAULT 0,    /* Copy local data to SHARE bucket */
+  state_aws38copy INT DEFAULT 0,    /* Copy local data to AWS bucket */
 
   state_ncbiexpt INT DEFAULT 0,     /* Year one, experiment defined at NCBI (X) */
   state_ncbiorig INT DEFAULT 0,     /* Original input file as bam or cram (S) */
@@ -163,7 +163,6 @@ my $FAILED    = 99;           # Task failed
 
 /*   Remove this from bamfiles
      Remove this from runs
-  offsite      CHAR(1) DEFAULT 'N',     Not too sure about this ??
 */
 
 
@@ -208,123 +207,11 @@ SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0;
 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0;
 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='TRADITIONAL,ALLOW_INVALID_DATES';
 
--- -----------------------------------------------------
--- Table `actions`
--- -----------------------------------------------------
-DROP TABLE IF EXISTS `actions` ;
-
-CREATE TABLE IF NOT EXISTS `actions` (
-  `id` INT(11) NOT NULL AUTO_INCREMENT,
-  `name` VARCHAR(45) NOT NULL,
-  PRIMARY KEY (`id`),
-  INDEX `index2` (`name` ASC))
-ENGINE = InnoDB;
-
--- -----------------------------------------------------
--- Table `builds`
--- -----------------------------------------------------
-DROP TABLE IF EXISTS `builds` ;
-
-CREATE TABLE IF NOT EXISTS `builds` (
-  `id` INT(11) NOT NULL AUTO_INCREMENT,
-  `name` VARCHAR(45) NOT NULL,
-  PRIMARY KEY (`id`),
-  INDEX `index2` (`name` ASC))
-ENGINE = InnoDB;
-
--- -----------------------------------------------------
--- Table `bamfiles_actions`
--- -----------------------------------------------------
-DROP TABLE IF EXISTS `bamfiles_actions` ;
-
-CREATE TABLE IF NOT EXISTS `bamfiles_actions` (
-  `bam_id` INT(11) NOT NULL COMMENT '	',
-  `action_id` INT(11) NOT NULL,
-  `state_id` INT(11) NOT NULL,
-  `build_id` INT(11) NOT NULL,
-  `created_at` DATETIME NOT NULL,
-  `modified_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  INDEX `index1` (`bam_id` ASC),
-  INDEX `index2` (`action_id` ASC),
-  INDEX `index3` (`state_id` ASC),
-  UNIQUE INDEX `index4` (`bam_id` ASC, `action_id` ASC, `build_id` ASC),
-  INDEX `index5` (`build_id` ASC),
-  CONSTRAINT `fk_bamfiles_actions_1`
-    FOREIGN KEY (`bam_id`)
-    REFERENCES `nhlbi`.`bamfiles` (`bamid`)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION,
-  CONSTRAINT `fk_bamfiles_actions_2`
-    FOREIGN KEY (`action_id`)
-    REFERENCES `actions` (`id`)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION,
-  CONSTRAINT `fk_bamfiles_actions_3`
-    FOREIGN KEY (`state_id`)
-    REFERENCES `nhlbi`.`states` (`id`)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION,
-  CONSTRAINT `fk_bamfiles_actions_4`
-    FOREIGN KEY (`build_id`)
-    REFERENCES `builds` (`id`)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION)
-ENGINE = InnoDB;
-
-SET SQL_MODE=@OLD_SQL_MODE;
-SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;
-SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS;
-
--- -----------------------------------------------------
--- Data for table `actions`
--- -----------------------------------------------------
-START TRANSACTION;
-INSERT INTO `actions` (`id`, `name`) VALUES (1, 'arrive');
-INSERT INTO `actions` (`id`, `name`) VALUES (2, 'verify');
-INSERT INTO `actions` (`id`, `name`) VALUES (3, 'qplot');
-INSERT INTO `actions` (`id`, `name`) VALUES (4, 'cram');
-INSERT INTO `actions` (`id`, `name`) VALUES (5, 'gce-push');
-INSERT INTO `actions` (`id`, `name`) VALUES (6, 'gce-pull');
-INSERT INTO `actions` (`id`, `name`) VALUES (7, 'gce-bcf-push');
-INSERT INTO `actions` (`id`, `name`) VALUES (8, 'gce-bcf-pull');
-INSERT INTO `actions` (`id`, `name`) VALUES (9, 'gce-bcf');
-INSERT INTO `actions` (`id`, `name`) VALUES (10, 'gce-map');
-
-COMMIT;
-
--- -----------------------------------------------------
--- Data for table `builds`
--- -----------------------------------------------------
-START TRANSACTION;
-INSERT INTO `builds` (`id`, `name`) VALUES (1, '37');
-INSERT INTO `builds` (`id`, `name`) VALUES (2, '38');
-
-COMMIT;
-
-
-/*  This table is keeps track of freezes - sets of samples */
-DROP TABLE IF EXISTS freezes;
-CREATE TABLE freezes (
-  id      INT PRIMARY KEY AUTO_INCREMENT,
-  bamid   INT         NOT NULL,
-  freeze  VARCHAR(45) NOT NULL,
-  created_at   DATETIME  NOT NULL,  /* Cannot use DEFAULT CURRENT_TIMESTAMP, use plugin */
-  modified_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_freezes_1
-    FOREIGN KEY (bamid)
-    REFERENCES bamfiles (bamid)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION
-);
-CREATE INDEX index_bamid   ON freezes(bamid);
-CREATE INDEX index_freeze  ON freezes(freeze);
-
-
 /*  This table is regularly loaded from a tab delimited summary file from NCBI
     The NCBI data is loaded into this table to make it easier for us to garner
     the state of data sent there.
 
-    mysql -h f-db.sph.umich.edu -u sqlnhlbi --password=pw --local-infile=1 nhlbi    
+    mysql -h f-db.sph.umich.edu -u USER --password=PASSWORD --local-infile=1 nhlbi    
     load data local infile 'ncbi_summary' into table ncbi_summary;
 
 */
@@ -386,10 +273,13 @@ CREATE TABLE stepstats (
   count_gcecopy     INT DEFAULT 0,
   avetime_gcecopy   INT DEFAULT 0,
   ncbicount_gcecopy INT DEFAULT 0,
+  count_gcecpbcf    INT DEFAULT 0,
+  avetime_gcecpbcf  INT DEFAULT 0,
+  ncbicount_gcecpbcf INT DEFAULT 0,
   count_gcebackup     INT DEFAULT 0,
   avetime_gcebackup   INT DEFAULT 0,
   ncbicount_gcebackup INT DEFAULT 0,
-g  count_awscopy     INT DEFAULT 0,
+  count_awscopy     INT DEFAULT 0,
   avetime_awscopy   INT DEFAULT 0,
   ncbicount_awscopy INT DEFAULT 0,
 
