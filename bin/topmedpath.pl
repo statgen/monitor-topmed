@@ -61,9 +61,8 @@ our %opts = (
     results38dir => 'working/mapping/results',
     gcebackupuri => 'gs://topmed-irc-working/archives',   # Was topmed-backups
     gcearchiveuri => 'gs://topmed-archives',
-    #gcebcfuri => 'gs://topmed-bcf',
-    gceuploaduri => 'gs://topmed-bcf',
-    #gceremapuri => 'gs://topmed-incoming',
+    gcebcfuploaduri => 'gs://topmed-bcf',               # For remapped BCF data
+    gceuploaduri => 'gs://topmed-irc-share/genomes',    # For remapped CRAM data
     awsbucket => 'nih-nhlbi-datacommons',
     awsbucketpath => 'UofM/crams/b38',
     awsuploaduri => 's3://nih-nhlbi-datacommons/UofM/crams/b38',
@@ -199,8 +198,13 @@ sub WherePath {
         exit;
     }
  
-    if ($set eq 'gceupload' || $set eq 'upload') {
-        print "$opts{gceuploaduri}/$nwdid\n";
+    if ($set eq 'gcebcfupload') {
+        print "$opts{gcebcfuploaduri}/$nwdid\n";
+        exit;
+    }
+
+    if ($set eq 'gceupload') {
+        print "$opts{gceuploaduri}\n";
         exit;
     }
 
@@ -522,7 +526,7 @@ topmedpath.pl - Show paths for data in the TopMed database
   topmedcmd.pl wherepath 2199 qcresults    # Returns path to directory for qc.results
   topmedcmd.pl wherepath 2199 console      # Returns path to directory for SLURM output
   topmedcmd.pl wherepath 2199 backup       # Returns GCE URI to where backup might be
-  topmedcmd.pl wherepath 2199 gceupload    # Returns GCE URI to where all files are copied
+  topmedcmd.pl wherepath 2199 gceupload    # Returns GCE URI to where remapped CRAMs are copied
   topmedcmd.pl wherepath 2199 awsupload    # Returns AWS URI to where all files are copied
 
   topmedcmd.pl whathost 2199 bam           # Returns host for bam
@@ -568,7 +572,7 @@ Parameters to this program are grouped into several groups which are used
 to deal with specific sets of information in the monitor databases.
 The paths returned may not exist.
 
-B<wherepath bamid|nwdid bam|cram|backup|qcresults|console|b37|b38bcf|gceupload|awsupload|awsbucket|awsbucketpath>
+B<wherepath bamid|nwdid bam|cram|backup|qcresults|console|b37|b38bcf|gceupload|gcebcfupload|awsupload|awsbucket|awsbucketpath>
 If B<bam> was specified, display the path to the real bam file.
 
 If B<cram> or B<localbackup> was specified, display the path to the backup directory.
@@ -589,7 +593,9 @@ If B<b38> was specified, display the path to the directory of remapped data for 
 
 If B<bcf> was specified, display the path to the directory of BCF (vt-discover) data.
 
-If B<gceupload> was specified, display the path to the GCE data.
+If B<gceupload> was specified, display the path to the GCE data for remapped CRAMs.
+
+If B<gcebcfupload> was specified, display the path to the GCE data for remapped BCF data.
 
 If B<awsupload> was specified, display the path to the AWS data.
 This path may not exist.
