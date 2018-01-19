@@ -58,6 +58,7 @@ my @statecols =                         #   States to be checked
     state_gce38pull
     state_gce38bcf
     state_gce38copy
+    state_gce38cpbcf
     state_aws38copy
 /;
 
