@@ -25,7 +25,8 @@ $STATUSLETTERS =  "<br/> " .
     "<i><b>a</b>=File Arrived, <b>5</b>=MD5 Verified, <b>B</b>=Remote Backup of CRAM, <b>C</b>=BAM=>CRAM, <b>Q</b>=qplot run,<br/>" .
     "<b>7</b>=Remapped Build=37, " .
     "<b>s</b>=Push Build=38 to GCE, <b>r</b>=Pull Build=38 from GCE, <b>8</b>=Remapped Build=38," .
-    "<br/><b>V</b>=Completed BCF/VT 38,<b>G</b></b>=Upload data to GCE,<b>A</b></b>=Upload data to AWS,<br/>" .
+    "<br/><b>V</b>=Completed BCF/VT 38,<b>G</b></b>=Upload CRAM to GCE," .
+    "<b>g</b></b>=Upload BCF to GCE,<b>A</b></b>=Upload data to AWS,<br/>" .
     "<b>X</b>=EXPT=>NCBI <b>S</b>=Orig BAM/CRAM=>NCBI, <b>P</b>=</b>B37=>NCBI<br/>" .
     "<b>F</b>=FIX";
 
@@ -84,6 +85,7 @@ $quickcols = array(                     // Map of status column to topmedcmd ver
     'state_b38'      => 'mapping38',
     'state_gce38bcf' => 'bcf',
     'state_gce38copy'=> 'gcecopy',
+    'state_gce38cpbcf'=> 'gcecpbcf',
     'state_aws38copy'=> 'awscopy',
     'state_ncbiexpt' => 'sendexpt',
     'state_ncbiorig' => 'sendorig',
@@ -102,6 +104,7 @@ $quickletter = array(                   // Map of status column to letter we see
     'state_b38'      => '8',
     'state_gce38bcf' => 'V',
     'state_gce38copy'=> 'G',
+    'state_gce38cpbcf' => 'g',
     'state_aws38copy'=> 'A',
     'state_ncbiexpt' => 'X',
     'state_ncbiorig' => 'S',
@@ -109,7 +112,7 @@ $quickletter = array(                   // Map of status column to letter we see
     'state_fix'      => 'F'
 );
 $validfunctions = array('all', 'verify', 'cram', 'gcebackup', 'qplot',
-    'gcepush', 'gcepull', 'bcf', 'gcecopy', 'awscopy', 'fix');
+    'gcepush', 'gcepull', 'bcf', 'gcecopy', 'gcecpbcf', 'awscopy', 'fix');
 $NOTSET = 0;                // Not set
 $REQUESTED = 1;             // Task requested
 $SUBMITTED = 2;             // Task submitted to be run
@@ -134,7 +137,8 @@ $state2str = array(         // Values here are class for SPAN tag
 );
 
 $TOPMEDJOBNAMES = array('verify', 'cram', 'backup', 'qplot', 'expt', 'orig', 'b37',
-    'push38', 'pull38', 'b38', 'pushbcf38', 'pullbcf38', 'bcf', 'gcecopy', 'awscopy','fix');
+    'push38', 'pull38', 'b38', 'pushbcf38', 'pullbcf38', 'bcf', 'gcecopy',
+    'gce38cpbcf', 'awscopy','fix');
 
 //  These columns are state values to be converted to people readable strings
 //  See DateState() for possible values
@@ -819,6 +823,7 @@ function RestartJobs($h) {
         "<option value='gce38post'>post</option>" .
         "<option value='bcf'>bcf</option>" .
         "<option value='gce38copy'>gcecopy</option>" .
+        "<option value='gce38cpbcf'>gcecpbcf</option>" .
         "<option value='aws38copy'>awscopy</option>" .
         "</select></td>" .
         "<td><font color='green'>&nbsp; </font></td>" .
@@ -960,7 +965,7 @@ function DateState($t) {
 ---------------------------------------------------------------*/
 function CalcRunStatus($str) {
     global $quickletter;
-    $separator_actions = array('Q','7','8','V', 'G', 'P');
+    $separator_actions = array('Q','7','8','V', 'G', 'g', 'P');
     //return $str;          // To see original state
     $h = '';
     $cols = array_values($quickletter);

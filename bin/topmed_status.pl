@@ -5,7 +5,6 @@
 #
 # Description:
 #   Use this program to automatically update the states for runs
-#   from NHLBI TopMed centers.
 #   This program is expected to run as a crontab job.
 #
 # ChangeLog:
@@ -46,6 +45,7 @@ my %attributes2letter = (
     'state_b38'       => '8',
     'state_gce38bcf'  => 'V',
     'state_gce38copy' => 'G',
+    'state_gce38cpbcf' => 'g',
     'state_aws38copy' => 'A',
     'state_ncbiexpt'  => 'X',
     'state_ncbiorig'  => 'S',

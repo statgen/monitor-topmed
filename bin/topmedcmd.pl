@@ -42,7 +42,7 @@ my $FAILED    = 99;                 # Task failed
 
 #   How to add a column to this program
 #       Define the column in the database
-#       Create QOS for this new type of action
+#       Maybe create QOS for this new type of action
 #       Add verbname => db column name to %VALIDVERBS
 #       Add operation verb to %VALIDOPS in topmedpermit.pl
 #       Add operation verb to statecols in topmed_failures.pl
@@ -63,6 +63,7 @@ my %VALIDVERBS = (                  # Valid verbs to database colum
     b38        => 'state_b38',     
     bcf        => 'state_gce38bcf',     
     gcecopy    => 'state_gce38copy',     
+    gcecpbcf   => 'state_gce38cpbcf',     
     awscopy    => 'state_aws38copy',     
     ncbiexpt   => 'state_ncbiexpt',
     ncbiorig   => 'state_ncbiorig',

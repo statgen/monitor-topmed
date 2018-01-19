@@ -45,6 +45,7 @@ my %STEPS = (                       # List of steps we collect data for
     bcf => 1,
     gcebackup => 1,
     gcecopy => 1,
+    gcecpbcf => 1,
     awscopy => 1,
     fix => 1,
 );

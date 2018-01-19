@@ -64,6 +64,7 @@ our %opts = (
     topmedgce38bcfpush => "$topmedbin/topmed_gcebcfpush.sh",
     topmedgce38bcfpull => "$topmedbin/topmed_gcebcfpull.sh",
     topmedgcecopy => "$topmedbin/topmed_gcecopy.sh",
+    topmedgcecpbcf => "$topmedbin/topmed_gcecpbcf.sh",
     topmedawscopy => "$topmedbin/topmed_awscopy.sh",
     topmedfix => "$topmedbin/topmed_fix.sh",
     topmedbcf  => "$topmedbin/topmed_bcf.sh",
@@ -94,7 +95,7 @@ Getopt::Long::GetOptions( \%opts,qw(
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$Script [options] arrive|verify|qplot|cram|gcebackup|qplot|gcepush|gcepull|bcf|gcecopy|awscopy|fix\n" .
+    warn "$Script [options] arrive|verify|qplot|cram|gcebackup|qplot|gcepush|gcepull|bcf|gcecopy|gcecpbcf|awscopy|fix\n" .
         "Find runs which need some action and queue a request to do it.\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
@@ -341,7 +342,7 @@ if ($fcn eq 'bcf') {
 }
 
 #--------------------------------------------------------------
-#   Copy local data to GCE storage
+#   Copy local cram data to GCE storage
 #--------------------------------------------------------------
 if ($fcn eq 'gcecopy') {
     #   Get list of all samples yet to process
@@ -360,6 +361,31 @@ if ($fcn eq 'gcecopy') {
         }
         if ($href->{state_gce38copy} != $NOTSET && $href->{state_gce38copy} != $REQUESTED) { next; }
         if (! BatchSubmit("$opts{topmedgcecopy} -submit $href->{bamid}")) { last; }
+    }
+    ShowSummary($fcn);
+    exit;
+}
+
+#--------------------------------------------------------------
+#   Copy local bcf data to GCE storage
+#--------------------------------------------------------------
+if ($fcn eq 'gcecpbcf') {
+    #   Get list of all samples yet to process
+    my $sql = BuildSQL("SELECT bamid,state_b38,state_gce38bcf,state_gce38cpbcf FROM $opts{bamfiles_table}",
+        "WHERE state_gce38cpbcf!=$COMPLETED");
+    my $sth = DoSQL($sql);
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { exit; }
+    for (my $i=1; $i<=$rowsofdata; $i++) {
+        my $href = $sth->fetchrow_hashref;
+        if ($href->{state_b38} != $COMPLETED) { next; }
+        if ($href->{state_gce38bcf} != $COMPLETED) { next; }
+        if ($href->{state_gce38cpbcf} == $COMPLETED) { next; }
+        if ($opts{suberr} && $href->{state_gce38cpbcf} >= $FAILEDCHECKSUM) {
+            $href->{state_gce38cpbcf} = $REQUESTED;
+        }
+        if ($href->{state_gce38cpbcf} != $NOTSET && $href->{state_gce38cpbcf} != $REQUESTED) { next; }
+        if (! BatchSubmit("$opts{topmedgcecpbcf} -submit $href->{bamid}")) { last; }
     }
     ShowSummary($fcn);
     exit;
@@ -751,7 +777,7 @@ The default for B<-maxjobs> is B<100>.
 
 =item B<-nopermit>
 
-Disable topmedpermit.pl check.  Useful to overwhelm SLURM some more.
+Disable topmedpermit.pl check.  Useful to overwhelm SLURM some times.
 
 =item B<-piname NAME>
 
@@ -797,7 +823,7 @@ Provided for developers to see additional information.
 
 =over 4
 
-=item B<arrive | verify | qplot | cram | gcebackup | qplot | gcepush | gcepull | bcf | gcecopy | fix\n" .
+=item B<arrive | verify | qplot | cram | gcebackup | qplot | gcepush | gcepull | bcf | gcecopy | gcecpbcf | fix\n" .
 y>
 
 Directs this program to look for runs that have not been through the process name
