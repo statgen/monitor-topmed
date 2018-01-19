@@ -2,32 +2,14 @@
 #
 #   topmed_gcecopy.sh -submit| bamid
 #
-#	Copy files from local storage to a GCE bucket for GCE processing
+#	Copy files from local storage to a GCE SHARE bucket for GCE processing
+#   This is not the same as copying to gs://topmed-bcf or other of OUR buckets
 #
 . /usr/cluster/topmed/bin/topmed_actions.inc
+shareoption="-u topmed-1366"
 
 me=gcecopy
 markverb=$me
-
-#------------------------------------------------------------------
-# Subroutine:
-#   Copy2GCE(f, gcefile)
-#   Copy file to GCE as gcefile
-#------------------------------------------------------------------
-function Copy2GCE {
-  local f=$1
-  local gcefile=$2
-  if [ "${f##*.}" = "cram" ]; then
-    gs=$gsutilbig
-  else
-    gs=$gsutil
-  fi
-  echo "====> Copying to $gcefile"
-  $gs cp $f $copyuri/$gcefile       # Someday we will upgrade and -q will work
-  if [ "$?" != "0" ]; then
-    Fail "Failed to copy $f to GCE as $gcefile"
-  fi
-}
 
 if [ "$1" = "-submit" ]; then
   shift
@@ -79,51 +61,31 @@ if [ "$b38cramchecksum" = "" ]; then
   SetDB $bamid b38cramchecksum $b38cramchecksum
 fi
 
-#   Get bcf file for remapped cram file
-recabbcf=`$topmedpath wherefile $bamid bcf`
-if [ "$recabbcf" = "" ]; then
-  Fail "Unable to determine BCF file for '$bamid'"
-fi
-if [ ! -f $recabbcf ]; then
-  Fail "BCF file for '$bamid' does not exist: $recabbcf"
-fi
-
-CreateBCFIndex $bamid $recabbcf
-recabcsi=$recabbcf.csi
-
-#   Create metadata, same place where other remapped data is
-p=`$topmedpath wherepath $bamid b38`
-metafile=$p/$nwdid.metadata.txt
-crammd5=`GetDB $bamid b${build}cramchecksum`
-craimd5=`GetDB $bamid b${build}craichecksum`
-flagstat=`GetDB $bamid b${build}flagstat`
-studyname=`GetDB $bamid studyname`
-
-echo "$nwdid.b$build.irc.cram-md5 $crammd5 $nwdid.b$build.irc.crai-md5 $craimd5 $nwdid.b$build.irc.nonredundant_sequence_reads $flagstat studyname $studyname" > $metafile
-
 #======================================================================
 #   All the files of interest exist locally
 #   Copy is very fast to GCE, so don't try to be too clever
-#   When a file does not change name, copy as a group
 #======================================================================
 copyuri=`$topmedpath wherepath $nwdid gceupload`
-Copy2GCE $recabcram `basename $recabcram`
-$gsutil cp $recabcrai $recabbcf $recabcsi $metafile $copyuri 
+gcecramname=$nwdid.b${build}.irc.v1.cram
+
+$gsutilbig $shareoption cp $recabcram $copyuri/$gcecramname
 if [ "$?" != "0" ]; then
-  Fail "Failed to copy files to GCE as $gcefile"
+  Fail "Failed to copy $recabcram to GCE as $gcecramname"
 fi
+echo "Copied CRAM to $copyuri"
+gsutil $shareoption cp $recabcrai $copyuri/$gcecramname.crai
+if [ "$?" != "0" ]; then
+  Fail "Failed to copy $recabcrai to GCE as $gcecramname.crai"
+fi
+echo "Copied CRAI to $copyuri"
 
-#   For a few months, clean out files we no longer want
-$gsutil rm $copyuri/\*.md5 $copyuri/\*.flagstat
-rm -f $p/*.md5 $p/*.flagstat
-
-echo "GCE files for $bamid $nwdid are up to date"
-$gsutil ls -l $copyuri
+echo "GCE SHARE files for $bamid $nwdid"
+$gsutil $shareoption ls -l $copyuri/${nwdid}\*
 
 etime=`date +%s`
 etime=`expr $etime - $stime`
 
-echo "Copy of files to GCE completed in $etime seconds"
+echo "Copy of CRAM files to GCE completed in $etime seconds"
 Successful
 Log $etime
 exit
