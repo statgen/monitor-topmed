@@ -54,7 +54,7 @@ if [ "$1" = "-submit" ]; then	#  subroutine SubmitJob will run sbatch
   bamid=`GetDB $1 bamid`
   RandomRealHost $bamid
   MayIRun $me $bamid $realhost
-  timeout='8:00:00'
+  timeout='9:00:00'
   SubmitJob $bamid "topmed" '8G' "$0 $*"
   exit
 fi
@@ -68,10 +68,12 @@ if [ "$1" = "" ]; then	 	#  if no arguments, print usage note
 fi
 
 bamid=$1  	 	 	#  Here starts the actual execution
+nwdid=`GetNWDID $bamid`
+bamid=`GetDB $nwdid bamid`
+
 #   Mark this as started
 SetDB $bamid state_fix 3
 Started 
-nwdid=`GetNWDID $bamid`
 
 #   Figure out index file name
 bamfile=`$topmedpath wherefile $bamid bam`
@@ -114,12 +116,6 @@ fixverifybamid=/usr/cluster/topmed/bin/nhlbi.1648.vbid.rewrite.awk
 verifybamid_dir=/usr/cluster/software/trusty/verify-bam-id
 verifybamid=$verifybamid_dir/1.0.0-b38/bin/VerifyBamID
 qplotnew=/usr/cluster/topmed/bin/qplot	 	# <== New qplot from Tom
-
-#   For Tom - Save existing qplot files until Tom says this works, then no need to save them
-#if [ ! -f $console/$nwdid.*.nwdid ]; then
-#  cp -p $outdir/$nwdid.* $console
-#  echo "Saved original qcresults to $console"   # Remove this as soon as Tom is happy
-#fi
 
 #   Assign resource variables specific to each build
 #   The logic here is that we set shell variables specific to build 37 or build 38, then 
