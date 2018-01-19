@@ -404,6 +404,35 @@ function CreateBCFIndex {
 
 #------------------------------------------------------------------
 # Subroutine:
+#   v=`CalcFlagstatFromFile(file)`    Prints flagstat for a bam or cram
+#
+#	Calculate the flagstat from a flagstat file
+#------------------------------------------------------------------
+function CalcFlagstatFromFile {
+  local file=$1
+
+  #   File has results of flagstat call, get fields and calculate 
+  a=(`grep 'in total' $file`)
+  if [ "${a[0]}" = "" ]; then
+    Fail "Unable to get in total from '$file'"
+  fi
+  intotal=${a[0]}
+  a=(`grep 'secondary' $file`)
+  if [ "${a[0]}" = "" ]; then
+    ${a[0]} = 0
+  fi
+  secondary=${a[0]}
+  a=(`grep 'supplementary' $file`)
+  if [ "${a[0]}" = "" ]; then
+    ${a[0]} = 0
+  fi
+  supplementary=${a[0]}
+  flagstat=`expr $intotal - $secondary - $supplementary`
+  echo $flagstat
+}
+
+#------------------------------------------------------------------
+# Subroutine:
 #   v=`CalcFlagstat(bamid,file)`    Prints flagstat for a bam or cram
 #
 #	Calculate the flagstat paired in sequencing number for a bam or cram
@@ -428,13 +457,9 @@ function CalcFlagstat {
     Fail "$samtools flagstat $file failed. Results in $of"
   fi
 
-  #   Outfile has results of flagstat call, get paired reads
-  a=(`grep 'paired in sequencing' $of`)
-  if [ "${a[0]}" = "" ]; then
-    Fail "Unable to get reads of paired in sequencing from '$of' for '$file'"
-  fi
+  #   Outfile has results of flagstat, print flagstat
+  CalcFlagstatFromFile $of
   rm -f $of
-  echo ${a[0]}
 }
 
 #------------------------------------------------------------------
