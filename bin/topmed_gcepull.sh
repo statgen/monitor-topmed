@@ -28,8 +28,10 @@ if [ "$1" = "" ]; then
   exit 1
 fi
 bamid=$1
+nwdid=`GetNWDID $bamid`
+bamid=`GetDB $nwdid bamid`
 
-#   Get remapped cram file location
+#   Get 
 crampath=`$topmedpath wherepath $bamid b$build`
 if [ "$crampath" = "" ]; then
   Fail "Unable to determine where remapped CRAM file should go for '$bamid'"
@@ -66,7 +68,7 @@ if [ "$?" != "0" ]; then
   Fail "Failed to copy flagstat from GCE: $inuri.flagstat"
 fi
 #   Get number of interest from flagstat file and check it
-n=`grep 'paired in sequencing' $crampath/$nwdid.recab.cram.flagstat | awk '{print $1}'`
+n=`CalcFlagstatFromFile $crampath/$nwdid.recab.cram.flagstat`
 if [ "$n" != "$cramflagstat" ]; then
   # Renaming the flagstat file stops pull from happening again
   $gsutil mv $inuri.flagstat $inuri.flagstat.nomatch
@@ -107,7 +109,6 @@ SetDB $bamid b${build}flagstat $cramflagstat
 $topmedcmd setdate $bamid datemapping_b38 $cramfile
 
 #   Clean up data in GCE if data found in incoming.  Move remapped data to bcf bucket
-$gsutil mv $inuri.flagstat  $bcfuri/$nwdid/$nwdid.recab.cram.flagstat
 $gsutil mv $inuri         $bcfuri/$nwdid/$nwdid.recab.cram
 echo "Moved $inuri files to $bcfuri/$nwdid"
 #   Remove any left over cruft in recabs bucket
@@ -117,24 +118,6 @@ $gsutil rm -rf $incominguri/$nwdid
 etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "Copy of remapped CRAM from GCE to $crampath completed in $etime seconds"
-
-######### Temporary - sometimes remapping screwed up header, rebuild if needed
-#year=`GetDB $bamid datayear`
-#if [ "$year" != "3" ]; then
-#  CheckRGMap $bamid
-#  if [ "$?" != "0" ]; then
-#    echo #"#======================================================================"
-#    echo "#    RGMAP for cramfile is broken, rebuild"
-#    echo #"#======================================================================"
-#    SetDB $bamid state_fix 2          # Fix action started
-#    /usr/cluster/topmed/topmed_rgmap.sh $bamid $markverb
-#    if [ "$?" != "0" ]; then
-#      Fail "RGMAP correction failed"
-#    fi
-#  fi
-#  SetDB $bamid state_fix 20           # Mark sample as fixed or no rgmap needed
-#fi
-######### Remove this when we believe remapping is correct (2018)
 
 SetDB $bamid state_b${build} 20     # Mark b38 as done
 SetDB $bamid state_gce38bcf 1       # We need more reprocessing
