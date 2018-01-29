@@ -18,6 +18,7 @@ realhost=''
 
 cores=''                            # Set to same as gsutil if it will be used
 gsutil="gsutil -m"
+gsshareoption="-u topmed-1366"      # Used to copy to SHARE
 gsutilbig='gsutil -o GSUtil:parallel_composite_upload_threshold=150M'
 #   No need to parallel processing 
 #cores="--cpus-per-task=2"         # Cores here should be same as gsutil
@@ -308,7 +309,7 @@ function ValidateIndex {
 
 #------------------------------------------------------------------
 # Subroutine:
-#   CreateIndex(bamid,file)    Create CRAM or BAM index
+#   CreateIndex(bamid,file)    Create CRAM/BAM index
 #
 #	samtools can fail in multiple ways and never tell us
 #   This script attempts to centralize all known attempts
@@ -320,13 +321,20 @@ function CreateIndex {
 
   local bamid=$1
   local file=$2
-  craifile=$file.crai
+
+  craifile=$file.crai           # This is file to be created
+  nameoffile=CRAI
+  x=`echo $file | grep bam`
+  if [ "$x" != "" ]; then
+    craifile=$file.bai
+    nameoffile=BAI
+  fi
 
   timecram=`$stat $file 2>/dev/null`
   timecrai=`$stat $craifile 2>/dev/null`
 
   if [ "$timecram" = "" ]; then
-    Fail "CRAM file for '$bamid' does not exist: $file"
+    Fail "INPUT file for '$bamid' does not exist: $file"
   fi
   #   Check if existing CRAI is valid
   if [ "$timecrai" != "" ]; then
@@ -345,12 +353,12 @@ function CreateIndex {
     timecrai=`expr $timecram - 10`
   fi
   if [ "$timecram" -ge "$timecrai" ]; then
-    echo "No CRAI or old CRAI, creating index file '$craifile'"
+    echo "No $nameoffile or old one, creating index file '$craifile'"
     $samtools index $file 2>&1
     if [ "$?" != "0" ]; then
       Fail "Unable to create CRAI index for '$file'"
     fi
-    echo "Created CRAI index for CRAM '$file'"
+    echo "Created $nameoffile index for '$file'"
     calcchecksum=y
   fi
  
@@ -361,6 +369,11 @@ function CreateIndex {
     Fail "Index file '$craifile' remains invalid. I give up"
   fi
 
+  if [ "$nameoffile" = "BAI" ]; then
+    return
+  fi
+
+  # Need checksum for CRAM index
   md5=`GetDB $bamid b38craichecksum`
   #  Calculate checksum?
   if [ "$calcchecksum" = "n" -a "$md5" != "" ]; then
@@ -471,11 +484,11 @@ function CalcMD5 {
   local file=$2
 
   md5=`md5sum $file`
-  checksum=${md5[0]}
-  if [ "$checksum" = "" ]; then
+  if [ "$md5" = "" ]; then
     Fail "Unable to calculate MD5 for '$file' [$bamid]"
   fi
-  echo $checksum
+  checksum=($md5)
+  echo ${checksum[0]}
 }
 
 #------------------------------------------------------------------
