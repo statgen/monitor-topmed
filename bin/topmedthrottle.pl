@@ -123,6 +123,7 @@ sub ParseConf {
         if (/^job\s+(\S+)\s+$OPENAMP/i) {
             my $job = $1;
             while (<$in>) {
+                if (/^#/) { next; }
                 if (/\s*$CLOSEAMP/) { last; }       # End of job
                 if (/\s*(\S+)\s*=\s*(.+)\s*$/) {    # Capture key = value
                     $JOBS{$job}{$1} = $2;
