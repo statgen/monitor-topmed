@@ -6,7 +6,6 @@
 #   This is not the same as copying to gs://topmed-bcf or other of OUR buckets
 #
 . /usr/cluster/topmed/bin/topmed_actions.inc
-shareoption="-u topmed-1366"
 
 me=gcecopy
 markverb=$me
@@ -68,19 +67,19 @@ fi
 copyuri=`$topmedpath wherepath $nwdid gceupload`
 gcecramname=$nwdid.b${build}.irc.v1.cram
 
-$gsutilbig $shareoption cp $recabcram $copyuri/$gcecramname
+$gsutil $gsshareoption cp $recabcram $copyuri/$gcecramname
 if [ "$?" != "0" ]; then
   Fail "Failed to copy $recabcram to GCE as $gcecramname"
 fi
 echo "Copied CRAM to $copyuri"
-gsutil $shareoption cp $recabcrai $copyuri/$gcecramname.crai
+gsutil $gsshareoption cp $recabcrai $copyuri/$gcecramname.crai
 if [ "$?" != "0" ]; then
   Fail "Failed to copy $recabcrai to GCE as $gcecramname.crai"
 fi
 echo "Copied CRAI to $copyuri"
 
 echo "GCE SHARE files for $bamid $nwdid"
-$gsutil $shareoption ls -l $copyuri/${nwdid}\*
+gsutil $gsshareoption ls -l $copyuri/${nwdid}\*
 
 etime=`date +%s`
 etime=`expr $etime - $stime`
