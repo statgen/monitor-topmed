@@ -413,6 +413,10 @@ function CreateBCFIndex {
     fi
     echo "Created CSI index for BCF '$bcffile'"
   fi
+  if [ ! -s $csifile ]; then
+    rm -f $csifile
+    Fail "Zero length CSI file detected for $bamid for: $bcffile"
+  fi
 }
 
 #------------------------------------------------------------------
