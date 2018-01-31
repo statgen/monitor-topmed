@@ -96,6 +96,7 @@ etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "Created BCF file for remapped CRAM ($crampath) completed in $etime seconds"
 SetDB $bamid 'state_gce38bcf' 20
+SetDB $bamid 'state_gce38cpbcf' 1
 
 Successful
 Log $etime
