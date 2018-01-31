@@ -108,14 +108,25 @@ my $nowdate = strftime('%Y/%m/%d %H:%M', localtime);
 
 if ($opts{nopermit}) { $ENV{IGNORE_PERMIT} = 1; }   # Stop topmedpermit.pl
 
-#   User might provide runid rather than name of run
-if (exists($opts{runs}) &&  $opts{runs} =~ /^\d+$/) {
-    my $sql = "SELECT dirname from $opts{runs_table} WHERE runid=$opts{runs}";
+#   User might provide dirname rather than runid
+if (exists($opts{runs}) &&  $opts{runs} =~ /[^0-9,]/) {
+    my @r = split(',',$opts{runs});
+    my $s = "'" . join("','",@r) . "'";
+    my $sql = "SELECT runid from $opts{runs_table} WHERE dirname IN ($s)";
     my $sth = DoSQL($sql);
-    if ($sth) {
-        my $href = $sth->fetchrow_hashref;
-        $opts{runs} = $href->{dirname};
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) {
+        die "$Script -  $nowdate Unknown run in '$opts{runs}'\n";
     }
+    @r = ();
+    for (1 .. $rowsofdata) {
+        my $href = $sth->fetchrow_hashref;
+        push @r, $href->{runid};
+    }
+    if (! @r) { die "$Script - Unknown run in '$opts{runs}'\n"; }
+    $s = join(',', @r);
+    print "Getting data for runs: $s\n";
+    $opts{runs} = $s;
 }
 
 #--------------------------------------------------------------
@@ -167,7 +178,7 @@ if ($fcn eq 'arrive') {
 #   This lock is released when the program ends by whatever means
 #==================================================================
 my $f = "/run/lock/topmed.$fcn.lock";
-open(my $fh, '>' . $f) || die "Unable to create file '$f': $!\n";
+open(my $fh, '>' . $f) || die "$Script - Unable to create file '$f': $!\n";
 if (! flock($fh, LOCK_EX|LOCK_NB)) { die "Stopping - another instance of '$Script($fcn)' is running\n"; }
 
 #--------------------------------------------------------------
@@ -465,7 +476,8 @@ if ($fcn eq 'fix') {
 #--------------------------------------------------------------
 if ($fcn eq 'sexpt') {
     #   Get list of all samples yet to process
-    my $sql = BuildSQL("SELECT * FROM $opts{bamfiles_table}", "WHERE datayear=1");
+#    my $sql = BuildSQL("SELECT * FROM $opts{bamfiles_table}", "WHERE datayear=1");
+my $sql = BuildSQL("SELECT * FROM $opts{bamfiles_table}", 'WHERE b.datayear=3');
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { exit; }
@@ -658,7 +670,7 @@ sub BuildSQL {
     #   For a specific run (overrides center)
     if ($opts{runs}) {
         $s = $sql . " as b JOIN $opts{runs_table} AS r on b.runid=r.runid " .
-            "WHERE r.dirname='$opts{runs}'";
+            "WHERE r.runid IN ($opts{runs})";
         if ($opts{datayear}) { $s .= " AND b.datayear=$opts{datayear}"; }
         $opts{datayear} = '';
         if ($opts{build}) { $s .= " AND b.build=$opts{build}"; }
@@ -702,7 +714,7 @@ sub GetUnArrivedRuns {
     my $where = " WHERE arrived!='Y'";
     #   Maybe want some runs
     if ($opts{runs}) { 
-        $where .= " AND dirname='$opts{runs}'";
+        $where .= " AND runid IN ($opts{runs})";
     }
     $sql .= $where;
     my $sth = DoSQL($sql);
