@@ -14,8 +14,8 @@ markverb=$me
 #   QplotCheck(statsfile, bamid)   #  (statsfile is from Qplot output)
 #   Sanity check.  Qplot can easily be fooled if samtools truncates when reading 
 #   the bamfile (NFS surprise).  Qplot prints the total number of reads in millions 
-#   to 3 decimal places.  We add 501 in case the last digit was rounded down.
-#   This should fail if the TotalReads < bmflagstat value - 500
+#   to 2 decimal places.  We add 5001 in case the last digit was rounded down.
+#   This should fail if the TotalReads < bamflagstat value - 5000
 #------------------------------------------------------------------
 function QplotCheck {
   local statsfile=$1
@@ -27,7 +27,7 @@ function QplotCheck {
     Fail "QPLOT data $statsfile not found or TotalReads not found"
   fi
   tr=`perl -E "print $tr*1000000"`    # Man, is it hard to do mutiply of float in shell!
-  tr=`expr $tr + 501`
+  tr=`expr $tr + 5001`
   if [ "$tr" -lt "$bamflagstat" ]; then
     Fail "QPLOT data must have been truncated. TotalReads=$tr Flagstat=$bamflagstat"
   fi
