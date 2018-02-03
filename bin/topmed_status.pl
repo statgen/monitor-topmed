@@ -181,7 +181,7 @@ sub GetRunsCount {
     my ($cid) = @_;
     my %runs2count = ();
 
-    my $sql = "SELECT runid,dirname,bamcount FROM $main::opts{runs_table} WHERE centerid=$cid";
+    my $sql = "SELECT runid,dirname,count FROM $main::opts{runs_table} WHERE centerid=$cid";
     my $sth = My_DB::DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) {
@@ -199,7 +199,7 @@ sub GetRunsCount {
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         if ($main::opts{runs} && (! exists($theseruns{$href->{dirname}}))) { next; }
-        $runs2count{$href->{runid}} = $href->{bamcount};
+        $runs2count{$href->{runid}} = $href->{count};
     }
     return \%runs2count;
 }

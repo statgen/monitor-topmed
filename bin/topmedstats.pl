@@ -130,20 +130,20 @@ sub Jobids {
     $sth = DoSQL($sql, 0);
     $rowsofdata = $sth->rows();
     if (! $rowsofdata) {
-        my ($bamcount, $errcount) = (0, 0);             # This day's counts
+        my ($count, $errcount) = (0, 0);             # This day's counts
         $sql = "SELECT count(*) FROM $opts{bamfiles_table} WHERE state_verify=$COMPLETED";
         $sth = DoSQL($sql, 0);
         $href = $sth->fetchrow_hashref;
-        if ($href->{'count(*)'}) { $bamcount = $href->{'count(*)'}; }
+        if ($href->{'count(*)'}) { $count = $href->{'count(*)'}; }
         $sql = "SELECT count(*) FROM $opts{bamfiles_table} WHERE state_ncbiorig=$FAILED OR state_ncbib37=$FAILED";
         $sth = DoSQL($sql, 0);
         $href = $sth->fetchrow_hashref;
         if ($href->{'count(*)'}) { $errcount = $href->{'count(*)'}; }
         #   INSERT this row, from now on we can do UPDATE
         $sql = "INSERT INTO $opts{stats_table} " .
-            "(yyyymmdd,bamcount,errcount) VALUES ('$yyyymmdd',$bamcount,$errcount)";
+            "(yyyymmdd,count,errcount) VALUES ('$yyyymmdd',$count,$errcount)";
         $sth = DoSQL($sql);
-        print "Created record for '$yyyymmdd' [$bamcount,$errcount]\n";
+        print "Created record for '$yyyymmdd' [$count,$errcount]\n";
     }
     
 

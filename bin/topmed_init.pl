@@ -43,8 +43,8 @@ our %opts = (
     bamfiles_table => 'bamfiles',
     topdir => '/net/topmed/incoming/topmed',
     runcount => 0,
-    bamcount => 0,
-    bamcountruns => '',
+    count => 0,
+    countruns => '',
     arrivedsecs => 86400*7, # If no new bam in a week, stop looking at run
     ignorearrived => 0,     # If set, ignored arrived database field
     verbose => 0,
@@ -116,7 +116,7 @@ foreach my $centerid (keys %{$centersref}) {
 $nowdate = strftime('%Y/%m/%d %H:%M', localtime);
 
 if ($opts{runcount}) { print "$nowdate  Added $opts{runcount} runs\n"; }
-if ($opts{bamcount}) { print "$nowdate  Added $opts{bamcount} bams from: $opts{bamcountruns}\n"; }
+if ($opts{count})    { print "$nowdate  Added $opts{count} bams from: $opts{countruns}\n"; }
 exit;
 
 #==================================================================
@@ -158,7 +158,7 @@ sub CreateRun {
 
     #   Directory is writable, create SQL record
     my $sql = "INSERT INTO $opts{runs_table} " .
-        "(centerid,dirname,comments,bamcount,dateinit) " .
+        "(centerid,dirname,comments,count,dateinit) " .
         "VALUES($cid,'$d','',0,'$nowdate')";
     my $sth = DoSQL($sql);
     my $runid = $sth->{mysql_insertid};
@@ -254,18 +254,18 @@ sub AddBams {
         if ($badmd5) { next; }              # This MD5 was in error
     }
 
-    #   If we added bams, change the bamcount
+    #   If we added bams, change the count
     if ($newbams) {
         print "$Script - $newbams new bams found in '$d'\n";
-        $opts{bamcount} += $newbams;            # Stats for ending msg
-        $opts{bamcountruns} .= $d . ' ';
+        $opts{count} += $newbams;            # Stats for ending msg
+        $opts{countruns} .= $d . ' ';
     }
 
     #   Get number of database records
     $sql = "SELECT bamid FROM $opts{bamfiles_table} WHERE runid=$runid";
     $sth = DoSQL($sql);
     my $numbamrecords = $sth->rows();
-    $sql = "UPDATE $opts{runs_table}  SET bamcount=$numbamrecords WHERE runid=$runid";
+    $sql = "UPDATE $opts{runs_table}  SET count=$numbamrecords WHERE runid=$runid";
     $sth = DoSQL($sql);
 
     #   Last sanity check, see if number of BAM files matches records

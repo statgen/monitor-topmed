@@ -61,7 +61,7 @@ for ($i=0; $i<$numrows; $i++) {
 $sql = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE state_verify=$COMPLETED";
 $result = SQL_Query($sql);
 $row = SQL_Fetch($result);
-$totalbamcount = $row['count(*)'];
+$totalcount = $row['count(*)'];
 
 
 //-------------------------------------------------------------------
@@ -99,7 +99,7 @@ if ($fcn == 'plot') {
         "</font></b></p>\n";
     $legend = array('aws38copy', 'gce38copy', 'gce38bcf', 'b38', 'gce38pull', 'gce38push',
         'b37', 'qplot', 'gcebackup', 'cram', 'verify', 'fix' );    // Reversed
-    $title = "Counts for All Verified Samples [$totalbamcount]";
+    $title = "Counts for All Verified Samples [$totalcount]";
     $plotdata = array();
     //$s = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE datayear=$datayear AND";
     $s = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE ";

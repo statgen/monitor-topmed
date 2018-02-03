@@ -72,7 +72,7 @@ l=`$topmedcmd whatrun $bamid`
 echo $l
 l=($l)
 dirname=${l[6]}
-bamcount=`expr ${l[10]} - 1`
+count=`expr ${l[10]} - 1`
 
 #   Get the list of files to remove
 bam=`GetFile $bamid bam`
@@ -130,7 +130,7 @@ if [ "$qcresults" != "" ]; then echo "  QC RESULTS: $qcresults"; fi
 if [ "$bcf"       != "" ]; then echo "  BCF: $bcf"; fi
 if [ "$b37"       != "" ]; then echo "  B37 CRAM: $b37"; fi
 if [ "$b38"       != "" ]; then echo "  B38 CRAM: $b38"; fi
-echo "Count for run $run will be set to '$bamcount'"
+echo "Count for run $run will be set to '$count'"
 echo ""
 if [ "$prompt" = "y" ]; then
   echo -n "Shall we delete data for sample $bamid $nwdid? (y/n): "
@@ -155,7 +155,7 @@ fi
 echo "Update database ..."
 xsql "delete from qc_results where bam_id=$bamid" || exit 4
 xsql "delete from bamfiles where bamid=$bamid" || exit 5
-xsql "update runs set bamcount=$bamcount where dirname=\"$run\"" || exit 6
+xsql "update runs set count=$count where dirname=\"$run\"" || exit 6
 
 echo "Successfully removed sample $bamid/$nwdid"
 exit

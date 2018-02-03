@@ -313,15 +313,15 @@ sub WhatRun {
     }
     if (! $sth) { die "$Script - Unknown '$bamid'\n"; }
     my $href = $sth->fetchrow_hashref;
-    $sth = DoSQL("SELECT centerid,runid,dirname,bamcount,datayear FROM $opts{runs_table} WHERE runid=$href->{runid}");
+    $sth = DoSQL("SELECT centerid,runid,dirname,count,datayear FROM $opts{runs_table} WHERE runid=$href->{runid}");
     $href = $sth->fetchrow_hashref;
     my $runid = $href->{runid};
     my $dirname = $href->{dirname};
-    my $bamcount = $href->{bamcount};
+    my $count = $href->{count};
     $sth = DoSQL("SELECT centername FROM $opts{centers_table} WHERE centerid=$href->{centerid}");
     $href = $sth->fetchrow_hashref;
     my $center = uc($href->{centername});
-    print "$bamid in center $center from run $dirname $runid which has $bamcount samples\n";
+    print "$bamid in center $center from run $dirname $runid which has $count samples\n";
 }
 
 #==================================================================
