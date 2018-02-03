@@ -65,7 +65,7 @@ CREATE TABLE runs (
   centerid     INT,
   dirname      VARCHAR(64) NOT NULL,
   status       VARCHAR(256),
-  bamcount     INT,
+  count        INT,
   datayear     INT DEFAULT 3,          /* Year of project: 1, 2 ... */
   offsite      CHAR(1) DEFAULT 'N',    /* Original files kept offsite (N,Y,D) */
   xmlfound     INT DEFAULT 0,          /* Remove this */
