@@ -25,11 +25,11 @@ if [ "$1" = "" ]; then
   echo "Mark a bam as arrived and extract details from the header"
   exit 1
 fi
-bamid=$1
-bamfile=`$topmedpath wherefile $bamid bam`
-
-Started
+bamid=$1                            # This MUST be bamid, may not use NWD yet
 #nwdid=`GetNWDID $bamid`            # Only case where we do not get NWDID right away
+
+bamfile=`$topmedpath wherefile $bamid bam`
+Started
 
 #   Determine build used to generate this bam/cram
 c=`$topmedcmd show $bamid center`
