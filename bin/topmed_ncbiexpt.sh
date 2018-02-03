@@ -32,6 +32,8 @@ if [ "$1" = "" ]; then
   exit 1
 fi
 bamid=$1
+nwdid=`GetNWDID $bamid`
+bamid=`GetDB $nwdid bamid`
 
 Started
 

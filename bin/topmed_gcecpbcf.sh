@@ -27,10 +27,10 @@ if [ "$1" = "" ]; then
   exit 1
 fi
 bamid=$1
-
-Started
 nwdid=`GetNWDID $bamid`
 bamid=`GetDB $nwdid bamid`
+
+Started
 stime=`date +%s`
 
 #   Get bcf file for remapped cram file

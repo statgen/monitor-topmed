@@ -39,8 +39,9 @@ if [ "$cramfile" = "" ]; then
   Fail "Unable to determine CRAM file for '$bamid'"
 fi
 
-Started
 nwdid=`GetNWDID $bamid`
+bamid=`GetDB $nwdid bamid`
+Started
 
 #======================================================================
 #   Copy CRAM to Google Cloud

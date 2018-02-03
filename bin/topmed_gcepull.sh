@@ -50,6 +50,8 @@ cramfile=$crampath/$nwdid.recab.cram
 #======================================================================
 cramflagstat=`GetDB $bamid cramflagstat`
 if [ "$cramflagstat" = "" ]; then
+  SetDB $bamid state_gce38bcf 0
+  SetDB $bamid state_gce38copy 0
   Fail "Unable to get cramflagstat for bamid '$bamid'"
 fi
 
@@ -57,48 +59,70 @@ stime=`date +%s`
 
 inuri="$incominguri/$nwdid/$nwdid.recab.cram"
 $gsutil stat "$inuri"
-if [ "$?" != "0" ]; then
-  Fail "Unable to find $nwdid/$nwdid.recab.cram in: $incominguri"
+if [ "$?" = "0" ]; then         # Remote file is there
+  #   Now know where to look for data. Check flagstat
+  echo "Checking if flagstat is as we expect from $inuri"
+  $gsutil cp  $inuri.flagstat $crampath
+  if [ "$?" != "0" ]; then
+    SetDB $bamid state_gce38bcf 0
+    SetDB $bamid state_gce38copy 0
+    Fail "Failed to copy flagstat from GCE: $inuri.flagstat"
+  fi
+  #   Get number of interest from flagstat file and check it
+  n=`CalcFlagstatFromFile $crampath/$nwdid.recab.cram.flagstat`
+  if [ "$n" != "$cramflagstat" ]; then
+    # Renaming the flagstat file stops pull from happening again
+    $gsutil mv $inuri.flagstat $inuri.flagstat.nomatch
+    SetDB $bamid state_gce38bcf 0
+    SetDB $bamid state_gce38copy 0
+    Fail "Flagstat '$n' did not match cramflagstat '$cramflagstat' for bamid '$bamid' nwdid $nwdid  -- URL=$inuri"
+  fi
+  echo "Flagstat value is correct: $n"
+
+  #   See if we have already done this
+  f=$crampath/$nwdid.recab.cram
+  if [ -f $f ]; then
+    echo "Replacing existing CRAM $f"
+    rm -f $f $f.crai
+  fi
+
+  echo "Copying remapped CRAM to local file $crampath"
+  $gsutil cp $inuri $crampath
+  if [ "$?" != "0" ]; then
+    SetDB $bamid state_gce38bcf 0
+    SetDB $bamid state_gce38copy 0
+    Fail "Failed to copy file from GCE $inuri to $crampath"
+  fi
+
+  #   Remapping can still result in a trashed file
+  set -o pipefail
+  $samtools view -H $f | grep '^@RG' | $topmed_check_recab
+  if [ "$?" != "0" ]; then
+    SetDB $bamid state_gce38bcf 0
+    SetDB $bamid state_gce38copy 0
+    Fail "Remapped file '$f' header has multiple ids"
+  fi
+  echo "Only one sample found in the header"
+
+  #   Clean up data in GCE if data found in incoming.  Move remapped data to bcf bucket
+  $gsutil mv $inuri         $bcfuri/$nwdid/$nwdid.recab.cram
+  echo "Moved $inuri files to $bcfuri/$nwdid"
+  #   Remove any left over cruft in recabs bucket
+  echo "Removing $incominguri/$nwdid"
+  $gsutil rm -rf $incominguri/$nwdid
+else
+  echo "Unable to find $nwdid/$nwdid.recab.cram in: $incominguri"
 fi
 
-#   Now know where to look for data. Check flagstat
-echo "Checking if flagstat is as we expect from $inuri"
-$gsutil cp  $inuri.flagstat $crampath
-if [ "$?" != "0" ]; then
-  Fail "Failed to copy flagstat from GCE: $inuri.flagstat"
+#   If we have file locally, assume this is a rerun of pull
+if [ ! -f $cramfile ]; then
+  SetDB $bamid state_gce38bcf 0
+  SetDB $bamid state_gce38copy 0
+  Fail "Unable to find $cramfile"
 fi
-#   Get number of interest from flagstat file and check it
-n=`CalcFlagstatFromFile $crampath/$nwdid.recab.cram.flagstat`
-if [ "$n" != "$cramflagstat" ]; then
-  # Renaming the flagstat file stops pull from happening again
-  $gsutil mv $inuri.flagstat $inuri.flagstat.nomatch
-  Fail "Flagstat '$n' did not match cramflagstat '$cramflagstat' for bamid '$bamid' nwdid $nwdid  -- URL=$inuri"
-fi
-echo "Flagstat value is correct: $n"
-SetDB $bamid b38flagstat $n
-
-#   See if we have already done this
-f=$crampath/$nwdid.recab.cram
-if [ -f $f ]; then
-  echo "Replacing existing CRAM $f"
-  rm -f $f $f.crai
-fi
-
-echo "Copying remapped CRAM to local file $crampath"
-$gsutil cp $inuri $crampath
-if [ "$?" != "0" ]; then
-  Fail "Failed to copy file from GCE $inuri $crampath"
-fi
-
-#   Remapping can still result in a trashed file
-set -o pipefail
-$samtools view -H $f | grep '^@RG' | $topmed_check_recab
-if [ "$?" != "0" ]; then
-  Fail "Remapped file '$f' header has multiple ids"
-fi
-echo "Only one sample found in the header"
 
 #   Post processing needed here
+echo "Begin post-processing of $cramfile"
 echo "Calculating MD5 for local file ($cramfile)"
 md5=`CalcMD5 $bamid $cramfile`
 echo "Set checksum and flagstat for b$build file"
@@ -107,13 +131,6 @@ SetDB $bamid b${build}flagstat $cramflagstat
 
 #   Save date of file in database
 $topmedcmd setdate $bamid datemapping_b38 $cramfile
-
-#   Clean up data in GCE if data found in incoming.  Move remapped data to bcf bucket
-$gsutil mv $inuri         $bcfuri/$nwdid/$nwdid.recab.cram
-echo "Moved $inuri files to $bcfuri/$nwdid"
-#   Remove any left over cruft in recabs bucket
-echo "Removing $incominguri/$nwdid"
-$gsutil rm -rf $incominguri/$nwdid
 
 etime=`date +%s`
 etime=`expr $etime - $stime`

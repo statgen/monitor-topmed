@@ -45,9 +45,10 @@ if [ "$1" = "" ]; then
 fi
 bamid=$1
 bamfile=`$topmedpath wherefile $bamid bam`
+nwdid=`GetNWDID $bamid`
+bamid=`GetDB $nwdid bamid`
 
 Started
-nwdid=`GetNWDID $bamid`
 stime=`date +%s`
 
 extension="${bamfile##*.}"
