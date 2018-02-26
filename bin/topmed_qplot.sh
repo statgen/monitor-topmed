@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-#   topmed_qplot.sh [-submit [-timeout HH:MM:SS ]] bamid
+#   topmed_qplot.sh [-submit ] bamid
 #
-#	Run QPLOT on a BAM file   You can force the SLURM timeout with -submit
+#	Run QPLOT on a BAM file
 #
 . /usr/cluster/topmed/bin/topmed_actions.inc
 
@@ -51,14 +51,25 @@ function RC_Check {
 
 if [ "$1" = "-submit" ]; then	#  subroutine SubmitJob will run sbatch
   shift	 	 	 	            #  with the current shell script and args
-  timeout="8:00:00"
-  if [ "$1" = "-timeout" ]; then
-    shift
-    timeout="$1"
-    echo "Forcing SLURM timeout to '$timeout'"
-    shift
-  fi
   bamid=`GetDB $1 bamid`
+  timeout="8:00:00"
+  #   Figure out index file name
+  srcfile=`$topmedpath wherefile $bamid bam`
+  if [ ! -f $srcfile ]; then      # BAM should exist, but if not, try CRAM
+    srcfile=`$topmedpath wherefile $bamid cram`
+  fi
+  filesize=`stat --printf=%s $srcfile`
+  #   Large files can take a lot more time
+  if [ "$filesize" -gt "40255183256" ]; then
+    timeout="20:00:00"
+  elif [ "$filesize" -gt "35044692321" ]; then
+    timeout="14:00:00"
+  elif [ "$filesize" -gt "23023087355" ]; then
+    timeout="11:00:00"
+  fi
+  if [ "$timeout" != "8:00:00" ]; then
+    echo "Forcing SLURM timeout to '$timeout'"
+  fi
   RandomRealHost $bamid
   MayIRun $me $bamid $realhost
   SubmitJob $bamid "topmed" '8G' "$0 $*"    # Uses $timeout 
