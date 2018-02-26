@@ -90,7 +90,7 @@ our %opts = (
 );
 Getopt::Long::GetOptions( \%opts,qw(
     help verbose topdir=s center=s runs=s piname=s studyname=s maxjobs=i random
-    dryrun suberr datayear=i build=i nopermit
+    dryrun suberr datayear=i build=i nopermit descending
     )) || die "Failed to parse options\n";
 
 #   Simple help if requested
@@ -336,7 +336,7 @@ if ($fcn eq 'bcf') {
 if ($fcn eq 'gcecopy') {
     #   Get list of all samples yet to process
     my $sql = BuildSQL("SELECT bamid,state_b38,state_gce38bcf,state_gce38copy",
-        "WHERE b.state_b38=$COMPLETED AND b.state_gce38copy!=$COMPLETED");
+        "WHERE b.state_b38=$COMPLETED AND b.state_gce38copy=$REQUESTED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { exit; }
@@ -601,7 +601,8 @@ sub BuildSQL {
 
     #   Support randomization
     if ($opts{random}) { $s .= ' ORDER BY RAND()'; }
-    if ($opts{verbose}) { print "SQL=$s\n"; }
+    if ($opts{descending}) { $s .= ' ORDER BY b.bamid DESC'; }
+     if ($opts{verbose}) { print "SQL=$s\n"; }
     return $s;
 }
 
@@ -679,6 +680,11 @@ The default is to run against all centers.
 =item B<-datayear N>
 
 Submit only jobs for samples in a specific year.
+
+=item B<-descending>
+
+Select the rows based on the bamid in B<descending> order.
+The MySQL default is B<ascending> order.
 
 =item B<-dryrun>
 
