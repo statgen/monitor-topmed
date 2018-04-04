@@ -70,7 +70,7 @@ our %opts = (
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose
+    help raw realm=s verbose
     )) || die "$Script - Failed to parse options\n";
 
 #   Simple help if requested
@@ -262,7 +262,8 @@ sub WhatHost {
     #   BAM is in one of those $opts{netdir} trees where without a symlink
     if ($set eq 'bam') {
         my $bamhost = 'none';
-        my $bamfdir = abs_path("$opts{netdir}/$opts{incomingdir}/$centername/$rundir") || '';
+        my $bamfdir = "$opts{netdir}/$opts{incomingdir}/$centername/$rundir";
+        $bamfdir = abs_path($bamfdir);
         if ($bamfdir =~ /\/net\/([^\/]+)\//) { $bamhost = $1; }
         print $bamhost . "\n";
         exit;
@@ -271,7 +272,8 @@ sub WhatHost {
     #   Find where the backup CRAM lives and show host
     if ($set eq 'cram' || $set eq 'localbackup') {
         my $backuphost = 'none';
-        my $bakbamfdir = abs_path("$opts{netdir}/$opts{backupsdir}/$centername/$rundir");
+        my $bakbamfdir = "$opts{netdir}/$opts{backupsdir}/$centername/$rundir";
+        $bakbamfdir = abs_path($bakbamfdir);
         if ($bakbamfdir =~ /\/net\/([^\/]+)\//) { $backuphost = $1; }
         print $backuphost . "\n";
         exit;
@@ -279,7 +281,8 @@ sub WhatHost {
 
     #   Print where qc.results are and show host
     if ($set eq 'qcresults') {
-        my $qcdir = abs_path("$opts{netdir}/$opts{qcresultsdir}/$centername/$rundir/$nwdid");
+        my $qcdir = "$opts{netdir}/$opts{qcresultsdir}/$centername/$rundir/$nwdid";
+        $qcdir = abs_path($qcdir);
         if ($qcdir && $qcdir =~ /\/net\/([^\/]+)\//) { print $1 . "\n"; }
         exit;
     }
@@ -345,14 +348,16 @@ sub WhereFile {
 
     #   BAM is in one of those $opts{netdir} trees where without a symlink
     if ($set eq 'bam') {
-        my $bamfile = abs_path("$opts{netdir}/$opts{incomingdir}/$centername/$rundir") || '';
+        my $bamfile = "$opts{netdir}/$opts{incomingdir}/$centername/$rundir";
+        if (! $opts{raw}) { $bamfile = abs_path($bamfile) || ''; }
         if ($bamfile) { print $bamfile . "/$bamname" . "\n"; }
         exit;
     }
  
     #   Find where the local backup CRAM lives
     if ($set eq 'cram' || $set eq 'localbackup') {
-        my $bakfile = abs_path("$opts{netdir}/$opts{backupsdir}/$centername/$rundir") || '';
+        my $bakfile = "$opts{netdir}/$opts{backupsdir}/$centername/$rundir";
+        if (! $opts{raw}) { $bakfile = abs_path($bakfile) || ''; }
         if ($bakfile) { print $bakfile . "/$cramname" . "\n"; }
         exit;
     }
@@ -373,7 +378,8 @@ sub WhereFile {
 
     #   Print where qc.results we are interested are
     if ($set eq 'qcresults') {
-        my $qcdir = abs_path("$opts{netdir}/$opts{qcresultsdir}/$centername/$rundir");
+        my $qcdir = "$opts{netdir}/$opts{qcresultsdir}/$centername/$rundir";
+        if (! $opts{raw}) { $qcdir = abs_path($qcdir) || ''; }
         $bamname =~ s/.bam//;               # Instead of nwdid, maybe it is original bamname
         if (-f "$qcdir/$bamname.vb.selfSM") {
             print "$qcdir/$bamname.vb.selfSM" . "\n";
@@ -553,6 +559,12 @@ See B<perldoc DBIx::Connector> for details defining the database.
 =item B<-help>
 
 Generates this output.
+
+=item B<-raw NAME>
+
+Specifies the path returned has not used abs_path(), e.g. has not been verified.
+In this case B<-raw> will always return a path, whereas the default behavior
+could return a null string if the path is invalid (e.g. NFS mount has failed).
 
 =item B<-realm NAME>
 
