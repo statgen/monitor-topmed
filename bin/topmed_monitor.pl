@@ -509,6 +509,10 @@ sub BatchSubmit {
     if ($rc == 0) {
         $opts{jobcount}++;
         if ($opts{verbose}) { print "submitted => $cmd\n"; }
+        #   Capture the bamid for ShowSummary
+        if ($cmd =~ /\s(\d+)$/) {
+            $opts{jobbamid} .= $1 . ' ';
+        }
         return -1;
     }
     if ($rc == 4) {
@@ -542,6 +546,7 @@ sub ShowSummary {
     if ($opts{jobsnotpermitted})    { $s .=  "  $opts{jobsnotpermitted} job submissions not permitted"; }
     if ($opts{jobsfailedsubmission}) { $s .=  "  $opts{jobsfailedsubmission} job submissions failed"; }
     if (! $s) { return; }
+    if ($opts{jobbamid}) { $s .= "  bamids=$opts{jobbamid}"; }
     print "$nowdate $type: $s\n";
 }
 
