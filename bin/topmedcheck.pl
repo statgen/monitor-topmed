@@ -62,11 +62,11 @@ our %opts = (
 Getopt::Long::GetOptions( \%opts,qw(
     db localfiles awsfiles gcefiles checkfiles b37files recabfiles
     help register checkfiles fixer=s execfixer random max=i redo verbose
-    center=s run=s piname=s studyname=s datayear=i
+    center=s run=s piname=s studyname=s datayear=i nfsmounts
     )) || die "$Script - Failed to parse options\n";
 
 #   Simple help if requested
-if ($opts{help} || ($#ARGV<0 && (! $opts{run}) && (! $opts{center}))) {
+if ($opts{help} || ($#ARGV<0 && (! $opts{run}) && (! $opts{center}) && (! $opts{nfsmounts}))) {
     my $m = "$Script [options]";
     warn "$m -todo bamid|bamid-bamid|nwdid\n" .
         " or\n" .
@@ -77,9 +77,6 @@ if ($opts{help} || ($#ARGV<0 && (! $opts{run}) && (! $opts{center}))) {
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
     exit 1;
-}
-if (! ($opts{db} || $opts{localfiles} || $opts{awsfiles} || $opts{gcefiles} || $opts{b37files} || $opts{recabfiles})) {
-    die "$Script - Specify the type of check:  -db -localfiles -awsfiles or -gcefiles\n";
 }
 if ($opts{redo}) { $opts{fixer} = $opts{redotool}; }
 
@@ -99,6 +96,49 @@ if ($opts{b37files})  { $morewhere .= " AND state_b37=20"; }
 if ($opts{random})    { $morewhere .= ' ORDER BY RAND()'; }
 if ($opts{max})       { $morewhere .= " LIMIT $opts{max}"; }
 
+#==================================================================
+#   Special case - check one sample in each run for each center
+#==================================================================
+if ($opts{nfsmounts}) {
+    my $centersref = GetCenters();          # Only returns one center
+    foreach my $cid (keys %{$centersref}) {
+        $opts{centername} = $centersref->{$cid};    # Save center name
+        my $runsref = GetRuns($cid) || next;
+        #   Get one bamid for every run
+        foreach my $runid (keys %{$runsref}) {
+            my $sql = "SELECT bamid,expt_sampleid FROM $opts{bamfiles_table} " .
+                "WHERE runid=$runid AND state_cram=20 ORDER BY RAND() LIMIT 1";
+            my $sth = DoSQL($sql);
+            GetArrayOfSamples($sth);
+        }
+    }
+
+    #   We now have a list of one sample from each run for all centers
+    print "Verify NFS mounts by checking " .
+        scalar(@bamidrange) . " samples\n";
+    my $errs = 0;
+    my $h = `hostname`;
+    chomp($h);
+    foreach my $bamid (@bamidrange) {
+        my $filecmd = $opts{topmedpath} . " -raw wherefile $bamid cram ";
+        if (! $opts{verbose}) { $filecmd .= " >/dev/null"; }    # Do not show ls results
+
+        my $p = `$filecmd`;
+        if ($opts{verbose}) { print "Check sample $p"; next; }
+        if ($p && system("ls -l $p")) {
+            print "$Script - command failed on host '$h': $filecmd\n";
+            system($filecmd);
+            $errs++;
+            next;
+        }
+    }
+    if (! $errs) { print "NFS mounts on '$h' seem to be okay\n"; }
+    exit($errs);
+}
+
+#==================================================================
+#   Resume normal processing
+#==================================================================
 if (@ARGV) {                # Maybe one or a range of bamids specified
     my $bamid = shift @ARGV;
     my @input = ();
@@ -157,40 +197,66 @@ if ($opts{db}) {
     for (my $i=0; $i<=$#bamidrange; $i++) {
         Check_DB($bamidrange[$i], $nwdids[$i]);
     }
+    exit;
 }
 if ($opts{recabfiles}) {
     print "Verify remapped files GCE recabs\n";
     for (my $i=0; $i<=$#bamidrange; $i++) {
         Check_RecabFiles($bamidrange[$i], $nwdids[$i]);
     }
+    exit;
 }
 if ($opts{localfiles}) {
     print "Verify local files\n";
     for (my $i=0; $i<=$#bamidrange; $i++) {
         Check_LocalFiles($bamidrange[$i], $nwdids[$i]);
     }
+    exit;
 }
 if ($opts{gcefiles}) {
     print "Verify GCE files\n";
     for (my $i=0; $i<=$#bamidrange; $i++) {
         Check_GCEFiles($bamidrange[$i], $nwdids[$i]);
     }
+    exit;
 }
 if ($opts{awsfiles}) {
     print "Verify Amazon files\n";
     for (my $i=0; $i<=$#bamidrange; $i++) {
         Check_AWSFiles($bamidrange[$i], $nwdids[$i]);
     }
+    exit;
 }
 if ($opts{b37files}) {              # This only checks ALL b37 files
     Check_B37Files('', 'NWD*');
+    exit;
 }
 if ($opts{checkfiles}) {
     print "Verify the local files (md5 and flagstat) - patience!\n";
     for (my $i=0; $i<=$#bamidrange; $i++) {
         Check_Files($bamidrange[$i], $nwdids[$i]);
     }
+    exit;
 }
+
+#if ($opts{checkbcf}) {
+#    print "Verify the local BCF files and index - patience!\n";
+#    for (my $i=0; $i<=$#bamidrange; $i++) {
+#        Check_BCFFiles($bamidrange[$i], $nwdids[$i]);
+#    }
+#}
+
+#$ bcftools index -f /net/topmed8/working/candidate_variants/Ellinor/NWD694535.bcf
+#[E::bgzf_uncompress] inflate failed: progress temporarily not possible, or in() / out() returned an error
+#[E::bgzf_read_block] inflate_block error -1
+#[E::bgzf_read] bgzf_read_block error -1 after 9 of 32 bytes
+#index: failed to create index for "/net/topmed8/working/candidate_variants/Ellinor/NWD694535.bcf"
+#$ echo $?
+#255
+
+die "$Script - Unable to figure out what to check. Try $Script -help\n";
+
+
 exit;
 
 #==================================================================
