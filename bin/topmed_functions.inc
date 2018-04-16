@@ -1,35 +1,6 @@
 #
-#	Define variables that all TOPMED action scripts need defined
+#	Define functions used in scripts for this project
 #
-topmedcmd=/usr/cluster/topmed/bin/topmedcmd.pl
-topmedpermit=/usr/cluster/topmed/bin/topmedpermit.pl
-topmedpath=/usr/cluster/topmed/bin/topmedpath.pl
-topmedrename=/usr/cluster/topmed/bin/topmedrename.pl
-topmedqplot=/usr/cluster/topmed/bin/topmedqplot.pl
-bam=/usr/cluster/bin/bam
-samtools=/usr/cluster/bin/samtools
-vt=/usr/cluster/topmed/bin/vt
-vtref=/net/topmed/working/mapping/gotcloud/ref/hg38/hs38DH.fa
-bcftools=/usr/cluster/bin/bcftools
-console=/net/topmed/working/topmed-output
-slurmp=topmed-working
-build=38
-realhost=''
-
-cores=''                            # Set to same as gsutil if it will be used
-gsutil="gsutil -m"
-gsshareoption="-u topmed-1366"      # Used to copy to SHARE
-gsutilbig='gsutil -o GSUtil:parallel_composite_upload_threshold=150M'
-#   No need to parallel processing 
-#cores="--cpus-per-task=2"         # Cores here should be same as gsutil
-#gsutil='gsutil -o GSUtil:parallel_composite_upload_threshold=150M -o GSUtil:parallel_process_count=2'
-incominguri='gs://topmed-recabs'
-bcfuri='gs://topmed-bcf'
-export BOTO_CONFIG=/net/topmed/working/shared/tpg_gsutil_config.txt
-
-#==================================================================
-#   Define useful functions to be used by the action scripts
-#==================================================================
 
 #------------------------------------------------------------------
 # Subroutine:
@@ -52,7 +23,7 @@ function finish {
 #   Does not return if permission is denied
 #------------------------------------------------------------------
 function MayIRun {
-  $topmedpermit test $1 $2 $3
+  $prjpermit test $1 $2 $3
   rc=$?
   if [ "$rc" = "4" ]; then
     exit 4
@@ -90,7 +61,7 @@ function Warn {
 function Fail {
   local msg="$1"
   if [ "$markverb" != "" ]; then
-    $topmedcmd -emsg "$msg" mark $bamid $markverb failed
+    $prjcmd -emsg "$msg" mark $bamid $markverb failed
   else
     >&2 echo $msg
     #>&2 echo "Task for $bamid FAILED, no markverb set"
@@ -105,7 +76,7 @@ function Fail {
 #------------------------------------------------------------------
 function Started {
   if [ "$markverb" != "" ]; then
-    $topmedcmd mark $bamid $markverb started
+    $prjcmd mark $bamid $markverb started
   fi
   d=`date +%Y/%m/%d`
   s=`hostname`
@@ -119,7 +90,7 @@ function Started {
 #------------------------------------------------------------------
 function Successful {
   if [ "$markverb" != "" ]; then
-    $topmedcmd -emsg "" mark $bamid $markverb completed
+    $prjcmd -emsg "" mark $bamid $markverb completed
   else
     echo "Task for $bamid successful, no markverb set"
   fi
@@ -133,7 +104,7 @@ function SetDB {
   local bamid=$1
   local col=$2
   local val=$3
-  $topmedcmd set $bamid $col "$val"
+  $prjcmd set $bamid $col "$val"
   if [ "$?" != "0" ]; then
     Fail "Unable to set column '$col' to '$val' for bamid '$bamid'" 
   fi
@@ -146,7 +117,7 @@ function SetDB {
 function GetDB {
   local bamid=$1
   local col=$2
-  $topmedcmd show $bamid $col
+  $prjcmd show $bamid $col
   if [ "$?" != "0" ]; then
     Fail "Unable to get column '$col' for bamid '$bamid'" 
   fi
@@ -158,7 +129,7 @@ function GetDB {
 #------------------------------------------------------------------
 function GetNWDID {
   local bamid=$1
-  nwdid=`$topmedcmd show $bamid expt_sampleid`
+  nwdid=`$prjcmd show $bamid expt_sampleid`
   if [ "$nwdid" = "" ]; then
     Fail "Unable to find the NWDID for '$bamid'" 
   fi
@@ -172,7 +143,7 @@ function GetNWDID {
 function MyRealHost {
   local bamid=$1
   local type=$2
-  realhost=`$topmedpath whathost $bamid $type`
+  realhost=`$prjpath whathost $bamid $type`
 }
 
 #------------------------------------------------------------------
@@ -215,7 +186,7 @@ function RandomRealHost {
 function CheckRGMap {
   local bamid=$1
   
-  /usr/cluster/topmed/bin/topmedrgmap.pl -check $bamid /dev/null
+  /usr/cluster/$project/bin/${project}rgmap.pl -check $bamid /dev/null
   return $?
 }
 
@@ -268,6 +239,9 @@ function ValidateIndex {
     build=`GetBuild $bamid $file`
     if [ "$build" = "37" ]; then
       buildstr="hs37d5:35,450,000-35,477,943"
+      if [ "$project" = "inpsyght" ]; then  # Broad use differ 37 ref for this project
+        buildstr="GL000192.1:544,000-547,490"
+      fi
     fi
     if [ "$build" = "38" ]; then
       buildstr="chr19_KI270938v1_alt"
@@ -459,7 +433,7 @@ function CalcFlagstat {
 
   # Special hack for this center
   ref=/net/mario/gotcloud/gotcloud.ref/hs37d5.fa
-  c=`$topmedcmd show $bamid center`
+  c=`$prjcmd show $bamid center`
   if [ "$c" = "illumina" ]; then
     ref=/net/topmed/incoming/study.reference/study.reference/illumina.hg19.fa
   fi
@@ -537,7 +511,7 @@ function SubmitJob {
     echo `date` $me ${l[3]} $slurmp $qos $mem >> $console/$bamid.jobids
   fi
   if [ "$markverb" != "" ]; then
-    $topmedcmd mark $bamid $markverb submitted
+    $prjcmd mark $bamid $markverb submitted
   fi
   exit
 }
@@ -581,7 +555,7 @@ function SubmitSRUN {
     echo `date` $me ${l[3]} $slurmp $qos $mem >> $console/$bamid.jobids
   fi
   if [ "$markverb" != "" ]; then
-    $topmedcmd mark $bamid $markverb submitted
+    $prjcmd mark $bamid $markverb submitted
   fi
   exit
 }
