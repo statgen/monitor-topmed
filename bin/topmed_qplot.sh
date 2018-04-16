@@ -89,7 +89,6 @@ nwdid=`GetNWDID $bamid`
 bamid=`GetDB $nwdid bamid`
 
 #   Mark this as started
-SetDB $bamid state_fix 3
 Started 
 
 #   Figure out index file name
@@ -205,7 +204,6 @@ if [ "$?" != "0" ]; then
   Fail "Unable to update the database with the QCPLOT results for '$bamid' [$outdir $nwdid]"
 fi
 
-SetDB $bamid state_fix 20           # Keep track of what is redone. Remove someday
 Successful
 Log $etime
 exit 0
