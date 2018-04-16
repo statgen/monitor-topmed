@@ -5,6 +5,7 @@
 #
 # Description:
 #   Use this program to rename a BAM to it's nwdid name
+#   This program can work with topmed and inpsyght
 #
 # ChangeLog:
 #   $Log: topmedrename.pl,v $
@@ -31,13 +32,16 @@ use File::Basename;
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
-my $topmedbin = '/usr/cluster/topmed/bin';
 our %opts = (
-    topmedcmd => "$topmedbin/topmedcmd.pl",
-    realm => '/usr/cluster/topmed/etc/.db_connections/topmed',
+    realm => '/usr/cluster/topmed/etc/.db_connections/',
     bamfiles_table => 'bamfiles',
     verbose => 0,
 );
+if ($0 =~ /\/(\w+)ren/) {
+    my $x = $1;
+    $opts{realm} .= $x;
+}
+
 Getopt::Long::GetOptions( \%opts,qw(
     help realm=s verbose
     )) || die "Failed to parse options\n";
@@ -60,7 +64,7 @@ my $rowsofdata = $sth->rows();
 if (! $rowsofdata) { die "Script BAM '$bamid' does not exist in database [$bamfilepath]\n"; }
 my $href = $sth->fetchrow_hashref;
 my $nwdid = $href->{expt_sampleid};
-if ($nwdid !~ /^NWD/) { die "Script BAM '$bamid' NWDID [$nwdid] was not set [$bamfilepath]\n"; }
+if (! defined($nwdid) || $nwdid eq '') { die "Script BAM '$bamid' NWDID [$nwdid] was not set [$bamfilepath]\n"; }
 
 
 #   CD to place where BAM exists

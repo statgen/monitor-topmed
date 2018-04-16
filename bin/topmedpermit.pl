@@ -5,7 +5,7 @@
 #
 # Description:
 #   Use this program to determine if an action is permitted
-#   This program is tightly coupled with topmed/html/index.php
+#   This program can work with topmed and inpsyght
 #
 #   This was originally part of topmedcmd.pl, but had to be broken
 #   into a separate program because of all the dependencies
@@ -35,7 +35,7 @@ our ($DBC, $DBH);
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
 our %opts = (
-    realm => '/usr/cluster/topmed/etc/.db_connections/topmed',
+    realm => '/usr/cluster/topmed/etc/.db_connections/',
     bamfiles_table => 'bamfiles',
     centers_table => 'centers',
     runs_table => 'runs',
@@ -60,6 +60,7 @@ my %VALIDOPS = (                    # Used for permit
     sexpt => 1,
     sorig => 1,
 );
+if ($0 =~ /\/(\w+)permit/) { $opts{realm} .= $1; }
 
 Getopt::Long::GetOptions( \%opts,qw(
     help conf=s verbose
