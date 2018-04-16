@@ -23,7 +23,7 @@ $VERSION = '1.0';
 error_reporting(E_ALL);
 
 //  These guys can do anything for any monitor action
-$MGRS = array('tpg', 'schelcj');
+$MGRS = array('tpg');
 
 $HDR['home'] = '/topmed';        // Banner URL
 $HDR['title'] = 'NHLBI TOPMed - Data Tracking';   // Banner title
