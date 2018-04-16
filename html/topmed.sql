@@ -18,9 +18,6 @@ mysqldump -u sqlnhlbi --password=pw -h f-db nhlbi > /tmp/nhlbi.sql
 mysql -u sqlnhlbi --password=pw -h localhost nhlbi < /tmp/nhlbi.sql
 */
 
-/* --------------------------------------------------------------
-#   Do not delete columns without telling Chris so he can fix mapping
-#--------------------------------------------------------------- */
 /* This table is used to control when/if an operation is permitted
    If an entry is in this table, it means it is disabled */
 DROP TABLE IF EXISTS permissions;
@@ -116,7 +113,7 @@ CREATE TABLE bamfiles (
 
   datearrived  VARCHAR(12),             /* Referenced in nhlbi_qc_metrics */
   bamsize      VARCHAR(16) DEFAULT 0,   /* Referenced in nhlbi_qc_metrics */
-  datayear     INT DEFAULT 3,           /* Year of project: 1, 2 ... */\
+  datayear     INT DEFAULT 3,           /* Year of project: 1, 2 ... */
   build        VARCHAR(4) DEFAULT '38', /* Build original input file user, 37, 38 etc */
   dateinit     VARCHAR(12),             /* Referenced in nhlbi_qc_metrics */
   bamname_orig VARCHAR(96) NOT NULL,
@@ -172,11 +169,6 @@ my $FAILED    = 99;           # Task failed
     ALTER TABLE bamfiles CHANGE expt_sampleid expt_sampleid VARCHAR(24);
     
     ALTER TABLE bamfiles DROP COLUMN colname;
-
-select bamid,bamname,runid,(select dirname from runs where runid=bamfiles.runid) from bamfiles where state_ncbib37=19;
-
-  How can we have dozens of files with this checksum ?
-select bamid,bamname from bamfiles where cramb37checksum='d41d8cd98f00b204e9800998ecf8427e'
 */
  
 CREATE INDEX index_runid   ON bamfiles(runid);
