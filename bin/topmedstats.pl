@@ -141,7 +141,7 @@ sub Jobids {
         if ($href->{'count(*)'}) { $errcount = $href->{'count(*)'}; }
         #   INSERT this row, from now on we can do UPDATE
         $sql = "INSERT INTO $opts{stats_table} " .
-            "(yyyymmdd,count,errcount) VALUES ('$yyyymmdd',$count,$errcount)";
+            "(yyyymmdd,bamcount,errcount) VALUES ('$yyyymmdd',$count,$errcount)";
         $sth = DoSQL($sql);
         print "Created record for '$yyyymmdd' [$count,$errcount]\n";
     }
