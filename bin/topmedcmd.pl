@@ -5,7 +5,7 @@
 #
 # Description:
 #   Use this program to update the NHLBI database.
-#   This program is tightly coupled with /monitor/topmed/index.php
+#   This program can work with topmed and inpsyght
 #
 # ChangeLog:
 #   $Log: topmedcmd.pl,v $
@@ -85,18 +85,25 @@ my %VALIDSTATUS = (                 # Valid status for the verbs
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
 our %opts = (
-    realm => '/usr/cluster/topmed/etc/.db_connections/topmed',
+    realm => '/usr/cluster/topmed/etc/.db_connections/',
     bamfiles_table => 'bamfiles',
     centers_table => 'centers',
     permissions_table => 'permissions',
     runs_table => 'runs',
-    netdir => '/net/topmed',
-    backupsdir => 'working/backups/incoming/topmed',
+    netdir => '/net/',
+    backupsdir => 'working/backups/incoming/',
     ascpcmd => "/usr/cluster/bin/ascp -i ".
         "/net/topmed/incoming/study.reference/send2ncbi/topmed-2-ncbi.pri -l 800M -k 1",
     ascpdest => 'asp-um-sph@gap-submit.ncbi.nlm.nih.gov:protected',    
     verbose => 0,
 );
+if ($0 =~ /\/(\w+)cmd/) {
+    my $x = $1;
+    $opts{realm} .= $x;
+    $opts{netdir} .= $x;
+    $opts{backupsdir} .= $x;
+#    $opts{ascpcmd} .= $x;                   # This is wrong, only topmed
+}
 
 Getopt::Long::GetOptions( \%opts,qw(
     help verbose with-id|bamid emsg=s
@@ -305,12 +312,8 @@ sub WhatRun {
     my ($bamid) = @_;
     my $sth;
 
-    if ($bamid =~ /^NWD\d+/) {              # If NWDID, get bamid
-        $sth = DoSQL("SELECT runid FROM $opts{bamfiles_table} WHERE expt_sampleid='$bamid'");
-    }
-    else {
-        $sth = DoSQL("SELECT runid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
-    }
+    $bamid = GetBamid($bamid);
+    $sth = DoSQL("SELECT runid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
     if (! $sth) { die "$Script - Unknown '$bamid'\n"; }
     my $href = $sth->fetchrow_hashref;
     $sth = DoSQL("SELECT centerid,runid,dirname,count,datayear FROM $opts{runs_table} WHERE runid=$href->{runid}");
@@ -507,7 +510,8 @@ sub Show {
     my ($sth, $rowsofdata, $href);
 
     #   This could be a run name. Does not start with NWD, not all digits
-    if ($bamid !~ /^NWD/ && $bamid =~ /\D+/) {
+    my $b = GetBamid($bamid, 1);    # Do not die, come back with zero if failed
+    if (! $b) {                     # Not a sample, must be a run
         $sth = DoSQL("SELECT runid,$col FROM $opts{runs_table} WHERE dirname='$bamid'", 0);
         if ($sth) {
             $rowsofdata = $sth->rows();
@@ -517,11 +521,10 @@ sub Show {
                 return;
             }
         }
+        die "$Script - Unknown '$bamid', not a sampleid, bamid or dir of a run\n";
     }
+    else { $bamid = $b; }               #   This is bamid or nwdid
 
-    #   This is bamid or nwdid
-    $bamid = GetBamid($bamid);
-    
     $sth = DoSQL("SELECT bamid,runid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
     $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
@@ -563,27 +566,25 @@ sub Show {
 
 #==================================================================
 # Subroutine:
-#   GetBamid($bamid)
+#   GetBamid($bamid, $flag)
+#
+#   If this is not a sampleid or bamid and FLAG is 1, do not die, return zero
 #
 #   Return bamid for bamid or expt_sampleid
 #==================================================================
 sub GetBamid {
-    my ($bamid) = @_;
+    my ($bamid, $flag) = @_;
     my ($sth, $rowsofdata, $href);
     if ($bamid =~ /^\d+$/) { return $bamid; }
 
-    if ($bamid =~ /^NWD/){
-        $sth = DoSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE expt_sampleid='$bamid'");
-        $rowsofdata = $sth->rows();
-        if ($rowsofdata) {
-            $href = $sth->fetchrow_hashref;
-            return $href->{bamid};
-        }
+    $sth = DoSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE expt_sampleid='$bamid'");
+    $rowsofdata = $sth->rows();
+    if ($rowsofdata) {
+        $href = $sth->fetchrow_hashref;
+        return $href->{bamid};
     }
-    if ($bamid !~ /^\d+$/){
-        die "$Script - Invalid bamid or NWDID ($bamid). Try '$Script -help'\n";
-    }
-    return $bamid;
+    if ($flag) { return 0; }        # Not bamid or sample and do not die
+    die "$Script - Invalid bamid or NWDID ($bamid). Try '$Script -help'\n";
 }
 
 #==================================================================

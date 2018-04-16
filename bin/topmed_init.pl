@@ -6,6 +6,7 @@
 # Description:
 #   Use this program to check for files that are arriving
 #   and initialize the NHLBI TOPMED database
+#   This program can work with topmed and inpsyght
 #
 # ChangeLog:
 #   $Log: topmed_init.pl,v $
@@ -37,7 +38,7 @@ use File::Basename;
 #--------------------------------------------------------------
 my $NOTSET    = 0;          # Not set
 our %opts = (
-    realm => '/usr/cluster/topmed/etc/.db_connections/topmed',
+    realm => '/usr/cluster/topmed/etc/.db_connections/',
     centers_table => 'centers',
     runs_table => 'runs',
     bamfiles_table => 'bamfiles',
@@ -49,6 +50,12 @@ our %opts = (
     ignorearrived => 0,     # If set, ignored arrived database field
     verbose => 0,
 );
+if ($0 =~ /\/(\w+)_/) {
+    my $p = $1;
+    if ($p =~ /inpsy/) { $p = 'inpsyght'; }
+    $opts{realm} .= $p;
+    $opts{topdir} = "/net/$p/incoming/$p";
+}
 
 Getopt::Long::GetOptions( \%opts,qw(
     help realm=s verbose center=s run=s ignorearrived
@@ -134,11 +141,11 @@ exit;
 sub CreateRun {
     my ($cid, $d) = @_;
     #   Runs with a magic name are ignored
-    if ($d eq 'upload' || $d eq 'slots') { return undef(); }
+    if ($d eq 'upload') { return undef(); }
 
     #   Do nothing until this is owned by the right user
     my @s = stat($d);
-    if ($s[5] != 2307982) {
+    if ($s[5] != 2307982 && $s[5] != 1106) {
         if ($opts{verbose}) { print "$Script - Ignoring directory '$d' until it is owned by topmed\n"; }
         return undef();
     }

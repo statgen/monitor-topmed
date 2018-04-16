@@ -8,6 +8,7 @@
 #   This was part of topmedcmd.pl but was moved into a new program
 #   for stability. This program might return surprising paths
 #   to deal with inconsistencies from differing centers.
+#   This program can work with topmed and inpsyght
 #
 # Poor man's regression testing:
 #  t=/tmp/topmedpath.pl
@@ -46,28 +47,40 @@ use Cwd qw(realpath abs_path);
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
 our %opts = (
-    realm => '/usr/cluster/topmed/etc/.db_connections/topmed',
+    realm => '/usr/cluster/topmed/etc/.db_connections/',
     bamfiles_table => 'bamfiles',
     centers_table => 'centers',
     runs_table => 'runs',
-    netdir => '/net/topmed',
+    netdir => '/net/',
     qcresultsdir => 'incoming/qc.results',
-    incomingdir => 'incoming/topmed',
-    backupsdir => 'working/backups/incoming/topmed',
+    incomingdir => 'incoming/',
+    backupsdir => 'working/backups/incoming/',
     bcfsdir => 'working/candidate_variants',
-    consoledir => 'working/topmed-output',
+    consoledir => 'working/',
     wresults37dir => 'working/schelcj/results',
     iresults37dir => 'incoming/schelcj/results',
     results38dir => 'working/mapping/results',
-    gcebackupuri => 'gs://topmed-irc-working/archives',   # Was topmed-backups
-    gcearchiveuri => 'gs://topmed-archives',
-    gcebcfuploaduri => 'gs://topmed-bcf',               # For remapped BCF data
-    gceuploaduri => 'gs://topmed-irc-share/genomes',    # For remapped CRAM data
+    gcebackupuri => 'gs://',                        # Was topmed-backups
+    gcearchiveuri => 'gs://',
+    gcebcfuploaduri => 'gs://',                     # For remapped BCF data
+    gceuploaduri => 'gs://',                        # For remapped CRAM data
     awsbucket => 'nih-nhlbi-datacommons',
     awsbucketpath => 'UofM/crams/b38',
     awsuploaduri => 's3://nih-nhlbi-datacommons/UofM/crams/b38',
     verbose => 0,
 );
+if ($0 =~ /\/(\w+)path/) {
+    my $x = $1;
+    $opts{realm} .= $x;
+    $opts{netdir} .= $x;
+    $opts{backupsdir} .= $x;
+    $opts{incomingdir} .= $x;
+    $opts{consoledir} .= $x . '-output';
+    $opts{gcebackupuri} .= $x . '-backups';
+    $opts{gcearchiveuri} .= $x . '-archives';
+    $opts{gcebcfuploaduri} .= $x . '-bcf';
+    $opts{gceuploaduri} .= $x . '-irc-share/genomes';
+}
 
 Getopt::Long::GetOptions( \%opts,qw(
     help raw realm=s verbose
@@ -136,14 +149,14 @@ sub WherePath {
     #   BAM is in one of those $opts{netdir} trees where without a symlink
     if ($set eq 'bam') {
         my $bamhost = 'none';
-        my $bamfdir = abs_path("$opts{netdir}/$opts{incomingdir}/$centername/$rundir") || '';
+        my $bamfdir = AbsPath("$opts{netdir}/$opts{incomingdir}/$centername/$rundir");
         print $bamfdir . "\n";
         exit;
     }
  
     #   Find where the cram file lives
     if ($set eq 'cram' || $set eq 'localbackup') {
-        my $bakbamfdir = abs_path("$opts{netdir}/$opts{backupsdir}/$centername/$rundir") || '';
+        my $bakbamfdir = AbsPath("$opts{netdir}/$opts{backupsdir}/$centername/$rundir");
         print $bakbamfdir . "\n";
         exit;
     }
@@ -164,7 +177,7 @@ sub WherePath {
 
     #   Print where qc.results are 
     if ($set eq 'qcresults') {
-        my $qcdir = abs_path("$opts{netdir}/$opts{qcresultsdir}/$centername/$rundir");
+        my $qcdir = AbsPath("$opts{netdir}/$opts{qcresultsdir}/$centername/$rundir");
         print $qcdir . "\n";
         exit;
     }
@@ -263,7 +276,7 @@ sub WhatHost {
     if ($set eq 'bam') {
         my $bamhost = 'none';
         my $bamfdir = "$opts{netdir}/$opts{incomingdir}/$centername/$rundir";
-        $bamfdir = abs_path($bamfdir);
+        $bamfdir = AbsPath($bamfdir);
         if ($bamfdir =~ /\/net\/([^\/]+)\//) { $bamhost = $1; }
         print $bamhost . "\n";
         exit;
@@ -273,7 +286,7 @@ sub WhatHost {
     if ($set eq 'cram' || $set eq 'localbackup') {
         my $backuphost = 'none';
         my $bakbamfdir = "$opts{netdir}/$opts{backupsdir}/$centername/$rundir";
-        $bakbamfdir = abs_path($bakbamfdir);
+        $bakbamfdir = AbsPath($bakbamfdir);
         if ($bakbamfdir =~ /\/net\/([^\/]+)\//) { $backuphost = $1; }
         print $backuphost . "\n";
         exit;
@@ -282,7 +295,7 @@ sub WhatHost {
     #   Print where qc.results are and show host
     if ($set eq 'qcresults') {
         my $qcdir = "$opts{netdir}/$opts{qcresultsdir}/$centername/$rundir/$nwdid";
-        $qcdir = abs_path($qcdir);
+        $qcdir = AbsPath($qcdir);
         if ($qcdir && $qcdir =~ /\/net\/([^\/]+)\//) { print $1 . "\n"; }
         exit;
     }
@@ -349,7 +362,7 @@ sub WhereFile {
     #   BAM is in one of those $opts{netdir} trees where without a symlink
     if ($set eq 'bam') {
         my $bamfile = "$opts{netdir}/$opts{incomingdir}/$centername/$rundir";
-        if (! $opts{raw}) { $bamfile = abs_path($bamfile) || ''; }
+        $bamfile = AbsPath($bamfile);
         if ($bamfile) { print $bamfile . "/$bamname" . "\n"; }
         exit;
     }
@@ -357,7 +370,7 @@ sub WhereFile {
     #   Find where the local backup CRAM lives
     if ($set eq 'cram' || $set eq 'localbackup') {
         my $bakfile = "$opts{netdir}/$opts{backupsdir}/$centername/$rundir";
-        if (! $opts{raw}) { $bakfile = abs_path($bakfile) || ''; }
+        $bakfile = AbsPath($bakfile);
         if ($bakfile) { print $bakfile . "/$cramname" . "\n"; }
         exit;
     }
@@ -379,7 +392,7 @@ sub WhereFile {
     #   Print where qc.results we are interested are
     if ($set eq 'qcresults') {
         my $qcdir = "$opts{netdir}/$opts{qcresultsdir}/$centername/$rundir";
-        if (! $opts{raw}) { $qcdir = abs_path($qcdir) || ''; }
+        $qcdir = AbsPath($qcdir);
         $bamname =~ s/.bam//;               # Instead of nwdid, maybe it is original bamname
         if (-f "$qcdir/$bamname.vb.selfSM") {
             print "$qcdir/$bamname.vb.selfSM" . "\n";
@@ -424,18 +437,13 @@ sub GetBamid {
     my ($sth, $rowsofdata, $href);
     if ($bamid =~ /^\d+$/) { return $bamid; }
 
-    if ($bamid =~ /^NWD/){
-        $sth = DoSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE expt_sampleid='$bamid'");
-        $rowsofdata = $sth->rows();
-        if ($rowsofdata) {
-            $href = $sth->fetchrow_hashref;
-            return $href->{bamid};
-        }
+    $sth = DoSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE expt_sampleid='$bamid'");
+    $rowsofdata = $sth->rows();
+    if ($rowsofdata) {
+        $href = $sth->fetchrow_hashref;
+        return $href->{bamid};
     }
-    if ($bamid !~ /^\d+$/){
-        die "$Script - Invalid bamid or NWDID ($bamid). Try '$Script -help'\n";
-    }
-    return $bamid;
+    die "$Script - Invalid bamid or NWDID ($bamid). Try '$Script -help'\n";
 }
 
 #==================================================================
@@ -449,9 +457,9 @@ sub FindB37 {
     die "$Script - there are no local B37 files. See gs://topmed-irc-working/remapping/b37\n";
     my %files = ();
     foreach my $n ('', '2', '3', '4', '5', '6', '7', '9', '10') {     # All possible topmed hosts
-        my $p = abs_path("$opts{netdir}$n/$opts{wresults37dir}/$centername/$piname/$nwdid/bams/$nwdid.recal.cram") || '';
+        my $p = AbsPath("$opts{netdir}$n/$opts{wresults37dir}/$centername/$piname/$nwdid/bams/$nwdid.recal.cram");
         if ($p) { $files{$p} = 1; next; }
-        $p = abs_path("$opts{netdir}$n/$opts{iresults37dir}/$centername/$piname/$nwdid/bams/$nwdid.recal.cram") || '';
+        $p = AbsPath("$opts{netdir}$n/$opts{iresults37dir}/$centername/$piname/$nwdid/bams/$nwdid.recal.cram");
         if ($p) { $files{$p} = 1; next; }
     }
     if (! %files) { return ''; }                # Nothing found
@@ -512,6 +520,30 @@ sub FindB38 {
         return $file;
     }
     die "$Script - FindB38 did not know about datayear=$datayear\n";
+}
+
+#==================================================================
+# Subroutine:
+#   AbsPath($path)
+#
+#   Returns the absolute path for a path. This is done
+#   manually by get the value of a symlink and then
+#   replacing any leading ../../ prefix with /net/
+#
+#   Return full path or null string
+#==================================================================
+sub AbsPath {
+    my ($p) = @_;
+    if (-l $p) {
+        #   This is symlink, replace prefix with absolute path
+        if ($p =~ /^\.\.[\.\/]+([a-z].+)/) {
+            $p = '/net/' . $1;
+        }
+    }
+    if (! $opts{raw}) {
+        return abs_path($p) || '';
+    }
+    return $p;
 }
 
 1;

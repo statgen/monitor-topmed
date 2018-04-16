@@ -32,14 +32,25 @@ use File::Basename;
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
 our %opts = (
-    samtools => '/net/mario/gotcloud/bin/samtools',
+    samtools => '/usr/cluster/bin/samtools',
     lookuptable => '/net/topmed/incoming/study.reference/study.reference/lookup.table.tab',
-    topdir => '/net/topmed/incoming/topmed',
-    qcresults => '/net/topmed/incoming/qc.results',
-    topmedcmd => '/usr/cluster/topmed/bin/topmedcmd.pl',
+    topdir => '/net/topmed/incoming/',
+    qcresults => '/net/',
+    topmedcmd => '/usr/cluster/',
     nominal_awk => $Bin . '/topmed_get_nominal.awk',
     verbose => 0,
 );
+if ($0 =~ /\/(\w+)_nwd/) {
+    my $x = $1;
+    $opts{topdir} .= $x;
+    $opts{qcresults} .= $x;
+    $opts{consoledir} .= $x . '/incoming/qc.results';
+    $opts{topmedcmd} .= $x . "/bin/${x}cmd.pl";
+    #   Topmed has a way to determine the studyname. Others? not so sure
+    $opts{pi_name} = $x;
+    $opts{studyname} = $x;
+#    $opts{lookuptable} = 'This is for topmed only';
+}
 
 Getopt::Long::GetOptions( \%opts,qw(
     help verbose bamid=s nonwdid
@@ -127,25 +138,30 @@ if (! $base_coord) { die "BAM '$bamfile' base_coord missing\n  CMD=$cmd/n"; }
 #   matches the value of "SM:"
 #--------------------------------------------------------------
 my ($pi_name, $study);
-open(IN,$opts{lookuptable}) ||
-    die "Unable to open file '$opts{lookuptable}': $!\n";
-while (<IN>) {
-    if (! /^$smvalue/) { next; }
-    my @cols = split(' ',$_);
-    $pi_name = $cols[3];
-    $study = $cols[4];
-    last;
+if ($opts{pi_name} eq 'inpsyght') {     # Special hack for other projects
+    ($pi_name, $study) = ($opts{pi_name}, $opts{pi_name});
 }
-close(IN);
+else {
+    open(IN,$opts{lookuptable}) ||
+        die "Unable to open file '$opts{lookuptable}': $!\n";
+    while (<IN>) {
+        if (! /^$smvalue/) { next; }
+        my @cols = split(' ',$_);
+        $pi_name = $cols[3];
+        $study = $cols[4];
+        last;
+    }
+    close(IN);
 
-#   For now, any file whose "SM:" value begins with "LP600"
-#   is a special case until they get their act together.
-if (! $study && $smvalue =~ /^LP600/) {
-    $pi_name = 'Barnes';
-    $study = 'Asthma_Afr';
+    #   For now, any file whose "SM:" value begins with "LP600"
+    #   is a special case until they get their act together.
+    if (! $study && $smvalue =~ /^LP600/) {
+        $pi_name = 'Barnes';
+        $study = 'Asthma_Afr';
+    }
+    if (! $study) { die "Unable to find study for '$smvalue' in '$opts{lookuptable}'\n"; }
+    if (! $pi_name) { die "Unable to find pi_name for '$smvalue' in '$opts{lookuptable}'\n"; }
 }
-if (! $study) { die "Unable to find study for '$smvalue' in '$opts{lookuptable}'\n"; }
-if (! $pi_name) { die "Unable to find pi_name for '$smvalue' in '$opts{lookuptable}'\n"; }
 
 #--------------------------------------------------------------
 #   Update database with this info if bamid provided
