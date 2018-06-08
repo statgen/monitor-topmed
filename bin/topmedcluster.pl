@@ -224,9 +224,8 @@ sub SQueue {
             $mosixrunning{$c[4]}++;    # Count of running jobs for this user
             next;
         }
-        #if ($c[1] !~ /^topmed/) { next; }   # Only want my partition of interest
         if ($c[4] ne 'topmed') {            # Save partition and not topmed user
-            $nottopmed{$c[1]}{$c[4]} = 1;
+            $nottopmed{$c[1]}{$c[4]}++;
             next;
         }
         $partitions{$c[1]} = 1;
@@ -252,7 +251,10 @@ sub SQueue {
         if (! defined($queued{$p}{count}))  { $queued{$p}{count} = 0; }
         if (! defined($running{$p}{count})) { $running{$p}{count} = 0; }
         if (! defined($queued{$p}{held}))   { $queued{$p}{held} = 0; }
-        my $s = join(' ',sort keys %{$nottopmed{$p}});
+        my $s = '';
+        foreach my $u (sort keys %{$nottopmed{$p}}) {
+            $s .= "$u [${$nottopmed{$p}}{$u}] ";
+        }
         my $k = scalar(keys %{$nottopmed{$p}}) || 0;
         printf("  %-18s %3d running / %3d queued / %3d held / %3d foreign user: $s \n",
             $p, $running{$p}{count}, $queued{$p}{count}, $queued{$p}{held}, $k);
