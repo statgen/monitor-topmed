@@ -205,7 +205,11 @@ function RandomRealHost {
   if [ "${bamid2host[$n]}" = "" -o "${bamid2host[$n]}" = "DOWN" ]; then
     n=0
   fi
-  realhost=${bamid2host[$n]}
+  if [ "$SLURMNODE" != "" ]; then	# Allow user to force node
+    realhost=$SLURMNODE
+  else
+    realhost=${bamid2host[$n]}
+  fi
 }
 
 #------------------------------------------------------------------
