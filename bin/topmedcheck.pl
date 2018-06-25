@@ -26,6 +26,7 @@ use lib (
 );
 
 use Getopt::Long;
+use File::Basename;
 use Cwd qw(realpath abs_path);
 use My_DB;
 use Topmed::Constants qw(:states);
@@ -60,7 +61,7 @@ our %opts = (
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
-    db localfiles awsfiles gcefiles checkfiles b37files recabfiles
+    db localfiles awsfiles gcefiles checkfiles b37files
     help register checkfiles fixer=s execfixer random max=i redo verbose
     center=s run=s piname=s studyname=s datayear=i nfsmounts
     )) || die "$Script - Failed to parse options\n";
@@ -68,12 +69,12 @@ Getopt::Long::GetOptions( \%opts,qw(
 #   Simple help if requested
 if ($opts{help} || ($#ARGV<0 && (! $opts{run}) && (! $opts{center}) && (! $opts{nfsmounts}))) {
     my $m = "$Script [options]";
-    warn "$m -todo bamid|bamid-bamid|nwdid\n" .
+    warn "$m [-subset] [-todo] [bamid|bamid-bamid|nwdid]\n" .
         " or\n" .
-        "$m -subsetkey value  (e.g. -center, -runs, -piname, -studyname, -datayear)\n" .
+        "Where \n" .
+        "  [-subset] is -center, -run, -piname, -studyname, -datayear\n" .
+        "  [-todo]   is -db -localfiles -awsfiles -gcefiles -b37 or -recabfiles\n" .
         "\n" .
-        "-todo must be: -db -localfiles -awsfiles -gcefiles -b37 or -recabfiles\n" .
-        "\n" .        
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
     exit 1;
@@ -112,27 +113,31 @@ if ($opts{nfsmounts}) {
             GetArrayOfSamples($sth);
         }
     }
-
+    #@bamidrange=(44872, 127984);
     #   We now have a list of one sample from each run for all centers
-    print "Verify NFS mounts by checking " .
-        scalar(@bamidrange) . " samples\n";
+    if ($opts{verbose}) { print "Verify NFS mounts by checking " .
+        scalar(@bamidrange) . " samples\n"; }
     my $errs = 0;
+    my $success = 0;
     my $h = `hostname`;
     chomp($h);
     foreach my $bamid (@bamidrange) {
         my $filecmd = $opts{topmedpath} . " -raw wherefile $bamid cram ";
-        if (! $opts{verbose}) { $filecmd .= " >/dev/null"; }    # Do not show ls results
-
         my $p = `$filecmd`;
-        if ($opts{verbose}) { print "Check sample $p"; next; }
-        if ($p && system("ls -l $p")) {
-            print "$Script - command failed on host '$h': $filecmd\n";
-            system($filecmd);
-            $errs++;
+        chomp($p);
+        if (! $p) {
+            print "Unable to find path for cram file $bamid\n";
             next;
         }
+        my $rc = system("/usr/bin/stat $p 2>/dev/null >/dev/null");
+        if (! $rc) { $success++; next; }
+        print "Host '$h', failed find file $p\n";
+        $errs++;
     }
-    if (! $errs) { print "NFS mounts on '$h' seem to be okay\n"; }
+    if (! $errs) {
+	if ($opts{verbose}) { print "NFS mounts on '$h' seem to be okay  (found $success files)\n"; }
+    }
+    else { print "NFS mounts on '$h' found $success files, failed to find $errs files\n"; }
     exit($errs);
 }
 
@@ -192,51 +197,50 @@ print "Checking " . scalar(@bamidrange) . " samples\n";
 #--------------------------------------------------------------
 #   Do varying checks over a set of bamids
 #--------------------------------------------------------------
+my %emptyok = ();                   # Cache directories with missing data
 if ($opts{db}) { 
     print "Verify database values\n";
     for (my $i=0; $i<=$#bamidrange; $i++) {
         Check_DB($bamidrange[$i], $nwdids[$i]);
     }
-    exit;
 }
 if ($opts{recabfiles}) {
     print "Verify remapped files GCE recabs\n";
     for (my $i=0; $i<=$#bamidrange; $i++) {
         Check_RecabFiles($bamidrange[$i], $nwdids[$i]);
     }
-    exit;
 }
 if ($opts{localfiles}) {
     print "Verify local files\n";
     for (my $i=0; $i<=$#bamidrange; $i++) {
         Check_LocalFiles($bamidrange[$i], $nwdids[$i]);
     }
-    exit;
+    if (%emptyok) {
+        my @ds = sort keys %emptyok;
+        print "Warning: " . scalar(@ds) . " directories were unexectedly empty:\n";
+        if ($opts{verbose}) { print "  " . join("\n  ", @ds) . "\n"; }
+    }
 }
 if ($opts{gcefiles}) {
     print "Verify GCE files\n";
     for (my $i=0; $i<=$#bamidrange; $i++) {
         Check_GCEFiles($bamidrange[$i], $nwdids[$i]);
     }
-    exit;
 }
 if ($opts{awsfiles}) {
     print "Verify Amazon files\n";
     for (my $i=0; $i<=$#bamidrange; $i++) {
         Check_AWSFiles($bamidrange[$i], $nwdids[$i]);
     }
-    exit;
 }
 if ($opts{b37files}) {              # This only checks ALL b37 files
     Check_B37Files('', 'NWD*');
-    exit;
 }
 if ($opts{checkfiles}) {
     print "Verify the local files (md5 and flagstat) - patience!\n";
     for (my $i=0; $i<=$#bamidrange; $i++) {
         Check_Files($bamidrange[$i], $nwdids[$i]);
     }
-    exit;
 }
 
 #if ($opts{checkbcf}) {
@@ -255,8 +259,6 @@ if ($opts{checkfiles}) {
 #255
 
 die "$Script - Unable to figure out what to check. Try $Script -help\n";
-
-
 exit;
 
 #==================================================================
@@ -363,7 +365,7 @@ sub Check_DB {
 
     $c = 'datayear';
     if (! defined$href->{$c}) { $href->{$c} = ''; }
-    if ($href->{$c} !~ /^1|2|3$/) {
+    if ($href->{$c} !~ /^1|2|3|4$/) {
         push @error,"Column $c $href->{$c} must be 1, 2 or 3";
     }
 
@@ -394,7 +396,7 @@ sub Check_LocalFiles {
     my $filecmd = $opts{topmedpath} . " wherefile $bamid ";
 
     #   Get some data for this sample
-    my $sql = "SELECT datayear,state_b37,state_b38 FROM $opts{bamfiles_table} WHERE bamid=$bamid";
+    my $sql = "SELECT datayear,state_b37,state_b38,state_qplot FROM $opts{bamfiles_table} WHERE bamid=$bamid";
     my $sth = DoSQL($sql);
     if (! $sth) { die "$Script - Unable to get data for $sql\n"; }
     my $href = $sth->fetchrow_hashref;
@@ -419,13 +421,22 @@ sub Check_LocalFiles {
     }
 
     #   QPlot files should exist
-    $f = `$filecmd qcresults`;
-    if (! $f) { die "Unable to determine qcresults file for $bamid\n"; }
-    chomp($f);
-    if ( -f $f ) {
-        if ($opts{verbose}) { print "BAMID=$bamid NWD=$nwdid QCRESULTS OK: $f\n"; }
+    if ($href->{state_qplot} == $COMPLETED) {
+        $f = `$filecmd qcresults`;
+        if (! $f) { die "Unable to determine qcresults file for $bamid\n"; }
+        chomp($f);
+        if ( -f $f ) {
+            if ($opts{verbose}) { print "BAMID=$bamid NWD=$nwdid QCRESULTS OK: $f\n"; }
+        }
+        else {
+            #   We normally expect qcresults to exist, but sometimes they get deleted
+            my $d = dirname($f);
+            if (! exists($emptyok{$d})) {
+                if (-f "$d/.emptyok") { $emptyok{$d} = 1; }
+                else { push @error,"QCRESULTS missing: $f"; }
+            }
+        }
     }
-    else { push @error,"QCRESULTS missing: $f"; }
 
     #   B37 crams should exist for ALL year 1 samples
     #   Some other year samples were also mapped
@@ -838,6 +849,8 @@ topmedcheck.pl - Check all the monitor information for a set of samples
   topmedcheck.pl -db -center nygc           # Check database for samples in a center
   topmedcheck.pl -recabfiles -center nygc -pi MESA  # Check recab files 
   topmedcheck.pl -db -center nygc -datayear 1   # Check database  for samples in center/year
+
+  topmedcheck.pl -nfsmounts                 # Special case - check for broken NFS mounts
  
 =head1 DESCRIPTION
 
@@ -859,6 +872,10 @@ See the B<-redo> and B<-fixer> options.
 
 Specifies that files in the AWS filesystem should be checked.
 
+=item B<-b37files>
+
+Specifies files in GCE for remapped B37.
+
 =item B<-center NAME>
 
 Selects samples from a particular center.
@@ -875,6 +892,10 @@ Selects samples from a particular year.
 =item B<-db>
 
 Checks the database for the selected samples.
+
+=item B<-execfixer>
+
+If set this will force the B<-fixer> command to be run as the errors are detected.
 
 =item B<-fixer COMMANDSTRING>
 
@@ -898,9 +919,17 @@ Specifies that files in the local filesystem should be checked.
 
 Reduce the number of samples that would normally be selected to N samples.
 
+=item B<-nfsmounts>
+
+Check all the NFS mounts. This is a special case to ensure the NFS mounts for this host still work.
+
 =item B<-register>
 
-Will generate a message when a sample is not registered in the NCBI database.
+Will generate a message when a sample is not registered in the NCBI database. Untested.
+
+=item B<-run dirname>
+
+Selects samples from a particular run.
 
 =item B<-piname NAME>
 
