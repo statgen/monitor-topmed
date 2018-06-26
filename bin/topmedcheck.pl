@@ -4,7 +4,7 @@
 # Name: topmedcheck.pl
 #
 # Description:
-#    Do a serious check of data for a set of bamids
+#   Do a serious check of data for a set of samples
 #
 # ChangeLog:
 #   $Log: topmedcheck.pl,v $
@@ -27,10 +27,9 @@ use lib (
 
 use Getopt::Long;
 use File::Basename;
-use Cwd qw(realpath abs_path);
-use My_DB;
 use Topmed::Constants qw(:states);
 use Topmed::Get;
+use Topmed::Path;
 
 #my $NOTSET = 0;                     # Not set
 #my $REQUESTED = 1;                  # Task requested
@@ -45,12 +44,10 @@ use Topmed::Get;
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
 our %opts = (
-    realm => '/usr/cluster/topmed/etc/.db_connections/topmed',
     bamfiles_table => 'bamfiles',
     centers_table => 'centers',
     runs_table => 'runs',
     gceuri => 'gs://topmed-bcf',
-    topmedpath => '/usr/cluster/topmed/bin/topmedpath.pl',
     gsutil => '/usr/bin/gsutil',
     b37gceuri => 'gs://topmed-irc-working/remapping/b37',
     gcels => '/usr/bin/gsutil ls',   # Add $opts{gceuri}/NWDxxxxxxx
@@ -80,8 +77,8 @@ if ($opts{help} || ($#ARGV<0 && (! $opts{run}) && (! $opts{center}) && (! $opts{
     exit 1;
 }
 if ($opts{redo}) { $opts{fixer} = $opts{redotool}; }
+if ($0 =~ /\/(\w+)check/) { PathInit($1); } # Set up project variables;
 
-DBConnect($opts{realm});
 
 #--------------------------------------------------------------
 #   Get list of bamids to check
@@ -109,7 +106,7 @@ if ($opts{nfsmounts}) {
         foreach my $runid (keys %{$runsref}) {
             my $sql = "SELECT bamid,expt_sampleid FROM $opts{bamfiles_table} " .
                 "WHERE runid=$runid AND state_cram=20 ORDER BY RAND() LIMIT 1";
-            my $sth = DoSQL($sql);
+            my $sth = My_DB::DoSQL($sql);
             GetArrayOfSamples($sth);
         }
     }
@@ -122,15 +119,12 @@ if ($opts{nfsmounts}) {
     my $h = `hostname`;
     chomp($h);
     foreach my $bamid (@bamidrange) {
-        my $filecmd = $opts{topmedpath} . " -raw wherefile $bamid cram ";
-        my $p = `$filecmd`;
-        chomp($p);
+        my $p = WhereFile($bamid, 'cram');
         if (! $p) {
             print "Unable to find path for cram file $bamid\n";
             next;
         }
-        my $rc = system("/usr/bin/stat $p 2>/dev/null >/dev/null");
-        if (! $rc) { $success++; next; }
+        if (-f $p) { $success++; next; }
         print "Host '$h', failed find file $p\n";
         $errs++;
     }
@@ -154,7 +148,7 @@ if (@ARGV) {                # Maybe one or a range of bamids specified
         if ($b =~ /^NWD/) { $sql .= "expt_sampleid='$b'"; }
         else { $sql .= "bamid=$b"; }
         $sql .= $morewhere;
-        my $sth = DoSQL($sql);
+        my $sth = My_DB::DoSQL($sql);
         GetArrayOfSamples($sth);
     }
 }
@@ -168,7 +162,7 @@ else {                      # Range specified by center or run
             foreach my $runid (keys %{$runsref}) {
                 my $sql = "SELECT bamid,expt_sampleid FROM $opts{bamfiles_table} " .
                     "WHERE runid=$runid AND state_cram=20" . $morewhere;
-                my $sth = DoSQL($sql);
+                my $sth = My_DB::DoSQL($sql);
                 GetArrayOfSamples($sth);
             }
         }
@@ -177,7 +171,7 @@ else {                      # Range specified by center or run
     if ($opts{run}) {
         if ($opts{run}=~/\D+/) {               # Get runid from dirname
             my $sql = "SELECT runid FROM $opts{runs_table} WHERE dirname='$opts{run}'";
-            my $sth = DoSQL($sql);
+            my $sth = My_DB::DoSQL($sql);
             if (! $sth) { die "$Script - Unknown run '$opts{run}'\n"; }
             my $href = $sth->fetchrow_hashref;
             $opts{run} = $href->{runid};
@@ -185,7 +179,7 @@ else {                      # Range specified by center or run
         #   Get bamid for this run
         my $sql = "SELECT bamid,expt_sampleid FROM $opts{bamfiles_table} " .
             "WHERE state_cram=20 AND runid=$opts{run}" . $morewhere;
-        my $sth = DoSQL($sql);
+        my $sth = My_DB::DoSQL($sql);
         GetArrayOfSamples($sth);
     }
 }
@@ -198,19 +192,23 @@ print "Checking " . scalar(@bamidrange) . " samples\n";
 #   Do varying checks over a set of bamids
 #--------------------------------------------------------------
 my %emptyok = ();                   # Cache directories with missing data
-if ($opts{db}) { 
+my $didsomething = 0;
+if ($opts{db}) {
+    $didsomething++;
     print "Verify database values\n";
     for (my $i=0; $i<=$#bamidrange; $i++) {
         Check_DB($bamidrange[$i], $nwdids[$i]);
     }
 }
 if ($opts{recabfiles}) {
+    $didsomething++;
     print "Verify remapped files GCE recabs\n";
     for (my $i=0; $i<=$#bamidrange; $i++) {
         Check_RecabFiles($bamidrange[$i], $nwdids[$i]);
     }
 }
 if ($opts{localfiles}) {
+    $didsomething++;
     print "Verify local files\n";
     for (my $i=0; $i<=$#bamidrange; $i++) {
         Check_LocalFiles($bamidrange[$i], $nwdids[$i]);
@@ -222,21 +220,25 @@ if ($opts{localfiles}) {
     }
 }
 if ($opts{gcefiles}) {
+    $didsomething++;
     print "Verify GCE files\n";
     for (my $i=0; $i<=$#bamidrange; $i++) {
         Check_GCEFiles($bamidrange[$i], $nwdids[$i]);
     }
 }
 if ($opts{awsfiles}) {
+    $didsomething++;
     print "Verify Amazon files\n";
     for (my $i=0; $i<=$#bamidrange; $i++) {
         Check_AWSFiles($bamidrange[$i], $nwdids[$i]);
     }
 }
 if ($opts{b37files}) {              # This only checks ALL b37 files
+    $didsomething++;
     Check_B37Files('', 'NWD*');
 }
 if ($opts{checkfiles}) {
+    $didsomething++;
     print "Verify the local files (md5 and flagstat) - patience!\n";
     for (my $i=0; $i<=$#bamidrange; $i++) {
         Check_Files($bamidrange[$i], $nwdids[$i]);
@@ -258,7 +260,7 @@ if ($opts{checkfiles}) {
 #$ echo $?
 #255
 
-die "$Script - Unable to figure out what to check. Try $Script -help\n";
+if (! $didsomething) { die "$Script - Unable to figure out what to check. Try $Script -help\n"; }
 exit;
 
 #==================================================================
@@ -300,7 +302,7 @@ sub Check_DB {
 
     #   Get all data for this sample
     my $sql = "SELECT * FROM $opts{bamfiles_table} WHERE bamid=$bamid";
-    my $sth = DoSQL($sql);
+    my $sth = My_DB::DoSQL($sql);
     if (! $sth) { die "$Script - Unable to get data for $sql\n"; }
     my $href = $sth->fetchrow_hashref;
     my $year = $href->{datayear};
@@ -393,18 +395,16 @@ sub Check_DB {
 sub Check_LocalFiles {
     my ($bamid, $nwdid) = @_;
     my @error = ();
-    my $filecmd = $opts{topmedpath} . " wherefile $bamid ";
 
     #   Get some data for this sample
     my $sql = "SELECT datayear,state_b37,state_b38,state_qplot FROM $opts{bamfiles_table} WHERE bamid=$bamid";
-    my $sth = DoSQL($sql);
+    my $sth = My_DB::DoSQL($sql);
     if (! $sth) { die "$Script - Unable to get data for $sql\n"; }
     my $href = $sth->fetchrow_hashref;
     my $year = $href->{datayear};
 
     #   Check original file (could be bam or cram)
-    my $f = `$filecmd bam`;
-    chomp($f);
+    my $f = WhereFile($bamid, 'bam');
     my $e = VerifyFile($f);
     if ($e) { push @error,"BAM cram/index is invalid: $e: $f"; }
     else {
@@ -412,8 +412,7 @@ sub Check_LocalFiles {
     }
     
     #   Check cram, either original file or converted from bam
-    $f = `$filecmd cram`;
-    chomp($f);
+    $f = WhereFile($bamid, 'cram');
     $e = VerifyFile($f);
     if ($e) { push @error,"CRAM index is invalid: $e: $f"; }
     else {
@@ -422,9 +421,8 @@ sub Check_LocalFiles {
 
     #   QPlot files should exist
     if ($href->{state_qplot} == $COMPLETED) {
-        $f = `$filecmd qcresults`;
+        $f = WhereFile($bamid, 'qcresults');
         if (! $f) { die "Unable to determine qcresults file for $bamid\n"; }
-        chomp($f);
         if ( -f $f ) {
             if ($opts{verbose}) { print "BAMID=$bamid NWD=$nwdid QCRESULTS OK: $f\n"; }
         }
@@ -445,8 +443,7 @@ sub Check_LocalFiles {
         push @error,"Warning: Year $year sample was not mapped for build B37";
     }
     if (0 && $href->{state_b37} == $COMPLETED) {
-        $f = `$filecmd b37`;
-        chomp($f);
+        $f = WhereFile($bamid, 'b37');
         my $e = VerifyFile($f);
         if ($e) { push @error,"B37 cram/index is invalid: $e: $f"; }
         else {
@@ -456,8 +453,7 @@ sub Check_LocalFiles {
 
     #   B38 crams must exist for all samples
     if ($href->{state_b38} == $COMPLETED) {
-        $f = `$filecmd b38`;
-        chomp($f);
+        $f = WhereFile($bamid, 'b38');
         my $e = VerifyFile($f);
         if ($e) { push @error,"B38 cram/index is invalid: $e: $f"; }
         else {
@@ -468,8 +464,7 @@ sub Check_LocalFiles {
     #   BCF must exist for all samples
     if (! defined($href->{state_gce38bcf})) { $href->{state_gce38bcf} = 0; }
     if ($href->{state_gce38bcf} == $COMPLETED) {
-        $f = `$filecmd bcf`;
-        chomp($f);
+        $f = WhereFile($bamid, 'bcf');
         my $e = VerifyFile($f);
         if ($e) { push @error,"BCF/index is invalid: $e: $f"; }
         else {
@@ -495,7 +490,7 @@ sub Check_GCEFiles {
 
     #   Do not bother if we have not copied data to GCE
     my $sql = "SELECT state_gce38copy FROM $opts{bamfiles_table} WHERE bamid=$bamid";
-    my $sth = DoSQL($sql);
+    my $sth = My_DB::DoSQL($sql);
     my $href = $sth->fetchrow_hashref;
     if ($href->{state_gce38copy} != $COMPLETED) {
         if ($opts{verbose}) { print "BAMID=$bamid NWD=$nwdid not copied to GCE yet\n"; }
@@ -544,11 +539,10 @@ sub Check_GCEFiles {
 sub Check_RecabFiles {
     my ($bamid, $nwdid) = @_;
     my @error = ();
-    my $filecmd = $opts{topmedpath} . " wherefile $bamid ";
     my $tmpfile = '/run/shm/topmedcheck.tmp';
 
     my $sql = "SELECT * FROM $opts{bamfiles_table} WHERE bamid=$bamid";
-    my $sth = DoSQL($sql);
+    my $sth = My_DB::DoSQL($sql);
     my $href = $sth->fetchrow_hashref;
 
     my ($center, $dirname) = GetCenterRun($href->{runid});
@@ -572,8 +566,7 @@ sub Check_RecabFiles {
         }
     }
 
-    my $f = `$filecmd b38`;
-    chomp($f);
+    my $f = WhereFile($bamid, 'b38');
     if (-f $f) { $summary{local_file} = 'local_exists'; }
     else { $summary{local_file} = 'local_missing'; }
 
@@ -616,7 +609,7 @@ sub Check_RecabFiles {
 sub Check_AWSFiles {
     my ($bamid, $nwdid) = @_;
     my @error = ();
-    my $filecmd = $opts{topmedpath} . " wherefile $bamid ";
+    die "$Script - this is not ready yet\n";
 
 }
 
@@ -667,7 +660,7 @@ sub Check_B37Files {
 
     #   Now get all the samples we think should be there and look for missing/extra files
     my $sql = "SELECT bamid,expt_sampleid FROM $opts{bamfiles_table} WHERE state_b37=$COMPLETED";
-    my $sth = DoSQL($sql);
+    my $sth = My_DB::DoSQL($sql);
     my $href = $sth->fetchrow_hashref;
     my $rowsofdata = $sth->rows();
     for (my $i=1; $i<$rowsofdata; $i++) {
@@ -713,13 +706,12 @@ sub Check_B37Files {
 sub Check_Files {
     my ($bamid, $nwdid) = @_;
     my @error = ();
-    my $filecmd = $opts{topmedpath} . " wherefile $bamid ";
-
+    die "$Script - this is not ready yet\n";
 }
 
 #==================================================================
 # Subroutine:
-#   GetArrayOfSamples($sth)      Follows $sth = DoSQL($sql)
+#   GetArrayOfSamples($sth)      Follows $sth = My_DB::DoSQL($sql)
 #
 #   Sets values in @bamidrange and @nwdids
 #==================================================================
@@ -795,12 +787,12 @@ sub VerifyFile {
 sub GetCenterRun {
     my ($runid) = @_;
 
-    my $sth = DoSQL("SELECT centerid,dirname FROM $opts{runs_table} WHERE runid=$runid");
+    my $sth = My_DB::DoSQL("SELECT centerid,dirname FROM $opts{runs_table} WHERE runid=$runid");
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - Run '$runid' unknown, how'd that happen?\n"; }
     my $href = $sth->fetchrow_hashref;
     my $dirname = $href->{dirname};
-    $sth = DoSQL("SELECT centername FROM $opts{centers_table} WHERE centerid=$href->{centerid}");
+    $sth = My_DB::DoSQL("SELECT centername FROM $opts{centers_table} WHERE centerid=$href->{centerid}");
     $rowsofdata = $sth->rows();
     if (! $rowsofdata) { die "$Script - Center for '$dirname', how'd that happen?\n"; }
     $href = $sth->fetchrow_hashref;
