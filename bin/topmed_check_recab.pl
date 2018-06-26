@@ -32,19 +32,55 @@
 ###################################################################
 use strict;
 use warnings;
+use FindBin qw($Bin $Script);
+use Getopt::Long;
+
+#--------------------------------------------------------------
+#   Initialization - Sort out the options and parameters
+#--------------------------------------------------------------
+our %opts = (
+    verbose => 0,
+);
+Getopt::Long::GetOptions( \%opts,qw(
+    csg
+    )) || die "$Script - Failed to parse options\n";
 
 #--------------------------------------------------------------
 #   Parse samtools header information for multiple sample ids
+#   Additionally note if we find references to paths we use
+#   when remapping -- tells us this is CRAM **WE** remapped.
 #--------------------------------------------------------------
 my %id = ();
+my $ourref = 0;
+my $ourfastq = 0;
 while (<>) {
-  chomp;
-  my $h = grep {/^SM:/} split(/\t/);
-  $id{$h} = 1;
+    chomp;
+    # Check if header contained paths we used
+    if (/\@PG/) {
+        if (/\/home\/alignment\/ref\/hs38DH.fa/) { $ourref++; }
+        if (/\/home\/alignment\/input.fastq.gz/) { $ourfastq++; }
+        next;
+    }
+    if (/^\@RG/) {
+        my $h = grep {/^SM:/} split(/\t/);
+        $id{$h} = 1;
+        next;
+    }
 }       
 
 my @samples = keys %id;
 my $n = scalar(@samples);
-if ($n == 1) { exit 0; }
-print "Incorrect number of samples found: " . join(' ', @samples) . "\n";
-exit(1);
+if ($n != 1) {
+    print "Incorrect number of samples found: " . join(' ', @samples) . "\n";
+    exit(1);
+}
+print "Sample headers looked correct\n";
+#   If parameter to pgm was 'csg', then check if this was a CSG file
+if ($opts{csg}) {
+    if ($ourref == 0 || $ourfastq == 0) {
+        print "Sample was not remapped by CSG\n";
+        exit(2);
+    }
+    print "Sample WAS remapped by CSG\n";
+}
+exit;
