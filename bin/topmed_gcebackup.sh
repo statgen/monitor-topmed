@@ -45,7 +45,7 @@ extension="${file##*.}"
 #======================================================================
 #   Backup CRAM to GCE for only datayear=3 and build=38,
 #======================================================================
-if [ "$extension" = "cram" -a "$datayear" = "3" -a "$build" = "38" ]; then
+if [ "$extension" = "cram" -a "$datayear" -ge "3" -a "$build" = "38" ]; then
   stime=`date +%s`
 
   # Start by making sure the local filesystem backup is set
