@@ -46,7 +46,7 @@ our %opts = (
     runcount => 0,
     count => 0,
     countruns => '',
-    arrivedsecs => 86400*7, # If no new bam in a week, stop looking at run
+    arrivedsecs => 86400*21,# If no new files in a bit, stop looking at run
     ignorearrived => 0,     # If set, ignored arrived database field
     verbose => 0,
 );
