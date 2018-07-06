@@ -4,8 +4,7 @@
 #
 #	Copy CRAM for a sample to Google Cloud
 #
-. /usr/cluster/topmed/bin/topmed_actions.inc
-
+. /usr/cluster/$PROJECT/bin/topmed_actions.inc
 me=gcepush
 markverb=$me
 incominguri='gs://topmed-incoming'
@@ -13,11 +12,10 @@ incominguri='gs://topmed-incoming'
 if [ "$1" = "-submit" ]; then
   shift
   bamid=`GetDB $1 bamid`
-  #MyRealHost $bamid cram
   RandomRealHost $bamid
   MayIRun $me $bamid $realhost
   timeout='2:00:00'
-  SubmitJob $bamid "topmed" '4G' "$0 $*"
+  SubmitJob $bamid $PROJECT '4G' "$0 $*"
   exit
 fi
 
@@ -57,7 +55,7 @@ fi
 
 stime=`date +%s`
 echo "Copying CRAM to $incominguri/$center/$run/$nwdid.src.cram"
-$gsutilbig cp $cramfile $incominguri/$center/$run/$nwdid.src.cram
+$gsutil cp $cramfile $incominguri/$center/$run/$nwdid.src.cram
 if [ "$?" != "0" ]; then
   Fail "Failed to copy file to GCE"
 fi

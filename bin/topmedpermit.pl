@@ -34,13 +34,14 @@ our ($DBC, $DBH);
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
+if (! -d "/usr/cluster/$ENV{PROJECT}") { die "$Script - Environment variable PROJECT '$ENV{PROJECT}' incorrect\n"; }
 our %opts = (
-    realm => '/usr/cluster/topmed/etc/.db_connections/',
+    realm => "/usr/cluster/$ENV{PROJECT}/etc/.db_connections/$ENV{PROJECT}",
     bamfiles_table => 'bamfiles',
     centers_table => 'centers',
     runs_table => 'runs',
     permissions_table => 'permissions',
-    squeuedata => '/run/shm/squeue.results',
+    squeuedata => "/run/shm/squeue.$ENV{PROJECT}.results",
     verbose => 0,
 );
 my %VALIDOPS = (                    # Used for permit
@@ -60,7 +61,6 @@ my %VALIDOPS = (                    # Used for permit
     sexpt => 1,
     sorig => 1,
 );
-if ($0 =~ /\/(\w+)permit/) { $opts{realm} .= $1; }
 
 Getopt::Long::GetOptions( \%opts,qw(
     help conf=s verbose
@@ -128,7 +128,8 @@ sub Test {
         my $opcount = 0;                # How many of these operations are queued/running anywhere
         while (<$in>) {
             my @c = split(' ', $_);
-            if ($c[1] ne 'topmed-working') { next; }
+            if ($c[1] ne 'topmed-working') { next; }    # Special topmed case
+            if ($c[1] ne $ENV{PROJECT}) { next; }
             if ($c[3] !~ /\d+-$op/) { next; }
             $opcount++;
             if ($c[9] ne $h) { next; }

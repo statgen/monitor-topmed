@@ -54,11 +54,11 @@ my %IGNORESUFFIXES = (
     'hg19.bam' => 1,
 );
 
-my $topmedbin = '/usr/cluster/topmed/bin';
+if (! -d "/usr/cluster/$ENV{PROJECT}") { die "$Script - Environment variable PROJECT '$ENV{PROJECT}' incorrect\n"; }
 my $ascphost = 'asp-um-sph@gap-submit.ncbi.nlm.nih.gov';
 our %opts = (
-    topmedcmd => "$topmedbin/topmedcmd.pl",
-    realm => '/usr/cluster/topmed/etc/.db_connections/topmed',
+    topmedcmd => "/usr/cluster/$ENV{PROJECT}/bin/topmedcmd.pl",
+    realm => "/usr/cluster/$ENV{PROJECT}/etc/.db_connections/$ENV{PROJECT}",
     ascpcmd => '/usr/cluster/bin/ascp -i /net/topmed/incoming/study.reference/send2ncbi/topmed-2-ncbi.pri -Q -l 200m -k 1 -q',
     centers_table => 'centers',
     runs_table => 'runs',
@@ -66,9 +66,9 @@ our %opts = (
     bamfiles_table => 'bamfiles',
     summary_table => 'ncbi_summary',
     summarydir => 'ncbisummaries',
-    topdir  => '/net/topmed/incoming/topmed',
+    topdir  => "/net/$ENV{PROJECT}/incoming/$ENV{PROJECT}",
     studystatusurl => 'http://www.ncbi.nlm.nih.gov/projects/gap/cgi-bin/GetSampleStatus.cgi?study_id=phs000954&rettype=xml',
-    xmlfilesdir => '/net/topmed/working/topmed-output/XMLfiles',
+    xmlfilesdir => "/net/$ENV{PROJECT}/working/$ENV{PROJECT}-output/XMLfiles",
     ascpfiles => '/net/topmed/incoming/study.reference/send2ncbi/topmed-2-ncbi.pri ' .
         '-Q -l 200m -k 1 $ascphost:outgoing/Files',
     ascpinfiles => 'outgoing/Files',

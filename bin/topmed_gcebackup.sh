@@ -4,8 +4,7 @@
 #
 #	Backup CRAM of a sample to GCE
 #
-. /usr/cluster/topmed/bin/topmed_actions.inc
-
+. /usr/cluster/$PROJECT/bin/topmed_actions.inc
 me=gcebackup
 markverb=$me
 
@@ -13,10 +12,10 @@ if [ "$1" = "-submit" ]; then
   shift
   bamid=`GetDB $1 bamid`
   RandomRealHost $bamid
-  #MyRealHost $bamid cram
+  MyRealHost $bamid cram
   MayIRun $me $bamid $realhost
   timeout='2:00:00'
-  SubmitJob $bamid "topmed" '4G' "$0 $*"
+  SubmitJob $bamid $PROJECT '4G' "$0 $*"
   exit
 fi
 
@@ -43,9 +42,10 @@ datayear=`GetDB $bamid datayear`
 build=`GetDB $bamid build`
 extension="${file##*.}"
 #======================================================================
-#   Backup CRAM to GCE for only datayear=3 and build=38,
+#   Backup CRAM to GCE for only datayear=3 and build=38
+#   Kill backups offsite until Goncalo makes a decision  7/2018
 #======================================================================
-if [ "$extension" = "cram" -a "$datayear" -ge "3" -a "$build" = "38" ]; then
+if [ "$PROJECT" = "topmedx" -a "$extension" = "cram" -a "$datayear" -ge "3" -a "$build" = "38" ]; then
   stime=`date +%s`
 
   # Start by making sure the local filesystem backup is set
@@ -60,7 +60,7 @@ if [ "$extension" = "cram" -a "$datayear" -ge "3" -a "$build" = "38" ]; then
 
   f=`basename $cramfile`
   echo "Backup of CRAM to $backupuri/$f to GCE"
-  $gsutilbig cp $cramfile $backupuri/$f
+  $gsutil cp $cramfile $backupuri/$f
   if [ "$?" != "0" ]; then
     Fail "Failed to copy file to GCE: cp $cramfile $backupuri/$f"
   fi
@@ -103,10 +103,12 @@ fi
 if [ "$extension" = "cram" ]; then
   offsite=`GetDB $bamid offsite`
   if [ "$offsite" != "D" ]; then
-    Fail "Original file was a CRAM ($bamid) but was not backed up offsite ($offsite)"
+    #Fail "Original file was a CRAM ($bamid) but was not backed up offsite ($offsite)"
+    echo "Original file was a CRAM ($bamid) but was not backed up offsite ($offsite), but who cares?"
+  else
+    echo "Original CRAM was backed up offsite"
   fi
-  echo "Original CRAM was backed up offsite"
-
+  
   cramdir=`$topmedpath wherepath $bamid cram`
   if [ "$cramdir" = "" ]; then
     Fail "Unable to determine backup directory for '$bamid'"
@@ -119,8 +121,10 @@ if [ "$extension" = "cram" ]; then
   fi
   cramfile=`$topmedpath wherefile $bamid cram`
   newname=`basename $cramfile`
-  ln -sf $bamfile $newname        # Create backup file as symlink in case of screwy names
-  ln -sf $bamfile.crai $newname.crai
+  if [ "$cramfile" != "$newname" ]; then
+    ln -sf $bamfile $newname        # Create backup file as symlink in case of screwy names
+    ln -sf $bamfile.crai $newname.crai
+  fi
   if [ ! -f $newname ]; then
     Fail "Unable to create backup file '$newname' in '$cramdir'"
   fi

@@ -5,8 +5,7 @@
 #	Copy files from local storage to a GCE SHARE bucket for GCE processing
 #   This is not the same as copying to gs://topmed-bcf or other of OUR buckets
 #
-. /usr/cluster/topmed/bin/topmed_actions.inc
-
+. /usr/cluster/$PROJECT/bin/topmed_actions.inc
 me=gcecopy
 markverb=$me
 
@@ -17,7 +16,7 @@ if [ "$1" = "-submit" ]; then
   #MyRealHost $bamid b$build
   MayIRun $me $bamid $realhost
   timeout='2:00:00'
-  SubmitJob $bamid "topmed" '3G' "$0 $*"
+  SubmitJob $bamid $PROJECT '3G' "$0 $*"
   exit
 fi
 

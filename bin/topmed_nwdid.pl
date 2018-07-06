@@ -22,8 +22,6 @@ use lib (
   qq($FindBin::Bin/../lib),
   qq($FindBin::Bin/../lib/perl5),
   qq($FindBin::Bin/../local/lib/perl5),
-  qq(/usr/cluster/topmed/lib/perl5),
-  qq(/usr/cluster/topmed/local/lib/perl5),
 );
 use Getopt::Long;
 use File::Basename;
@@ -31,27 +29,20 @@ use File::Basename;
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
+if (! -d "/usr/cluster/$ENV{PROJECT}") { die "$Script - Environment variable PROJECT '$ENV{PROJECT}' incorrect\n"; }
 our %opts = (
     samtools => '/usr/cluster/bin/samtools',
-    lookuptable => '/net/topmed/incoming/study.reference/study.reference/lookup.table.tab',
-    topdir => '/net/topmed/incoming/',
-    qcresults => '/net/',
+    lookuptable => "/net/$ENV{PROJECT}/incoming/study.reference/study.reference/lookup.table.tab",
+    topdir => "/net/$ENV{PROJECT}/incoming/$ENV{PROJECT}",
+    qcresults => "/net/$ENV{PROJECT}",
     topmedcmd => '/usr/cluster/',
+    consoledir => "$ENV{PROJECT}/incoming/qc.results",
     nominal_awk => $Bin . '/topmed_get_nominal.awk',
+    topmedcmd => $Bin . '/topmedcmd.pl',
+    pi_name => $ENV{PROJECT},               # Default values if no lookuptable
+    studyname => $ENV{PROJECT},
     verbose => 0,
 );
-if ($0 =~ /\/(\w+)_nwd/) {
-    my $x = $1;
-    $opts{topdir} .= $x;
-    $opts{qcresults} .= $x;
-    $opts{consoledir} .= $x . '/incoming/qc.results';
-    $opts{topmedcmd} .= $x . "/bin/${x}cmd.pl";
-    #   Topmed has a way to determine the studyname. Others? not so sure
-    $opts{pi_name} = $x;
-    $opts{studyname} = $x;
-#    $opts{lookuptable} = 'This is for topmed only';
-}
-
 Getopt::Long::GetOptions( \%opts,qw(
     help verbose bamid=s nonwdid
     )) || die "Failed to parse options\n";
@@ -67,6 +58,8 @@ if ($#ARGV < 0 || $opts{help}) {
 }
 my $bamfile = shift @ARGV;
 if ($bamfile !~ /^\//) { die "The path to the bamfile '$bamfile' must begin with '/'\n"; }
+
+if ($ENV{PROJECT} ne 'topmed') { $opts{nonwdid} = 1; }  # Avoid QC Results hook
 
 #--------------------------------------------------------------
 #   samtools view -H filename.bam` returns between 100 and 200
@@ -136,22 +129,19 @@ if (! $base_coord) { die "BAM '$bamfile' base_coord missing\n  CMD=$cmd/n"; }
 #   In the lookup.table.tab file, get the fields "PI_NAME" and
 #   "STUDY" (columns 4 and 5) from the line whose first column
 #   matches the value of "SM:"
+#
+#   Some projects might need to default these values
 #--------------------------------------------------------------
-my ($pi_name, $study);
-if ($opts{pi_name} eq 'inpsyght') {     # Special hack for other projects
-    ($pi_name, $study) = ($opts{pi_name}, $opts{pi_name});
-}
-else {
-    open(IN,$opts{lookuptable}) ||
-        die "Unable to open file '$opts{lookuptable}': $!\n";
-    while (<IN>) {
+my ($pi_name, $study, $in);
+if (open($in,$opts{lookuptable})) {
+    while (<$in>) {
         if (! /^$smvalue/) { next; }
         my @cols = split(' ',$_);
         $pi_name = $cols[3];
         $study = $cols[4];
         last;
     }
-    close(IN);
+    close($in);
 
     #   For now, any file whose "SM:" value begins with "LP600"
     #   is a special case until they get their act together.
@@ -161,6 +151,10 @@ else {
     }
     if (! $study) { die "Unable to find study for '$smvalue' in '$opts{lookuptable}'\n"; }
     if (! $pi_name) { die "Unable to find pi_name for '$smvalue' in '$opts{lookuptable}'\n"; }
+}
+else {
+    warn "Unable to open lookuptable '$opts{lookuptable}'. Using default values\n";
+    ($pi_name, $study) = ($opts{pi_name}, $opts{studyname});
 }
 
 #--------------------------------------------------------------

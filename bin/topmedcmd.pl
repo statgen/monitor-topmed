@@ -22,8 +22,7 @@ use lib (
   qq($FindBin::Bin/../lib),
   qq($FindBin::Bin/../lib/perl5),
   qq($FindBin::Bin/../local/lib/perl5),
-  qq(/usr/cluster/topmed/lib/perl5),
-  qq(/usr/cluster/topmed/local/lib/perl5),
+  qq(/usr/cluster/topmed/lib/perl5),            # So we can run from /tmp
 );
 
 use Getopt::Long;
@@ -85,33 +84,30 @@ my %VALIDSTATUS = (                 # Valid status for the verbs
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
 our %opts = (
-    realm => '/usr/cluster/topmed/etc/.db_connections/',
     bamfiles_table => 'bamfiles',
     centers_table => 'centers',
     permissions_table => 'permissions',
     runs_table => 'runs',
-    netdir => '/net/',
-    backupsdir => 'working/backups/incoming/',
-    ascpcmd => "/usr/cluster/bin/ascp -i ".
-        "/net/topmed/incoming/study.reference/send2ncbi/topmed-2-ncbi.pri -l 800M -k 1",
     ascpdest => 'asp-um-sph@gap-submit.ncbi.nlm.nih.gov:protected',    
     verbose => 0,
 );
-if ($0 =~ /\/(\w+)cmd/) {
-    my $x = $1;
-    $opts{realm} .= $x;
-    $opts{netdir} .= $x;
-    $opts{backupsdir} .= $x;
-#    $opts{ascpcmd} .= $x;                   # This is wrong, only topmed
-}
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help verbose with-id|bamid emsg=s
+    help verbose with-id|bamid emsg=s project=s
     )) || die "$Script - Failed to parse options\n";
+#   Non-typical code for PROJECT so non-project IDs can easily use this
+if ($opts{project}) { $ENV{PROJECT} = $opts{project}; }
+else {
+    if (! exists($ENV{PROJECT})) { $ENV{PROJECT} = 'noproject'; }
+}
+if (! -d "/usr/cluster/$ENV{PROJECT}") {
+   die "$Script - Environment variable PROJECT '$ENV{PROJECT}' incorrect\n";
+}
+$opts{realm} = "/usr/cluster/$ENV{PROJECT}/etc/.db_connections/$ENV{PROJECT}";
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    my $m = "$Script [options] ";
+    my $m = "$Script [-p project] [options] ";
     my $verbs = join(' ', sort keys %VALIDVERBS);
     my $requests = join(' ', sort keys %VALIDSTATUS);
     warn "$m mark bamid|nwdid action newstatus\n" .
@@ -335,8 +331,11 @@ sub WhatRun {
 #==================================================================
 sub Send2NCBI {
     my ($files) = @_;
+    my $ascpcmd = "/usr/cluster/bin/ascp -i " .
+        "/net/$ENV{PROJECT}/incoming/study.reference/send2ncbi/$ENV{PROJECT}-2-ncbi.pri " .
+        "-l 800M -k 1";
 
-    my $cmd = "$opts{ascpcmd} $files $opts{ascpdest}";
+    my $cmd = "$ascpcmd $files $opts{ascpdest}";
     my $errs = "/tmp/Send2NCBI.$$";
     foreach (1 .. 10) {             # Keep trying for auth errors
         my $rc = system("$cmd 2> $errs");
@@ -629,7 +628,7 @@ topmedcmd.pl - Update the database for NHLBI TopMed
   topmedcmd.pl set NWD123433 jobidqplot 123445    # Set jobidqplot in bamfiles
   topmedcmd.pl set 2016apr20 offsite N     # Set 2016apr20 in runs
 
-  topmedcmd.pl show 2199 state_cram        # Show a column
+  topmedcmd.pl -proj MYPROJ show 2199 state_cram        # Show a column
   topmedcmd.pl show 2199 center            # Show center 
   topmedcmd.pl show NWD00234 run           # Show run
   topmedcmd.pl show 2016apr20 offsite      # Show offsite for run
@@ -651,6 +650,11 @@ topmedcmd.pl - Update the database for NHLBI TopMed
 
 This program supports simple commands to set key elements of the NHLBI database.
 The queue of tasks is kept in a MySQL database.
+
+This program requires you to provide the project name (lower case) as either
+environment variable or with the option B<-project>.
+Projects must have a directory as /usr/cluster/projectname.
+
 See B<perldoc DBIx::Connector> for details defining the database.
 
 Functions wherefile, wherepath and whathost were moved into topmedpath.pl.
@@ -670,6 +674,11 @@ Prints B<string> to STDOUT and saves it in the database.
 =item B<-help>
 
 Generates this output.
+
+=item B<-project projectname>
+
+Allows one to specify the project to work on. You must specify this option
+or set the environment variable B<PROJECT}.
 
 =item B<-with-bamid>
 

@@ -5,7 +5,7 @@
 #	Verify the MD5 checksum for a BAM file
 #   Do not specify a QOS for verify so it runs before QPLOT
 #
-. /usr/cluster/topmed/bin/topmed_actions.inc
+. /usr/cluster/$PROJECT/bin/topmed_actions.inc
 me=verify
 markverb=$me
 
@@ -15,7 +15,7 @@ if [ "$1" = "-submit" ]; then
   RandomRealHost $bamid
   MayIRun $me $bamid $realhost
   timeout='4:00:00'
-  SubmitJob $bamid "topmed" '4G' "$0 $*"
+  SubmitJob $bamid $PROJECT '4G' "$0 $*"
   exit
 fi
 
@@ -32,19 +32,27 @@ bamfile=`$topmedpath wherefile $bamid bam`
 
 Started
 
-#   Verify the MD5
+#   Verify the MD5 - special case, if md5 is all zeroes, we use what we calculate
 stime=`date +%s`
 tmpfile=/run/shm/$$.md5
-echo "$checksum  $bamfile" > $tmpfile
-md5sum -c $tmpfile
-rc=$?
+if [ "$checksum" = "00000000000000000000000000000000" ]; then
+  sum=`md5sum $bamfile`
+  if [ "$sum" = "" ]; then
+    Fail "MD5sum calculation failed"
+  fi
+  SetDB $bamid checksum ${sum[0]}
+  echo "Checksum forced to ${sum[0]}"
+else  
+  echo "$checksum  $bamfile" > $tmpfile
+  md5sum -c $tmpfile
+  if [ "$?" != "0" ]; then
+    Fail "MD5sum failed"
+  fi
+  rm -f $tmpfile
+fi
 etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "MD5SUM  completed in $etime seconds"
-rm -f $tmpfile
-if [ "$rc" != "0" ]; then
-  Fail "MD5sum failed"
-fi
 
 #   Set bamsize again to be sure
 sz=`ls -L -l $bamfile | awk '{print $5}'`

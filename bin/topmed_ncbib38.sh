@@ -4,9 +4,9 @@
 #
 #	Send the proper set of files to NCBI for the remapped bam build 38
 #
-. /usr/cluster/topmed/bin/topmed_actions.inc
+. /usr/cluster/$PROJECT/bin/topmed_actions.inc
 ascpcmd="$topmedcmd send2ncbi"
-topmedxml="/usr/cluster/topmed/bin/topmed_xml.pl"
+topmedxml="/usr/cluster/$PROJECT/bin/topmed_xml.pl"
 
 me=ncbib38
 markverb=$me

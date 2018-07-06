@@ -4,8 +4,8 @@
 #
 #	Copy remapped CRAM for a sample from GCE
 #
-. /usr/cluster/topmed/bin/topmed_actions.inc
-topmed_check_recab=/usr/cluster/topmed/bin/topmed_check_recab.pl
+. /usr/cluster/$PROJECT/bin/topmed_actions.inc
+topmed_check_recab=/usr/cluster/$PROJECT/bin/topmed_check_recab.pl
 
 me=gcepull
 markverb=$me
@@ -16,7 +16,7 @@ if [ "$1" = "-submit" ]; then
   MyRealHost $bamid b$build
   MayIRun $me $bamid $realhost
   timeout='4:00:00'
-  SubmitJob $bamid "topmed" '4G' "$0 $*"
+  SubmitJob $bamid $PROJECT '4G' "$0 $*"
   exit
 fi
 
@@ -47,7 +47,6 @@ if [ "$?" != "0" ]; then
 fi
 
 Started
-nwdid=`GetNWDID $bamid`
 cramfile=$crampath/$nwdid.recab.cram
 
 #======================================================================

@@ -4,8 +4,7 @@
 #
 #	Copy files from local storage to AWS for release to the world
 #
-
-. /usr/cluster/topmed/bin/topmed_actions.inc
+. /usr/cluster/$PROJECT/bin/topmed_actions.inc
 aws="/usr/local/bin/aws --profile nhlbi-data-commons s3"
 me=awscopy
 markverb=$me
@@ -33,7 +32,7 @@ if [ "$1" = "-submit" ]; then
   #MyRealHost $bamid b$build
   MayIRun $me $bamid $realhost
   timeout='2:00:00'
-  SubmitJob $bamid "topmed" '2G' "$0 $*"
+  SubmitJob $bamid $PROJECT '2G' "$0 $*"
   exit
 fi
 

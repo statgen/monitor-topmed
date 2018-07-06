@@ -45,8 +45,9 @@ my $xmlns_url = "xmlns:xsi = \"http://www.w3.org/2001/XMLSchema-instance\"\n" .
             "trunk/sra/doc/SRA_1-5/SRA";
 my $incomingdir = '/net/topmed/incoming';
 my $topmed = '/net/topmed';
+if (! -d "/usr/cluster/$ENV{PROJECT}") { die "$Script - Environment variable PROJECT '$ENV{PROJECT}' incorrect\n"; }
 our %opts = (
-    realm => '/usr/cluster/topmed/etc/.db_connections/topmed',
+    realm => "/usr/cluster/$ENV{PROJECT}/etc/.db_connections/$ENV{PROJECT}",
     centers_table => 'centers',
     runs_table => 'runs',
     bamfiles_table => 'bamfiles',

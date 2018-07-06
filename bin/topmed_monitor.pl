@@ -23,15 +23,12 @@ use lib (
   qq($FindBin::Bin/../lib),
   qq($FindBin::Bin/../lib/perl5),
   qq($FindBin::Bin/../local/lib/perl5),
-  qq(/usr/cluster/topmed/lib/perl5),
-  qq(/usr/cluster/topmed/local/lib/perl5),
 );
 use My_DB;
 use Getopt::Long;
 
-use Cwd qw(realpath abs_path);
 use Fcntl ':flock';
-use POSIX qw(strftime tmpnam);
+use POSIX qw(strftime);
 
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
@@ -46,41 +43,35 @@ my $CANCELLED = 89;           # Task cancelled
 my $FAILEDCHECKSUM = 98;      # Task failed, because checksum at NCBI bad
 my $FAILED    = 99;           # Task failed
 
-my $topmedbin = '/usr/cluster/topmed/bin';
+if (! -d "/usr/cluster/$ENV{PROJECT}") { die "$Script - Environment variable PROJECT '$ENV{PROJECT}' incorrect\n"; }
 our %opts = (
-    topmedcmd => "$topmedbin/topmedcmd.pl",
-    topmedarrive => "$topmedbin/topmed_arrive.sh",
-    topmedverify => "$topmedbin/topmed_verify.sh",
-    topmedbackup => "$topmedbin/topmed_gcebackup.sh",
-    topmedcram   => "$topmedbin/topmed_cram.sh",
-    topmedqplot  => "$topmedbin/topmed_qplot.sh",
-    topmedexpt  => "$topmedbin/topmed_ncbiexpt.sh",
-    topmedncbiorig => "$topmedbin/topmed_ncbiorig.sh",
-    topmedncbib37 => "$topmedbin/topmed_ncbib37.sh",
-    topmedncbib38 => "$topmedbin/topmed_ncbib38.sh",
-    topmedgce38push => "$topmedbin/topmed_gcepush.sh",
-    topmedgce38pull => "$topmedbin/topmed_gcepull.sh",
-    topmedgce38post => "$topmedbin/topmed_gcepost.sh",
-    topmedgce38bcfpush => "$topmedbin/topmed_gcebcfpush.sh",
-    topmedgce38bcfpull => "$topmedbin/topmed_gcebcfpull.sh",
-    topmedgcecopy => "$topmedbin/topmed_gcecopy.sh",
-    topmedgcecpbcf => "$topmedbin/topmed_gcecpbcf.sh",
-    topmedawscopy => "$topmedbin/topmed_awscopy.sh",
-    topmedfix => "$topmedbin/topmed_fix.sh",
-    topmedbcf  => "$topmedbin/topmed_bcf.sh",
-    topmedxml    => "$topmedbin/topmed_xml.pl",
-    netdir => '/net/topmed',
-    incomingdir => 'incoming/topmed',
-    realm => '/usr/cluster/topmed/etc/.db_connections/topmed',
+    realm => "/usr/cluster/$ENV{PROJECT}/etc/.db_connections/$ENV{PROJECT}",
+    topmedcmd => $Bin . "/topmedcmd.pl",
+    topmedarrive => $Bin . "/topmed_arrive.sh",
+    topmedverify => $Bin . "/topmed_verify.sh",
+    topmedbackup => $Bin . "/topmed_gcebackup.sh",
+    topmedcram   => $Bin . "/topmed_cram.sh",
+    topmedqplot  => $Bin . "/topmed_qplot.sh",
+    topmedexpt  => $Bin . "/topmed_ncbiexpt.sh",
+    topmedncbiorig => $Bin . "/topmed_ncbiorig.sh",
+    topmedncbib37 => $Bin . "/topmed_ncbib37.sh",
+    topmedncbib38 => $Bin . "/topmed_ncbib38.sh",
+    topmedgce38push => $Bin . "/topmed_gcepush.sh",
+    topmedgce38pull => $Bin . "/topmed_gcepull.sh",
+    topmedgce38post => $Bin . "/topmed_gcepost.sh",
+    topmedgcecopy => $Bin . "/topmed_gcecopy.sh",
+    topmedgcecpbcf => $Bin . "/topmed_gcecpbcf.sh",
+    topmedawscopy => $Bin . "/topmed_awscopy.sh",
+    topmedfix => $Bin . "/topmed_fix.sh",
+    topmedbcf  => $Bin . "/topmed_bcf.sh",
+    topmedxml    => $Bin . "/topmed_xml.pl",
     centers_table => 'centers',
     runs_table => 'runs',
     studies_table => 'studies',
     bamfiles_table => 'bamfiles',
-    topdir => '/net/topmed/incoming/topmed',
-    backupdir => '/working/backups/incoming/topmed',
-    resultsdir => '/incoming/qc.results',    
+    topdir => "/net/$ENV{PROJECT}/incoming/$ENV{PROJECT}",
     submitlog => '/tmp/batchsubmit.log',
-    consoledir => '/net/topmed/working/topmed-output',
+    consoledir => "/net/$ENV{PROJECT}/working/$ENV{PROJECT}-output",
     dryrun => 0,
     verbose => 0,
     maxjobs => 100,
@@ -150,16 +141,13 @@ if ($fcn eq 'arrive') {
             my $f = $opts{topdir} . "/$href->{centername}/$href->{dirname}/" . $href->{bamname};
             my @stats = stat($f);
             if (! @stats) { next; }     # No real data
-            #   Check ownership of run. Things break if now owned by topmed
+            #   Check ownership of run. Things break if not owned by real owner
             my $owner = getpwuid($stats[4]);
-            my $gid = $stats[5];
-            if ($owner ne 'topmed' || $gid ne '2307982') {
-                print "$nowdate Ignoring run '$runsref->{$runid}' owned by $owner/$gid\n";
+            if ($owner ne $ENV{PROJECT}) {
+                print "$nowdate Ignoring run '$runsref->{$runid}' owned by $owner\n";
             }
             #   See if we should mark this as arrived
-            #   All BAMs must start with NWD. Only skip this if the BAM name
-            #   is NWD and it is marked as completed
-            if ($href->{bamname} =~ /^NWD/ && $href->{state_arrive} == $COMPLETED) { next; }
+            if ($href->{state_arrive} == $COMPLETED) { next; }
             #   If the mtime on the file is very recent, it might still be coming
             if ((time() - $stats[9]) < 3600) { next; }  # Catch it next time
             #   Run the command

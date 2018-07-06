@@ -4,8 +4,7 @@
 #
 #	Create BCF file for a remapped CRAM
 #
-. /usr/cluster/topmed/bin/topmed_actions.inc
-
+. /usr/cluster/$PROJECT/bin/topmed_actions.inc
 me=bcf
 markverb=$me
 
@@ -36,7 +35,7 @@ if [ "$1" = "-submit" ]; then
   RandomRealHost $bamid
   MayIRun $me $bamid $realhost
   timeout='8:00:00'
-  SubmitJob $bamid "topmed" $mem "$0 $*"
+  SubmitJob $bamid $PROJECT $mem "$0 $*"
   exit
 fi
 
@@ -50,6 +49,9 @@ fi
 bamid=$1
 nwdid=`GetNWDID $bamid`
 bamid=`GetDB $nwdid bamid`
+if [ "$PROJECT" = "inpsyght" ]; then        # Special hack to overwhelm bug
+  bm=/usr/cluster/topmed/bin/bam
+fi
 
 Started
 stime=`date +%s`

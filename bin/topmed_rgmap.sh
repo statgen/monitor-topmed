@@ -4,7 +4,7 @@
 #
 #	RG headers in remapped cram are wrong, rebuild fixed cram
 #
-. /usr/cluster/topmed/bin/topmed_actions.inc
+. /usr/cluster/$PROJECT/bin/topmed_actions.inc
 me=rgmap
 markverb=''                 # Avoids setting database unless provided by
 

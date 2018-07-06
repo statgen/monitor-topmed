@@ -24,8 +24,6 @@ use lib (
   qq($FindBin::Bin/../lib),
   qq($FindBin::Bin/../lib/perl5),
   qq($FindBin::Bin/../local/lib/perl5),
-  qq(/usr/cluster/topmed/lib/perl5),
-  qq(/usr/cluster/topmed/local/lib/perl5),
 );
 
 use Getopt::Long;
@@ -34,18 +32,18 @@ use My_DB;
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
+if (! -d "/usr/cluster/$ENV{PROJECT}") { die "$Script - Environment variable PROJECT '$ENV{PROJECT}' incorrect\n"; }
 our %opts = (
-    realm => '/usr/cluster/topmed/etc/.db_connections/topmed',
+    realm => "/usr/cluster/$ENV{PROJECT}/etc/.db_connections/$ENV{PROJECT}",
     bamfiles_table => 'bamfiles',
     runs_table => 'runs',
-    conf => "$Bin/../etc/topmedthrottle.conf",
+    conf => "$Bin/../etc/$ENV{PROJECT}throttle.conf",
     topmedsummary => '/run/shm/Slurm.summary',
-    topmedcluster => '/usr/cluster/topmed/bin/topmedcluster.pl summary',
-    topmedmonitor => '/usr/cluster/topmed/bin/topmed_monitor.pl',
-    newcache => '/usr/cluster/topmed/bin/topmedcluster.pl newcache',
+    topmedcluster => $Bin . '/topmedcluster.pl summary',
+    topmedmonitor => $Bin . '/topmed_monitor.pl',
+    newcache => $Bin . '/topmedcluster.pl newcache',
     verbose => 0,
 );
-
 Getopt::Long::GetOptions( \%opts,qw(
     help verbose conf=s dry-run action=s
     )) || die "$Script - Failed to parse options\n";
@@ -72,7 +70,7 @@ exit;
 # Subroutine:
 #   SubmitJobs()
 #
-#   Print summary of topmed-related jobs
+#   Print summary of project related jobs
 #==================================================================
 sub SubmitJobs {
     #my ($p1, $p2) = @_;

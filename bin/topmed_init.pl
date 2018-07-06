@@ -23,8 +23,6 @@ use lib (
   qq($FindBin::Bin/../lib),
   qq($FindBin::Bin/../lib/perl5),
   qq($FindBin::Bin/../local/lib/perl5),
-  qq(/usr/cluster/topmed/lib/perl5),
-  qq(/usr/cluster/topmed/local/lib/perl5),
 );
 use My_DB;
 use Topmed::Get;
@@ -36,13 +34,14 @@ use File::Basename;
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
-my $NOTSET    = 0;          # Not set
+if (! -d "/usr/cluster/$ENV{PROJECT}") { die "$Script - Environment variable PROJECT '$ENV{PROJECT}' incorrect\n"; }
+my $NOTSET = 0;
 our %opts = (
-    realm => '/usr/cluster/topmed/etc/.db_connections/',
+    realm => "/usr/cluster/$ENV{PROJECT}/etc/.db_connections/$ENV{PROJECT}",
     centers_table => 'centers',
     runs_table => 'runs',
     bamfiles_table => 'bamfiles',
-    topdir => '/net/topmed/incoming/topmed',
+    topdir => "/net/$ENV{PROJECT}/incoming/$ENV{PROJECT}",
     runcount => 0,
     count => 0,
     countruns => '',
@@ -50,13 +49,6 @@ our %opts = (
     ignorearrived => 0,     # If set, ignored arrived database field
     verbose => 0,
 );
-if ($0 =~ /\/(\w+)_/) {
-    my $p = $1;
-    if ($p =~ /inpsy/) { $p = 'inpsyght'; }
-    $opts{realm} .= $p;
-    $opts{topdir} = "/net/$p/incoming/$p";
-}
-
 Getopt::Long::GetOptions( \%opts,qw(
     help realm=s verbose center=s run=s ignorearrived
     )) || die "Failed to parse options\n";

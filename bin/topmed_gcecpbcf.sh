@@ -4,8 +4,7 @@
 #
 #	Copy bcf files from local storage to a GCE bucket
 #
-. /usr/cluster/topmed/bin/topmed_actions.inc
-
+. /usr/cluster/$PROJECT/bin/topmed_actions.inc
 me=gcecpbcf
 markverb=$me
 
@@ -15,7 +14,7 @@ if [ "$1" = "-submit" ]; then
   RandomRealHost $bamid
   MayIRun $me $bamid $realhost
   timeout='2:00:00'
-  SubmitJob $bamid "topmed" '3G' "$0 $*"
+  SubmitJob $bamid $PROJECT '3G' "$0 $*"
   exit
 fi
 

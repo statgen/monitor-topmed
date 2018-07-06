@@ -4,8 +4,7 @@
 #
 #	Convert the original BAM to a CRAM
 #
-. /usr/cluster/topmed/bin/topmed_actions.inc
-
+. /usr/cluster/$PROJECT/bin/topmed_actions.inc
 ref=/net/mario/gotcloud/gotcloud.ref/hs37d5.fa
 illuminaref=/net/topmed/incoming/study.reference/study.reference/illumina.hg19.fa
 
@@ -26,7 +25,7 @@ if [ "$1" = "-submit" ]; then
   if [ $qual -le 11 ]; then
     sq='-squeezed'
   fi
-  SubmitJob $bamid "topmed" '8G' "$0 $sq $*"
+  SubmitJob $bamid $PROJECT '8G' "$0 $sq $*"
   exit
 fi
 
@@ -64,12 +63,12 @@ if [ "$extension" = "cram" ]; then
     center=`GetDB $bamid center`
     run=`GetDB $bamid run`
     #   Go to where backups directory for this run should be
-    d=/net/topmed/working/backups/incoming/topmed/$center
+    d=/net/$PROJECT/working/backups/incoming/$PROJECT/$center
     cd $d
     if [ "$?" != "0" ];  then
       Fail "Unable to CD to CRAM directory $d" 
     fi
-    #   Get home of original source files  (e.g. /net/topmed/incoming/topmed/...)
+    #   Get home of original source files  (e.g. /net/$PROJECT/incoming/$PROJECT/...)
     #   Now make the /net be relative so it could work in FLUX someday
     bdir=`$topmedpath wherepath $bamid bam | sed -e 's:/net:../../../../../..:'`
     ln -s $bdir .

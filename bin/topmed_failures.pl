@@ -36,15 +36,15 @@ use POSIX qw(strftime);
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
-my $topmedbin = '/usr/cluster/topmed/bin';
+if (! -d "/usr/cluster/$ENV{PROJECT}") { die "$Script - Environment variable PROJECT '$ENV{PROJECT}' incorrect\n"; }
 our %opts = (
-    topmedcmd => "$topmedbin/topmedcmd.pl",
+    topmedcmd => "/usr/cluster/$ENV{PROJECT}/bin/topmedcmd.pl",
     sacct => '/usr/cluster/bin/sacct',
-    realm => '/usr/cluster/topmed/etc/.db_connections/topmed',
+    realm => "/usr/cluster/$ENV{PROJECT}/etc/.db_connections/$ENV{PROJECT}",
     centers_table => 'centers',
     runs_table => 'runs',
     bamfiles_table => 'bamfiles',
-    outdir => '/net/topmed/working/topmed-output',
+    outdir => "/net/$ENV{PROJECT}/working/$ENV{PROJECT}-output",
     verbose => 0,                       # Must be defined for My_DB
 );
 

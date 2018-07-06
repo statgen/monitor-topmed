@@ -26,8 +26,6 @@ use lib (
   qq($FindBin::Bin/../lib),
   qq($FindBin::Bin/../lib/perl5),
   qq($FindBin::Bin/../local/lib/perl5),
-  qq(/usr/cluster/topmed/lib/perl5),
-  qq(/usr/cluster/topmed/local/lib/perl5),
 );
 
 use Getopt::Long;
@@ -36,20 +34,23 @@ use My_DB;
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
+if (! -d "/usr/cluster/$ENV{PROJECT}") { die "$Script - Environment variable PROJECT '$ENV{PROJECT}' incorrect\n"; }
 our %opts = (
-    realm => '/usr/cluster/topmed/etc/.db_connections/topmed',
-    netdir => '/net/topmed',
+    realm => "/usr/cluster/$ENV{PROJECT}/etc/.db_connections/$ENV{PROJECT}",
+    netdir => "/net/$ENV{PROJECT}",
     bamfiles_table => 'bamfiles',
     runs_table => 'runs',
-    squeuecmd => "/usr/cluster/bin/squeue -a -o '%.9i %.15P %.18q %.18j %.8u %.2t %.8M %.6D %R %.9n' -p topmed-working",
+    squeuecmd => "/usr/cluster/bin/squeue -a -o '%.9i %.15P %.18q %.18j %.8u %.2t %.8M %.6D %R %.9n' -p ",
     maxlongjobs => 6,
-    conf => "/usr/cluster/topmed/etc/topmedthrottle.conf",
-    consoledir => 'working/topmed-output',
-    squeuefile => '/run/shm/squeue.results',
+    conf => "/usr/cluster/$ENV{PROJECT}/etc/topmedthrottle.conf",
+    consoledir => "working/$ENV{PROJECT}-output",
+    squeuefile => '/run/shm/squeue.$ENV{PROJECT}.results',
     verbose => 0,
     squeuefiletime => 30,               # Refresh file if older than this seconds
 );
-
+#   Special hack needed because of inconsistent naming conventions
+if ($ENV{PROJECT} eq 'topmed') { $opts{squeuecmd} .= 'topmed-working'; }
+else {$opts{squeuecmd} .= $ENV{PROJECT}; }
 Getopt::Long::GetOptions( \%opts,qw(
     help verbose maxlongjobs=i force
     )) || die "$Script - Failed to parse options\n";
@@ -165,7 +166,7 @@ sub Summary {
     foreach my $l (@squeuelines) {
         my @c = split(' ', $l);
         #   Should be none of these, but if so, we want to know about it
-        if ($c[4] ne 'topmed') { next; }    # Only interested in my jobs
+        if ($c[4] ne $ENV{PROJECT}) { next; }    # Only interested in my jobs
         if ($c[5] eq 'PD') {        # Queued
             if ($c[3] =~ /\d+-([a-z]+)/) {
                 my $act = $1;
@@ -202,7 +203,7 @@ sub Summary {
 # Subroutine:
 #   SQueue()
 #
-#   Print summary of topmed-related jobs
+#   Print summary of my-related jobs
 #==================================================================
 sub SQueue {
     #my ($bamid, $set) = @_;
@@ -220,11 +221,11 @@ sub SQueue {
     foreach my $l (@squeuelines) {
         my @c = split(' ', $l);
         #   Should be none of these, but if so, we want to know about it
-        if ($c[1] eq 'nomosix' && $c[8] =~ /topmed/) {    # nomosix on topmed node
+        if ($c[1] eq 'nomosix' && $c[8] =~ /$ENV{PROJECT}/) {    # nomosix on my node
             $mosixrunning{$c[4]}++;    # Count of running jobs for this user
             next;
         }
-        if ($c[4] ne 'topmed') {            # Save partition and not topmed user
+        if ($c[4] ne $ENV{PROJECT}) {  # Save partition and not my user
             $nottopmed{$c[1]}{$c[4]}++;
             next;
         }
@@ -314,7 +315,7 @@ sub SQueue {
     print "\n";
     if (%mosixrunning) {
         my $format = "    %-8s  %s\n";
-        print "  Partition nomosix jobs on topmed hosts:\n";
+        print "  Partition nomosix jobs on $ENV{PROJECT} hosts:\n";
         printf ($format, 'User', 'Job count');
         foreach my $u (sort keys %mosixrunning) {
             printf($format, $u, "  [" . $mosixrunning{$u} . '] ');
@@ -356,7 +357,7 @@ sub SQueue {
     #   Get summary of IO data for key nodes
     my @iostatinfo = ();
     if (opendir(my $dh, "$opts{netdir}/$opts{consoledir}")) {
-        @iostatinfo = sort sorthost grep { /iostat.topmed\d*.txt/ } readdir($dh);
+        @iostatinfo = sort sorthost grep { /iostat.$ENV{PROJECT}\d*.txt/ } readdir($dh);
         closedir $dh;
         my $in;
         my $prefix = ' ' x 12;
@@ -368,7 +369,7 @@ sub SQueue {
         foreach my $f (@iostatinfo) {
             my $host = $prefix;
             if (open($in,"$opts{netdir}/$opts{consoledir}/$f")) {
-                if ($f =~ /(topmed\d*)/) { $host = sprintf('%-12s', $1); }
+                if ($f =~ /($ENV{PROJECT}\d*)/) { $host = sprintf('%-12s', $1); }
                 #   Linux 4.2.0-42-generic (topmed) 	02/10/2017 	_x86_64_	(120 CPU)
                 #
                 #   avg-cpu:  %user   %nice %system %iowait  %steal   %idle
@@ -406,15 +407,15 @@ sub SQueue {
 
 #==================================================================
 # Subroutine:
-#   sorthost    Used to sort topmed hosts in numnerical order
+#   sorthost    Used to sort my hosts in numnerical order
 #
 #   Return reformatted device data
 #==================================================================
 sub sorthost {
     my $cmp1 = 0;
     my $cmp2 = 0;
-    if ($a =~ /topmed(\d+)/) { $cmp1 = sprintf('%02d',$1); }
-    if ($b =~ /topmed(\d+)/) { $cmp2 = sprintf('%02d',$1); }
+    if ($a =~ /$ENV{PROJECT}(\d+)/) { $cmp1 = sprintf('%02d',$1); }
+    if ($b =~ /$ENV{PROJECT}(\d+)/) { $cmp2 = sprintf('%02d',$1); }
     return ($cmp1 <=> $cmp2);
 }
 

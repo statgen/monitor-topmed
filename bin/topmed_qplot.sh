@@ -4,8 +4,7 @@
 #
 #	Run QPLOT on a BAM file
 #
-. /usr/cluster/topmed/bin/topmed_actions.inc
-
+. /usr/cluster/$PROJECT/bin/topmed_actions.inc
 me=qplot
 markverb=$me
 
@@ -72,7 +71,7 @@ if [ "$1" = "-submit" ]; then	#  subroutine SubmitJob will run sbatch
   fi
   RandomRealHost $bamid
   MayIRun $me $bamid $realhost
-  SubmitJob $bamid "topmed" '8G' "$0 $*"    # Uses $timeout 
+  SubmitJob $bamid $PROJECT '8G' "$0 $*"
   exit
 fi
 

@@ -49,7 +49,7 @@ our %PATHOPTS = (
 #==================================================================
 sub PathInit {
     my ($project) = @_;
-    $PATHOPTS{realm} .= $project;
+    $PATHOPTS{realm} = "/usr/cluster/$project/etc/.db_connections/$project";
     $PATHOPTS{netdir} .= $project;
     $PATHOPTS{backupsdir} .= $project;
     $PATHOPTS{incomingdir} .= $project;
@@ -310,7 +310,11 @@ sub FindB38 {
     my ($centername, $piname, $nwdid, $bamid, $datayear) = @_;
     if (! defined($datayear)) { $datayear=''; }
 
-    if ("$datayear" ne '3') {
+    if ($ENV{PROJECT} eq 'inpsyght') {
+        return "/net/$ENV{PROJECT}/working/mapping/results/$centername/$piname/b38/$nwdid/$nwdid.recab.cram";
+    }
+
+    if ($ENV{PROJECT} eq 'topmed' && $datayear ne '3') {
         my @host_partialpath = (
             [ qw/topmed10 topmed9 topmed6  topmed7  topmed9  topmed10/ ],
             [ qw/working  working incoming incoming incoming incoming/ ]
@@ -328,7 +332,7 @@ sub FindB38 {
         return $file;
     }
     #   Yet another brand new scheme invented for year 3
-    if ("$datayear" eq '3') {
+    if ($ENV{PROJECT} eq 'topmed' && $datayear ge '3') {
         my @host_partialpath = (
             [ qw/topmed  topmed2 topmed3 topmed7 topmed5  topmed6  topmed7 topmed9/ ],
             [ qw/working working working working incoming incoming incoming incoming/ ]

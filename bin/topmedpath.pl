@@ -38,8 +38,7 @@ use lib (
   qq($FindBin::Bin/../lib),
   qq($FindBin::Bin/../lib/perl5),
   qq($FindBin::Bin/../local/lib/perl5),
-  qq(/usr/cluster/topmed/lib/perl5),
-  qq(/usr/cluster/topmed/local/lib/perl5),
+  qq(/usr/cluster/topmed/lib/perl5),            # So we can run from /tmp
 );
 
 use Getopt::Long;
@@ -51,15 +50,23 @@ use Topmed::Path;
 our %opts = (
     verbose => 0,
 );
-if ($0 =~ /\/(\w+)path/) { PathInit($1); }      # Set up project variables;
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help raw realm=s verbose
+    help raw realm=s verbose project=s
     )) || die "$Script - Failed to parse options\n";
+#   Non-typical code for PROJECT so non-project IDs can easily use this
+if ($opts{project}) { $ENV{PROJECT} = $opts{project}; }
+else {
+    if (! exists($ENV{PROJECT})) { $ENV{PROJECT} = 'noproject'; }
+}
+if (! -d "/usr/cluster/$ENV{PROJECT}") {
+   die "$Script - Environment variable PROJECT '$ENV{PROJECT}' incorrect\n";
+}
+PathInit($ENV{PROJECT});                # Set up project variables, special handling
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    my $m = "$Script [options]";
+    my $m = "$Script [-p project] [options]";
     warn "$m wherepath bamid|nwdid KEYWORD\n" .
         "  or\n" .
         "$m whathost bamid|nwdid KEYWORD\n" .
@@ -103,7 +110,7 @@ topmedpath.pl - Show paths for data in the TopMed database
   topmedcmd.pl wherepath 2199 gceupload    # Returns GCE URI to where remapped CRAMs are copied
   topmedcmd.pl wherepath 2199 awsupload    # Returns AWS URI to where all files are copied
 
-  topmedcmd.pl whathost 2199 bam           # Returns host for bam
+  topmedcmd.pl -proj MYPROJ  whathost 2199 bam   # Returns host for bam
   topmedcmd.pl whathost 2199 cram          # Returns host for cram directory
   topmedcmd.pl whathost 2199 qcresults     # Returns host for directory for qc.results
 
@@ -118,6 +125,10 @@ topmedpath.pl - Show paths for data in the TopMed database
 This program supports simple commands to show the path to key files and directories.
 This program provides the path, but does not guarantee the the file/directory exists.
 
+This program requires you to provide the project name (lower case) as either
+environment variable or witht he option B<-project>.
+Projects must have a directory as /usr/cluster/projectname.
+
 See B<perldoc DBIx::Connector> for details defining the database.
 
 =head1 OPTIONS
@@ -127,6 +138,11 @@ See B<perldoc DBIx::Connector> for details defining the database.
 =item B<-help>
 
 Generates this output.
+
+=item B<-project projectname>
+
+Allows one to specify the project to work on. You must specify this option
+or set the environment variable B<PROJECT}.
 
 =item B<-raw NAME>
 

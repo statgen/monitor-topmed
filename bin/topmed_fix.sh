@@ -4,11 +4,49 @@
 #
 #	Fix some sort of problem. This script changes all the time
 #
-. /usr/cluster/topmed/bin/topmed_actions.inc
+. /usr/cluster/$PROJECT/bin/topmed_actions.inc
 me=fix
 markverb=$me
-export IGNORE_PERMIT=1         # Ignore MayIRun stuff
 
+#   Special case - run a command against a set of bamids
+#   topmed_fix.sh host cmd file-of-bamids
+if [ "$1" = "-submit" ]; then
+  shift
+  realhost=$1       # Force to run here
+  shift
+  timeout='24:00:00'
+  SubmitJob $realhost $PROJECT '4G' "$0 $*"
+  exit
+fi
+
+#   Command here is:  topmed_fix.sh  cmd  file-of-bamids
+#   e.f.  topmed_fix.sh  [-submit] /usr/cluster/topmed/bin/gcebackup.sh ~/set1.bamids
+#
+#   ./xsql.sh 'SELECT count(*) from bamfiles where state_gcebackup!=20'
+#   ./xsql.sh 'SELECT bamid from bamfiles where state_gcebackup!=20 order by rand()' >setofbams
+#   head -9000 setofbams | split -d -l 1000    # Makes xdd files of 1000 each
+#   bin/topmed_fix.sh -submit topmed2 /usr/cluster/topmed/bin/topmed_gcebackup.sh ~/x02
+#   bin/topmed_fix.sh -submit topmed3 /usr/cluster/topmed/bin/topmed_gcebackup.sh ~/x03
+#   bin/topmed_fix.sh -submit topmed4 /usr/cluster/topmed/bin/topmed_gcebackup.sh ~/x04
+#   bin/topmed_fix.sh -submit topmed5 /usr/cluster/topmed/bin/topmed_gcebackup.sh ~/x05
+#   bin/topmed_fix.sh -submit topmed6 /usr/cluster/topmed/bin/topmed_gcebackup.sh ~/x06
+#   bin/topmed_fix.sh -submit topmed7 /usr/cluster/topmed/bin/topmed_gcebackup.sh ~/x07
+#   bin/topmed_fix.sh -submit topmed9 /usr/cluster/topmed/bin/topmed_gcebackup.sh ~/x08
+#   bin/topmed_fix.sh -submit topmed10 /usr/cluster/topmed/bin/topmed_gcebackup.sh ~/x01
+#   bin/topmed_fix.sh -submit topmed  /usr/cluster/topmed/bin/topmed_gcebackup.sh ~/x00
+n=`basename $1`
+for b in `cat $2`; do
+  echo "#========== `date` Running $1 on sample $b ========#"
+  $1 $b > $console/$b-$n.out 2>&1
+done
+exit
+
+
+exit
+#
+#   Standard submit of the job
+#
+export IGNORE_PERMIT=1         # Ignore MayIRun stuff
 if [ "$1" = "-submit" ]; then
   shift
   bamid=`GetDB $1 bamid`
@@ -18,11 +56,6 @@ if [ "$1" = "-submit" ]; then
   SubmitJob $bamid "topmed" '4G' "$0 $*"
   exit
 fi
-
-#
-#   Rerun topmedcheck on all the centers
-#
-/usr/cluster/topmed
 
 
 #

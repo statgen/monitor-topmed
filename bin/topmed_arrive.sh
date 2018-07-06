@@ -6,9 +6,8 @@
 #   This command almost certainly runs locally, however
 #   the batch -submit has been left in
 #
-. /usr/cluster/topmed/bin/topmed_actions.inc
-topmednwd=/usr/cluster/topmed/bin/topmed_nwdid.pl
-
+. /usr/cluster/$PROJECT/bin/topmed_actions.inc
+topmednwd=/usr/cluster/$PROJECT/bin/topmed_nwdid.pl
 me=arrive
 markverb=$me
 
@@ -29,6 +28,7 @@ bamid=$1                            # This MUST be bamid, may not use NWD yet
 #nwdid=`GetNWDID $bamid`            # Only case where we do not get NWDID right away
 
 bamfile=`$topmedpath wherefile $bamid bam`
+
 Started
 
 #   Determine build used to generate this bam/cram

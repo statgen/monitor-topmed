@@ -1,31 +1,8 @@
 #
 #	Define variables that all TOPMED action scripts need defined
+#	Requires PROJECT to be set
 #
-topmedcmd=/usr/cluster/topmed/bin/topmedcmd.pl
-topmedpermit=/usr/cluster/topmed/bin/topmedpermit.pl
-topmedpath=/usr/cluster/topmed/bin/topmedpath.pl
-topmedrename=/usr/cluster/topmed/bin/topmedrename.pl
-topmedqplot=/usr/cluster/topmed/bin/topmedqplot.pl
-bam=/usr/cluster/bin/bam
-samtools=/usr/cluster/bin/samtools
-vt=/usr/cluster/topmed/bin/vt
-vtref=/net/topmed/working/mapping/gotcloud/ref/hg38/hs38DH.fa
-bcftools=/usr/cluster/bin/bcftools
-console=/net/topmed/working/topmed-output
-slurmp=topmed-working
-build=38
-realhost=''
-
-cores=''                            # Set to same as gsutil if it will be used
-gsutil="gsutil -m"
-gsshareoption="-u topmed-1366"      # Used to copy to SHARE
-gsutilbig='gsutil -o GSUtil:parallel_composite_upload_threshold=150M'
-#   No need to parallel processing 
-#cores="--cpus-per-task=2"         # Cores here should be same as gsutil
-#gsutil='gsutil -o GSUtil:parallel_composite_upload_threshold=150M -o GSUtil:parallel_process_count=2'
-incominguri='gs://topmed-recabs'
-bcfuri='gs://topmed-bcf'
-export BOTO_CONFIG=/net/topmed/working/shared/tpg_gsutil_config.txt
+source /usr/cluster/$PROJECT/bin/${PROJECT}_defs.inc
 
 #==================================================================
 #   Define useful functions to be used by the action scripts
@@ -177,49 +154,12 @@ function MyRealHost {
 
 #------------------------------------------------------------------
 # Subroutine:
-#   RandomRealHost(bamid, realhost)   Set realhost based on bamid
-#------------------------------------------------------------------
-function RandomRealHost {
-  local bamid=$1                # Normal processing, pick realhost from bamid
-  declare -A bamid2host
-  bamid2host[0]=topmed
-  bamid2host[1]=topmed2
-  bamid2host[2]=topmed3
-  bamid2host[3]=topmed4
-  bamid2host[4]=topmed5
-  bamid2host[5]=topmed6
-  bamid2host[6]=topmed7
-  bamid2host[7]=topmed9
-  bamid2host[8]=topmed10
-  #   See if anything is down
-  f=/run/shm/RandomRealHost.down
-  if [ -f $f ]; then
-    while read l; do
-      ll=($l)
-      bamid2host[${ll[0]}]=DOWN
-      #echo "Marked index ${ll[0]} [${ll[1]}] as DOWN"
-    done < $f
-  fi
-  n=`perl -e "{ print $bamid%9 }"`
-  #   See this entry is down, use first entry. If topmed down, cannot submit jobs
-  if [ "${bamid2host[$n]}" = "" -o "${bamid2host[$n]}" = "DOWN" ]; then
-    n=0
-  fi
-  if [ "$SLURMNODE" != "" ]; then	# Allow user to force node
-    realhost=$SLURMNODE
-  else
-    realhost=${bamid2host[$n]}
-  fi
-}
-
-#------------------------------------------------------------------
-# Subroutine:
 #   CheckRGMap(bamid)     rc=0 if rgmap not needed, rc=1 if needed
 #------------------------------------------------------------------
 function CheckRGMap {
   local bamid=$1
   
-  /usr/cluster/topmed/bin/topmedrgmap.pl -check $bamid /dev/null
+  /usr/cluster/$PROJECT/bin/topmedrgmap.pl -check $bamid /dev/null
   return $?
 }
 
@@ -502,6 +442,7 @@ function CalcMD5 {
 # Subroutine:
 #   SubmitJob(bamid, qos, mem, cmdtorun)    Submit this script to SLURM
 #   Uses global variables: $me $markverb $console $slurp $realhost $cores $timeout
+#	Uses environment variable: SBATCH_OPT
 #------------------------------------------------------------------
 function SubmitJob {
   local bamid=$1
@@ -530,9 +471,9 @@ function SubmitJob {
     echo "No command to execute provided to SubmitJob"
     exit 3
   fi
-  l=(`/usr/cluster/bin/sbatch -p $slurmp $mem $r $t $cores $q --workdir=$console -J $bamid-$me --output=$console/$bamid-$me.out $cmdtorun`)
+  l=(`/usr/cluster/bin/sbatch -p $slurmp $mem $r $t $cores $q $SBATCH_OPT --workdir=$console -J $bamid-$me --output=$console/$bamid-$me.out $cmdtorun`)
   if [ "$?" != "0" ]; then
-    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp $mem $r $cores $q --workdir=$console -J $bamid-$me --output=$console/$bamid-$me.out $cmdtorun" >> $console/$bamid-$me.out
+    echo "CMD=/usr/cluster/bin/sbatch -p $slurmp $mem $r $cores $q $SBATCH_OPT --workdir=$console -J $bamid-$me --output=$console/$bamid-$me.out $cmdtorun" >> $console/$bamid-$me.out
     Fail "Failed to submit command to SLURM - $l" | tee -a $console/$bamid-$me.out
     exit 1
   fi

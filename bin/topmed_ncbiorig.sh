@@ -4,7 +4,7 @@
 #
 #	Send the proper set of files to NCBI for the original/secondary files
 #
-. /usr/cluster/topmed/bin/topmed_actions.inc
+. /usr/cluster/$PROJECT/bin/topmed_actions.inc
 topmedxml="/usr/cluster/topmed/bin/topmed_xml.pl"
 ascpcmd="$topmedcmd send2ncbi"
 me=ncbiorig

@@ -7,7 +7,7 @@
 #   This is designed to redo bits of the monitor processes
 #   Ideally it is driven by error messages from topmedcheck.pl -fix topmed_redo.sh
 #   Each unique error message will require particular processing to set the arguments properly
-. /usr/cluster/topmed/bin/topmed_actions.inc
+. /usr/cluster/$PROJECT/bin/topmed_actions.inc
 me=redo
 markverb=''
 
@@ -223,7 +223,7 @@ if [ "$action" = "b37copy" ]; then
   fi
 
   #   Copy existing cram and crai
-  $gsutilbig cp $b37file $uri/$lcstudyname/$crambase
+  $gsutil cp $b37file $uri/$lcstudyname/$crambase
   if [ "$?" != "0" ]; then
     Fail "Unable to copy $b37file $uri/$lcstudyname/$crambase"
   fi

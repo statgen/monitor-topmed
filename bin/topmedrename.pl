@@ -22,8 +22,6 @@ use lib (
   qq($FindBin::Bin/../lib),
   qq($FindBin::Bin/../lib/perl5),
   qq($FindBin::Bin/../local/lib/perl5),
-  qq(/usr/cluster/topmed/lib/perl5),
-  qq(/usr/cluster/topmed/local/lib/perl5),
 );
 use My_DB;
 use Getopt::Long;
@@ -32,16 +30,12 @@ use File::Basename;
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
+if (! -d "/usr/cluster/$ENV{PROJECT}") { die "$Script - Environment variable PROJECT '$ENV{PROJECT}' incorrect\n"; }
 our %opts = (
-    realm => '/usr/cluster/topmed/etc/.db_connections/',
+    realm => "/usr/cluster/$ENV{PROJECT}/etc/.db_connections/$ENV{PROJECT}",
     bamfiles_table => 'bamfiles',
     verbose => 0,
 );
-if ($0 =~ /\/(\w+)ren/) {
-    my $x = $1;
-    $opts{realm} .= $x;
-}
-
 Getopt::Long::GetOptions( \%opts,qw(
     help realm=s verbose
     )) || die "Failed to parse options\n";

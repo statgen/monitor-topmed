@@ -4,8 +4,8 @@
 #
 #	Send the proper set of files to NCBI for the remapped bam build 37
 #
-. /usr/cluster/topmed/bin/topmed_actions.inc
-topmedxml="/usr/cluster/topmed/bin/topmed_xml.pl"
+. /usr/cluster/$PROJECT/bin/topmed_actions.inc
+topmedxml="/usr/cluster/$PROJECT/bin/topmed_xml.pl"
 ascpcmd="$topmedcmd send2ncbi"
 me=ncbib37
 markverb=$me
@@ -22,7 +22,7 @@ if [ "$1" = "-submit" ]; then
   fi
   RandomRealHost $bamid
   MayIRun $me $bamid $realhost
-  SubmitJob $bamid "topmed-redo" '2G' "$0 $*"
+  SubmitJob $bamid $PROJECT '2G' "$0 $*"
   exit
 fi
 
