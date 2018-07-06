@@ -153,6 +153,7 @@ $JS['BACK'] = "<p align='right'><font size='-1'><a href='javascript:history.back
 //-------------------------------------------------------------------
 //  Get parameters passed in via normal invocation
 //-------------------------------------------------------------------
+putenv('PROJECT=topmed');           # Set env variable so pgms play nice
 if (! isset($_SERVER['REMOTE_USER'])) { $_SERVER['REMOTE_USER'] = 'none'; }
 
 $iammgr = 0;
@@ -169,7 +170,8 @@ if ($iammgr) {
         "<a href='http://nhlbi.sph.umich.edu/report/monitor.php' " .
         "onclick='javascript:popup2(\"http://nhlbi.sph.umich.edu/report/monitor.php\",680,720); " .
         "return false;'>ReMapping</a> &nbsp;" .
-        "<a href='https://console.cloud.google.com/storage/browser/' target='_blank'>Browser</a> &nbsp;";
+        "<a href='https://console.cloud.google.com/storage/browser/' target='_blank'>Browser</a> &nbsp;" .
+        "<a href='https://www-inpsyght1.sph.umich.edu/inpsyght/' target='_blank'>Inpsyght</a> &nbsp;";
 }
 print doheader($HDR['title'], 1);
 
