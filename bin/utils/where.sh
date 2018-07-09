@@ -4,13 +4,14 @@
 #
 bamid=$1
 fcn=bam
+pth=/usr/cluster/topmed/bin/topmedpath.pl
 if [ "$2" != "" ]; then
-  /usr/cluster/topmed/bin/topmedpath.pl wherefile $bamid $2
+  $pth wherefile $bamid $2
   exit $? 
 fi
 #echo -n "FCN=$fcn  "
-echo -n 'bam   '; /usr/cluster/topmed/bin/topmedpath.pl wherefile $bamid bam
-echo -n 'cram  '; /usr/cluster/topmed/bin/topmedpath.pl wherefile $bamid cram
-echo -n 'b38   '; /usr/cluster/topmed/bin/topmedpath.pl wherefile $bamid b38
-echo -n 'b37   '; /usr/cluster/topmed/bin/topmedpath.pl wherefile $bamid b37
+echo -n 'bam   '; $pth wherefile $bamid bam
+echo -n 'cram  '; $pth wherefile $bamid cram
+echo -n 'b38   '; $pth wherefile $bamid b38
+echo -n 'b37   '; $pth wherefile $bamid b37
 echo ''
