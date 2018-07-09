@@ -49,9 +49,6 @@ fi
 bamid=$1
 nwdid=`GetNWDID $bamid`
 bamid=`GetDB $nwdid bamid`
-if [ "$PROJECT" = "inpsyght" ]; then        # Special hack to overwhelm bug
-  bm=/usr/cluster/topmed/bin/bam
-fi
 
 Started
 stime=`date +%s`
