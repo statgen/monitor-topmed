@@ -5,6 +5,7 @@
 #
 #   Use this script to backup a MySQL database and put the result
 #   in a specified directory
+#   PROJECT must be set
 #
 #   Input:
 #    realm    realm to use
@@ -15,11 +16,13 @@
 #
 ####################################################################
 me=`basename $0`
-HOME=/net/topmed/working/home/topmed   # Our cron does not set HOME correctly
+realm=$LOGNAME                          # Also project
+if [ "$HOME" != "" ]; then              # Sometimes cron does not set HOME
+  HOME=/net/topmed/working/home/topmed
+fi
 realmdir=$HOME/.db_connections
 pgm=/usr/bin/mysqldump
 destdir=$HOME/BACKUPS/MYSQLBAK
-realm=$USER
 name=""
 
 #	Allow realm and database to be overridden
@@ -43,11 +46,10 @@ pgmopts="--opt --host=$h --user=$u --password=$p --single-transaction"
 
 #	Do actual backup
 if [ "$name" = "" ]; then
-  day=`date +%d`
-  f=$destdir/$day-$db.sql.gz
-else
-   f=$destdir/$name.sql.gz
+  name=`date +%d`
 fi
+f=$destdir/$realm-$name.$db.sql.gz
+
 echo "Backup of database $db ..."
 $pgm $pgmopts $db | gzip -c > $f
 if [ $? != 0 ]; then
