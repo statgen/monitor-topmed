@@ -91,7 +91,8 @@ sub MarkState {
             "WHERE expt_sampleid='$nwdid'";
         my $sth = DoSQL($sql);
         my $href = $sth->fetchrow_hashref;
-        if ($href->{state_gce38push} != $COMPLETED) {
+        if (! exists($href->{state_gce38push}) ||
+            $href->{state_gce38push} ne $COMPLETED) {
             print "Sample $nwdid exists in GCE, but was not pushed\n";
             $countcannot++;
             next;
