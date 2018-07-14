@@ -12,7 +12,7 @@ vt=/usr/cluster/topmed/bin/vt
 vtref=/net/topmed/working/mapping/gotcloud/ref/hg38/hs38DH.fa
 bcftools=/usr/cluster/bin/bcftools
 console=/net/$PROJECT/working/${PROJECT}-output
-slurmp=$PROJECT
+slurmp=topmed-working
 build=38
 realhost=''
 
