@@ -14,7 +14,7 @@ topuser=topmed
 topgrp=topmed
 topdir=/incoming/topmed
 topmedcmd=/usr/cluster/topmed/bin/topmedcmd.pl
-
+export PROJECT=topmed
 myhost=`hostname`               # Where I am running
 
 #------------------------------------------------------------------
