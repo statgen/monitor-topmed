@@ -41,9 +41,6 @@ nwdid=`GetNWDID $bamid`
 bamid=`GetDB $nwdid bamid`
 Started
 
-#======================================================================
-#   Copy CRAM to Google Cloud
-#======================================================================
 center=`GetDB $bamid center`
 if [ "$center" = "" ]; then
   Fail "Unable to get center for bamid '$bamid'"
@@ -52,8 +49,52 @@ run=`GetDB $bamid run`
 if [ "$run" = "" ]; then
   Fail "Unable to get run for bamid '$bamid'"
 fi
-
+datayear=`GetDB $bamid datayear`
+if [ "$datayear" = "" ]; then
+  Fail "Unable to get datayear for bamid '$bamid'"
+fi
 stime=`date +%s`
+
+#======================================================================
+#   Special hack - year 4 topmed is not remapped, but we pretend it is
+#   Note: when G changes his mind, we must delete all symlinks this creates
+#   and realize, of course, SOME year 4 BROAD files were already remapped
+#======================================================================
+if [ "$PROJECT" = "topmed" -a "$datayear" = "4" -a "$center" = "broad" ]; then
+  echo "Special hack for $PROJECT $center datayear $datayear - pretend remapping was done"
+  recabfile=`$topmedpath wherefile $bamid b38`
+  if [ "$recabfile" = "" ]; then
+    Fail "Unable to find path for recab file for $nwdid [$bamid]"
+  fi
+  if [ -f $recabfile ]; then
+    Fail "Recab $recabfile for $nwdid [$bamid] already exists, remove if necessary"
+  fi
+  p=`dirname $recabfile`
+  mkdir -p $p
+  if [ "$?" != "0" ]; then
+    Fail "Unable to create recab directory $nwdid [$bamid]"
+  fi
+  # Finally make symlink
+  ln -s $cramfile $recabfile
+  if [ "$?" != "0" ]; then
+    Fail "Unable to create recab symlink $recabfile for $nwdid [$bamid]"
+  fi
+  SetDB $bamid state_gce38bcf 0
+  SetDB $bamid state_gce38pull 20      # Mark B38 remapping as done
+  SetDB $bamid state_b38 20
+  SetDB $bamid state_gce38copy 0       # Mark copy files to GCE as not done yet
+  SetDB $bamid state_aws38copy 0
+
+  etime=`date +%s`
+  etime=`expr $etime - $stime`
+  Successful
+  Log $etime
+  exit
+fi
+
+#======================================================================
+#   Copy CRAM to Google Cloud
+#======================================================================
 echo "Copying CRAM to $incominguri/$center/$run/$nwdid.src.cram"
 $gsutil cp $cramfile $incominguri/$center/$run/$nwdid.src.cram
 if [ "$?" != "0" ]; then
