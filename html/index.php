@@ -26,7 +26,7 @@ $STATUSLETTERS =  "<br/> " .
     "<b>7</b>=Remapped Build=37, " .
     "<b>s</b>=Push Build=38 to GCE, <b>r</b>=Pull Build=38 from GCE, <b>8</b>=Remapped Build=38," .
     "<br/><b>V</b>=Completed BCF/VT 38,<b>G</b></b>=Upload CRAM to GCE," .
-    "<b>g</b></b>=Upload BCF to GCE,<b>A</b></b>=Upload data to AWS,<br/>" .
+    "<b>g</b></b>=Upload BCF to GCE,<b>x</b></b>=Cleanup Backup files,<b>A</b></b>=Upload data to AWS,<br/>" .
     "<b>X</b>=EXPT=>NCBI <b>S</b>=Orig BAM/CRAM=>NCBI, <b>P</b>=</b>B37=>NCBI<br/>" .
     "<b>F</b>=FIX";
 
@@ -86,6 +86,7 @@ $quickcols = array(                     // Map of status column to topmedcmd ver
     'state_gce38bcf' => 'bcf',
     'state_gce38copy'=> 'gcecopy',
     'state_gce38cpbcf'=> 'gcecpbcf',
+    'state_gcecleanup'=> 'gcecleanup',
     'state_aws38copy'=> 'awscopy',
     'state_ncbiexpt' => 'sendexpt',
     'state_ncbiorig' => 'sendorig',
@@ -105,6 +106,7 @@ $quickletter = array(                   // Map of status column to letter we see
     'state_gce38bcf' => 'V',
     'state_gce38copy'=> 'G',
     'state_gce38cpbcf' => 'g',
+    'state_gcecleanup' => 'x',
     'state_aws38copy'=> 'A',
     'state_ncbiexpt' => 'X',
     'state_ncbiorig' => 'S',
@@ -112,7 +114,7 @@ $quickletter = array(                   // Map of status column to letter we see
     'state_fix'      => 'F'
 );
 $validfunctions = array('all', 'verify', 'cram', 'gcebackup', 'qplot',
-    'gcepush', 'gcepull', 'bcf', 'gcecopy', 'gcecpbcf', 'awscopy', 'fix');
+    'gcepush', 'gcepull', 'bcf', 'gcecopy', 'gcecpbcf', 'gcecleanup', 'awscopy', 'fix');
 $NOTSET = 0;                // Not set
 $REQUESTED = 1;             // Task requested
 $SUBMITTED = 2;             // Task submitted to be run
@@ -138,7 +140,7 @@ $state2str = array(         // Values here are class for SPAN tag
 
 $TOPMEDJOBNAMES = array('verify', 'cram', 'backup', 'qplot', 'expt', 'orig', 'b37',
     'push38', 'pull38', 'b38', 'pushbcf38', 'pullbcf38', 'bcf', 'gcecopy',
-    'gce38cpbcf', 'awscopy','fix');
+    'gce38cpbcf', 'gcecleanup', 'awscopy', 'fix');
 
 //  These columns are state values to be converted to people readable strings
 //  See DateState() for possible values
@@ -197,7 +199,7 @@ $parmcols = array('fcn', 'maxdir', 'desc', 'center', 'datayear',
     'run', 'runid', 'bamid', 'centerid', 'fetchpath', 'hostname', 'col',
     'op', 'id', 'samplestate');
 extract (isolate_parms($parmcols));
-if (! $center) { $center = 'year3'; }
+if (! $center) { $center = 'year4'; }
 if (! $fcn)    { $fcn = 'runs'; }
 if (! $maxdir) { $maxdir = 0; }     // Show all data
 
@@ -247,6 +249,8 @@ if ($fcn == 'showout') {                // Show output from a SLURM job
     if ($samplestate == 'V') { $s = 'bcf'; }
     if ($samplestate == 'A') { $s = 'awscopy'; }
     if ($samplestate == 'G') { $s = 'gcecopy'; }
+    if ($samplestate == 'g') { $s = 'gcecpbcf'; }
+    if ($samplestate == 'x') { $s = 'cleanup'; }
     // Hardcoded path cause mario won't play with topmedpath.pl
     $ss = '/net/topmed/working/topmed-output';
     $a = $ss . '/' . $bamid . "-$s.out";
@@ -930,7 +934,7 @@ function GetCenters() {
 ---------------------------------------------------------------*/
 function QuickStatus($r, $url) {
     global $quickcols, $quickletter;
-    $separator_actions = array('Q','7','8','V', 'A', 'P');
+    $separator_actions = array('Q','7','8','V', 'x', 'A', 'P');
     //  Add a small separator to 'group' certain actions
     $h = '';
     $col = '';
@@ -970,7 +974,7 @@ function DateState($t) {
 ---------------------------------------------------------------*/
 function CalcRunStatus($str) {
     global $quickletter;
-    $separator_actions = array('Q','7','8','V', 'G', 'g', 'P');
+    $separator_actions = array('Q','7','8','V', 'G', 'x', 'P');
     //return $str;          // To see original state
     $h = '';
     $cols = array_values($quickletter);

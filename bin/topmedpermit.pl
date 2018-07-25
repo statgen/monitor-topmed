@@ -57,6 +57,7 @@ my %VALIDOPS = (                    # Used for permit
     bcf => 1,
     gcecopy => 1,
     gcecpbcf => 1,
+    gcecleanup => 1,
     awscopy => 1,
     sexpt => 1,
     sorig => 1,

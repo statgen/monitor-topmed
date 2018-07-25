@@ -63,6 +63,7 @@ my %VALIDVERBS = (                  # Valid verbs to database colum
     bcf        => 'state_gce38bcf',     
     gcecopy    => 'state_gce38copy',     
     gcecpbcf   => 'state_gce38cpbcf',     
+    gcecleanup => 'state_gcecleanup',     
     awscopy    => 'state_aws38copy',     
     ncbiexpt   => 'state_ncbiexpt',
     ncbiorig   => 'state_ncbiorig',

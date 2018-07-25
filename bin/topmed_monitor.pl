@@ -61,6 +61,7 @@ our %opts = (
     topmedgce38post => $Bin . "/topmed_gcepost.sh",
     topmedgcecopy => $Bin . "/topmed_gcecopy.sh",
     topmedgcecpbcf => $Bin . "/topmed_gcecpbcf.sh",
+    topmedgcecleanup => $Bin . "/topmed_gcecleanup.sh",
     topmedawscopy => $Bin . "/topmed_awscopy.sh",
     topmedfix => $Bin . "/topmed_fix.sh",
     topmedbcf  => $Bin . "/topmed_bcf.sh",
@@ -86,7 +87,7 @@ Getopt::Long::GetOptions( \%opts,qw(
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$Script [options] arrive|verify|qplot|cram|gcebackup|qplot|gcepush|gcepull|bcf|gcecopy|gcecpbcf|awscopy|fix\n" .
+    warn "$Script [options] arrive|verify|qplot|cram|gcebackup|qplot|gcepush|gcepull|bcf|gcecopy|gcecpbcf|gcecleanup|awscopy|fix\n" .
         "Find runs which need some action and queue a request to do it.\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
@@ -356,6 +357,27 @@ if ($fcn eq 'gcecpbcf') {
         }
         if ($href->{state_gce38cpbcf} != $NOTSET && $href->{state_gce38cpbcf} != $REQUESTED) { next; }
         if (! BatchSubmit("$opts{topmedgcecpbcf} -submit $href->{bamid}")) { last; }
+    }
+    ShowSummary($fcn);
+    exit;
+}
+
+#--------------------------------------------------------------
+#   Cleanup unnecessary backup files
+#--------------------------------------------------------------
+if ($fcn eq 'gcecleanup') {
+    my $sql = BuildSQL("SELECT bamid,state_gcecleanup",
+        "WHERE b.state_gce38cpbcf=$COMPLETED AND b.state_gcecleanup!=$COMPLETED");
+    my $sth = DoSQL($sql);
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { exit; }
+    for (my $i=1; $i<=$rowsofdata; $i++) {
+        my $href = $sth->fetchrow_hashref;
+        if ($opts{suberr} && $href->{state_gcecleanup} >= $FAILEDCHECKSUM) {
+            $href->{state_gcecleanup} = $REQUESTED;
+        }
+        if ($href->{state_gcecleanup} != $NOTSET && $href->{state_gcecleanup} != $REQUESTED) { next; }
+        if (! BatchSubmit("$opts{topmedgcecleanup} -submit $href->{bamid}")) { last; }
     }
     ShowSummary($fcn);
     exit;
@@ -740,7 +762,7 @@ Provided for developers to see additional information.
 
 =over 4
 
-=item B<arrive | verify | qplot | cram | gcebackup | qplot | gcepush | gcepull | bcf | gcecopy | gcecpbcf | fix\n" .
+=item B<arrive | verify | qplot | cram | gcebackup | qplot | gcepush | gcepull | bcf | gcecopy | gcecpbcf | gcecleanup | fix\n" .
 y>
 
 Directs this program to look for runs that have not been through the process name

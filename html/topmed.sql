@@ -147,6 +147,7 @@ my $FAILED    = 99;           # Task failed
   state_gce38cpbcf  INT DEFAULT 0,  /* Copy BCF data to GCE BCF bucket */
 
   state_gce38copy INT DEFAULT 0,    /* Copy local data to SHARE bucket */
+  state_gcecleanup INT DEFAULT 0,   /* Remove backup original cram file, local or remote */
   state_aws38copy INT DEFAULT 0,    /* Copy local data to AWS bucket */
 
   state_ncbiexpt INT DEFAULT 0,     /* Year one, experiment defined at NCBI (X) */
@@ -173,7 +174,6 @@ my $FAILED    = 99;           # Task failed
  
 CREATE INDEX index_runid   ON bamfiles(runid);
 CREATE INDEX index_nwdid   ON bamfiles(expt_sampleid);
-CREATE INDEX index_refname ON bamfiles(refname);
 CREATE INDEX index_datayear ON bamfiles(datayear);
 CREATE INDEX index_bamflagstat ON bamfiles(bamflagstat);
 CREATE INDEX index_cramflagstat ON bamfiles(cramflagstat);
@@ -183,14 +183,11 @@ CREATE INDEX index_studyname ON bamfiles(studyname);
 CREATE INDEX index_piname ON bamfiles(piname);
 CREATE INDEX index_state_verify ON bamfiles(state_verify);
 CREATE INDEX index_state_cram ON bamfiles(state_cram);
-CREATE INDEX index_state_bai ON bamfiles(state_bai);
 CREATE INDEX index_state_qplot ON bamfiles(state_qplot);
 CREATE INDEX index_state_b37 ON bamfiles(state_b37);
 CREATE INDEX index_state_b38 ON bamfiles(state_b38);
 CREATE INDEX index_state_gce38push ON bamfiles(state_gce38push);
 CREATE INDEX index_state_gce38pull ON bamfiles(state_gce38pull);
-CREATE INDEX index_state_gce38post ON bamfiles(state_gce38post);
-CREATE INDEX index_state_bcf ON bamfiles(state_bcf);
 ALTER TABLE bamfiles ADD UNIQUE (expt_sampleid);
 
 -- MySQL Workbench Forward Engineering

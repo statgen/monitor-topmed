@@ -44,6 +44,7 @@ my %attributes2letter = (
     'state_gce38bcf'  => 'V',
     'state_gce38copy' => 'G',
     'state_gce38cpbcf' => 'g',
+    'state_gcecleanup' => 'x',
     'state_aws38copy' => 'A',
     'state_ncbiexpt'  => 'X',
     'state_ncbiorig'  => 'S',
