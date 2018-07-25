@@ -99,11 +99,11 @@ if [ -f $f ]; then
 fi
 
 echo "Copying remapped CRAM to local file $crampath"
-$gsutil cp $inuri $crampath
+$gsutil cp $inuri $f
 if [ "$?" != "0" ]; then
   SetDB $bamid state_gce38bcf 0
   SetDB $bamid state_gce38copy 0
-  Fail "Failed to copy file from GCE $inuri to $crampath"
+  Fail "Failed to copy file from GCE $inuri to $f"
 fi
 
 #   Remapping can still result in a trashed file.  Make sure this is a CSG file
@@ -123,23 +123,21 @@ echo "Moved $inuri files to $bcfuri/$nwdid"
 echo "Removing $incominguri/$nwdid"
 $gsutil rm -rf $incominguri/$nwdid
 
-#   If we have file locally, assume this is a rerun of pull
-if [ ! -f $cramfile ]; then
-  SetDB $bamid state_gce38bcf 0
-  SetDB $bamid state_gce38copy 0
-  Fail "Unable to find $cramfile"
-fi
-
 #   Post processing needed here
-echo "Begin post-processing of $cramfile"
-echo "Calculating MD5 for local file ($cramfile)"
-md5=`CalcMD5 $bamid $cramfile`
-echo "Set checksum and flagstat for b$build file"
-SetDB $bamid b${build}cramchecksum $md5
+echo "Begin post-processing of $f"
+echo "Create index for remapped sample"
+CreateIndex $bamid $f
+echo "Calculating MD5s for local files"
+md5cram=`CalcMD5 $bamid $f`
+md5crai=`CalcMD5 $bamid $f.crai`
+
+echo "Set checksums and flagstat for b$build sample"
+SetDB $bamid b${build}cramchecksum $md5cram
+SetDB $bamid b${build}craichecksum $md5crai
 SetDB $bamid b${build}flagstat $cramflagstat
 
 #   Save date of file in database
-$topmedcmd setdate $bamid datemapping_b38 $cramfile
+$topmedcmd setdate $bamid datemapping_b38 $f
 
 etime=`date +%s`
 etime=`expr $etime - $stime`
