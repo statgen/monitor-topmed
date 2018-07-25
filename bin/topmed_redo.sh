@@ -1,15 +1,63 @@
 #!/bin/bash
 #
-#   topmed_redo.sh bamid error message
-#     or
+#	Fix some sort of problem. This script changes all the time
+#
+#   topmed_redo.sh host fileofbams
+#
+. /usr/cluster/$PROJECT/bin/topmed_actions.inc
+me=redo
+markverb=''
+
+#   Special case - run a command against a set of bamids
+if [ "$1" = "-submit" ]; then
+  shift
+  realhost=$1       # Force to run here
+  shift
+  timeout='24:00:00'
+  s=`date +%s`
+  me="$me-$s"
+  echo "Ignore any errors from topmedcmd about invalid bamid"
+  SubmitJob $realhost $PROJECT '4G' "$0 $*"
+  exit
+fi
+
+stime=`date +%s`
+infile=$1
+n=0
+e=0
+#   e.g. topmed_redo.sh  [-submit] topmed3 somebamids
+for bamid in `cat $infile`; do
+  f=`$topmedpath wherefile $bamid b38`
+  if [ -f $f.crai ]; then
+    v=`CalcMD5 $bamid $f.crai`
+    echo "update bamfiles set b38craichecksum='$v' where bamid=$bamid" >> $infile.sql
+    echo "Completed $bamid $v"
+    n=`expr $n + 1`
+  else
+    e=`expr $e + 1`
+    if [ -f $f ]; then              # Year 4 hack - create index or redo 'push'
+      CreateIndex $bamid $f
+    else
+      /usr/cluster/topmed/bin/topmed_gcepush.sh $bamid
+    fi
+  fi
+done
+
+etime=`date +%s`
+etime=`expr $etime - $stime`
+echo "Complete calculating $n b38craichecksums from $infile in $etime seconds - $e failed"
+exit
+
+
+
+######################### Dead code #########################
+exit
+
 #   topmed_redo.sh bamid action args-for-action (based on error message)
 #
 #   This is designed to redo bits of the monitor processes
 #   Ideally it is driven by error messages from topmedcheck.pl -fix topmed_redo.sh
 #   Each unique error message will require particular processing to set the arguments properly
-. /usr/cluster/$PROJECT/bin/topmed_actions.inc
-me=redo
-markverb=''
 
 #   If we are passed lots of arguments, this is full message, submit as job
 if [ "$#" -gt "5" ]; then
