@@ -1,44 +1,63 @@
 #!/bin/bash
 #
 #   topmed_fix.sh -submit bamid|nwdid
+#   Another possibility is:  topmed_fix.sh  realhost  file-of-bamids
 #
 #	Fix some sort of problem. This script changes all the time
 #
 . /usr/cluster/$PROJECT/bin/topmed_actions.inc
 me=fix
+me=$1
 markverb=$me
 
 #   Special case - run a command against a set of bamids
-#   topmed_fix.sh host cmd file-of-bamids
 if [ "$1" = "-submit" ]; then
   shift
   realhost=$1       # Force to run here
   shift
   timeout='24:00:00'
-  SubmitJob $realhost $PROJECT '4G' "$0 $*"
+  s=`date +%s`
+  me="$me-$s"
+  SubmitJob $realhost $PROJECT '8G' "$0 $*"
+  echo "Ignore error from topmedcmd about invalid bamid"
   exit
 fi
 
-#   Command here is:  topmed_fix.sh  cmd  file-of-bamids
-#   e.f.  topmed_fix.sh  [-submit] /usr/cluster/topmed/bin/gcebackup.sh ~/set1.bamids
-#
-#   ./xsql.sh 'SELECT count(*) from bamfiles where state_gcebackup!=20'
-#   ./xsql.sh 'SELECT bamid from bamfiles where state_gcebackup!=20 order by rand()' >setofbams
-#   head -9000 setofbams | split -d -l 1000    # Makes xdd files of 1000 each
-#   bin/topmed_fix.sh -submit topmed2 /usr/cluster/topmed/bin/topmed_gcebackup.sh ~/x02
-#   bin/topmed_fix.sh -submit topmed3 /usr/cluster/topmed/bin/topmed_gcebackup.sh ~/x03
-#   bin/topmed_fix.sh -submit topmed4 /usr/cluster/topmed/bin/topmed_gcebackup.sh ~/x04
-#   bin/topmed_fix.sh -submit topmed5 /usr/cluster/topmed/bin/topmed_gcebackup.sh ~/x05
-#   bin/topmed_fix.sh -submit topmed6 /usr/cluster/topmed/bin/topmed_gcebackup.sh ~/x06
-#   bin/topmed_fix.sh -submit topmed7 /usr/cluster/topmed/bin/topmed_gcebackup.sh ~/x07
-#   bin/topmed_fix.sh -submit topmed9 /usr/cluster/topmed/bin/topmed_gcebackup.sh ~/x08
-#   bin/topmed_fix.sh -submit topmed10 /usr/cluster/topmed/bin/topmed_gcebackup.sh ~/x01
-#   bin/topmed_fix.sh -submit topmed  /usr/cluster/topmed/bin/topmed_gcebackup.sh ~/x00
-n=`basename $1`
-for b in `cat $2`; do
-  echo "#========== `date` Running $1 on sample $b ========#"
-  $1 $b > $console/$b-$n.out 2>&1
+stime=`date +%s`
+n=0
+e=0
+k=0
+#   e.g. topmed_fix.sh  [-submit] topmed3 ~/coldline/x00
+for bamid in `cat $1`; do
+  nwdid=`GetNWDID $bamid`
+  studyname=`GetDB $bamid studyname`
+  k=`expr $k + 1`
+  echo "#========== `date` Running sample $b $nwdid $studyname from $1 ========#"
+  st=`date +%s`
+  rc=0
+  for x in recal.cram recal.cram.crai recal.cram.flagstat recal.cram.md5; do
+    y=`echo ${studyname,,} | grep copd`
+    if [ "$y" != "" ]; then         # Studyname is not always part of the path  POS
+      studyname=copd
+    fi
+    $gsutil rewrite -s coldline gs://topmed-irc-working/remapping/b37/${studyname,,}/$nwdid.$x
+    rc=`expr $rc + $?`
+  done
+  if [ "$rc" = "0" ]; then
+    SetDB $bamid state_fix 20
+    n=`expr $n + 1`
+  else
+    SetDB $bamid state_fix 99
+    e=`expr $e + 1`
+  fi
+  et=`date +%s`
+  et=`expr $et - $st`
+  echo "[$k] Coldline attempted for $nwdid $bamid in $et seconds"
 done
+
+etime=`date +%s`
+etime=`expr $etime - $stime`
+echo "Complete changing $n samples to coldline storage in $etime seconds - $e failed"
 exit
 
 
