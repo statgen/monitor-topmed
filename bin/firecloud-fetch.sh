@@ -13,6 +13,7 @@
 #
 me=`basename $0`
 convert_checksums=/net/topmed/incoming/study.reference/study.reference/nhlbi.4275.gsutil.checksums.awk
+export PROJECT=topmed
 
 if [ "$#" -lt 2 ]; then
   echo "$me - Fetch data from the BROAD from firecloud"
