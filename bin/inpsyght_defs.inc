@@ -19,7 +19,6 @@ realhost=''
 cores=''                            # Set to same as gsutil if it will be used
 gsutil="gsutil -m"
 gsshareoption="-u topmed-1366"      # Used to copy to SHARE
-#gsutilbig='gsutil -o GSUtil:parallel_composite_upload_threshold=150M'
 export BOTO_CONFIG=/net/topmed/working/shared/tpg_gsutil_config.txt
 
 #incominguri='gs://topmed-recabs'
