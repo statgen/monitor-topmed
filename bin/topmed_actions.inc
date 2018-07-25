@@ -212,6 +212,9 @@ function ValidateIndex {
     build=`GetBuild $bamid $file`
     if [ "$build" = "37" ]; then
       buildstr="hs37d5:35,450,000-35,477,943"
+      if [ "$project" = "inpsyght" ]; then  # Broad use differ 37 ref for this project
+        buildstr="GL000192.1:544,000-547,490"
+      fi
     fi
     if [ "$build" = "38" ]; then
       buildstr="chr19_KI270938v1_alt"
@@ -317,6 +320,10 @@ function CreateIndex {
   fi
 
   # Need checksum for CRAM index
+  x=`grep recab $file`
+  if [ "$x" = "" ]; then
+    return
+  fi
   md5=`GetDB $bamid b38craichecksum`
   #  Calculate checksum?
   if [ "$calcchecksum" = "n" -a "$md5" != "" ]; then
