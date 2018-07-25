@@ -37,10 +37,6 @@ if [ "$cramfile" = "" ]; then
   Fail "Unable to determine CRAM file for '$bamid'"
 fi
 
-nwdid=`GetNWDID $bamid`
-bamid=`GetDB $nwdid bamid`
-Started
-
 center=`GetDB $bamid center`
 if [ "$center" = "" ]; then
   Fail "Unable to get center for bamid '$bamid'"
@@ -53,6 +49,7 @@ datayear=`GetDB $bamid datayear`
 if [ "$datayear" = "" ]; then
   Fail "Unable to get datayear for bamid '$bamid'"
 fi
+nwdid=`GetNWDID $bamid`
 stime=`date +%s`
 
 #======================================================================
@@ -69,20 +66,33 @@ if [ "$PROJECT" = "topmed" -a "$datayear" = "4" -a "$center" = "broad" ]; then
   if [ -f $recabfile ]; then
     Fail "Recab $recabfile for $nwdid [$bamid] already exists, remove if necessary"
   fi
+  #   No local recab exists, make fake one
   p=`dirname $recabfile`
   mkdir -p $p
   if [ "$?" != "0" ]; then
     Fail "Unable to create recab directory $nwdid [$bamid]"
   fi
-  # Finally make symlink
-  ln -s $cramfile $recabfile
+  ln -s $cramfile $recabfile            # Finally make symlink
   if [ "$?" != "0" ]; then
     Fail "Unable to create recab symlink $recabfile for $nwdid [$bamid]"
   fi
+  ln -s $cramfile.crai $recabfile.crai
+  if [ "$?" != "0" ]; then
+    Fail "Unable to create recab symlink $recabfile.crai for $nwdid [$bamid]"
+  fi
+  x=`GetDB $bamid bamflagstat`
+  SetDB $bamid b38flagstat $x
+  x=`GetDB $bamid checksum`
+  SetDB $bamid b38cramchecksum $x
+  x=`CalcMD5 $bamid $recabfile.crai`
+  SetDB $bamid b38craichecksum $x
+  $topmedcmd setdate $bamid datemapping_b38 $recabfile
+  SetDB $bamid state_gce38pull 20       # B38 remapping is done
+
+  #   Done with fake pull, finish up
   SetDB $bamid state_gce38bcf 0
-  SetDB $bamid state_gce38pull 20      # Mark B38 remapping as done
   SetDB $bamid state_b38 20
-  SetDB $bamid state_gce38copy 0       # Mark copy files to GCE as not done yet
+  SetDB $bamid state_gce38copy 1        # Be sure this gets copied to GCE
   SetDB $bamid state_aws38copy 0
 
   etime=`date +%s`
