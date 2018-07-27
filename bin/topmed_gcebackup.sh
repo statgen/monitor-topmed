@@ -2,7 +2,8 @@
 #
 #   topmed_gcebackup.sh -submit| bamid
 #
-#	Backup CRAM of a sample to GCE
+#	Backup of a sample original file to local storage
+#   Note, we no longer copy this file to GCE (July 2018)
 #
 . /usr/cluster/$PROJECT/bin/topmed_actions.inc
 me=gcebackup
@@ -35,105 +36,23 @@ stime=`date +%s`
 
 file=`GetDB $bamid bamname`
 if [ "$file" = "" ]; then
-  Fail "Unable to determine BAMNAME for '$bamid'"
+  Fail "Unable to determine original source file BAMNAME for '$bamid'"
 fi
-
-datayear=`GetDB $bamid datayear`
-build=`GetDB $bamid build`
 extension="${file##*.}"
+
 #======================================================================
-#   Backup CRAM to GCE for only datayear=3 and build=38
-#   Kill backups offsite until Goncalo makes a decision  7/2018
+#   Backup original source file to local storage
 #======================================================================
-if [ "$PROJECT" = "topmedx" -a "$extension" = "cram" -a "$datayear" -ge "3" -a "$build" = "38" ]; then
-  stime=`date +%s`
-
-  # Start by making sure the local filesystem backup is set
-  f=`$topmedpath wherefile $bamid cram`
-  if [ ! -f $f ]; then
-    Fail "Set up local working directory so we can always find the cram"
-  fi
-
-  # Now backup the file offsite
-  backupuri=`$topmedpath wherepath $nwdid remotebackup`
-  cramfile=`$topmedpath wherefile $bamid cram`
-
-  f=`basename $cramfile`
-  echo "Backup of CRAM to $backupuri/$f to GCE"
-  $gsutil cp $cramfile $backupuri/$f
-  if [ "$?" != "0" ]; then
-    Fail "Failed to copy file to GCE: cp $cramfile $backupuri/$f"
-  fi
-  echo "Backup of CRAM to $backupuri/$f.crai to GCE"
-  $gsutil cp $cramfile.crai $backupuri/$f.crai
-  if [ "$?" != "0" ]; then
-    Fail "Failed to copy file to GCE: cp $cramfile.crai $backupuri/$f.crai"
-  fi
-  SetDB $bamid 'offsite' D          # Mark this as backed up offsite
-
-  etime=`date +%s`
-  etime=`expr $etime - $stime`
-  echo "Backup of CRAM to Google CLoud completed in $etime seconds"
-
-  Successful
-  Log $etime
-  exit
+backupfile=`$topmedpath wherefile $bamid localbackup`
+echo "Backup of $file to $backupfile"
+cp -p $file $backupfile
+if [ "$?" != "0" ]; then
+  Fail "Failed to backup $file to $backupfile"
 fi
+etime=`date +%s`
+etime=`expr $etime - $stime`
+echo "Backup of original source file to local storage completed in $etime seconds"
 
-#======================================================================
-#   Original file was a bam
-#======================================================================
-if [ "$extension" = "bam" ]; then
-  cramfile=`$topmedpath wherefile $bamid cram`
-  if [ "$cramfile" = "" ]; then
-    Fail "Unable to determine CRAM file for '$bamid'"
-  fi
-  if [ ! -f "$cramfile" ]; then
-    Fail "CRAM file '$cramfile' for '$bamid' was never created"
-  fi
-  echo "Original BAM was converted by topmed_cram to a cram - nothing to do"
-  Successful
-  Log 1
-  exit
-fi
-
-#======================================================================
-#   Original file was a cram - should have been backed up offsite
-#======================================================================
-if [ "$extension" = "cram" ]; then
-  offsite=`GetDB $bamid offsite`
-  if [ "$offsite" != "D" ]; then
-    #Fail "Original file was a CRAM ($bamid) but was not backed up offsite ($offsite)"
-    echo "Original file was a CRAM ($bamid) but was not backed up offsite ($offsite), but who cares?"
-  else
-    echo "Original CRAM was backed up offsite"
-  fi
-  
-  cramdir=`$topmedpath wherepath $bamid cram`
-  if [ "$cramdir" = "" ]; then
-    Fail "Unable to determine backup directory for '$bamid'"
-  fi
-  echo "Create symlink to original file since backup is offsite"
-  mkdir -p $cramdir             # Safe to make backup dir cause it is small
-  cd $cramdir
-  if [ "$?" != "0" ]; then
-      Fail "Unable to CD $cramdir. This directory must be created first."
-  fi
-  cramfile=`$topmedpath wherefile $bamid cram`
-  newname=`basename $cramfile`
-  if [ "$cramfile" != "$newname" ]; then
-    ln -sf $bamfile $newname        # Create backup file as symlink in case of screwy names
-    ln -sf $bamfile.crai $newname.crai
-  fi
-  if [ ! -f $newname ]; then
-    Fail "Unable to create backup file '$newname' in '$cramdir'"
-  fi
-
-  Successful
-  Log 1
-  exit
-fi
-
-#   We should never get here
-Fail "Somehow $0 $bamid failed to figure out what to backup"
-exit 3
+Successful
+Log $etime
+exit
