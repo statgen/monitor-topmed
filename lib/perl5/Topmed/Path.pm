@@ -26,7 +26,8 @@ our %PATHOPTS = (
     netdir => '/net/',
     qcresultsdir => 'incoming/qc.results',
     incomingdir => 'incoming/',
-    backupsdir => 'working/backups/incoming/',
+    cramdir => 'working/backups/incoming/',
+    backupsdir => '/net/topmed8/working/temp_backups/',
     bcfsdir => 'working/candidate_variants',
     consoledir => 'working/',
     wresults37dir => 'working/schelcj/results',
@@ -51,6 +52,7 @@ sub PathInit {
     my ($project) = @_;
     $PATHOPTS{realm} = "/usr/cluster/$project/etc/.db_connections/$project";
     $PATHOPTS{netdir} .= $project;
+    $PATHOPTS{cramdir} .= $project;
     $PATHOPTS{backupsdir} .= $project;
     $PATHOPTS{incomingdir} .= $project;
     $PATHOPTS{consoledir} .= $project . '-output';
@@ -103,9 +105,15 @@ sub WherePath {
     }
  
     #   Find where the cram file lives
-    if ($set eq 'cram' || $set eq 'localbackup') {
-        my $bakbamfdir = AbsPath("$PATHOPTS{netdir}/$PATHOPTS{backupsdir}/$centername/$rundir");
+    if ($set eq 'cram') {
+        my $bakbamfdir = AbsPath("$PATHOPTS{netdir}/$PATHOPTS{cramdir}/$centername/$rundir");
         return $bakbamfdir;
+    }
+
+    #   Find where the original source file was backed up
+    if ($set eq 'localbackup') {
+        my $backup = "$PATHOPTS{backupsdir}/$centername";
+        return $backup;
     }
 
     #   Find where the GCE backup cram file lives
@@ -225,7 +233,9 @@ sub WhereFile {
 
     if ($set eq 'bam') { return $path . "/$bamname"; }
  
-    if ($set eq 'cram' || $set eq 'localbackup') { return $path . "/$cramname"; }
+    if ($set eq 'cram') { return $path . "/$cramname"; }
+
+    if ($set eq 'localbackup') { return $path . "/$cramname"; }
 
     if ($set eq 'remotebackup') { return $path . "/$cramname"; }
 
