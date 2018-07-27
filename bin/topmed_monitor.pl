@@ -325,7 +325,7 @@ if ($fcn eq 'bcf') {
 if ($fcn eq 'gcecopy') {
     #   Get list of all samples yet to process
     my $sql = BuildSQL("SELECT bamid,state_b38,state_gce38bcf,state_gce38copy",
-        "WHERE b.state_b38=$COMPLETED AND b.state_gce38copy=$REQUESTED");
+        "WHERE b.state_b38=$COMPLETED AND b.state_gce38copy!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { exit; }
