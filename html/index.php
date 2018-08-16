@@ -392,7 +392,7 @@ function ViewRuns($center, $maxdirs, $iammgr) {
     $html = "<h3 align='center'>Summary of Runs</h3>\n" .
         "<center>" . GetChooseLines() . "<br/>$SHOWSTATUS</center>\n";
     $centers2show = array();                // Get list of centers for this query
-    $yearstart = 3;
+    $yearstart = 4;
     $yearstop = 0;
     if ($center == 'year1' || $center == 'year2' || $center == 'year3' || $center == 'year4') {
         $centers2show = $CENTERS;
