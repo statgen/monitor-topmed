@@ -46,7 +46,7 @@ else
   echo "$checksum  $bamfile" > $tmpfile
   md5sum -c $tmpfile
   if [ "$?" != "0" ]; then
-    Fail "MD5sum failed"
+    Fail "MD5sum failed: `cat $tmpfile`"
   fi
   rm -f $tmpfile
 fi
