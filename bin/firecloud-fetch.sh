@@ -39,9 +39,11 @@ else
   dir=$localdir
 fi
 mkdir -p $dir
+chmod 0770 $dir || exit 5       # Be sure permissions are set properly
 cd $dir || exit 4
 
 logfile=fetch.log
+echo "Log file at $dir/$logfile"
 echo ''   >  $logfile
 echo "`date`	`uname -n`" >> $logfile
 echo $me  >> $logfile
@@ -93,6 +95,7 @@ if [ "$bucket" = "" ]; then
   echo "See curl output in `pwd`/$logfile" >> $logfile
   exit 2
 fi
+rm -f extract.pl
 uri="gs://$bucket"
 echo $uri   >> $logfile
 echo  ''    >> $logfile
@@ -106,9 +109,9 @@ gsutil ls -r -L ${uri}/'**' > gsutil.complete
 awk -f $convert_checksums  gsutil.complete > gsutil.checksums
 grep -v cram.crai gsutil.checksums | cut -f 1 > Manifest.txt
 echo `date` >> $logfile
+rm -f gsutil.checksums
 
 #   Finally know what we are supposed to do
-
 mkdir incoming
 cd    incoming || exit 5
 
@@ -146,15 +149,18 @@ if [ "$n" = "0" ]; then
   echo "$me - something went wrong, no CRAMS found" >> $logfile
   exit 9
 else
-#   Clean out cruft from the Broad. For now the cruft is left in $dir/incoming
+#   Clean out cruft from the Broad
   rm -rf incoming
 fi
+#   Insure the CRAI files are younger than the source file. Avoid re-making indexes. Correct permissions
+touch *.crai
+chmod 0660 *.cram *.crai
+
 echo "SUCCESSFUL  Fetched $n $uri files to $ddndir/$dir"   >> $logfile
 echo "Manifest.txt shows `ls -l Manifest.txt` .cram files" >> $logfile
 echo `date` >> $logfile
 echo  ''    >> $logfile
 echo -n "$localdir	:  " >> $logfile
-
 #   Register this new run in the monitor database
 #   This part of the code is hard-wired with center = broad
 
@@ -164,7 +170,8 @@ cd /net/topmed/incoming/topmed/$center
 ln -s ../../../../$linkdir .
 cd $HOME
 /usr/cluster/topmed/bin/topmed_init.pl -center $center updatedb >> $dir/$logfile
+rc=$?
 echo '' >> $dir/$logfile
-exit $?
+exit $rc
 
 
