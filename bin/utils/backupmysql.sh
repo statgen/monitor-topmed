@@ -50,12 +50,23 @@ if [ "$name" = "" ]; then
 fi
 f=$destdir/$realm-$name.$db.sql.gz
 
-echo "Backup of database $db ..."
-$pgm $pgmopts $db | gzip -c > $f
+log=/tmp/$$
+echo "Backup of database $db ..." > $log
+$pgm $pgmopts $db 2>/dev/null | gzip -c > $f
 if [ $? != 0 ]; then
+  cat $log
+  rm -f $log
   echo "$me - Error backing up database '$db' (realm=$realm)"
   ls -la $f
   exit 1
 fi
 chmod 600 $f
-ls -la $f
+ls -la $f >> $log
+
+#   Backup successful. Every now and then generate STDOUT so cron shows what happened
+if [ "$RANDOM" -gt "25000" ]; then
+  echo "Just reminding you a backup was done successfully"
+  echo ""
+  cat $log
+fi
+rm -f $log
