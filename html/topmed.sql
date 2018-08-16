@@ -63,7 +63,7 @@ CREATE TABLE runs (
   dirname      VARCHAR(64) NOT NULL,
   status       VARCHAR(256),
   count        INT,
-  datayear     INT DEFAULT 3,          /* Year of project: 1, 2 ... */
+  datayear     INT DEFAULT 4,          /* Year of project: 1, 2 ... */
   offsite      CHAR(1) DEFAULT 'N',    /* Original files kept offsite (N,Y,D) */
   xmlfound     INT DEFAULT 0,          /* Remove this */
   arrived      CHAR(1) DEFAULT 'N',    /* Y or N that all files arrived for this run */
