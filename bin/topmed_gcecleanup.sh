@@ -39,7 +39,7 @@ function WhereIsGCEBackup {
   srcsize=`echo $srcfile | awk '{print $2}'`
   srcfile=`echo $srcfile | awk '{print $4}'`
   rmlist=''
-  for f in `awk '{print $4}' < $tmp`; do rmlist="$rmlist $f"; done
+  for f in `grep $ext $tmp | awk '{print $4}'`; do rmlist="$rmlist $f"; done
   echo "$ext $srcfile $srcsize $rmlist"
   rm -f $tmp
 }
@@ -52,7 +52,7 @@ if [ "$1" = "-submit" ]; then
   bamid=`GetDB $1 bamid`
   RandomRealHost $bamid
   MayIRun $me $bamid $realhost
-  SubmitJob $bamid $PROJECT '1G' "$0 $*"
+  SubmitJob $bamid $PROJECT '4G' "$0 $*"
   exit
 fi
 
@@ -92,12 +92,19 @@ if [ "$gceext" = "none" ]; then
   Log $etime
   exit
 fi
+echo "gceext=$gceext gcefile=$gcefile gcesize=$gcesize x=${x[*]}"
 
 #   We have something in GCE backups. See if local file size matches
-file=`$topmedpath wherefile $bamid $gceext`
-if [ "$file" = "" ]; then
+filepath=`$topmedpath wherepath $bamid $gceext`
+if [ "$filepath" = "" ]; then
   Fail "Unable to find local path to $gceext for $nwdid [ $bamid ]"
 fi
+if [ "$gceext" = "bam" ]; then
+  f=`$topmedcmd show $bamid bamname_orig`
+else
+  f=`$topmedcmd show $bamid cramname`
+fi
+file=$filepath/$f
 sz=`stat --dereference --format %s $file 2>/dev/null`
 if [ "$?" != "0" ]; then            # If local file was removed, cannot compare
     if [ "$gceext" = "cram" ]; then
@@ -126,98 +133,3 @@ echo "Removed GCE backups [$nwdid] in $etime seconds"
 Successful
 Log $etime
 exit
-
-
-#------------------------------------------------------------------
-# Subroutine:
-#   ipath=`B37ValidateIndex(bamid,file)`
-#
-#   file must exist
-#
-#	print indexfile_path valid_or_not
-#
-########### This function is apparently not working, trying something else ##########
-#------------------------------------------------------------------
-function B37ValidateIndex {
-  local bamid=$1
-  local file=$2         # BAM or CRAM
-
-#samtools view -H /net/topmed5/working/backups/incoming/topmed/nygc/nhlbi-umich-20150904_1/NWD979839.src.cram | awk -f /net/topmed/incoming/study.reference/current.6.2016/nhlbi.1530.cram.end.region.awk
-
-  #  To verify an index, we search for a string - depending on the extension
-  ext="${file##*.}"
-  buildstr='notset'
-  indexfile='notset'
-  if [ "$ext" = "bam" ]; then
-    indexfile=$file.bai
-    buildstr="3:148,100,000-148,110,000"
-  fi
-  if [ "$ext" = "cram" ]; then
-    indexfile=$file.crai
-    build=37
-    if [ "$build" = "37" ]; then
-      buildstr=`samtools view -H $file | awk -f /net/topmed/incoming/study.reference/current.6.2016/nhlbi.1530.cram.end.region.awk`
-      echo $buildstr > /tmp/j
-      if [ "$project" = "inpsyght" ]; then  # Broad use differ 37 ref for this project
-        buildstr="GL000192.1:544,000-547,490"
-      fi
-    fi
-    if [ "$build" = "38" ]; then
-      buildstr="chr19_KI270938v1_alt"
-    fi
-  fi
-  if [ "buildstr" = 'notset' ]; then
-    Fail "ValidateIndex: Unable to determine string to search for in header of $file"
-  fi
-
-  #   Index must exist and not be null
-  if [ ! -f $indexfile ]; then
-    echo "$indexfile invalid $buildstr"
-    return
-  fi
-  if [ ! -s $indexfile ]; then
-    echo "$indexfile invalid $buildstr"
-    return
-  fi
-
-  #   Index exists, let's see if it is any good
-  n=`$samtools view $file $buildstr | wc -l`
-  if [ "$n" = "" -o "$n" -lt "200" ]; then
-    echo "$indexfile invalid $buildstr $n"
-    return
-  fi
-  echo "$indexfile valid $buildstr $n"
-  return
-}
-
-#------------------------------------------------------------------
-# Subroutine:
-#   uri=`xxWhereIsGCEBackup nwdid`
-#
-#   prints uri sizeoffile or nothing
-#------------------------------------------------------------------
-function xxWhereIsGCEBackup {
-  local nwd=$1
-  run=`$topmedcmd show $nwd run`
-  center=`$topmedcmd show $nwd center`
-  if [ "$run" = "" -o "$center" = "" ]; then
-    Fail "Unable to figure out run or center for $nwd"
-  fi
-  >&2 echo "Searching for a backup of sample '$nwdid' in run '$run' center '$center'"
-  x=(`$gsutil ls -l gs://topmed-backups/$center/$run/$nwdid.src.cram 2>/dev/null | grep $nwd`)
-  if [ "${x[0]}" != "" ]; then
-    print ${x[0]} gs://topmed-backups/$center/$run
-    return
-  fi
-  x=(`$gsutil ls -l gs://topmed-archives/\*/$nwdid 2>/dev/null | grep $nwd`)
-  if [ "${x[0]}" != "" ]; then
-    print ${x[0]} gs://topmed-archives/$center/$run
-    return
-  fi
-  x=(`$gsutil ls -l gs://topmed-irc-working/archives/$center/$run/$nwdid.src.cram 2>/dev/null | grep $nwd`)
-  if [ "${x[0]}" != "" ]; then
-    print ${x[0]} gs://topmed-irc-working/archives/$center/$run
-    return
-  fi
-  return
-}
