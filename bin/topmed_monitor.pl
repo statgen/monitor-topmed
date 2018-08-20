@@ -49,7 +49,7 @@ our %opts = (
     topmedcmd => $Bin . "/topmedcmd.pl",
     topmedarrive => $Bin . "/topmed_arrive.sh",
     topmedverify => $Bin . "/topmed_verify.sh",
-    topmedbackup => $Bin . "/topmed_gcebackup.sh",
+    topmedbackup => $Bin . "/topmed_backup.sh",
     topmedcram   => $Bin . "/topmed_cram.sh",
     topmedqplot  => $Bin . "/topmed_qplot.sh",
     topmedexpt  => $Bin . "/topmed_ncbiexpt.sh",
@@ -87,7 +87,7 @@ Getopt::Long::GetOptions( \%opts,qw(
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$Script [options] arrive|verify|qplot|cram|gcebackup|qplot|gcepush|gcepull|bcf|gcecopy|gcecpbcf|gcecleanup|awscopy|fix\n" .
+    warn "$Script [options] arrive|verify|qplot|cram|backup|qplot|gcepush|gcepull|bcf|gcecopy|gcecpbcf|gcecleanup|awscopy|fix\n" .
         "Find runs which need some action and queue a request to do it.\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
@@ -215,18 +215,18 @@ if ($fcn eq 'cram') {
 #--------------------------------------------------------------
 #   Backup some files offsite
 #--------------------------------------------------------------
-if ($fcn eq 'gcebackup' || $fcn eq 'backup') {
-    my $sql = BuildSQL("SELECT bamid,bamname,state_cram,state_gcebackup",
-        "WHERE b.state_cram=$COMPLETED AND b.state_gcebackup!=$COMPLETED");
+if ($fcn eq 'backup') {
+    my $sql = BuildSQL("SELECT bamid,bamname,state_cram,state_backup",
+        "WHERE b.state_cram=$COMPLETED AND b.state_backup!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { exit; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
-        if ($opts{suberr} && $href->{state_gcebackup} >= $FAILEDCHECKSUM) {
-            $href->{state_gcebackup} = $REQUESTED;
+        if ($opts{suberr} && $href->{state_backup} >= $FAILEDCHECKSUM) {
+            $href->{state_backup} = $REQUESTED;
         }
-        if ($href->{state_gcebackup} != $NOTSET && $href->{state_gcebackup} != $REQUESTED) { next; }
+        if ($href->{state_backup} != $NOTSET && $href->{state_backup} != $REQUESTED) { next; }
         if (! BatchSubmit("$opts{topmedbackup} -submit $href->{bamid}")) { last; }
     }
     ShowSummary($fcn);
@@ -238,8 +238,8 @@ if ($fcn eq 'gcebackup' || $fcn eq 'backup') {
 #   Special hook using state_fix so we know when a sample has run the new aplot for Tom
 #--------------------------------------------------------------
 if ($fcn eq 'qplot') {
-    my $sql = BuildSQL("SELECT bamid,state_gcebackup,state_qplot",
-        "WHERE b.state_gcebackup=$COMPLETED AND b.state_qplot!=$COMPLETED");
+    my $sql = BuildSQL("SELECT bamid,state_backup,state_qplot",
+        "WHERE b.state_backup=$COMPLETED AND b.state_qplot!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { exit; }
@@ -411,8 +411,8 @@ if ($fcn eq 'awscopy') {
 #--------------------------------------------------------------
 if ($fcn eq 'fix') {
     #   Get list of all samples yet to process
-    my $sql = BuildSQL("SELECT bamid,state_gcebackup,state_qplot",
-        "WHERE b.state_gcebackup=$COMPLETED AND b.state_fix!=$COMPLETED");
+    my $sql = BuildSQL("SELECT bamid,state_backup,state_qplot",
+        "WHERE b.state_backup=$COMPLETED AND b.state_fix!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { exit; }
@@ -762,7 +762,7 @@ Provided for developers to see additional information.
 
 =over 4
 
-=item B<arrive | verify | qplot | cram | gcebackup | qplot | gcepush | gcepull | bcf | gcecopy | gcecpbcf | gcecleanup | fix\n" .
+=item B<arrive | verify | qplot | cram | backup | qplot | gcepush | gcepull | bcf | gcecopy | gcecpbcf | gcecleanup | fix\n" .
 y>
 
 Directs this program to look for runs that have not been through the process name

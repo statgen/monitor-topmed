@@ -77,7 +77,7 @@ $quickcols = array(                     // Map of status column to topmedcmd ver
     'state_arrive'   => 'arrived',
     'state_verify'   => 'verify',
     'state_cram'     => 'cramed',
-    'state_gcebackup'   => 'gcebackup',
+    'state_backup'   => 'backup',
     'state_qplot'    => 'qplot',
     'state_b37'      => 'mapping37',
     'state_gce38push'=> 'gcepush',
@@ -97,7 +97,7 @@ $quickletter = array(                   // Map of status column to letter we see
     'state_arrive'   => 'a',
     'state_verify'   => '5',
     'state_cram'     => 'C',
-    'state_gcebackup'=> 'B',
+    'state_backup'   => 'B',
     'state_qplot'    => 'Q',
     'state_b37'      => '7',
     'state_gce38push'=> 's',
@@ -113,7 +113,7 @@ $quickletter = array(                   // Map of status column to letter we see
     'state_ncbib37'  => 'P',
     'state_fix'      => 'F'
 );
-$validfunctions = array('all', 'verify', 'cram', 'gcebackup', 'qplot',
+$validfunctions = array('all', 'verify', 'cram', 'backup', 'qplot',
     'gcepush', 'gcepull', 'bcf', 'gcecopy', 'gcecpbcf', 'gcecleanup', 'awscopy', 'fix');
 $NOTSET = 0;                // Not set
 $REQUESTED = 1;             // Task requested
@@ -241,7 +241,7 @@ if ($fcn == 'bamdetail') {
 if ($fcn == 'showout') {                // Show output from a SLURM job
     $s='none';
     if ($samplestate == '5') { $s = 'verify'; }
-    if ($samplestate == 'B') { $s = 'gcebackup'; }
+    if ($samplestate == 'B') { $s = 'backup'; }
     if ($samplestate == 'Q') { $s = 'qplot'; }
     if ($samplestate == 'C') { $s = 'cram'; }
     if ($samplestate == 's') { $s = 'gcepush'; }
@@ -823,7 +823,7 @@ function RestartJobs($h) {
         "<option value='arrive'>arrive</option>" .
         "<option value='verify'>verify</option>" .
         "<option value='cram'>cram</option>" .
-        "<option value='gcebackup'>gcebackup</option>" .
+        "<option value='backup'>backup</option>" .
         "<option value='qplot'>qplot</option>" .
         "<option value='gce38push'>gcepush</option>" .
         "<option value='gce38pull'>gcepull</option>" .

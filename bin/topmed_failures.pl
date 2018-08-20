@@ -51,7 +51,7 @@ our %opts = (
 my $STARTED   = 3;                      # Task started
 my @statecols =                         #   States to be checked
     qw/ state_verify
-    state_gcebackup
+    state_backup
     state_cram
     state_qplot
     state_gce38push

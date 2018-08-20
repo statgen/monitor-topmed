@@ -134,7 +134,7 @@ my $FAILED    = 99;           # Task failed
 */
   state_arrive   INT DEFAULT 0,
   state_verify   INT DEFAULT 0,
-  state_gcebackup INT DEFAULT 0,
+  state_backup   INT DEFAULT 0,
   state_cram     INT DEFAULT 0,
   state_qplot    INT DEFAULT 0,     /* Referenced in nhlbi_qc_metrics */
   state_b37      INT DEFAULT 0,     /* Referenced in nhlbi_qc_metrics */
@@ -265,9 +265,9 @@ CREATE TABLE stepstats (
   count_gcecpbcf    INT DEFAULT 0,
   avetime_gcecpbcf  INT DEFAULT 0,
   ncbicount_gcecpbcf INT DEFAULT 0,
-  count_gcebackup     INT DEFAULT 0,
-  avetime_gcebackup   INT DEFAULT 0,
-  ncbicount_gcebackup INT DEFAULT 0,
+  count_backup      INT DEFAULT 0,
+  avetime_backup    INT DEFAULT 0,
+  ncbicount_backup  INT DEFAULT 0,
   count_awscopy     INT DEFAULT 0,
   avetime_awscopy   INT DEFAULT 0,
   ncbicount_awscopy INT DEFAULT 0,

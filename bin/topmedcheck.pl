@@ -654,10 +654,10 @@ sub Check_Backups {
     my @error = ();
 
     #   Original files can be backed up to either of two places
-    my $sql = "SELECT state_gcebackup,bamname,build,datayear,runid FROM $opts{bamfiles_table} WHERE bamid=$bamid";
+    my $sql = "SELECT state_backup,bamname,build,datayear,runid FROM $opts{bamfiles_table} WHERE bamid=$bamid";
     my $sth = My_DB::DoSQL($sql);
     my $href = $sth->fetchrow_hashref;
-    if ($href->{state_gcebackup} != $COMPLETED) {
+    if ($href->{state_backup} != $COMPLETED) {
         if ($opts{verbose}) { print "BAMID=$bamid NWD=$nwdid was not backed up yet\n"; }
         return;
     }

@@ -98,7 +98,7 @@ if ($fcn == 'plot') {
         "<font color='$COLORS[4]'>Not Started</font> " .
         "</font></b></p>\n";
     $legend = array('aws38copy', 'gce38copy', 'gce38bcf', 'b38', 'gce38pull', 'gce38push',
-        'b37', 'qplot', 'gcebackup', 'cram', 'verify', 'fix' );    // Reversed
+        'b37', 'qplot', 'backup', 'cram', 'verify', 'fix' );    // Reversed
     $title = "Counts for All Verified Samples [$totalcount]";
     $plotdata = array();
     //$s = 'SELECT count(*) FROM ' . $LDB['bamfiles'] . " WHERE datayear=$datayear AND";
@@ -178,7 +178,7 @@ if ($fcn == 'plot') {
     //-------------------------------------------------------------------
     print "<h4>Cloud Activity</h4>\n";
     $title = "Daily Count of Samples to/from Cloud";
-    $legend = array('gcebackup', 'gcepush', 'gcepull', 'gcecopy', 'awscopy');
+    $legend = array('backup', 'gcepush', 'gcepull', 'gcecopy', 'awscopy');
     $title = "Daily Count of Steps Completed";
     $plotdata = array(); 
     for ($i=0; $i<$numrows; $i++) {
@@ -186,7 +186,7 @@ if ($fcn == 'plot') {
         if ($row['yyyymmdd'] < $NCBIBAMDATE) { continue; }
         $d = array();
         array_push($d, substr($row['yyyymmdd'],5,5));
-        array_push($d, $row['count_gcebackup']);
+        array_push($d, $row['count_backup']);
         array_push($d, $row['count_gcepush']);
         array_push($d, $row['count_gcepull']);
         array_push($d, $row['count_gcecopy']);
@@ -202,7 +202,7 @@ if ($fcn == 'plot') {
         if ($row['yyyymmdd'] < $NCBIBAMDATE) { continue; }
         $d = array();
         array_push($d, substr($row['yyyymmdd'],5,5));
-        array_push($d, $row['avetime_gcebackup']);
+        array_push($d, $row['avetime_backup']);
         array_push($d, $row['avetime_gcepush']);
         array_push($d, $row['avetime_gcepull']);
         array_push($d, $row['avetime_gcecopy']);

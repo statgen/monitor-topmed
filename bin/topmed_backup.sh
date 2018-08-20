@@ -1,19 +1,18 @@
 #!/bin/bash
 #
-#   topmed_gcebackup.sh -submit| bamid
+#   topmed_backup.sh -submit| bamid
 #
 #	Backup of a sample original file to local storage
 #   Note, we no longer copy this file to GCE (July 2018)
 #
 . /usr/cluster/$PROJECT/bin/topmed_actions.inc
-me=gcebackup
+me=backup
 markverb=$me
 
 if [ "$1" = "-submit" ]; then
   shift
   bamid=`GetDB $1 bamid`
   RandomRealHost $bamid
-  MyRealHost $bamid cram
   MayIRun $me $bamid $realhost
   timeout='2:00:00'
   SubmitJob $bamid $PROJECT '4G' "$0 $*"
@@ -34,20 +33,18 @@ bamid=`GetDB $nwdid bamid`
 Started
 stime=`date +%s`
 
-file=`GetDB $bamid bamname`
-if [ "$file" = "" ]; then
-  Fail "Unable to determine original source file BAMNAME for '$bamid'"
-fi
-extension="${file##*.}"
-
 #======================================================================
 #   Backup original source file to local storage
 #======================================================================
+origfile=`$topmedpath wherefile $bamid bam`
 backupfile=`$topmedpath wherefile $bamid localbackup`
-echo "Backup of $file to $backupfile"
-cp -p $file $backupfile
+echo "Backup of $origfile to $backupfile"
+d=`dirname $backupfile`
+mkdir -p $d                         # Just in case center dir needs making
+chmod 0770 $d
+cp -p $origfile $backupfile
 if [ "$?" != "0" ]; then
-  Fail "Failed to backup $file to $backupfile"
+  Fail "Failed to backup $origfile to $backupfile"
 fi
 etime=`date +%s`
 etime=`expr $etime - $stime`
