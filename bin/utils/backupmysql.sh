@@ -53,7 +53,7 @@ f=$destdir/$realm-$name.$db.sql.gz
 log=/tmp/$$
 echo "Backup of database $db ..." > $log
 $pgm $pgmopts $db 2>/dev/null | gzip -c > $f
-if [ $? != 0 ]; then
+if [ "$?" != "0" ]; then
   cat $log
   rm -f $log
   echo "$me - Error backing up database '$db' (realm=$realm)"
