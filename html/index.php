@@ -22,7 +22,7 @@ include_once "edit.php";
 
 $qurl =  $_SERVER['SCRIPT_NAME'] . "?fcn=queue'";
 $STATUSLETTERS =  "<br/> " .
-    "<i><b>a</b>=File Arrived, <b>5</b>=MD5 Verified, <b>B</b>=Remote Backup of CRAM, <b>C</b>=BAM=>CRAM, <b>Q</b>=qplot run,<br/>" .
+    "<i><b>a</b>=File Arrived, <b>5</b>=MD5 Verified, <b>B</b>=Local Backup of CRAM, <b>C</b>=BAM=>CRAM, <b>Q</b>=qplot run,<br/>" .
     "<b>7</b>=Remapped Build=37, " .
     "<b>s</b>=Push Build=38 to GCE, <b>r</b>=Pull Build=38 from GCE, <b>8</b>=Remapped Build=38," .
     "<br/><b>V</b>=Completed BCF/VT 38,<b>G</b></b>=Upload CRAM to GCE," .
