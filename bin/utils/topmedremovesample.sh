@@ -79,9 +79,9 @@ bam=`GetFile $bamid bam`
 if [ "$bam" != "" ]; then
   extension=${bam##*.}
   if [ "$extension" = "bam" ]; then
-    bam="$bam $bam.bai"
+    bam="$bam $bam.md5 $bam.bai"
   else
-    bam=''
+    bam="$bam $bam.md5 $bam.crai"
   fi
 fi
 bamdir=`$topmedpath wherepath $bamid bam`
@@ -118,16 +118,13 @@ if [ "$state" = "20" ]; then
   if [ "$b38" != "" ]; then
     b38=`dirname $b38`
     gcepublishath=`$topmedpath wherepath $nwdid gceupload`
-    gce38copy=`gsutil ls $gcepublishath/$nwdid/`
+    gce38copy=`gsutil $gsshareoption ls $gcepublishath/$nwdid\*`
   fi
 fi
-state=`$topmedcmd show $bamid state_gcebackup`
-gcebackup=''
+state=`$topmedcmd show $bamid state_backup`
+backup=''
 if [ "$state" = "20" ]; then
-  gcebackuppath=`$topmedpath wherepath $nwdid remotebackup`
-  if [ "$gcepath" != "" ]; then
-    gcebackup=`gsutil ls $gcebackuppath/${nwdid}\*`
-  fi
+  backup=`$topmedpath wherefile $nwdid localbackup`
 fi
 
 #   Prompt to see if we should really do this
@@ -140,7 +137,7 @@ if [ "$qcresults" != "" ]; then echo "  QC RESULTS: $qcresults"; fi
 if [ "$bcf"       != "" ]; then echo "  BCF: $bcf"; fi
 if [ "$b37"       != "" ]; then echo "  B37 CRAM: $b37"; fi
 if [ "$b38"       != "" ]; then echo "  B38 CRAM: $b38"; fi
-if [ "$gcebackup" != "" ]; then echo "  GCE BACKUP: $gcebackuppath"; fi
+if [ "$backup"    != "" ]; then echo "  LOCAL BACKUP: $backup"; fi
 if [ "$gce38copy" != "" ]; then echo "  GCE PUBLISHED: $gcepublishath"; fi
 echo "Count for run $run will be set to '$bamcount'"
 echo ""
@@ -154,7 +151,7 @@ fi
 
 #   Actually remove files
 echo "Removing files ..."
-rm -f $bam $cram $bcf || exit 2
+rm -f $bam $backup $cram $bcf || exit 2
 rm -rf $b37 $b38 || exit 3
 if [ "$manifest" != "" ]; then
   echo "Fix Manifest ..."
@@ -167,10 +164,11 @@ fi
 echo "Update database ..."
 xsql "delete from qc_results where bam_id=$bamid" || exit 4
 xsql "delete from bamfiles where bamid=$bamid" || exit 5
-xsql "update runs set bamcount=$bamcount where dirname=\"$run\"" || exit 6
+xsql "update runs set count=$bamcount where dirname=\"$run\"" || exit 6
 
-gsutil rm -r $gcebackuppath/$nwdid/
-gsutil rm -r $gcepublishath/$nwdid/
+if [ "$gce30copy" != "" ]; then
+  gsutil $gsshareoption rm $gce38copy
+fi
 
 echo "Successfully removed sample $bamid/$nwdid"
 exit
