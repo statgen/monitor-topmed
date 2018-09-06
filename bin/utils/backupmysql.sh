@@ -17,12 +17,10 @@
 ####################################################################
 me=`basename $0`
 realm=$LOGNAME                          # Also project
-if [ "$HOME" != "" ]; then              # Sometimes cron does not set HOME
-  HOME=/net/topmed/working/home/topmed
-fi
-realmdir=$HOME/.db_connections
+WORKING=/net/$realm/working
+realmdir=/usr/cluster/$realm/etc/.db_connections
 pgm=/usr/bin/mysqldump
-destdir=$HOME/BACKUPS/MYSQLBAK
+destdir=$WORKING/BACKUPS/MYSQLBAK
 name=""
 
 #	Allow realm and database to be overridden
@@ -64,8 +62,9 @@ chmod 600 $f
 ls -la $f >> $log
 
 #   Backup successful. Every now and then generate STDOUT so cron shows what happened
-if [ "$RANDOM" -gt "25000" ]; then
-  echo "Just reminding you a backup was done successfully"
+x=$RANDOM
+if [ "$x" -gt "31000" ]; then
+  echo "Just reminding you a backup was done successfully [$x]"
   echo ""
   cat $log
 fi
