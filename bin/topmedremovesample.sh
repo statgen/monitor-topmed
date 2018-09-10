@@ -89,14 +89,18 @@ manifest=''
 if [ -f "$bamdir/Manifest.txt" ]; then
   manifest=$bamdir/Manifest.txt
 fi  
+bam=`GetFile $bamid bam`        # Actually original incoming file (no longer a bam)
+if [ "$bam" != "" ]; then
+  bam="$bam $bam.crai $bam.md5"
+fi
 cram=`GetFile $bamid cram`
 if [ "$cram" != "" ]; then
-  cram="$cram $cram.crai"
+  cram="$cram $cram.crai $cram.md5"
 fi
 qcresults=`GetFile $bamid qcresults`
 if [ "$qcresults" != "" ]; then
   f=`dirname $qcresults` 
-  qcresults="$f/$nwdid.*"
+  qcresults="$f/$nwdid.*" 
 fi
 bcf=`GetFile $bamid bcf`
 if [ "$bcf" != "" ]; then
