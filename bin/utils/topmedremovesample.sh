@@ -72,16 +72,16 @@ l=`$topmedcmd whatrun $bamid`
 echo $l
 l=($l)
 dirname=${l[6]}
-bamcount=`expr ${l[10]} - 1`
+count=`expr ${l[10]} - 1`
 
 #   Get the list of files to remove
 bam=`GetFile $bamid bam`
 if [ "$bam" != "" ]; then
   extension=${bam##*.}
   if [ "$extension" = "bam" ]; then
-    bam="$bam $bam.md5 $bam.bai"
+    bam="$bam $bam.bai"
   else
-    bam="$bam $bam.md5 $bam.crai"
+    bam=''
   fi
 fi
 bamdir=`$topmedpath wherepath $bamid bam`
@@ -89,14 +89,18 @@ manifest=''
 if [ -f "$bamdir/Manifest.txt" ]; then
   manifest=$bamdir/Manifest.txt
 fi  
+bam=`GetFile $bamid bam`        # Actually original incoming file (no longer a bam)
+if [ "$bam" != "" ]; then
+  bam="$bam $bam.crai $bam.md5"
+fi
 cram=`GetFile $bamid cram`
 if [ "$cram" != "" ]; then
-  cram="$cram $cram.crai"
+  cram="$cram $cram.crai $cram.md5"
 fi
 qcresults=`GetFile $bamid qcresults`
 if [ "$qcresults" != "" ]; then
   f=`dirname $qcresults` 
-  qcresults="$f/$nwdid.*"
+  qcresults="$f/$nwdid.*" 
 fi
 bcf=`GetFile $bamid bcf`
 if [ "$bcf" != "" ]; then
@@ -117,14 +121,7 @@ if [ "$state" = "20" ]; then
   b38=`GetFile $bamid b38`
   if [ "$b38" != "" ]; then
     b38=`dirname $b38`
-    gcepublishath=`$topmedpath wherepath $nwdid gceupload`
-    gce38copy=`gsutil $gsshareoption ls $gcepublishath/$nwdid\*`
   fi
-fi
-state=`$topmedcmd show $bamid state_backup`
-backup=''
-if [ "$state" = "20" ]; then
-  backup=`$topmedpath wherefile $nwdid localbackup`
 fi
 
 #   Prompt to see if we should really do this
@@ -137,9 +134,7 @@ if [ "$qcresults" != "" ]; then echo "  QC RESULTS: $qcresults"; fi
 if [ "$bcf"       != "" ]; then echo "  BCF: $bcf"; fi
 if [ "$b37"       != "" ]; then echo "  B37 CRAM: $b37"; fi
 if [ "$b38"       != "" ]; then echo "  B38 CRAM: $b38"; fi
-if [ "$backup"    != "" ]; then echo "  LOCAL BACKUP: $backup"; fi
-if [ "$gce38copy" != "" ]; then echo "  GCE PUBLISHED: $gcepublishath"; fi
-echo "Count for run $run will be set to '$bamcount'"
+echo "Count for run $run will be set to '$count'"
 echo ""
 if [ "$prompt" = "y" ]; then
   echo -n "Shall we delete data for sample $bamid $nwdid? (y/n): "
@@ -151,7 +146,7 @@ fi
 
 #   Actually remove files
 echo "Removing files ..."
-rm -f $bam $backup $cram $bcf || exit 2
+rm -f $bam $cram $bcf || exit 2
 rm -rf $b37 $b38 || exit 3
 if [ "$manifest" != "" ]; then
   echo "Fix Manifest ..."
@@ -164,11 +159,7 @@ fi
 echo "Update database ..."
 xsql "delete from qc_results where bam_id=$bamid" || exit 4
 xsql "delete from bamfiles where bamid=$bamid" || exit 5
-xsql "update runs set count=$bamcount where dirname=\"$run\"" || exit 6
-
-if [ "$gce30copy" != "" ]; then
-  gsutil $gsshareoption rm $gce38copy
-fi
+xsql "update runs set count=$count where dirname=\"$run\"" || exit 6
 
 echo "Successfully removed sample $bamid/$nwdid"
 exit
