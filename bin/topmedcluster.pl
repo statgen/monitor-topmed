@@ -355,6 +355,7 @@ sub SQueue {
     print "\n";
 
     #   Get summary of IO data for key nodes
+    return;                  # Ignoring IOSTAT data Sep 2018
     my @iostatinfo = ();
     if (opendir(my $dh, "$opts{netdir}/$opts{consoledir}")) {
         @iostatinfo = sort sorthost grep { /iostat.$ENV{PROJECT}\d*.txt/ } readdir($dh);
