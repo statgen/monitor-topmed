@@ -87,18 +87,18 @@ CREATE TABLE bamfiles (
   library_name VARCHAR(96),
   nominal_sdev INT DEFAULT 0,
   nominal_length  INT DEFAULT 0,
-  cramname     VARCHAR(96) NOT NULL,
-  cramchecksum VARCHAR(96) NOT NULL,
-  b37cramchecksum VARCHAR(96) NOT NULL,
-  b38cramchecksum VARCHAR(96) NOT NULL,
-  b38craichecksum VARCHAR(96) NOT NULL,
+  cramname     VARCHAR(96) DEFAULT NULL,
+  cramchecksum VARCHAR(96) DEFAULT NULL,
+  b37cramchecksum VARCHAR(96) DEFAULT NULL,
+  b38cramchecksum VARCHAR(96) DEFAULT NULL,
+  b38craichecksum VARCHAR(96) DEFAULT NULL,
   bamflagstat  BIGINT UNSIGNED DEFAULT NULL,
   cramflagstat BIGINT UNSIGNED DEFAULT NULL,
   b37flagstat  BIGINT UNSIGNED DEFAULT NULL,
   b38flagstat  BIGINT UNSIGNED DEFAULT NULL,
   datemapping_b38  datetime DEFAULT NULL,   /* Referenced in nhlbi_qc_metrics */
   datemapping_b37  datetime DEFAULT NULL,   /* Referenced in nhlbi_qc_metrics */
-  studyname    VARCHAR(96) NOT NULL,    /* Referenced in nhlbi_qc_metrics */
+  studyname    VARCHAR(96) DEFAULT NULL,    /* Referenced in nhlbi_qc_metrics */
   piname       VARCHAR(96),             /* Referenced in nhlbi_qc_metrics */
   phs          VARCHAR(12),
   phs_consent_short_name VARCHAR(24),
@@ -116,7 +116,7 @@ CREATE TABLE bamfiles (
   datayear     INT DEFAULT 4,           /* Year of project: 1, 2 ... */
   build        VARCHAR(4) DEFAULT '38', /* Build original input file user, 37, 38 etc */
   dateinit     VARCHAR(12),             /* Referenced in nhlbi_qc_metrics */
-  bamname_orig VARCHAR(96) NOT NULL,
+  bamname_orig VARCHAR(96) DEFAULT NULL,
   offsite      CHAR(1) DEFAULT 'N',     /* Original files kept offsite (N,Y,D) */
 
 /* Fields to track state for each step */
