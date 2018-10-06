@@ -13,7 +13,7 @@ if [ "$1" = "-submit" ]; then
   shift
   realhost=$1       # Force to run here
   shift
-  timeout='48:00:00'
+  timeout='36:00:00'
   f=`basename $1`
   me="$me-$f"
   #echo "Ignore any errors from topmedcmd about invalid bamid"
