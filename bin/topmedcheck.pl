@@ -50,8 +50,8 @@ our %opts = (
     gceuri => 'gs://topmed-bcf',
     gsutil => '/usr/bin/gsutil',
     b37gceuri => 'gs://topmed-irc-working/remapping/b37',
-    b38gcebackup => 'gs://topmed-backups',      # Current place for backups
-    prevgcebackup => 'gs://topmed-archives',    # Previous place for backups (why 2? this is dumb)
+    b38gcebackup => 'gs://topmed-irc-share/genomes', # Serves as remapped b38 bucket
+    b38gcebackupopt => '-u topmed-1366',    # gsutil option for backup bucket
     gcels => '/usr/bin/gsutil ls',   # Add $opts{gceuri}/NWDxxxxxxx
     redotool => '/usr/cluster/topmed/bin/topmed_redo.sh',
     samtools => '/usr/cluster/bin/samtools',
@@ -68,7 +68,7 @@ Getopt::Long::GetOptions( \%opts,qw(
 
 #   Simple help if requested
 if ($opts{help} || ($#ARGV<0) && (! $opts{nfsmounts})) {
-    my $m = "$Script [options] -subset value  db|localfiles|awsfiles|gcefiles|b37|recabfiles\n" .
+    print "$Script [options] -subset value  db|recabfiles|localfiles|awsfiles|gcebcffiles|gcecramfiles|b37|backups\n" .
         "Where \n" .
         "  [-subset] is -center, -run or -sample\n" .
         "\n" .
@@ -101,7 +101,7 @@ if ($opts{max})       { $morewhere .= " LIMIT $opts{max}"; }
 if ($opts{nfsmounts}) { Check_NFSMounts(); exit; }  # Special case processing
 
 if ($opts{sample}) {                    # Maybe one or a range of bamids specified
-    if ($opts{samplel} eq 'all') {
+    if ($opts{sample} eq 'all') {
         my $sql = "SELECT bamid,expt_sampleid FROM $opts{bamfiles_table} " .
             "WHERE state_arrive=20" . $morewhere;
         my $sth = My_DB::DoSQL($sql);
@@ -167,15 +167,15 @@ if ($action eq 'db') {
     for (my $i=0; $i<=$#bamidrange; $i++) {
         Check_DB($bamidrange[$i], $nwdids[$i]);
     }
-    print "Completed check of db\n";
+    print "Completed check of db for " . ($#bamidrange+1) . " samples\n";
 }
 if ($action eq 'recabfiles') {
     $didsomething++;
-    print "Verify remapped files GCE recabs\n";
+    print "Verify remapped files GCE recabs  ?????\n";
     for (my $i=0; $i<=$#bamidrange; $i++) {
         Check_RecabFiles($bamidrange[$i], $nwdids[$i]);
     }
-    print "Completed check of recabfiles\n";
+    print "Completed check of " . ($#bamidrange+1) . " recabfiles\n";
 }
 if ($action eq 'localfiles') {
     $didsomething++;
@@ -188,15 +188,23 @@ if ($action eq 'localfiles') {
         print "Warning: " . scalar(@ds) . " directories were unexectedly empty:\n";
         if ($opts{verbose}) { print "  " . join("\n  ", @ds) . "\n"; }
     }
-    print "Completed check of localfiles\n";
+    print "Completed check of " . ($#bamidrange+1) . " localfiles\n";
 }
-if ($action eq 'gcefiles') {
+if ($action eq 'gcebcffiles') {
     $didsomething++;
-    print "Verify GCE files\n";
+    print "Verify BCF files in GCE\n";
     for (my $i=0; $i<=$#bamidrange; $i++) {
-        Check_GCEFiles($bamidrange[$i], $nwdids[$i]);
+        Check_GCEBCFFiles($bamidrange[$i], $nwdids[$i]);
     }
-    print "Completed check of gcefiles\n";
+    print "Completed check of " . ($#bamidrange+1) . " BCF gcefiles\n";
+}
+if ($action eq 'gcecramfiles') {
+    $didsomething++;
+    print "Verify RECAB CRAM files in GCE\n";
+    for (my $i=0; $i<=$#bamidrange; $i++) {
+        Check_GCECramFiles($bamidrange[$i], $nwdids[$i]);
+    }
+    print "Completed check of " . ($#bamidrange+1) . " CRAM gcefiles\n";
 }
 if ($action eq 'awsfiles') {
     $didsomething++;
@@ -204,7 +212,7 @@ if ($action eq 'awsfiles') {
     for (my $i=0; $i<=$#bamidrange; $i++) {
         Check_AWSFiles($bamidrange[$i], $nwdids[$i]);
     }
-    print "Completed check of awsfiles\n";
+    print "Completed check of " . ($#bamidrange+1) . " awsfiles\n";
 }
 if ($action eq 'b37') {
     $didsomething++;
@@ -212,7 +220,7 @@ if ($action eq 'b37') {
     for (my $i=0; $i<=$#bamidrange; $i++) {
         Check_B37Files($bamidrange[$i], $nwdids[$i]);
     }
-    print "Completed check of b37files\n";
+    print "Completed check of " . ($#bamidrange+1) . " b37files\n";
 }
 if ($action eq 'backups') {
     $didsomething++;
@@ -220,7 +228,7 @@ if ($action eq 'backups') {
     for (my $i=0; $i<=$#bamidrange; $i++) {
         Check_Backups($bamidrange[$i], $nwdids[$i]);
     }
-    print "Completed check of backups\n";
+    print "Completed check of " . ($#bamidrange+1) . " backups\n";
 }
 #if ($action eq 'checkfiles') {
 #    $didsomething++;
@@ -229,13 +237,6 @@ if ($action eq 'backups') {
 #        Check_Files($bamidrange[$i], $nwdids[$i]);
 #    }
 #    print "Completed checkfiles\n";
-#}
-
-#if ($opts{checkbcf}) {
-#    print "Verify the local BCF files and index - patience!\n";
-#    for (my $i=0; $i<=$#bamidrange; $i++) {
-#        Check_BCFFiles($bamidrange[$i], $nwdids[$i]);
-#    }
 #}
 
 #$ bcftools index -f /net/topmed8/working/candidate_variants/Ellinor/NWD694535.bcf
@@ -478,7 +479,8 @@ sub Check_LocalFiles {
 our %cachelines = ();                # Saved cache data here
 our $current_cache_file = '';
 sub Get_Cache_Data {
-    my ($file, $gsuri) = @_;    
+    my ($file, $gsuri, $gsopt) = @_;
+    if (! $gsopt) { $gsopt = ''; }
 
     #   Nothing changed and we already did this
     if (! defined($current_cache_file)) { $current_cache_file = ''; }
@@ -499,7 +501,7 @@ sub Get_Cache_Data {
     if (! -f $file) {
         my $k = 0;
         my $IN;
-        my $cmd = $opts{gcels} . ' -r ' . $gsuri . '/';
+        my $cmd = "$opts{gsutil} $gsopt ls -r " . $gsuri . '/';
         my $t = time();
         print "Fetching cache file $file using '$cmd'\n";
         open($IN, "$cmd |") ||
@@ -551,41 +553,81 @@ sub Get_Cache_Data {
     return \%cachelines;
 }
 
-
 #==================================================================
 # Subroutine:
-#   Check_GCEFiles()
+#   Check_GCEBCFFiles()
 #   Verify files in Google Cloud Environment
 #==================================================================
-sub Check_GCEFiles {
+sub Check_GCEBCFFiles {
     my ($bamid, $nwdid) = @_;
     my @error = ();
 
     #   Do not bother if we have not copied data to GCE
-    my $sql = "SELECT state_gce38copy,state_gce38cpbcf FROM $opts{bamfiles_table} WHERE bamid=$bamid";
+    my $sql = "SELECT state_gce38cpbcf FROM $opts{bamfiles_table} WHERE bamid=$bamid";
     my $sth = My_DB::DoSQL($sql);
     my $href = $sth->fetchrow_hashref;
-    if ($href->{state_gce38copy} != $COMPLETED) {
-        if ($opts{verbose}) { print "BAMID=$bamid NWD=$nwdid not copied to GCE yet\n"; }
+    if ($href->{state_gce38cpbcf} != $COMPLETED) {
+        if ($opts{verbose}) { print "BAMID=$bamid NWD=$nwdid BCF data not copied to GCE yet\n"; }
         return;
     }
-    my %requiredextensions = ( 'recab.cram' => 1, 'recab.cram.crai' => 1);
-    if ($href->{state_gce38cpbcf} != $COMPLETED) {
-        if ($opts{verbose}) { print "BAMID=$bamid NWD=$nwdid BCF data not copied to GCE yet, continuing\n"; }
-    }
-    else {
-        $requiredextensions{bcf} = 1;
-        $requiredextensions{'bcf.csi'} = 1;
-    }
-
+    my %requiredextensions = ( 'bcf' => 1, 'bcf.csi' => 1);
     #   All data is supposed to be in GCE
-    my $cacheref = Get_Cache_Data($opts{cachefile}, $opts{gceuri});
+    my $cacheref = Get_Cache_Data($opts{cachefile} . '.bcf', $opts{gceuri});
     if (! exists($cacheref->{$nwdid})) {
         push @error,"No $nwdid GCE files found";
         @{$cacheref->{$nwdid}} = ();        # Create empty array so things work
     }    
     foreach my $f (@{$cacheref->{$nwdid}}) {
         chomp($f);
+        if ($f !~ /^$nwdid\.(\S+)/) {
+        push @error,"GCE file is invalid: Unknown file: $f"; }
+        else {
+            my $x = $1;                 # Extension of file
+            if (exists($requiredextensions{$x})) { $requiredextensions{$x} = 0; }
+            else { push @error,"GCE: Invalid BCF extension: $f"; }
+        }
+    }
+    foreach my $x (keys %requiredextensions) {
+        if ($requiredextensions{$x}) { push @error,"GCE BCF file missing: $nwdid.$x"; }
+    }
+
+    #   If there were problems, show messages
+    if (@error) { ShowErrors($bamid, $nwdid, \@error); }
+    else {
+        if ($opts{verbose}) { print "  BAMID=$bamid NWD=$nwdid - GCE BCF files all exist\n"; }
+    }
+}
+
+#==================================================================
+# Subroutine:
+#   Check_GCECramFiles()
+#   Verify recab files in Google Cloud Environment
+#==================================================================
+sub Check_GCECramFiles {
+    my ($bamid, $nwdid) = @_;
+    my @error = ();
+
+    #   Do not bother if we have not copied data to GCE
+    my $sql = "SELECT state_gce38copy FROM $opts{bamfiles_table} WHERE bamid=$bamid";
+    my $sth = My_DB::DoSQL($sql);
+    my $href = $sth->fetchrow_hashref;
+    if ($href->{state_gce38copy} != $COMPLETED) {
+        if ($opts{verbose}) { print "BAMID=$bamid NWD=$nwdid RECAB CRAM not copied to GCE yet\n"; }
+        return;
+    }
+    my %requiredextensions = ( 'b38.irc.v1.cram' => 1, 'b38.irc.v1.cram.crai' => 1);
+    my $gsuri = $opts{b38gcebackup};
+
+    #   All data is supposed to be in GCE after it is remapped
+    my $remapped = 0;
+    my $cacheref = Get_Cache_Data($opts{cachefile} . '.ircshare', $gsuri, $opts{b38gcebackupopt});
+ 	if (! exists($cacheref->{$nwdid})) {
+        push @error,"No $nwdid remapped GCE files found";
+        @{$cacheref->{$nwdid}} = ();        # Create empty array so things work
+    }    
+    foreach my $f (@{$cacheref->{$nwdid}}) {
+        chomp($f);
+        if ($f =~ /freeze/) { next; }   # Ignore surprising freeze files
         if ($f !~ /^$nwdid\.(\S+)/) {
         push @error,"GCE file is invalid: Unknown file: $f"; }
         else {
@@ -604,7 +646,6 @@ sub Check_GCEFiles {
         if ($opts{verbose}) { print "  BAMID=$bamid NWD=$nwdid - GCE files all exist\n"; }
     }
 }
-
 
 #==================================================================
 # Subroutine:
@@ -667,17 +708,11 @@ sub Check_Backups {
     my $runid = $href->{runid};
     my $ext = '???';
     if ($bamname =~ /\.(\w+)$/) { $ext = $1; }
-    my $gsuri = $opts{prevgcebackup};                # Assume previous backup
-    my $cachefile = $opts{cachefile} . '.prev';
-    # Same logic as found in topmed_gcebackup.sh
-    if ($ext eq 'cram' && $datayear >= 3 && $build == 38) {
-        $gsuri = $opts{b38gcebackup};               # Use recent backup
-        $cachefile = $opts{cachefile};
-    }
+    my $gsuri = $opts{b38gcebackup};
 
-    #   All data is supposed to be in GCE
+    #   All data is supposed to be in GCE after it is remapped
     my $backedup = 0;
-    my $cacheref = Get_Cache_Data($cachefile, $gsuri);
+    my $cacheref = Get_Cache_Data($opts{cachefile} . '.ircshare', $gsuri, $opts{b38gcebackupopt});
         if (exists($cacheref->{$nwdid})) {
         foreach my $f (@{$cacheref->{$nwdid}}) {    # All files for NWD
             if ($f =~ /\.$ext$/) { $backedup++; last; }
@@ -1048,6 +1083,10 @@ Force the cache file to be rebuilt.
 
 Selects samples from a run. You maybe specify the dirname or the runid.
 
+=item B<-sample nwdid>
+
+Selects a particular sample. This is useful for testing especially.
+
 =item B<-studyname NAME>
 
 Selects samples from a studyname.
@@ -1068,7 +1107,8 @@ Possibilities are to check the specified samples for:
   backups      Check the backup file is in GCE
   localfiles   Check local file system files
   awsfiles     Check the finished files in AWS
-  gcefiles     Check the finished files in GCE
+  gcebcffiles  Check the finished BCF files in GCE
+  gcecramfiles Check the remapped files in GCE
   b37          Check the remapped B37 files in GCE
   recabfiles   Check the GCE bucket for remapped, but not finished files
 
@@ -1080,7 +1120,7 @@ return code of 0. Any error will set a non-zero return code.
 
 =head1 AUTHOR
 
-Written by Terry Gliedt I<E<lt>tpg@umich.eduE<gt>> in 2017 and is
+Written by Terry Gliedt I<E<lt>tpg@umich.eduE<gt>> in 2017-2018 and is
 is free software; you can redistribute it and/or modify it under the
 terms of the GNU General Public License as published by the Free Software
 Foundation; See http://www.gnu.org/copyleft/gpl.html
