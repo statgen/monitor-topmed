@@ -32,6 +32,9 @@ if [ "$1" = "-submit" ]; then
   elif [ "$filesize" -gt "1566897485" ]; then
     mem=24G
   fi
+  if [ "$FORCEMEMORY" != "" ]; then
+    mem=$FORCEMEMORY
+  fi
   RandomRealHost $bamid
   MayIRun $me $bamid $realhost
   timeout='8:00:00'
@@ -96,7 +99,9 @@ etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "Created BCF file for remapped CRAM ($crampath) completed in $etime seconds"
 SetDB $bamid 'state_gce38bcf' 20
-SetDB $bamid 'state_gce38cpbcf' 1
+if [ "$PROJECT" = "topmed" ]; then
+  SetDB $bamid 'state_gce38cpbcf' 1
+fi
 
 Successful
 Log $etime
