@@ -93,6 +93,7 @@ if [ "$gceext" = "none" ]; then
   exit
 fi
 echo "gceext=$gceext gcefile=$gcefile gcesize=$gcesize x=${x[*]}"
+exit 99
 
 #   We have something in GCE backups. See if local file size matches
 filepath=`$topmedpath wherepath $bamid $gceext`
