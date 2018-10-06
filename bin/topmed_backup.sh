@@ -38,11 +38,16 @@ stime=`date +%s`
 #======================================================================
 origfile=`$topmedpath wherefile $bamid bam`
 backupfile=`$topmedpath wherefile $bamid localbackup`
+if [ ! -f $origfile ]; then     # If orig does not exist, try cram
+   origfile=`$topmedpath wherefile $bamid cram`
+   f=`basename $origfile`
+   backupfile=`$topmedpath wherefile $bamid localbackup`/$f 
+fi
 echo "Backup of $origfile to $backupfile"
 d=`dirname $backupfile`
 mkdir -p $d                         # Just in case center dir needs making
 chmod 0770 $d
-cp -p $origfile $backupfile
+cp --preserve=timestamps $origfile $backupfile
 if [ "$?" != "0" ]; then
   Fail "Failed to backup $origfile to $backupfile"
 fi
