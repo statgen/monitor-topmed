@@ -304,11 +304,12 @@ if ($fcn == 'df') {
 }
 
 if ($fcn == 'logs') {
+    $p = getenv('PROJECT');
     print "<center>$SHOWSTATUS &nbsp;&nbsp;&nbsp;</center>\n<pre>\n";
-    $d = '/net/topmed/working/topmed-output/';
+    $d = "/net/$p/working/$p-output/";
     if (! chdir($d)) { print "Cannot CD to '$d': $!\n"; }
     else {
-        $logs=explode("\n", `ls topmed*.log`);
+        $logs=explode("\n", `ls $p*.log`);
         foreach ($logs as $f) {
             if ($f) { print "<b>Showing $f</b>\n" . `tail -6 $f`; }
         }
@@ -831,6 +832,7 @@ function RestartJobs($h) {
         "<option value='gce38bcf'>bcf</option>" .
         "<option value='gce38copy'>gcecopy</option>" .
         "<option value='gce38cpbcf'>gcecpbcf</option>" .
+        "<option value='gcecleanup'>gcecleanup</option>" .
         "<option value='aws38copy'>awscopy</option>" .
         "</select></td>" .
         "<td><font color='green'>&nbsp; </font></td>" .
