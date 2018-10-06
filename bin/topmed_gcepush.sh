@@ -56,9 +56,19 @@ stime=`date +%s`
 #   Special hack - year 4 topmed is not remapped, but we pretend it is
 #   Note: when G changes his mind, we must delete all symlinks this creates
 #   and realize, of course, SOME year 4 BROAD files were already remapped
+#
+#   We also do not remap wave6 for inpsyght
 #======================================================================
+remap='Y'
 if [ "$PROJECT" = "topmed" -a "$datayear" = "4" -a "$center" = "broad" ]; then
-  echo "Special hack for $PROJECT $center datayear $datayear - pretend remapping was done"
+  remap='N'
+fi
+if [ "$PROJECT" = "inpsyght" -a "$run" = "wave6" ]; then
+  remap='N'
+fi
+
+if [ "$remap" = "N" ]; then
+  echo "Special hack for $PROJECT $center $run datayear $datayear - pretend remapping was done"
   recabfile=`$topmedpath wherefile $bamid b38`
   if [ "$recabfile" = "" ]; then
     Fail "Unable to find path for recab file for $nwdid [$bamid]"
@@ -92,8 +102,10 @@ if [ "$PROJECT" = "topmed" -a "$datayear" = "4" -a "$center" = "broad" ]; then
   #   Done with fake pull, finish up
   SetDB $bamid state_gce38bcf 0
   SetDB $bamid state_b38 20
-  SetDB $bamid state_gce38copy 1        # Be sure this gets copied to GCE
   SetDB $bamid state_aws38copy 0
+  if [ "$PROJECT" = "topmed" ]; then
+    SetDB $bamid state_gce38copy 1        # Be sure this gets copied to GCE
+  fi
 
   etime=`date +%s`
   etime=`expr $etime - $stime`
