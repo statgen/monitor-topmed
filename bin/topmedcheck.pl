@@ -57,7 +57,7 @@ our %opts = (
     samtools => '/usr/cluster/bin/samtools',
     cacheage => 60*60*24,            # If cache file older than this, refetch
     cachefile => "/tmp/$Script.gcefiles", 
-    remapstatus => 'curl --silent --insecure https://104.198.71.226/api/sample-status\\?ids=',
+    #remapstatus => 'curl --silent --insecure https://104.198.71.226/api/sample-status\\?ids=',
     verbose => 0,
 );
 
@@ -68,7 +68,7 @@ Getopt::Long::GetOptions( \%opts,qw(
 
 #   Simple help if requested
 if ($opts{help} || ($#ARGV<0) && (! $opts{nfsmounts})) {
-    print "$Script [options] -subset value  db|recabfiles|localfiles|awsfiles|gcebcffiles|gcecramfiles|b37|backups\n" .
+    print "$Script [options] -subset value  db|localfiles|awsfiles|gcebcffiles|gcecramfiles|b37|backups\n" .
         "Where \n" .
         "  [-subset] is -center, -run or -sample\n" .
         "\n" .
@@ -86,13 +86,13 @@ if ($0 =~ /\/(\w+)check/) { PathInit($1); } # Set up project variables;
 #--------------------------------------------------------------
 my @bamidrange = ();
 my @nwdids = ();
-my $morewhere = '';
-if ($opts{piname})    { $morewhere .= " AND piname='$opts{piname}'"; }
-if ($opts{studyname}) { $morewhere .= " AND studyname='$opts{studyname}'"; }
-if ($opts{datayear})  { $morewhere .= " AND datayear=$opts{datayear}"; }
-if ($opts{build})     { $morewhere .= " AND build=$opts{build}"; }
-if ($opts{b37files})  { $morewhere .= " AND state_b37=20"; }
-#if ($opts{recabfiles}){ $morewhere .= " AND state_gce38push=20 AND state_gce38pull!=20"; }
+my @wheres = ();
+if ($opts{piname})    { push @wheres,"piname='$opts{piname}'"; }
+if ($opts{studyname}) { push @wheres,"studyname='$opts{studyname}'"; }
+if ($opts{datayear})  { push @wheres,"datayear=$opts{datayear}"; }
+if ($opts{build})     { push @wheres,"build=$opts{build}"; }
+if ($opts{b37files})  { push @wheres,"state_b37=20"; }
+my $morewhere = join(' AND ', @wheres);
 if ($opts{max})       { $morewhere .= " LIMIT $opts{max}"; }
 
 #==================================================================
@@ -100,12 +100,10 @@ if ($opts{max})       { $morewhere .= " LIMIT $opts{max}"; }
 #==================================================================
 if ($opts{nfsmounts}) { Check_NFSMounts(); exit; }  # Special case processing
 
+my $sql = '';
 if ($opts{sample}) {                    # Maybe one or a range of bamids specified
     if ($opts{sample} eq 'all') {
-        my $sql = "SELECT bamid,expt_sampleid FROM $opts{bamfiles_table} " .
-            "WHERE state_arrive=20" . $morewhere;
-        my $sth = My_DB::DoSQL($sql);
-        GetArrayOfSamples($sth);
+        $sql .= "WHERE state_arrive=20";
     }
     else {
         my $bamid = $opts{sample};
@@ -113,12 +111,8 @@ if ($opts{sample}) {                    # Maybe one or a range of bamids specifi
         if ($bamid =~/^(\d+)\-(\d+)/) { @input = $1 .. $2; }
         else { push @input, $bamid; }
         for my $b (@input) {
-            my $sql = "SELECT bamid,expt_sampleid FROM $opts{bamfiles_table} WHERE ";
-            if ($b =~ /^NWD/) { $sql .= "expt_sampleid='$b'"; }
-            else { $sql .= "bamid=$b"; }
-            $sql .= $morewhere;
-            my $sth = My_DB::DoSQL($sql);
-            GetArrayOfSamples($sth);
+            if ($b =~ /^NWD/) { $sql .= "WHERE expt_sampleid='$b'"; }
+            else { $sql .= "WHERE bamid=$b"; }
         }
     }
 }
@@ -129,10 +123,7 @@ if ($opts{center}) {                        # Range specified by center or run
         my $runsref = GetRuns($cid) || next;
         #   Get bamid for every run
         foreach my $runid (keys %{$runsref}) {
-            my $sql = "SELECT bamid,expt_sampleid FROM $opts{bamfiles_table} " .
-                "WHERE runid=$runid AND state_cram=20" . $morewhere;
-            my $sth = My_DB::DoSQL($sql);
-            GetArrayOfSamples($sth);
+            $sql .= "WHERE runid=$runid AND state_cram=20";
         }
     }
 }
@@ -146,11 +137,15 @@ if ($opts{run}) {
         $opts{run} = $href->{runid};
     }
     #   Get bamid for this run
-    my $sql = "SELECT bamid,expt_sampleid FROM $opts{bamfiles_table} " .
-        "WHERE state_cram=20 AND runid=$opts{run}" . $morewhere;
-    my $sth = My_DB::DoSQL($sql);
-    GetArrayOfSamples($sth);
+    $sql = "WHERE state_cram=20 AND runid=$opts{run}";
 }
+if ($sql) {
+    $sql = "SELECT bamid,expt_sampleid FROM $opts{bamfiles_table} $sql";
+    if ($morewhere) { $sql .= " AND $morewhere"; }
+}
+else { $sql = "SELECT bamid,expt_sampleid FROM $opts{bamfiles_table} WHERE $morewhere"; }
+my $sth = My_DB::DoSQL($sql);
+GetArrayOfSamples($sth);
 
 if (! @bamidrange) { die "$Script - No samples were found\n"; }
 if ($opts{max}) { splice(@bamidrange,$opts{max}); } # We might have selected too many samples          
@@ -169,18 +164,12 @@ if ($action eq 'db') {
     }
     print "Completed check of db for " . ($#bamidrange+1) . " samples\n";
 }
-if ($action eq 'recabfiles') {
-    $didsomething++;
-    print "Verify remapped files GCE recabs  ?????\n";
-    for (my $i=0; $i<=$#bamidrange; $i++) {
-        Check_RecabFiles($bamidrange[$i], $nwdids[$i]);
-    }
-    print "Completed check of " . ($#bamidrange+1) . " recabfiles\n";
-}
 if ($action eq 'localfiles') {
     $didsomething++;
     print "Verify local files\n";
     for (my $i=0; $i<=$#bamidrange; $i++) {
+        if ($nwdids[$i] eq 'NWD302169') { next; }    # Ignore Bad data that NHLBI wants
+        if ($nwdids[$i] eq 'NWD911333') { next; }    # Ignore Bad data that NHLBI wants
         Check_LocalFiles($bamidrange[$i], $nwdids[$i]);
     }
     if (%emptyok) {
@@ -729,78 +718,6 @@ sub Check_Backups {
 
 #==================================================================
 # Subroutine:
-#   Check_RecabFiles()
-#   Verify files to be remapped
-#==================================================================
-sub Check_RecabFiles {
-    my ($bamid, $nwdid) = @_;
-    my @error = ();
-    die "$Script - this is not ready yet\n";
-
-    my $tmpfile = '/run/shm/topmedcheck.tmp';
-
-    my $sql = "SELECT * FROM $opts{bamfiles_table} WHERE bamid=$bamid";
-    my $sth = My_DB::DoSQL($sql);
-    my $href = $sth->fetchrow_hashref;
-
-    my ($center, $dirname) = GetCenterRun($href->{runid});
-
-    my %summary = ( bamid => $bamid, nwdid => $nwdid );
-
-    if ($href->{state_gce38push} = $COMPLETED) { $summary{gcepush} = 'pushed'; }
-    else { $summary{gcepush} = 'not_pushed'; }
-    
-    if ($href->{state_gce38pull} = $COMPLETED) {$summary{gcepull} = 'pulled'; }
-    else { $summary{gcepull} = 'not_pulled'; }
-
-    my $s = $opts{remapstatus} . $nwdid . " | grep NWD";
-    $s = `$s`;
-    if (! $s) { $summary{remapstatus} = $nwdid . "_unknown"; }
-    else {
-        if ($s =~ /post-aligned/) { $summary{remapstatus} = 'remapped_done'; }
-        else {
-            if ($s =~ /failed-pre-align/) { $summary{remapstatus} = "failed-pre-align"; }
-            else { $summary{remapstatus} = "unknown_status"; }
-        }
-    }
-
-    my $f = WhereFile($bamid, 'b38');
-    if (-f $f) { $summary{local_file} = 'local_exists'; }
-    else { $summary{local_file} = 'local_missing'; }
-
-    my $rc = system("$opts{gcels} gs://topmed-incoming/$center/$dirname/$nwdid.src.cram > $tmpfile 2>/dev/null");
-    if ($rc == 0) { $summary{to_be_remapped} = 'incoming_exists';}
-    else { $summary{to_be_remapped} = 'incoming_missing'; }
-
-    $rc = system("$opts{gcels} gs://topmed-recabs/$nwdid > $tmpfile 2>/dev/null");
-    if ($rc == 0) { $summary{to_be_pulled} = 'recab_exists'; }
-    else { $summary{to_be_pulled} = 'recab_missing'; }
-
-    $rc = system("$opts{gcels} gs://topmed-bcf/$nwdid > $tmpfile 2>/dev/null");
-    if ($rc == 0) { $summary{gcecopy} = 'gcecopy_exists'; }
-    else { $summary{gcecopy} = 'gcecopy_missing'; }
-
-    my @cols = sort keys %summary;
-    print join(',',@cols) . "\n";
-    $s = '';
-    foreach my $k (@cols) { $s .= $summary{$k} . ','; }
-    chop($s);
-    print "$s\n";
-    return;
-
-    print "    gcepush state:  $href->{state_gce38push}\n";
-    print "    gcepull state:  $href->{state_gce38pull}\n";
-    print "     remap status: "; system($opts{remapstatus} . $nwdid);
-    print "       local file: "; system("ls -l $f");
-    print "   to be remapped: ";
-      system("$opts{gcels} gs://topmed-incoming/$center/$dirname/$nwdid.src.cram");
-    print "     to be pulled: "; system("$opts{gcels} gs://topmed-recabs/$nwdid");
-    print "          gcecopy: "; system("$opts{gcels} gs://topmed-bcf/$nwdid\\*");
-    print "\n";
-}
-
-#==================================================================
-# Subroutine:
 #   Check_Files()
 #   Calculate the md5sum and flagstat value for files in this sample
 #==================================================================
@@ -1110,7 +1027,6 @@ Possibilities are to check the specified samples for:
   gcebcffiles  Check the finished BCF files in GCE
   gcecramfiles Check the remapped files in GCE
   b37          Check the remapped B37 files in GCE
-  recabfiles   Check the GCE bucket for remapped, but not finished files
 
 
 =head1 EXIT
