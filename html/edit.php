@@ -122,9 +122,12 @@ function Modify($table, $id) {
     if (! isset($DESC['_prikey_'])) { Nice_Exit("No primary key found for '$table'"); }
     $pkey = $DESC['_prikey_'];              // Name of primary key column
 
-    //  Input fields are an array of arrays $_POST[IN[]]
+   //  Input fields are an array of arrays $_POST[IN[]]
     $inp = array();
-    while (list($k,$val) = each($_POST['IN'])) { $inp[$k] = $val; }
+    while (list($k,$val) = each($_POST['IN'])) {
+        //  Sep 2018 datetime got picky. Ignore any of those fields
+        if ( $DESC[$k] != 'datetime' ) { $inp[$k] = $val; }
+    }
     $inp[$pkey] = $id;                      // Be sure primary key is set
 
     //  Set in defaults if not specified
@@ -148,13 +151,14 @@ function Modify($table, $id) {
         if ($k == $pkey) { continue; }
         $val = stripslashes($val);          // Canonicalize data first
         $val = SQL_Escape($val);
+        
         //  July 2016 we suddenly need to quote fields
         if (substr($val,0,1) == "'") { $sql .= "$k=$val,"; }
         else { $sql .= "$k='$val',"; }
 	}
     $sql = substr($sql,0,strlen($sql)-1);   // Drop last comma
     $sql .= " WHERE $pkey='$inp[$pkey]'";
-print "<!-- SQL=$sql -->\n";
+
     //  Do SQL we have constructed. Be sure we know when it fails
     $result = SQL_Query($sql, 0);
     $e = DB_CheckError($result);
