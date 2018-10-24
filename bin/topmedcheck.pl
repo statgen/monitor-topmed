@@ -52,12 +52,13 @@ our %opts = (
     b37gceuri => 'gs://topmed-irc-working/remapping/b37',
     b38gcebackup => 'gs://topmed-irc-share/genomes', # Serves as remapped b38 bucket
     b38gcebackupopt => '-u topmed-1366',    # gsutil option for backup bucket
-    gcels => '/usr/bin/gsutil ls',   # Add $opts{gceuri}/NWDxxxxxxx
+    gcels => '/usr/bin/gsutil ls',      # Add $opts{gceuri}/NWDxxxxxxx
     redotool => '/usr/cluster/topmed/bin/topmed_redo.sh',
     samtools => '/usr/cluster/bin/samtools',
-    cacheage => 60*60*24,            # If cache file older than this, refetch
+    cacheage => 60*60*24,               # If cache file older than this, refetch
     cachefile => "/tmp/$Script.gcefiles", 
     #remapstatus => 'curl --silent --insecure https://104.198.71.226/api/sample-status\\?ids=',
+    errorsfound => 0,                   # Count of errors detected
     verbose => 0,
 );
 
@@ -103,7 +104,7 @@ if ($opts{nfsmounts}) { Check_NFSMounts(); exit; }  # Special case processing
 my $sql = '';
 if ($opts{sample}) {                    # Maybe one or a range of bamids specified
     if ($opts{sample} eq 'all') {
-        $sql .= "WHERE state_arrive=20";
+        $sql .= "WHERE state_cram=20";
     }
     else {
         my $bamid = $opts{sample};
@@ -113,6 +114,7 @@ if ($opts{sample}) {                    # Maybe one or a range of bamids specifi
         for my $b (@input) {
             if ($b =~ /^NWD/) { $sql .= "WHERE expt_sampleid='$b'"; }
             else { $sql .= "WHERE bamid=$b"; }
+            $sql .= " AND state_cram=20";
         }
     }
 }
@@ -121,10 +123,9 @@ if ($opts{center}) {                        # Range specified by center or run
     foreach my $cid (keys %{$centersref}) {
         $opts{centername} = $centersref->{$cid};    # Save center name
         my $runsref = GetRuns($cid) || next;
-        #   Get bamid for every run
-        foreach my $runid (keys %{$runsref}) {
-            $sql .= "WHERE runid=$runid AND state_cram=20";
-        }
+        #   Get runid for every run
+        my $runidlist = join(',', keys %{$runsref});
+        $sql .= "WHERE state_cram=20 and runid in ($runidlist)";
     }
 }
 #   Get all bamids for this run
@@ -193,7 +194,7 @@ if ($action eq 'gcecramfiles') {
     for (my $i=0; $i<=$#bamidrange; $i++) {
         Check_GCECramFiles($bamidrange[$i], $nwdids[$i]);
     }
-    print "Completed check of " . ($#bamidrange+1) . " CRAM gcefiles\n";
+    print "Completed check of " . ($#bamidrange+1) . " CRAM gcefiles, $opts{errorsfound} errors\n";
 }
 if ($action eq 'awsfiles') {
     $didsomething++;
@@ -490,22 +491,28 @@ sub Get_Cache_Data {
     if (! -f $file) {
         my $k = 0;
         my $IN;
-        my $cmd = "$opts{gsutil} $gsopt ls -r " . $gsuri . '/';
+        my $cmd = "$opts{gsutil} $gsopt ls -lr " . $gsuri . '/';
         my $t = time();
         print "Fetching cache file $file using '$cmd'\n";
         open($IN, "$cmd |") ||
             die "$Script - Unable to fetch GCE data: CMD=$cmd\n";
+        #  Each line of interest looks like
+        #    size  timestamp  gs://topmed-bcf/NWD100417/NWD100417.bcf
         while (my $l = <$IN>) {
             chomp($l);
             if ((!defined($l)) || (! $l)) { next; }
             if ($l =~ /INFO/) { next; }     # gsutil had to retry
             if ($l =~ /[:\/]$/) { next; }
+            if ($l =~ /freeze/) { next; }   # Ignore unusual files in GCE buckets
             if ($l =~ /\/([^\/]+)\/([^\/]+)$/) {
-                my ($d, $f) = ($1, $2);
+                my ($d, $f) = ($1, $2);     # e.g. NWD123456.bcf
                 if ($d !~ /^NWD/) {             # Studyname, get NWDID from file
                     if ($f =~ /(\w+)\./) { $d = $1; }
                 }
-                push @{$cachelines{$d}},$f;
+                #   Get size from $l
+                my $sz = '?';
+                if ($l =~ /^\s*(\d+)/) { $sz = $1; }
+                push @{$cachelines{$d}},"$f $sz";
                 $k++;
                 #if ($k > 1000) { last; }       # Handy for debugging
                 next;
@@ -532,7 +539,7 @@ sub Get_Cache_Data {
             $k++;
             my @c = split(' ', $l);
             my $k = shift(@c);
-            $cachelines{$k} = \@c;
+            $cachelines{$k} = \@c;  # E.g. nwd -> nwd.bcf 234 nwd.bcf.csi 123
         }
         close($IN);
         print "Read cache file '$file' with $k samples\n";
@@ -545,7 +552,7 @@ sub Get_Cache_Data {
 #==================================================================
 # Subroutine:
 #   Check_GCEBCFFiles()
-#   Verify files in Google Cloud Environment
+#   Verify BCF files in Google Cloud Environment
 #==================================================================
 sub Check_GCEBCFFiles {
     my ($bamid, $nwdid) = @_;
@@ -565,16 +572,36 @@ sub Check_GCEBCFFiles {
     if (! exists($cacheref->{$nwdid})) {
         push @error,"No $nwdid GCE files found";
         @{$cacheref->{$nwdid}} = ();        # Create empty array so things work
-    }    
-    foreach my $f (@{$cacheref->{$nwdid}}) {
-        chomp($f);
+    }
+    
+    my @a = @{$cacheref->{$nwdid}};         # Copy cause I cannot get this syntax right
+    for (my $i=0; $i<=$#a; $i=$i+2) {
+        my $f = $a[$i];                     # E.g. NWD123456.bcf
+        my $fsz = $a[$i+1];                 # E.g. size of file in GCE
         if ($f !~ /^$nwdid\.(\S+)/) {
-        push @error,"GCE file is invalid: Unknown file: $f"; }
-        else {
-            my $x = $1;                 # Extension of file
-            if (exists($requiredextensions{$x})) { $requiredextensions{$x} = 0; }
-            else { push @error,"GCE: Invalid BCF extension: $f"; }
+            push @error,"GCE file is invalid: Unknown file: $f";
+            next;
         }
+        my $x = $1;                     # Extension of file
+        my $fsize = -1;
+        if (! exists($requiredextensions{$x})) {
+            push @error,"GCE: Invalid BCF extension: $f";
+            next;
+        }
+        #   Get size of local file and compare
+        my $ff = WherePath($bamid, 'bcf') . '/' . $f;
+        my @stats = stat($ff);
+        if (! defined($stats[7])) {
+            push @error,"GCE: Local file '$ff' does not exist: $f";
+            next;
+        }
+        $fsize  = $stats[7];
+        if ($fsize != $fsz) {
+            push @error,"GCE: local and remote filesize mismatch for $f ($fsize != $fsz)";
+            next;
+        }
+        $requiredextensions{$x} = 0;
+        if ($opts{verbose}) { print "Verified $f [$fsz]\n"; }
     }
     foreach my $x (keys %requiredextensions) {
         if ($requiredextensions{$x}) { push @error,"GCE BCF file missing: $nwdid.$x"; }
@@ -613,18 +640,42 @@ sub Check_GCECramFiles {
  	if (! exists($cacheref->{$nwdid})) {
         push @error,"No $nwdid remapped GCE files found";
         @{$cacheref->{$nwdid}} = ();        # Create empty array so things work
-    }    
-    foreach my $f (@{$cacheref->{$nwdid}}) {
-        chomp($f);
-        if ($f =~ /freeze/) { next; }   # Ignore surprising freeze files
-        if ($f !~ /^$nwdid\.(\S+)/) {
-        push @error,"GCE file is invalid: Unknown file: $f"; }
-        else {
-            my $x = $1;                 # Extension of file
-            if (exists($requiredextensions{$x})) { $requiredextensions{$x} = 0; }
-            else { push @error,"GCE: Invalid extension: $f"; }
-        }
     }
+
+    my @a = @{$cacheref->{$nwdid}};         # Copy cause I cannot get this syntax right
+    for (my $i=0; $i<=$#a; $i=$i+2) {
+        my $f = $a[$i];                     # E.g. NWD104562.b38.irc.v1.cram
+        my $fsz = $a[$i+1];                 # E.g. size of file in GCE
+        if ($f !~ /^$nwdid\.(\S+)/) {
+            push @error,"GCE file is invalid: Unknown file: $f";
+            next;
+        }
+        my $x = $1;                         # Extension of file, e.g. b38.irc.v1.cram
+        if (! exists($requiredextensions{$x})) {
+            push @error,"GCE: Invalid CRAM extension: $f";
+            next;
+        }
+        #   Figure out local filename, it differs from that in GCE
+        my $fsize = -1;
+        my $ff = 'unknown';
+        if ($x =~ /cram$/) { $ff  = $nwdid . '.recab.cram'; }
+        if ($x =~ /crai$/) { $ff  = $nwdid . '.recab.cram.crai'; }
+        #   Get size of local file and compare
+        $ff = WherePath($bamid, 'b38') . '/' . $ff;
+        my @stats = stat($ff);
+        if (! defined($stats[7])) {
+            push @error,"GCE: Local file '$ff' does not exist: $f";
+            next;
+        }
+        $fsize  = $stats[7];
+        if ($fsize != $fsz) {
+            push @error,"GCE: local and remote filesize mismatch for $f ($fsize != $fsz)";
+            next;
+        }
+        $requiredextensions{$x} = 0;
+        if ($opts{verbose}) { print "Verified $f [$fsz]\n"; }
+    }
+
     foreach my $x (keys %requiredextensions) {
         if ($requiredextensions{$x}) { push @error,"GCE file missing: $nwdid.$x"; }
     }
@@ -839,6 +890,7 @@ sub ShowErrors {
     my ($b, $nwd, $aref) = @_;
     #print "  Errors for BAMID=$b  NWD=$nwd -\n";
     foreach my $e (@{$aref}) {
+        $opts{errorsfound}++;
         if ($opts{fixer}) {
             my $cmd = $opts{fixer} . ' ' . $b . ' ' . $nwd . ' ' . $e;
             if ($opts{execfixer}) { 
