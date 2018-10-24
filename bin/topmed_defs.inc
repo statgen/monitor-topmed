@@ -11,6 +11,7 @@ samtools=/usr/cluster/bin/samtools
 vt=/usr/cluster/topmed/bin/vt
 vtref=/net/topmed/working/mapping/gotcloud/ref/hg38/hs38DH.fa
 bcftools=/usr/cluster/bin/bcftools
+slurmpath=/usr/cluster/bin
 console=/net/$PROJECT/working/${PROJECT}-output
 slurmp=topmed-working
 build=38
