@@ -24,12 +24,12 @@ function finish {
 
 #------------------------------------------------------------------
 # Subroutine:
-#   MayIRun(name, bamid, host)    Is bamid permitted to run for script 'name'
+#   MayIRun(name, bamid)    Is bamid permitted to run for script 'name'
 #
 #   Does not return if permission is denied
 #------------------------------------------------------------------
 function MayIRun {
-  $topmedpermit test $1 $2 $3
+  $topmedpermit test $1 $2
   rc=$?
   if [ "$rc" = "4" ]; then
     exit 4
