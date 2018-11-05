@@ -38,7 +38,7 @@ if [ "$1" = "-submit" ]; then
   RandomRealHost $bamid
   MayIRun $me $bamid $realhost
   timeout='8:00:00'
-  SubmitJob $bamid $PROJECT $mem "$0 $*"
+  SubmitJob $bamid "$PROJECT-bcf" $mem "$0 $*"
   exit
 fi
 
