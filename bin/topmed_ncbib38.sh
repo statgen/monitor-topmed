@@ -22,7 +22,7 @@ if [ "$1" = "-xmlonly" ]; then shift; xmlonly=Y; fi    # Force just XML to be se
 if [ "$1" = "-submit" ]; then
   shift
   #   May I submit this job?
-  $topmedcmd permit test sb37 $1
+  #$topmedcmd permit test sb37 $1
   if [ "$?" = "0" ]; then
     exit 4
   fi
