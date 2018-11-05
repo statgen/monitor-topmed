@@ -43,7 +43,15 @@ my $CANCELLED = 89;           # Task cancelled
 my $FAILEDCHECKSUM = 98;      # Task failed, because checksum at NCBI bad
 my $FAILED    = 99;           # Task failed
 
+#   Pre-check options for project
+for (my $i=0; $i<=$#ARGV; $i++) {
+    if (($ARGV[$i] eq '-p' || $ARGV[$i] eq '-project') && defined($ARGV[$i+1])) {
+        $ENV{PROJECT} = $ARGV[$i+1];
+        last;
+    }
+}
 if (! -d "/usr/cluster/$ENV{PROJECT}") { die "$Script - Environment variable PROJECT '$ENV{PROJECT}' incorrect\n"; }
+
 our %opts = (
     realm => "/usr/cluster/$ENV{PROJECT}/etc/.db_connections/$ENV{PROJECT}",
     topmedcmd => $Bin . "/topmedcmd.pl",
@@ -80,25 +88,40 @@ our %opts = (
     jobsnotpermitted => 0,
     jobsfailedsubmission => 0,
 );
+my %validverbs = (              # List of valid directives
+    arrive => 1,
+    verify => 1,
+    qplot => 1,
+    cram => 1,
+    backup => 1,
+    qplot => 1,
+    gcepush => 1,
+    gcepull => 1,
+    bcf => 1,
+    gcecopy => 1,
+    gcecpbcf => 1,
+    gcecleanup => 1,
+    awscopy => 1,
+    fix => 1,
+);
+
 Getopt::Long::GetOptions( \%opts,qw(
     help verbose topdir=s center=s runs=s piname=s studyname=s maxjobs=i random
-    dryrun suberr datayear=i build=i nopermit descending
+    dryrun suberr datayear=i build=i project=s descending
     )) || die "Failed to parse options\n";
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$Script [options] arrive|verify|qplot|cram|backup|qplot|gcepush|gcepull|bcf|gcecopy|gcecpbcf|gcecleanup|awscopy|fix\n" .
+    my $verbs = (join '|', sort keys %validverbs);
+    warn "$Script [options] $verbs\n" .
         "Find runs which need some action and queue a request to do it.\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
     exit 1;
 }
-my $fcn = shift(@ARGV);
 
 my $dbh = DBConnect($opts{realm});
 my $nowdate = strftime('%Y/%m/%d %H:%M', localtime);
-
-if ($opts{nopermit}) { $ENV{IGNORE_PERMIT} = 1; }   # Stop topmedpermit.pl
 
 #   User might provide dirname rather than runid
 if (exists($opts{runs}) &&  $opts{runs} =~ /[^0-9,]/) {
@@ -122,9 +145,37 @@ if (exists($opts{runs}) &&  $opts{runs} =~ /[^0-9,]/) {
 }
 
 #--------------------------------------------------------------
-#   Get a list of BAMs that have arrived, but not processed yet
+#   Ready to submit jobs for whatever actions are needed
 #--------------------------------------------------------------
-if ($fcn eq 'arrive') {
+my $fcn;
+foreach $fcn (@ARGV) {
+    #   Make sure only one of this subcommand is running
+    #   This lock is released when the program ends by whatever means
+    my $f = "/run/lock/topmed.$fcn.lock";
+    my $fh;
+    if (! open($fh, '>' . $f)) {
+        warn "$Script - Unable to create file '$f': $!\n";
+        next;
+    }
+    if (! flock($fh, LOCK_EX|LOCK_NB)) { 
+        warn "Skipping - another instance of '$Script($fcn)' is running\n";
+        next;
+    }
+
+    #   Do whatever is asked of us
+    if (! exists($validverbs{$fcn})) { die "Invalid request '$fcn'. Try '$Script --help'\n"; }
+    my $callsubmit = "Submit_$fcn()";
+    eval $callsubmit;
+
+    flock($fh, LOCK_UN);
+}
+exit;
+
+#==================================================================
+# Subroutine:
+#   Submit_arrive() - Mark new file as arrived
+#==================================================================
+sub Submit_arrive {
     my $runsref = GetUnArrivedRuns() || next;
     #   For each unarrived run, see if there are bamfiles that arrived
     foreach my $runid (keys %{$runsref}) {
@@ -159,26 +210,19 @@ if ($fcn eq 'arrive') {
         }
     }
     ShowSummary('Samples arrived');
-    exit;
 }
 
-#==================================================================
-#   Make sure only one of this subcommand is running
-#   This lock is released when the program ends by whatever means
-#==================================================================
-my $f = "/run/lock/topmed.$fcn.lock";
-open(my $fh, '>' . $f) || die "$Script - Unable to create file '$f': $!\n";
-if (! flock($fh, LOCK_EX|LOCK_NB)) { die "Stopping - another instance of '$Script($fcn)' is running\n"; }
 
-#--------------------------------------------------------------
-#   Get a list of BAMs that have not been verified
-#--------------------------------------------------------------
-if ($fcn eq 'verify') {
+#==================================================================
+# Subroutine:
+#   Submit_verify() - Submit jobs to verify input sample
+#==================================================================
+sub Submit_verify {
     my $sql = BuildSQL("SELECT bamid,bamname,state_arrive,state_verify,checksum",
         "WHERE b.state_arrive=$COMPLETED AND b.state_verify!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { exit; }
+    if (! $rowsofdata) { return; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         if ($opts{suberr} && $href->{state_verify} >= $FAILEDCHECKSUM) {
@@ -187,19 +231,19 @@ if ($fcn eq 'verify') {
         if ($href->{state_verify} != $NOTSET && $href->{state_verify} != $REQUESTED) { next; }
         if (! BatchSubmit("$opts{topmedverify} -submit $href->{bamid}")) { last; }
     }
-    ShowSummary($fcn);
-    exit;
+    ShowSummary('verify');
 }
 
-#--------------------------------------------------------------
-#   Get a list of BAMs that have not been converted to CRAMs
-#--------------------------------------------------------------
-if ($fcn eq 'cram') {
+#==================================================================
+# Subroutine:
+#   Submit_cram() - Submit jobs to create a cram if necessary
+#==================================================================
+sub Submit_cram {
     my $sql = BuildSQL("SELECT bamid,state_verify,state_cram",
         "WHERE b.state_verify=$COMPLETED AND b.state_cram!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { exit; }
+    if (! $rowsofdata) { return; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         if ($opts{suberr} && $href->{state_cram} >= $FAILEDCHECKSUM) {
@@ -208,19 +252,19 @@ if ($fcn eq 'cram') {
         if ($href->{state_cram} != $NOTSET && $href->{state_cram} != $REQUESTED) { next; }
         if (! BatchSubmit("$opts{topmedcram} -submit $href->{bamid}")) { last; }
     }
-    ShowSummary($fcn);
-    exit;
+    ShowSummary('cram');
 }
 
-#--------------------------------------------------------------
-#   Backup some files offsite
-#--------------------------------------------------------------
-if ($fcn eq 'backup') {
+#==================================================================
+# Subroutine:
+#   Submit_backup() - Submit jobs to backup files locally
+#==================================================================
+sub Submit_backup {
     my $sql = BuildSQL("SELECT bamid,bamname,state_cram,state_backup",
         "WHERE b.state_cram=$COMPLETED AND b.state_backup!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { exit; }
+    if (! $rowsofdata) { return; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         if ($opts{suberr} && $href->{state_backup} >= $FAILEDCHECKSUM) {
@@ -229,20 +273,19 @@ if ($fcn eq 'backup') {
         if ($href->{state_backup} != $NOTSET && $href->{state_backup} != $REQUESTED) { next; }
         if (! BatchSubmit("$opts{topmedbackup} -submit $href->{bamid}")) { last; }
     }
-    ShowSummary($fcn);
-    exit;
+    ShowSummary('backup');
 }
 
-#--------------------------------------------------------------
-#   Run QPLOT on BAMs
-#   Special hook using state_fix so we know when a sample has run the new aplot for Tom
-#--------------------------------------------------------------
-if ($fcn eq 'qplot') {
+#==================================================================
+# Subroutine:
+#   Submit_qplot() - Submit jobs to run qplot
+#==================================================================
+sub Submit_qplot {
     my $sql = BuildSQL("SELECT bamid,state_backup,state_qplot",
         "WHERE b.state_backup=$COMPLETED AND b.state_qplot!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { exit; }
+    if (! $rowsofdata) { return; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         if ($opts{suberr} && $href->{state_qplot} >= $FAILEDCHECKSUM) {
@@ -251,19 +294,19 @@ if ($fcn eq 'qplot') {
         if ($href->{state_qplot} != $NOTSET && $href->{state_qplot} != $REQUESTED) { next; }
         if (! BatchSubmit("$opts{topmedqplot} -submit $href->{bamid}")) { last; }
     }
-    ShowSummary($fcn);
-    exit;
+    ShowSummary('qplot');
 }
 
-#--------------------------------------------------------------
-#   Push data to Google Cloud for processing
-#--------------------------------------------------------------
-if ($fcn eq 'gcepush' || $fcn eq 'push') {
+#==================================================================
+# Subroutine:
+#   Submit_gcepush() - Submit jobs to push data to GCE for processing
+#==================================================================
+sub Submit_gcepush {
     my $sql = BuildSQL("SELECT bamid,state_cram,state_gce38push",
         "WHERE b.state_cram=$COMPLETED AND b.state_gce38push!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { exit; }
+    if (! $rowsofdata) { return; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         if ($opts{suberr} && $href->{state_gce38push} >= $FAILED) {
@@ -273,19 +316,19 @@ if ($fcn eq 'gcepush' || $fcn eq 'push') {
             $href->{state_gce38push} != $REQUESTED) { next; }
         if (! BatchSubmit("$opts{topmedgce38push} -submit $href->{bamid}")) { last ; }
     }
-    ShowSummary($fcn);
-    exit;
+    ShowSummary('gcepush');
 }
 
-#--------------------------------------------------------------
-#   Pull processed data from Google Cloud
-#--------------------------------------------------------------
-if ($fcn eq 'gcepull' || $fcn eq 'pull') {
+#==================================================================
+# Subroutine:
+#   Submit_gcepull() - Submit jobs to pull processed data from GCE
+#==================================================================
+sub Submit_gcepull {
     my $sql = BuildSQL("SELECT bamid,state_gce38push,state_gce38pull", 
         "WHERE b.state_gce38push=$COMPLETED AND b.state_gce38pull!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { exit; }
+    if (! $rowsofdata) { return; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         if ($opts{suberr} && $href->{state_gce38pull} >= $FAILED) {
@@ -294,19 +337,19 @@ if ($fcn eq 'gcepull' || $fcn eq 'pull') {
         if ($href->{state_gce38pull} != $REQUESTED) { next; }
         if (! BatchSubmit("$opts{topmedgce38pull} -submit $href->{bamid}")) { last; }
     }
-    ShowSummary($fcn);
-    exit;
+    ShowSummary('gcepull');
 }
 
-#--------------------------------------------------------------
-#   Create BCF file locally at the moment
-#--------------------------------------------------------------
-if ($fcn eq 'bcf') {
+#==================================================================
+# Subroutine:
+#   Submit_bcf() - Submit jobs to create BCF file locally
+#==================================================================
+sub Submit_bcf {
     my $sql = BuildSQL("SELECT bamid,state_b38,state_gce38bcf",
         "WHERE b.state_b38=$COMPLETED AND b.state_gce38bcf!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { exit; }
+    if (! $rowsofdata) { return; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         if ($opts{suberr} && $href->{state_gce38bcf} >= $FAILEDCHECKSUM) {
@@ -315,20 +358,20 @@ if ($fcn eq 'bcf') {
         if ($href->{state_gce38bcf} != $NOTSET && $href->{state_gce38bcf} != $REQUESTED) { next; }
         if (! BatchSubmit("$opts{topmedbcf} -submit $href->{bamid}")) { last; }
     }
-    ShowSummary($fcn);
-    exit;
+    ShowSummary('bcf');
 }
 
-#--------------------------------------------------------------
-#   Copy local cram data to GCE storage
-#--------------------------------------------------------------
-if ($fcn eq 'gcecopy') {
+#==================================================================
+# Subroutine:
+#   Submit_gcecopy() - Submit jobs to copy local cram data to GCE storage
+#==================================================================
+sub Submit_gcecopy {
     #   Get list of all samples yet to process
     my $sql = BuildSQL("SELECT bamid,state_b38,state_gce38bcf,state_gce38copy",
         "WHERE b.state_b38=$COMPLETED AND b.state_gce38copy!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { exit; }
+    if (! $rowsofdata) { return; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         if ($opts{suberr} && $href->{state_gce38copy} >= $FAILEDCHECKSUM) {
@@ -337,19 +380,19 @@ if ($fcn eq 'gcecopy') {
         if ($href->{state_gce38copy} != $NOTSET && $href->{state_gce38copy} != $REQUESTED) { next; }
         if (! BatchSubmit("$opts{topmedgcecopy} -submit $href->{bamid}")) { last; }
     }
-    ShowSummary($fcn);
-    exit;
+    ShowSummary('gcecopy');
 }
 
-#--------------------------------------------------------------
-#   Copy local bcf data to GCE storage
-#--------------------------------------------------------------
-if ($fcn eq 'gcecpbcf') {
+#==================================================================
+# Subroutine:
+#   Submit_gcecpbcf() - Submit jobs to copy local bcf data to GCE storage
+#==================================================================
+sub Submit_gcecpbcf {
     my $sql = BuildSQL("SELECT bamid,state_b38,state_gce38bcf,state_gce38cpbcf",
         "WHERE b.state_gce38bcf=$COMPLETED AND b.state_gce38cpbcf!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { exit; }
+    if (! $rowsofdata) { return; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         if ($opts{suberr} && $href->{state_gce38cpbcf} >= $FAILEDCHECKSUM) {
@@ -358,19 +401,19 @@ if ($fcn eq 'gcecpbcf') {
         if ($href->{state_gce38cpbcf} != $NOTSET && $href->{state_gce38cpbcf} != $REQUESTED) { next; }
         if (! BatchSubmit("$opts{topmedgcecpbcf} -submit $href->{bamid}")) { last; }
     }
-    ShowSummary($fcn);
-    exit;
+    ShowSummary('gcecpbcf');
 }
 
-#--------------------------------------------------------------
-#   Cleanup unnecessary backup files
-#--------------------------------------------------------------
-if ($fcn eq 'gcecleanup') {
+#==================================================================
+# Subroutine:
+#   Submit_gcecleanup() - Submit jobs to cleanup unnecessary backup files
+#==================================================================
+sub Submit_gcecleanup {
     my $sql = BuildSQL("SELECT bamid,state_gcecleanup",
         "WHERE b.state_gce38cpbcf=$COMPLETED AND b.state_gcecleanup!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { exit; }
+    if (! $rowsofdata) { return; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         if ($opts{suberr} && $href->{state_gcecleanup} >= $FAILEDCHECKSUM) {
@@ -379,21 +422,21 @@ if ($fcn eq 'gcecleanup') {
         if ($href->{state_gcecleanup} != $NOTSET && $href->{state_gcecleanup} != $REQUESTED) { next; }
         if (! BatchSubmit("$opts{topmedgcecleanup} -submit $href->{bamid}")) { last; }
     }
-    ShowSummary($fcn);
-    exit;
+    ShowSummary('gceclean');
 }
 
-#--------------------------------------------------------------
-#   Copy local data to AWS storage
-#--------------------------------------------------------------
-if ($fcn eq 'awscopy') {
+#==================================================================
+# Subroutine:
+#   Submit_awscopy() - Submit jobs to copy local data to AWS storage
+#==================================================================
+sub Submit_awscopy {
     #   Get list of all samples yet to process
     my $sql = BuildSQL("SELECT bamid,state_b38,state_gce38bcf,state_aws38copy",
-        "WHERE b.state_b38=$COMPLETED AND b.state_aws38copy!=$COMPLETED AND " .
-        "b.datayear!=3 AND b.send2aws='Y'");
+        "WHERE b.state_b38=$COMPLETED AND b.state_aws38copy=$REQUESTED AND " .
+        "b.datayear<3 AND b.send2aws='Y'");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { exit; }
+    if (! $rowsofdata) { return; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         if ($opts{suberr} && $href->{state_aws38copy} >= $FAILEDCHECKSUM) {
@@ -402,20 +445,20 @@ if ($fcn eq 'awscopy') {
         if ($href->{state_aws38copy} != $NOTSET && $href->{state_aws38copy} != $REQUESTED) { next; }
         if (! BatchSubmit("$opts{topmedawscopy} -submit $href->{bamid}")) { last; }
     }
-    ShowSummary($fcn);
-    exit;
+    ShowSummary('awscopy');
 }
 
-#--------------------------------------------------------------
-#   Fix some screwup
-#--------------------------------------------------------------
-if ($fcn eq 'fix') {
+#==================================================================
+# Subroutine:
+#   Submit_fix() - Submit jobs for fix
+#==================================================================
+sub Submit_fix {
     #   Get list of all samples yet to process
     my $sql = BuildSQL("SELECT bamid,state_backup,state_qplot",
         "WHERE b.state_backup=$COMPLETED AND b.state_fix!=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { exit; }
+    if (! $rowsofdata) { return; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         if ($opts{suberr} && $href->{state_qplot} >= $FAILEDCHECKSUM) {
@@ -424,21 +467,21 @@ if ($fcn eq 'fix') {
         if ($href->{state_qplot} == $STARTED || $href->{state_qplot} == $SUBMITTED) { next; }
         if (! BatchSubmit("$opts{topmedqplot} -submit $href->{bamid}")) { last; }
     }
-    ShowSummary($fcn);
-    exit;
+    ShowSummary('fix');
 }
 
-#--------------------------------------------------------------
-#   Create experiment XML and sent it to NCBI for this NWDID
-#--------------------------------------------------------------
-if ($fcn eq 'sexpt') {
+#==================================================================
+# Subroutine:
+#   Submit_sexpt() - Submit jobs for sexpt
+#==================================================================
+sub Submit_sexpt {
     #   Get list of all samples yet to process
     my $sql = BuildSQL("SELECT *", 
         "WHERE b.datayear=3 AND b.nwdid_known='Y' AND b.poorquality='N' " .
         "b.state_cram=$COMPLETED");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { exit; }
+    if (! $rowsofdata) { return; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         if ($opts{suberr} && $href->{state_ncbiexpt} >= $FAILEDCHECKSUM) { $href->{state_ncbiexpt} = $REQUESTED; }
@@ -446,21 +489,21 @@ if ($fcn eq 'sexpt') {
         #   Tell NCBI about this NWDID experiment
         if (! BatchSubmit("$opts{topmedexpt} -submit $href->{bamid}")) { last; }
     }
-    ShowSummary($fcn);
-    exit;
+    ShowSummary('sexpt');
 }
 
-#--------------------------------------------------------------
-#   Get a list of secondary BAMs to be sent to NCBI
-#--------------------------------------------------------------
-if ($fcn eq 'sorig') {
+#==================================================================
+# Subroutine:
+#   Submit_sorig() - Submit jobs for sorig
+#==================================================================
+sub Submit_sorig {
     #   Get list of all samples yet to process
     my $sql = BuildSQL("SELECT *",
         "WHERE b.datayear=1 AND b.state_ncbiexpt=$COMPLETED AND " .
         "b.poorquality='N'");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { exit; }
+    if (! $rowsofdata) { return; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         if ($opts{suberr} && $href->{state_ncbiorig} >= $FAILEDCHECKSUM) { $href->{state_ncbiorig} = $REQUESTED; }
@@ -468,21 +511,21 @@ if ($fcn eq 'sorig') {
         #   Send the secondary BAM to NCBI
         if (! BatchSubmit("$opts{topmedncbiorig} -submit $href->{bamid}")) { last; }
     }
-    ShowSummary($fcn);
-    exit;
+    ShowSummary('sorig');
 }
 
-#--------------------------------------------------------------
-#   Get a list of remapped primary BAMs to be sent to NCBI
-#--------------------------------------------------------------
-if ($fcn eq 'sb37') {
+#==================================================================
+# Subroutine:
+#   Submit_sb37() - Submit jobs for sb37
+#==================================================================
+sub Submit_sb37 {
     #   Get list of all samples yet to process
     my $sql = BuildSQL("SELECT *",
         "WHERE b.datayear=1 AND b.state_ncbiexpt=$COMPLETED AND" .
         "b.poorquality='N'");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { exit; }
+    if (! $rowsofdata) { return; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         if ($opts{suberr} && $href->{state_ncbib37} >= $FAILEDCHECKSUM) { $href->{state_ncbib37} = $REQUESTED; }
@@ -490,11 +533,8 @@ if ($fcn eq 'sb37') {
         #   Send the remapped CRAM to NCBI
         if (! BatchSubmit("$opts{topmedncbib37} -submit $href->{bamid}")) { last; }
     }
-    ShowSummary($fcn);
-    exit;
+    ShowSummary('b37');
 }
-
-die "Invalid request '$fcn'. Try '$Script --help'\n";
 
 #==================================================================
 # Subroutine:
@@ -667,6 +707,10 @@ topmed_monitor.pl - Find runs that need some action
   topmed_monitor.pl -datayear 2 qplot      # Do qplot on year 2 samples
   topmed_monitor.pl -random bcf            # Randomly find samples for bcf
 
+  topmed_monitor.pl -project inpsyght -random bcf   # Force same cmd for a project
+
+  topmed_monitor.pl -center broad arrive cram verify qplot   # Submit in this order
+
 =head1 DESCRIPTION
 
 Use program as a crontab job to find runs that have not had certain
@@ -714,15 +758,17 @@ Generates this output.
 Do not submit more than N jobs for this invocation.
 The default for B<-maxjobs> is B<100>.
 
-=item B<-nopermit>
-
-Disable topmedpermit.pl check.  Useful to overwhelm SLURM some times.
-
 =item B<-piname NAME>
 
 Specifies a piname for runs on which to run the action,
 e.g. B<Ellinor>.
 The default is to run against all pinames.
+
+=item B<-project PROJECT>
+
+Specifies these commands are to be used for a specific project.
+Warning, this can only be abbreviated as B<-p> or <-project>.
+The default is to use the environment variable PROJECT.
 
 =item B<-random>
 
