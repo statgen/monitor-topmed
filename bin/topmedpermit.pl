@@ -41,7 +41,6 @@ our %opts = (
     centers_table => 'centers',
     runs_table => 'runs',
     permissions_table => 'permissions',
-    squeuedata => "/run/shm/squeue.$ENV{PROJECT}.results",
     verbose => 0,
 );
 my %VALIDOPS = (                    # Used for permit
@@ -103,56 +102,6 @@ exit;
 sub Test {
     my ($op, $bamid, $h) = @_;
 
-    #   Sometimes we just do not want to check for limits
-    if ($ENV{IGNORE_PERMIT}) { exit; }
-
-    #   To start, get the the system and host maximums permitted
-    #       e.g. action= bcf sysmax= 350 hostmax= 35
-    my $systemmax = 0;
-    my $hostmax = 0;
-    my ($in);
-    if ($h && open($in, $opts{squeuedata})) {
-        while (<$in>) {
-            if (/JOBID/) { last; }
-            my @c = split(' ', $_);
-            if ($c[1] eq $op && $c[2] eq 'sysmax=' && $c[4] eq 'hostmax=') {
-                $systemmax = $c[3];
-                $hostmax = $c[5];
-            }
-        }
-        #print "op=$op host=$h systemmax=$systemmax hostmax=$hostmax\n";
-        #   Data we read is like this:
-        #   3896779  topmed-working topmed 91398-bcf  topmed PD 0:00 1 (None)   topmed4
-        #   3798393  topmed-working topmed 104073-bcf topmed  R 3:24:57 1 topmed7   topmed7
-        my $queued = 0;                 # How many are queued on this host
-        my $running = 0;                # How many are running on this host
-        my $opcount = 0;                # How many of these operations are queued/running anywhere
-        while (<$in>) {
-            my @c = split(' ', $_);
-            if ($c[1] ne 'topmed-working') { next; }    # Special topmed case
-            if ($c[1] ne $ENV{PROJECT}) { next; }
-            if ($c[3] !~ /\d+-$op/) { next; }
-            $opcount++;
-            if ($c[9] ne $h) { next; }
-            if ($c[5] eq 'R') { $running++; }
-            if ($c[5] eq 'PD') { $queued++; }
-        }
-        close($in);
-        #print "op=$op host=$h queued=$queued running=$running opcount=$opcount\n";
-        
-        #   See if this would overload the host or the system
-        my $now = strftime('%Y/%m/%d %H:%M', localtime);
-        if ($opcount >= $systemmax) {
-            print "$now Too many $op jobs [$opcount] running/queued system wide [$systemmax]\n";
-            exit(5);                        # Don't ask again, special return code
-        }
-        my $n = $queued + $running;
-        if ($n >= $hostmax) {
-            print "$now Too many $op jobs [$n] running/queued on $h [$hostmax]\n";
-            exit(4);                        # Operation not permitted, special return code
-        }
-    }
-
     #   This is a small table, read it all
     my $sth = DoSQL("SELECT runid,centerid,datayear,operation FROM $opts{permissions_table}");
     my $rowsofdata = $sth->rows();
@@ -173,7 +122,6 @@ sub Test {
             }
         }
     }
-    #sleep(2);                               # Try to avoid possible race in SLURM ??
     exit;                                   # Permitted
 }
 
