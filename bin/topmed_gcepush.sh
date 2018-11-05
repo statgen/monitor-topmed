@@ -15,7 +15,7 @@ if [ "$1" = "-submit" ]; then
   RandomRealHost $bamid
   MayIRun $me $bamid $realhost
   timeout='2:00:00'
-  SubmitJob $bamid $PROJECT '4G' "$0 $*"
+  SubmitJob $bamid "$PROJECT-gce" '4G' "$0 $*"
   exit
 fi
 
@@ -74,7 +74,8 @@ if [ "$remap" = "N" ]; then
     Fail "Unable to find path for recab file for $nwdid [$bamid]"
   fi
   if [ -f $recabfile ]; then
-    Fail "Recab $recabfile for $nwdid [$bamid] already exists, remove if necessary"
+    rm -f $recabfile $recabfile.crai
+    echo "Recab $recabfile for $nwdid [$bamid] already exists, removed"
   fi
   #   No local recab exists, make fake one
   p=`dirname $recabfile`

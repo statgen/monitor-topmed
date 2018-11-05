@@ -16,7 +16,7 @@ if [ "$1" = "-submit" ]; then
   MyRealHost $bamid b$build
   MayIRun $me $bamid $realhost
   timeout='4:00:00'
-  SubmitJob $bamid $PROJECT '4G' "$0 $*"
+  SubmitJob $bamid "$PROJECT-gce" '4G' "$0 $*"
   exit
 fi
 
