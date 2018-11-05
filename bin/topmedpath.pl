@@ -72,7 +72,7 @@ if ($#ARGV < 0 || $opts{help}) {
         "$m whathost bamid|nwdid KEYWORD\n" .
         "  or\n" .
         "$m wherefile bamid|nwdid KEYWORD\n" .
-        "\nWHERE KEYWORD is one of bam|cram|localbackup|remotebackup|remotearchive|qcresults|console|b37|b38|bcf|gceupload|awsupload|awsbucket|awsbucketpath\n" .
+        "\nWHERE KEYWORD is one of bam|cram|localbackup|remotebackup|remotearchive|qcresults|console|b37|b38|bcf|gceupload|awsupload\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
     exit 1;
