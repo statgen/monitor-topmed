@@ -34,31 +34,38 @@ use My_DB;
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
+#   Pre-check options for project
+for (my $i=0; $i<=$#ARGV; $i++) {
+    if (($ARGV[$i] eq '-p' || $ARGV[$i] eq '-project') && defined($ARGV[$i+1])) {
+        $ENV{PROJECT} = $ARGV[$i+1];
+        last;
+    }
+}
 if (! -d "/usr/cluster/$ENV{PROJECT}") { die "$Script - Environment variable PROJECT '$ENV{PROJECT}' incorrect\n"; }
+
 our %opts = (
     realm => "/usr/cluster/$ENV{PROJECT}/etc/.db_connections/$ENV{PROJECT}",
     netdir => "/net/$ENV{PROJECT}",
     bamfiles_table => 'bamfiles',
     runs_table => 'runs',
-    squeuecmd => "/usr/cluster/bin/squeue -a -o '%.9i %.15P %.18q %.18j %.8u %.2t %.8M %.6D %R %.9n' -p ",
+    squeuecmdprev => "/usr/cluster/bin/squeue -a -o '%.9i %.15P %.18q %.18j %.8u %.2t %.8M %.6D %R %.9n' -p ",
+    squeuecmd => "/net/slurm2/bin/squeue -a -o '%.9i %.15P %.18q %.18j %.8u %.2t %.8M %.6D %R %.9n' -p ",
     maxlongjobs => 6,
     conf => "/usr/cluster/$ENV{PROJECT}/etc/topmedthrottle.conf",
     consoledir => "working/$ENV{PROJECT}-output",
-    squeuefile => '/run/shm/squeue.$ENV{PROJECT}.results',
     verbose => 0,
-    squeuefiletime => 30,               # Refresh file if older than this seconds
 );
 #   Special hack needed because of inconsistent naming conventions
 if ($ENV{PROJECT} eq 'topmed') { $opts{squeuecmd} .= 'topmed-working'; }
 else {$opts{squeuecmd} .= $ENV{PROJECT}; }
 Getopt::Long::GetOptions( \%opts,qw(
-    help verbose maxlongjobs=i force
+    help verbose maxlongjobs=i force project=s
     )) || die "$Script - Failed to parse options\n";
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
     my $m = "$Script [options]";
-    warn "$m squeue|summary|newcache\n" .
+    warn "$m squeue|summary\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
     exit 1;
@@ -69,90 +76,11 @@ my @squeuelines = ();                   # Global data for functions
 #--------------------------------------------------------------
 #   Get squeue results, save in memory file every so often
 #--------------------------------------------------------------
-if ($fcn eq 'newcache')  { CacheFile('new'); exit; }
-
-if ($opts{force}) { CacheFile('new'); }         # Create new cache
-else { CacheFile('read'); }                     # Just cache
 if ($fcn eq 'squeue')    { SQueue(@ARGV); exit; }
 if ($fcn eq 'summary')   { Summary(@ARGV); exit; }
 
 die "$Script  - Invalid function '$fcn'\n";
 exit;
-
-#==================================================================
-# Subroutine:
-#   CacheFile(flag)
-#
-#   Read cachefile into @squeuelines. If 'new' provided, create it new
-#==================================================================
-sub CacheFile {
-    my $flag = $_[0] || 'read';
-    my $file = $opts{squeuefile};
-
-    my $in;
-    my $filetime;
-    if ($flag eq 'read' && -f $file) {
-        $filetime = time() - (stat($file))[9];       # How old is file
-        if ($filetime > $opts{squeuefiletime}) { $flag = 'new'; }   # Old, force create
-    }
-    else { $flag = 'new'; }                 # No file, force create of file
-
-    #   If recent file, read and return
-    if ($flag ne 'new') {
-        open($in, $file) ||
-            die "$Script - Unable to open file '$file': $!\n";
-        while (<$in>) {
-            if (/^#/) { next; }
-            push @squeuelines,$_;
-        }
-        close($in);
-        return;
-    }
-
-    #   Create a new file, start with squeue data
-    $file = "$opts{squeuecmd} |";
-    open($in, $file) ||
-        die "$Script - Unable to open file '$file': $!\n";
-    while (<$in>) {
-        if (/^#/) { next; }
-        push @squeuelines,$_;
-    }   
-    close($in);
-
-    #   Now read the conf file so we can get intended max values
-    my @maxes = ();
-    open($in, $opts{conf}) ||
-        die "$Script - Unable to open file '$opts{conf}': $!\n";
-    my %hostmaxperaction = ();
-    my %systemmaxperaction = ();
-    my $OPENAMP = '{';
-    my $CLOSEAMP = '}';
-    while (<$in>) {
-        if (/^#/) { next; }
-        if (! /\S/) { next; }
-        if (/^job\s+(\S+)\s+$OPENAMP/i) {
-            my $action = $1;
-            while (<$in>) {
-                if (/\s*$CLOSEAMP/) { last; }
-                if (/\s*max\s*=\s*(\S+)/) { $systemmaxperaction{$action} = $1; }
-                if (/\s*maxperhost\s*=\s*(\S+)/) { $hostmaxperaction{$action} = $1; }
-            }
-        }
-    }
-    close($in);
-
-    #   Make summary of maxes per action
-    foreach my $action (keys %hostmaxperaction) {
-        push @maxes,"action= $action sysmax= $systemmaxperaction{$action} hostmax= $hostmaxperaction{$action}\n";
-    }
-
-    #   Write out summary of all data of interest
-    my $out;
-    open($out, '>'. $opts{squeuefile}) ||
-        die "$Script - Unable to create file '$opts{squeuefile}': $!\n";
-    foreach (@maxes, @squeuelines) { print $out $_; }
-    close($out);
-} 
 
 #==================================================================
 # Subroutine:
@@ -216,6 +144,16 @@ sub SQueue {
     my %queued = ();
     my %nottopmed = ();             # Not my user list
     my %jobtype = ();               # If one QOS, we want to know types of jobs queued
+
+    my $file = "$opts{squeuecmd} |";
+    my $in;
+    open($in, $file) ||
+        die "$Script - Unable to open file '$file': $!\n";
+    while (<$in>) {
+        if (/^#/) { next; }
+        push @squeuelines,$_;
+    }   
+    close($in);
 
     DBConnect($opts{realm});
     foreach my $l (@squeuelines) {
@@ -495,9 +433,7 @@ topmedcluster.pl - Query for cluster system information
 =head1 SYNOPSIS
 
   topmedcluster.pl squeue           # Show summary of queues
-  topmedcluster.pl -force squeue    # Create new cache and show summary of queues
   topmedcluster.pl summary          # Show summary of jobtypes
-  topmedcluster.pl newcache         # Create new cache file, nothing else
 
 
 =head1 DESCRIPTION
@@ -509,10 +445,6 @@ This program supports simple commands to show information about the cluster syst
 
 =over 4
 
-=item B<-force>
-
-Forces the creation of a new cache file.
-
 =item B<-help>
 
 Generates this output.
@@ -520,6 +452,12 @@ Generates this output.
 =item B<-maxlongjobs N>
 
 Specifies the number of long running jobs to show. This defaults to B<6>.
+
+=item B<-project PROJECT>
+
+Specifies these commands are to be used for a specific project.
+Warning, this can only be abbreviated as B<-p> or <-project>.
+The default is to use the environment variable PROJECT.
 
 =item B<-verbose>
 
@@ -538,9 +476,6 @@ Use this to provide a short summary. No longer used I think.
 
 B<squeue>
 Use this to provide a smart summary of SLURM queues.
-
-B<newcache>
-Use this to force creation of a new cache file. No output.
 
 
 =head1 EXIT
