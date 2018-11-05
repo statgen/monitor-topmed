@@ -1,2 +1,2 @@
 #!/bin/bash
-/usr/cluster/topmed/bin/topmed_status.pl runstatus
+/usr/cluster/topmed/bin/topmed_status.pl -project topmed runstatus
