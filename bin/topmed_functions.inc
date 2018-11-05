@@ -290,7 +290,7 @@ function ValidateIndex {
 #   so we can possibly insure the index file will work  (POS)
 #------------------------------------------------------------------
 function CreateIndex {
-  stat="stat --printf=%Y --dereference"
+  local stat="stat --printf=%Y --dereference"
 
   local bamid=$1
   local file=$2
@@ -362,7 +362,7 @@ function CreateIndex {
 #   CreateBCFIndex(bamid,bcffile)    Create BCF index for remapped bcf, update db
 #------------------------------------------------------------------
 function CreateBCFIndex {
-  stat="stat --printf=%Y --dereference"
+  local stat="stat --printf=%Y --dereference"
 
   local bamid=$1
   local bcffile=$2
