@@ -34,7 +34,15 @@ use File::Basename;
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
+#   Pre-check options for project
+for (my $i=0; $i<=$#ARGV; $i++) {
+    if (($ARGV[$i] eq '-p' || $ARGV[$i] eq '-project') && defined($ARGV[$i+1])) {
+        $ENV{PROJECT} = $ARGV[$i+1];
+        last;
+    }
+}
 if (! -d "/usr/cluster/$ENV{PROJECT}") { die "$Script - Environment variable PROJECT '$ENV{PROJECT}' incorrect\n"; }
+
 my $NOTSET = 0;
 our %opts = (
     realm => "/usr/cluster/$ENV{PROJECT}/etc/.db_connections/$ENV{PROJECT}",
@@ -50,7 +58,7 @@ our %opts = (
     verbose => 0,
 );
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose center=s run=s ignorearrived
+    help realm=s verbose center=s run=s ignorearrived project=s
     )) || die "Failed to parse options\n";
 
 #   Simple help if requested
@@ -412,6 +420,12 @@ Generates this output.
 =item B<-ignorearrived>
 
 Specifies we should re-look at the run because something new has arrived.
+
+=item B<-project PROJECT>
+
+Specifies these commands are to be used for a specific project.
+Warning, this can only be abbreviated as B<-p> or <-project>.
+The default is to use the environment variable PROJECT.
 
 =item B<-realm NAME>
 
