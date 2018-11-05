@@ -65,7 +65,7 @@ exit
 #
 #   Standard submit of the job
 #
-export IGNORE_PERMIT=1         # Ignore MayIRun stuff
+#   export IGNORE_PERMIT=1         # Ignore MayIRun stuff
 if [ "$1" = "-submit" ]; then
   shift
   bamid=`GetDB $1 bamid`
