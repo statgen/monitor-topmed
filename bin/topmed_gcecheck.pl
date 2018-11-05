@@ -37,7 +37,15 @@ use POSIX qw(strftime);
 #--------------------------------------------------------------
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
+#   Pre-check options for project
+for (my $i=0; $i<=$#ARGV; $i++) {
+    if (($ARGV[$i] eq '-p' || $ARGV[$i] eq '-project') && defined($ARGV[$i+1])) {
+        $ENV{PROJECT} = $ARGV[$i+1];
+        last;
+    }
+}
 if (! -d "/usr/cluster/$ENV{PROJECT}") { die "$Script - Environment variable PROJECT '$ENV{PROJECT}' incorrect\n"; }
+
 our %opts = (
     verbose => 0,
     gcecachefileprefix => "topmed_gcecheck",
@@ -223,6 +231,12 @@ Generates this output.
 =item B<-nocache>
 
 Force removal of the cache file.
+
+=item B<-project PROJECT>
+
+Specifies these commands are to be used for a specific project.
+Warning, this can only be abbreviated as B<-p> or <-project>.
+The default is to use the environment variable PROJECT.
 
 =item B<-verbose>
 
