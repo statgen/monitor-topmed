@@ -71,7 +71,7 @@ if [ "$1" = "-submit" ]; then	#  subroutine SubmitJob will run sbatch
   fi
   RandomRealHost $bamid
   MayIRun $me $bamid $realhost
-  SubmitJob $bamid $PROJECT '8G' "$0 $*"
+  SubmitJob $bamid "$PROJECT-qplot" '8G' "$0 $*"
   exit
 fi
 
