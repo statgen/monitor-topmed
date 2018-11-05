@@ -126,7 +126,10 @@ function Modify($table, $id) {
     $inp = array();
     while (list($k,$val) = each($_POST['IN'])) {
         //  Sep 2018 datetime got picky. Ignore any of those fields
-        if ( $DESC[$k] != 'datetime' ) { $inp[$k] = $val; }
+        if ( $DESC[$k] == 'datetime' ) { continue; }
+        //  Oct 2018 Now cannot use null string for flagstats because they are INTs
+        if ($val == '' && preg_match('/flagstat/', $k)) { continue; }
+        $inp[$k] = $val;
     }
     $inp[$pkey] = $id;                      // Be sure primary key is set
 
