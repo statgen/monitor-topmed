@@ -37,9 +37,7 @@ our %PATHOPTS = (
     gcearchiveuri => 'gs://',
     gcebcfuploaduri => 'gs://',                     # For remapped BCF data
     gceuploaduri => 'gs://',                        # For remapped CRAM data
-    awsbucket => 'nih-nhlbi-datacommons',
-    awsbucketpath => 'UofM/crams/b38',
-    awsuploaduri => 's3://nih-nhlbi-datacommons/UofM/crams/b38',
+    awsuploaduri => 's3://nih-nhlbi-datacommons',
 );
 
 #==================================================================
@@ -169,14 +167,6 @@ sub WherePath {
 
     if ($set eq 'awsupload') {
         return $PATHOPTS{awsuploaduri};
-    }
-
-    if ($set eq 'awsbucket') {
-        return $PATHOPTS{awsbucket};
-    }
-
-    if ($set eq 'awsbucketpath') {
-        return $PATHOPTS{awsbucketpath};
     }
 
     die "$main::Script - Unknown WherePath option '$set'\n";
