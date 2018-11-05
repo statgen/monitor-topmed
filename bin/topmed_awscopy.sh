@@ -6,9 +6,10 @@
 #
 . /usr/cluster/$PROJECT/bin/topmed_actions.inc
 aws="/usr/local/bin/aws --profile nhlbi-data-commons s3"
+partpath=b38.irc.v1
 me=awscopy
 markverb=$me
-stat="stat --printf=%s --dereference"
+cmdstat="stat --printf=%s --dereference"
 
 #------------------------------------------------------------------
 # Subroutine:
@@ -19,7 +20,7 @@ function Copy2AWS {
   local f=$1
   local awsfile=$2
   echo "====> Copying $f"
-  $aws cp --quiet $metadata $f $copyuri/$awsfile
+  $aws cp --quiet $f $awsuri/$awsfile
   if [ "$?" != "0" ]; then
     Fail "Failed to copy $f to AWS as $awsfile"
   fi
@@ -29,10 +30,9 @@ if [ "$1" = "-submit" ]; then
   shift
   bamid=`$topmedcmd show $1 bamid`
   RandomRealHost $bamid
-  #MyRealHost $bamid b$build
   MayIRun $me $bamid $realhost
   timeout='2:00:00'
-  SubmitJob $bamid $PROJECT '2G' "$0 $*"
+  SubmitJob $bamid "$PROJECT-aws" '2G' "$0 $*"
   exit
 fi
 
@@ -68,12 +68,12 @@ fi
 if [ ! -f $recabcram ]; then
   Fail "CRAM file for '$bamid' does not exist: $recabcram"
 fi
-sizerecabcram=`$stat $recabcram`
+sizerecabcram=`$cmdstat $recabcram`
 
 #   Create the index file as necessary
 CreateIndex $bamid $recabcram
 recabcrai=$recabcram.crai
-sizerecabcrai=`$stat $recabcrai`
+sizerecabcrai=`$cmdstat $recabcrai`
 
 #   Get checksum for b38 file or calculate it
 b38cramchecksum=`GetDB $bamid b38cramchecksum`
@@ -87,64 +87,31 @@ if [ "$b38cramchecksum" = "" ]; then
   SetDB $bamid b38cramchecksum $b38cramchecksum
 fi
 
-#   Get bcf file
-#recabvcf=`$topmedpath wherefile $bamid bcf`
-#if [ "$recabvcf" = "" ]; then
-#  Fail "Unable to determine BCF file for '$bamid'"
-#fi
-#if [ ! -f $recabvcf ]; then
-#  Fail "BCF file for '$bamid' does not exist: $recabvcf"
-#fi
-#sizerecabvcf=`$stat $recabvcf`
-
 #======================================================================
-#   All the files of interest exist locally
-#   Copy the file to the remote destination only if the size differs
+#   All the files of interest exist locally, copy to AWS if changed
 #======================================================================
-studyname=`GetDB $bamid studyname`
-piname=`GetDB $bamid piname`
-datayear=`GetDB $bamid datayear`
-phs=`GetDB $bamid phs`
-metadata="--metadata sample-id=$nwdid,year=$datayear,study=$studyname,pi=$piname,phs=$phs" 
-
-lcstudyname=${studyname,,}              # Force to lower case cause AWS wants it that way
-copyuri=$awsuri/$lcstudyname
-
-#   Now get the sizes of files of interest in AWS
+#   Get size of files in AWS
 tmpf=/run/shm/$$
-$aws ls $copyuri/$nwdid > $tmpf
-l=(`grep -e $nwdid.cram\$ $tmpf`)
+$aws ls $awsuri/$nwdid > $tmpf
+l=(`grep -e $nwdid.$partpath.cram\$ $tmpf`)
 awscramsize=${l[2]}
-l=(`grep $nwdid.cram.crai $tmpf`)
+l=(`grep $nwdid.$partpath.cram.crai $tmpf`)
 awscraisize=${l[2]}
-#l=(`grep $nwdid.cram.vcf $tmpf`)
-#awsvcfsize=${l[2]}
 rm -f $tmpf
 
 #   Send files that have changed size
 if [ "$sizerecabcram" != "$awscramsize" ]; then
-  Copy2AWS $recabcram $nwdid.cram
+  Copy2AWS $recabcram $nwdid.$partpath.cram
+  Copy2AWS $recabcram.crai $nwdid.$partpath.cram.crai
 else
-  echo "No need to send unchanged $nwdid.cram"
+  echo "No need to send unchanged $nwdid.$partpath.cram"
+  if [ "$sizerecabcrai" != "$awscraisize" ]; then
+    echo Copy2AWS $recabcram.crai $nwdid.$partpath.cram.crai "$sizerecabcrai" != "$awscraisize" 
+  else
+    echo "No need to send unchanged $nwdid.$partpath.cram.crai"
+  fi
 fi
-if [ "$sizerecabcrai" != "$awscraisize" ]; then
-  Copy2AWS $recabcram.crai $nwdid.cram.crai
-else
-  echo "No need to send unchanged $nwdid.cram.crai"
-fi
-#if [ "$sizerecabvcf" != "$awsvcfsize" ]; then
-#  Copy2AWS $recabvcf $nwdid.cram.vcf
-#else
-#  echo "No need to send unchanged $nwdid.cram.vcf"
-#fi
-
-echo "AWS files for $bamid $nwdid are up to date"
-$aws ls $copyuri/$nwdid
-
-#echo "Here is metadata for the cram"
-#bucket=`$topmedpath wherepath $nwdid awsbucket`
-#bucketpath=`$topmedpath wherepath $nwdid awsbucketpath`
-#${aws}api head-object --bucket $bucket --key $bucketpath/$lcstudyname/$nwdid.cram.crai
+$aws ls $awsuri/$nwdid
 
 etime=`date +%s`
 etime=`expr $etime - $stime`
