@@ -47,6 +47,8 @@ our %opts = (
     bamfiles_table => 'bamfiles',
     centers_table => 'centers',
     runs_table => 'runs',
+    aws => 'aws --profile nhlbi-data-commons s3',
+    awsuri => 's3://nih-nhlbi-datacommons',
     gceuri => 'gs://topmed-bcf',
     gsutil => '/usr/bin/gsutil',
     b37gceuri => 'gs://topmed-irc-working/remapping/b37',
@@ -58,29 +60,30 @@ our %opts = (
     cacheage => 60*60*24,               # If cache file older than this, refetch
     cachefile => "/tmp/$Script.gcefiles", 
     #remapstatus => 'curl --silent --insecure https://104.198.71.226/api/sample-status\\?ids=',
+    project => 'topmed',
     errorsfound => 0,                   # Count of errors detected
     verbose => 0,
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
     help register fixer=s execfixer max=i redo verbose nfsmounts replace cachefile=s
-    all center=s run=s piname=s studyname=s datayear=i sample=s build=i 
+    all center=s run=s piname=s studyname=s datayear=i sample=s build=i project=s
     )) || die "$Script - Failed to parse options\n";
 
 #   Simple help if requested
 if ($opts{help} || ($#ARGV<0) && (! $opts{nfsmounts})) {
     print "$Script [options] -subset value  db|localfiles|awsfiles|gcebcffiles|gcecramfiles|b37|backups\n" .
         "Where \n" .
-        "  [-subset] is -center, -run or -sample\n" .
+        "  [-subset] is one of: -center -run -sample -datayear -piname -studyname -build\n" .
         "\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
     exit 1;
 }
 my $action = shift @ARGV;
+$ENV{PROJECT} = $opts{project};             # Force project for any other things we call
 if ($opts{redo}) { $opts{fixer} = $opts{redotool}; }
 if ($0 =~ /\/(\w+)check/) { PathInit($1); } # Set up project variables;
-
 
 #--------------------------------------------------------------
 #   Get list of bamids to check
@@ -458,7 +461,7 @@ sub Check_LocalFiles {
 
 #==================================================================
 # Subroutine:
-#   Get_Cache_Data()
+#   Get_GCE_Cache_Data()
 #   Data of interest looks like
 #     1454900  2018-02-04T09:30:18Z  gs://topmed-bcf/NWD103302/NWD103302.bcf.csi
 #   Get GCE listing of files in local cache file
@@ -468,14 +471,13 @@ sub Check_LocalFiles {
 #==================================================================
 our %cachelines = ();                # Saved cache data here
 our $current_cache_file = '';
-sub Get_Cache_Data {
+sub Get_GCE_Cache_Data {
     my ($file, $gsuri, $gsopt) = @_;
     if (! $gsopt) { $gsopt = ''; }
 
     #   Nothing changed and we already did this
     if (! defined($current_cache_file)) { $current_cache_file = ''; }
     if ($file eq $current_cache_file && %cachelines) { return \%cachelines; }
-    %cachelines = ();
 
     #   If file is old, redo
     if ($opts{replace}) { unlink($file); }  # Force rebuild of cache file
@@ -489,6 +491,7 @@ sub Get_Cache_Data {
         }
     }
     if (! -f $file) {
+        %cachelines = ();
         my $k = 0;
         my $IN;
         my $cmd = "$opts{gsutil} $gsopt ls -lr " . $gsuri . '/';
@@ -530,23 +533,109 @@ sub Get_Cache_Data {
         $t = time() - $t;
         print "Created cache file '$file' with $k files in $t secs\n";
     }
-    else {
-        my $IN;
-        open($IN, $file) ||
-            die "$Script - Unable to read GCE cache from '$file': $!\n";    
-        my $k = 0;
-        while (my $l = <$IN>) {
-            $k++;
-            my @c = split(' ', $l);
-            my $k = shift(@c);
-            $cachelines{$k} = \@c;  # E.g. nwd -> nwd.bcf 234 nwd.bcf.csi 123
-        }
-        close($IN);
-        print "Read cache file '$file' with $k samples\n";
 
+    #   Read in file
+    %cachelines = ();
+    my $IN;
+    open($IN, $file) ||
+        die "$Script - Unable to read GCE cache from '$file': $!\n";    
+    my $k = 0;
+    while (my $l = <$IN>) {
+        $k++;
+        my @c = split(' ', $l);
+        my $k = shift(@c);
+        $cachelines{$k} = \@c;  # E.g. nwd -> nwd.bcf 234 nwd.bcf.csi 123
     }
+    close($IN);
+    print "Read cache file '$file' with $k samples\n";
     $current_cache_file = $file;        # Remember what we just did
     return \%cachelines;
+}
+
+#==================================================================
+# Subroutine:
+#   Get_AWS_Cache_Data()
+#   Data of interest looks like
+#     2018-11-03 08:49:05 21493071506 NWD100234.b38.irc.v1.cram
+#   Get AWS listing of files in local cache file
+#
+#   Return:
+#       Reference to hash of array of files for each sample NWD
+#==================================================================
+our %awscachelines = ();                # Saved cache data here
+our $current_cache_awsfile = '';
+sub Get_AWS_Cache_Data {
+    my ($file, $awsuri, $awsopt) = @_;
+    if (! $awsopt) { $awsopt = ''; }
+
+    #   Nothing changed and we already did this
+    if (! defined($current_cache_awsfile)) { $current_cache_awsfile = ''; }
+    if ($file eq $current_cache_awsfile && %awscachelines) { return \%awscachelines; }
+
+    #   If file is old, redo
+    if ($opts{replace}) { unlink($file); }  # Force rebuild of cache file
+    if (-f $file) {
+        my @s = stat($file);
+        if ($s[9] > (time() + $opts{cacheage})) {
+            print "#### Shall I replace cache file '$file' (y/n): ";
+            my $a = <STDIN>;
+            if ($a !~ /^y/) { die "$Script - cache file not removed. Stopiing\n"; }
+            unlink($file);
+        }
+    }
+    if (! -f $file) {
+        %awscachelines = ();
+        my $k = 0;
+        my $IN;
+        my $cmd = "$opts{aws} ls " . $awsuri . ' ' . $awsopt;
+        my $t = time();
+        print "Fetching cache file $file using '$cmd'\n";
+        open($IN, "$cmd |") ||
+            die "$Script - Unable to fetch AWS data: CMD=$cmd\n";
+        #  Each line of interest looks like
+        #    size  timestamp  gs://topmed-bcf/NWD100417/NWD100417.bcf
+        while (my $l = <$IN>) {
+            chomp($l);
+            if ($l =~ /freeze/) { next; }   # Ignore unusual files in GCE buckets
+            my @c = split(' ', $l);
+            my $nwd = 'UNKNOWN';
+            if ($c[0] =~ /^201\d/) {
+                if ($c[3] =~ /^(NWD\w+)/) { $nwd = $1; }    # Get NWDID
+                push @{$awscachelines{$nwd}},"$c[3] $c[2]";
+                $k++;
+                #if ($k > 1000) { last; }       # Handy for debugging
+                next;
+            }
+            warn "Unrecognized line: $l\n";
+        }
+        close($IN);
+        my $OUT;
+        open($OUT, '>' . $file) ||
+            die "$Script - Unable to create file '$file': $!\n";
+        foreach my $ky (keys %awscachelines) {
+            print $OUT $ky . ' ' . join(' ', @{$awscachelines{$ky}}) . "\n";
+        }
+        close($OUT);
+        $t = time() - $t;
+        print "Created cache file '$file' with $k files in $t secs\n";
+    }
+
+    #   Read in file
+    %awscachelines = ();
+    my $IN;
+    open($IN, $file) ||
+        die "$Script - Unable to read AWS cache from '$file': $!\n";    
+    my $k = 0;
+    while (my $l = <$IN>) {
+        $k++;
+        my @c = split(' ', $l);
+        my $k = shift(@c);
+        $awscachelines{$k} = \@c;  # E.g. nwd -> nwd.bcf 234 nwd.bcf.csi 123
+    }
+    close($IN);
+    print "Read cache file '$file' with $k samples\n";
+    $current_cache_awsfile = $file;        # Remember what we just did
+    return \%awscachelines;
 }
 
 #==================================================================
@@ -568,7 +657,7 @@ sub Check_GCEBCFFiles {
     }
     my %requiredextensions = ( 'bcf' => 1, 'bcf.csi' => 1);
     #   All data is supposed to be in GCE
-    my $cacheref = Get_Cache_Data($opts{cachefile} . '.bcf', $opts{gceuri});
+    my $cacheref = Get_GCE_Cache_Data($opts{cachefile} . '.bcf', $opts{gceuri});
     if (! exists($cacheref->{$nwdid})) {
         push @error,"No $nwdid GCE files found";
         @{$cacheref->{$nwdid}} = ();        # Create empty array so things work
@@ -635,10 +724,9 @@ sub Check_GCECramFiles {
     my $gsuri = $opts{b38gcebackup};
 
     #   All data is supposed to be in GCE after it is remapped
-    my $remapped = 0;
-    my $cacheref = Get_Cache_Data($opts{cachefile} . '.ircshare', $gsuri, $opts{b38gcebackupopt});
+    my $cacheref = Get_GCE_Cache_Data($opts{cachefile} . '.ircshare', $gsuri, $opts{b38gcebackupopt});
  	if (! exists($cacheref->{$nwdid})) {
-        push @error,"No $nwdid remapped GCE files found";
+        push @error,"No $nwdid GCE files found";
         @{$cacheref->{$nwdid}} = ();        # Create empty array so things work
     }
 
@@ -676,10 +764,6 @@ sub Check_GCECramFiles {
         if ($opts{verbose}) { print "Verified $f [$fsz]\n"; }
     }
 
-    foreach my $x (keys %requiredextensions) {
-        if ($requiredextensions{$x}) { push @error,"GCE file missing: $nwdid.$x"; }
-    }
-
     #   If there were problems, show messages
     if (@error) { ShowErrors($bamid, $nwdid, \@error); }
     else {
@@ -699,7 +783,7 @@ sub Check_B37Files {
     my %requiredextensions = ( 'recal.cram' => 1, 'recal.cram.crai' => 1, 'recal.cram.md5' => 1, 'recal.cram.flagstat' => 1);
 
     #   All data is supposed to be in GCE
-    my $cacheref = Get_Cache_Data($opts{cachefile}, $opts{b37gceuri});
+    my $cacheref = Get_GCE_Cache_Data($opts{cachefile}, $opts{b37gceuri});
     if (! exists($cacheref->{$nwdid})) {
         push @error,"No $nwdid GCE files found";
         @{$cacheref->{$nwdid}} = ();        # Create empty array so things work
@@ -752,7 +836,7 @@ sub Check_Backups {
 
     #   All data is supposed to be in GCE after it is remapped
     my $backedup = 0;
-    my $cacheref = Get_Cache_Data($opts{cachefile} . '.ircshare', $gsuri, $opts{b38gcebackupopt});
+    my $cacheref = Get_GCE_Cache_Data($opts{cachefile} . '.ircshare', $gsuri, $opts{b38gcebackupopt});
         if (exists($cacheref->{$nwdid})) {
         foreach my $f (@{$cacheref->{$nwdid}}) {    # All files for NWD
             if ($f =~ /\.$ext$/) { $backedup++; last; }
@@ -786,7 +870,65 @@ sub Check_Files {
 sub Check_AWSFiles {
     my ($bamid, $nwdid) = @_;
     my @error = ();
-    die "$Script - this is not ready yet\n";
+
+    #   Do not bother if we have not copied data to AWS
+    my $sql = "SELECT state_aws38copy FROM $opts{bamfiles_table} WHERE bamid=$bamid";
+    my $sth = My_DB::DoSQL($sql);
+    my $href = $sth->fetchrow_hashref;
+    if ($href->{state_aws38copy} != $COMPLETED) {
+        if ($opts{verbose}) { print "BAMID=$bamid NWD=$nwdid RECAB CRAM not copied to AWS yet\n"; }
+        return;
+    }
+    my %requiredextensions = ( 'b38.irc.v1.cram' => 1, 'b38.irc.v1.cram.crai' => 1);
+    my $awsuri = $opts{awsuri};
+
+    #   All data is supposed to be in AWS
+    my $cacheref = Get_AWS_Cache_Data($opts{cachefile} . '.aws', $awsuri, '');
+ 	if (! exists($cacheref->{$nwdid})) {
+        push @error,"No $nwdid AWS files found";
+        @{$cacheref->{$nwdid}} = ();        # Create empty array so things work
+    }
+
+    my @a = @{$cacheref->{$nwdid}};         # Copy cause I cannot get this syntax right
+    for (my $i=0; $i<=$#a; $i=$i+2) {
+        my $f = $a[$i];                     # E.g. NWD104562.b38.irc.v1.cram
+        my $fsz = $a[$i+1];                 # E.g. size of file in AWS
+        if ($f !~ /^$nwdid\.(\S+)/) {
+            push @error,"AWS file is invalid: Unknown file: $f";
+            next;
+        }
+        my $x = $1;                         # Extension of file, e.g. b38.irc.v1.cram
+        if (! exists($requiredextensions{$x})) {
+            push @error,"GCE: Invalid GCE sample extension: $f";
+            next;
+        }
+        #   Figure out local filename, it differs from that in GCE
+        #   Since we have non-standard files showing up here, only be concerned with cram/crai
+        my $fsize = -1;
+        my $ff = 'unknown';
+        if ($x =~ /cram$/) { $ff  = $nwdid . '.recab.cram'; }
+        if ($x =~ /crai$/) { $ff  = $nwdid . '.recab.cram.crai'; }
+        #   Get size of local file and compare
+        $ff = WherePath($bamid, 'b38') . '/' . $ff;
+        my @stats = stat($ff);
+        if (! defined($stats[7])) {
+            push @error,"AWS: Local file '$ff' does not exist: $f";
+            next;
+        }
+        $fsize  = $stats[7];
+        if ($fsize != $fsz) {
+            push @error,"AWS: local and remote filesize mismatch for $f ($fsize != $fsz)";
+            next;
+        }
+        $requiredextensions{$x} = 0;        # Found file with this required extension
+        if ($opts{verbose}) { print "Verified $f [$fsz]\n"; }
+    }
+
+    #   If there were problems, show messages
+    if (@error) { ShowErrors($bamid, $nwdid, \@error); }
+    else {
+        if ($opts{verbose}) { print "  BAMID=$bamid NWD=$nwdid - AWS files all are correct\n"; }
+    }
 
 }
 
@@ -1017,6 +1159,11 @@ Generates this output.
 =item B<-max N>
 
 Reduce the number of samples that would normally be selected to N samples.
+
+=item B<-project PROJECT>
+
+Specifies these commands are to be used for a specific project.
+The default is to use the environment variable PROJECT.
 
 =item B<-nfsmounts>
 
