@@ -107,7 +107,7 @@ echo "`date`\t \tBuild Manifest.txt" >> $logfile
 gsutil ls -r -l ${uri}/'**' > gsutil.file.list
 gsutil ls -r -L ${uri}/'**' > gsutil.complete
 awk -f $convert_checksums  gsutil.complete > gsutil.checksums
-grep -v cram.crai gsutil.checksums | cut -f 1 > Manifest.txt
+grep -v cram.crai gsutil.checksums | grep -v cram.md5 | cut -f 1 > Manifest.txt
 echo `date` >> $logfile
 rm -f gsutil.checksums
 
