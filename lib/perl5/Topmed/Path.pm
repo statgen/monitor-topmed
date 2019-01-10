@@ -28,6 +28,7 @@ our %PATHOPTS = (
     incomingdir => 'incoming/',
     cramdir => 'working/backups/incoming/',
     backupsdir => '/net/topmed8/working/temp_backups/',
+    oldbackupsdir => '/net/topmed/working/backups/incoming/',
     bcfsdir => 'working/candidate_variants',
     consoledir => 'working/',
     wresults37dir => 'working/schelcj/results',
@@ -52,6 +53,7 @@ sub PathInit {
     $PATHOPTS{netdir} .= $project;
     $PATHOPTS{cramdir} .= $project;
     $PATHOPTS{backupsdir} .= $project;
+    $PATHOPTS{oldbackupsdir} .= $project;
     $PATHOPTS{incomingdir} .= $project;
     $PATHOPTS{consoledir} .= $project . '-output';
     $PATHOPTS{gcebackupuri} .= $project . '-backups';
@@ -109,8 +111,13 @@ sub WherePath {
     }
 
     #   Find where the original source file was backed up
+    #	Of course we changed how this works, so we much look in TWO places
+    #	If the FILE exists in the oldbackupsdir, we return that cause we
+    #	do not backup in two places ?? I hope ??
     if ($set eq 'localbackup') {
-        my $backup = "$PATHOPTS{backupsdir}/$centername";
+    	my $backup = "$PATHOPTS{oldbackupsdir}/$centername/$rundir";  # Old path
+    	if (-f "$backup/$cramname") { return abs_path($backup); }
+        $backup = "$PATHOPTS{backupsdir}/$centername";  	# New path        
         return $backup;
     }
 
