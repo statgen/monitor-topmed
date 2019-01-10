@@ -504,7 +504,8 @@ sub Get_GCE_Cache_Data {
         while (my $l = <$IN>) {
             chomp($l);
             if ((!defined($l)) || (! $l)) { next; }
-            if ($l =~ /INFO/) { next; }     # gsutil had to retry
+            if ($l =~ /PRE/) { next; }
+            if ($l =~ /INFO/) { next; }
             if ($l =~ /[:\/]$/) { next; }
             if ($l =~ /freeze/) { next; }   # Ignore unusual files in GCE buckets
             if ($l =~ /\/([^\/]+)\/([^\/]+)$/) {
