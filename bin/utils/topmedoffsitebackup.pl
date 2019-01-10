@@ -40,12 +40,12 @@ use My_DB;
 #--------------------------------------------------------------
 our %opts = (
     realm => '/usr/cluster/topmed/etc/.db_connections/topmed',
-    topmedcmd => '/usr/cluster/topmed/bin/topmedcmd.pl',
-    topmedpath => '/usr/cluster/topmed/bin/topmedpath.pl',
-    backupprefix => '../../../../../../',
+    topmedpath => '/usr/cluster/topmed/bin/topmedpath.pl -p topmed',
     centers_table => 'centers',
     bamfiles_table => 'bamfiles',
     runs_table => 'runs',
+	tmpfile => "/tmp/$Script.temp.sh",
+    topdir => "/net/topmed/working/backups/incoming/topmed",
     verbose => 0,
 );
 
@@ -68,95 +68,111 @@ DBConnect($opts{realm});
 #--------------------------------------------------------------
 #   Look for runs without a proper backup directory
 #--------------------------------------------------------------
-my %count = ();
+#	Create bash for loop in shell script
+my $out;
+open($out, '>' . $opts{tmpfile}) ||
+	die "$Script - Unable to create '$opts{tmpfile})': $!\n";
+print $out "#!/bin/bash\n" .
+	"#  cd $opts{topdir} || exit 5\n" .
+	"for c in \$1; do\n" .
+	"  cd $opts{topdir}\n" .
+	"  cd \$c\n " .
+	"    for r in *; do\n" .
+	"       n=`ls \$r/*.src.cram | wc -l`\n" .
+	"       cd \$r\n" .
+	"       echo \$c/\$r  \$n  `pwd -P`\n" .
+	"       cd ..\n" .
+	"     done\n" .
+	"done\n";
+close($out);
+
 #   Get all the known centers in the database
 my $centersref = GetCenters();
 foreach my $cid (keys %{$centersref}) {
+	my $runs = 0;
+	my $errs = 0;
     my $center = $centersref->{$cid};
-    my $runsref = GetRuns($cid) || next;
-    #   For each run, see if the backup directory is set up
+	print "Checking $center\n";
+	#   Get complete listing of all local backup directories 
+	#	and counts of src.cram files for this center.
+	my %backupruns = ();
+	my $cmd = "bash $opts{tmpfile} $center";
+	my $in;
+	open ($in, "$cmd |") ||
+		die "$Script - Unable to run command: $cmd\n";
+	while (<$in>) {
+		chomp;
+		my @cols = split(' ', $_);
+		if ($cols[1] eq '0') {
+			warn "$Script - run $cols[0] found zero backup files\n";
+			$errs++;
+			next;
+		}
+		$backupruns{$cols[0]} = $cols[2];
+	}
+	close($in);
+
+	#	For each run in this center, see if the local backup directory
+	#	has a src.cram for one sample and see if topmedpath returns
+	#	the correct place for this sample
+    my $runsref = GetRuns($cid);
+    if (! $runsref) {
+    	warn "$Script - found no runs in database for center 'center'\n";
+    	$errs++;
+    	next;
+    }
     foreach my $runid (keys %{$runsref}) {
         my $dirname = $runsref->{$runid};
-        if ($dirname =~ /slot/) { next; }   # For development
-        #   Backed up offsite?
-        my $sql = "SELECT offsite FROM " . $opts{runs_table} .
-            " WHERE runid=$runid";
+        my $centerrun = "$center/$dirname";
+        my $sql = "SELECT offsite FROM $opts{runs_table} WHERE runid=$runid";
         my $sth = DoSQL($sql);
         my $href = $sth->fetchrow_hashref;
         my $offsite = $href->{offsite};
-        $sql = "SELECT bamid,bamname FROM " . $opts{bamfiles_table} . 
+        $runs++;
+        #	Get one sample for sanity checking
+        $sql = "SELECT bamid,cramname FROM " . $opts{bamfiles_table} . 
             " WHERE runid=$runid LIMIT 1";
         $sth = DoSQL($sql);
-        if (! $sth) { next; }           # No files for this run yet
+        if (! $sth) {
+    		warn "$Script - no sample for $centerrun\n";
+    		$errs++;
+    		next;
+    	}
         $href = $sth->fetchrow_hashref;
-        if (! $href) { next; }          # No files for this run yet
+        if (! $href) {
+    		warn "$Script - no sample for $centerrun\n";
+    		$errs++;
+    		next;
+    	}
+    	my $bamid = $href->{bamid};
+    	my $cramname = $href->{cramname};
 
-        #   Assumes all files for a run are the same type
-        my $original_file = $href->{bamname};
-        my $bamid = $href->{bamid};
-        my $incomingdir = `$opts{topmedpath} wherepath $bamid bam`;
-        chomp($incomingdir);
-        my $backupsdir = `$opts{topmedpath} wherepath $bamid localbackup`;
-        chomp($backupsdir);
-
-        #   If original file was a bam, just check that backups can be done
-        if ($original_file =~ /\.bam$/) {
-            if (! -d $backupsdir) {
-                print "You must create a local backup directory for '$center/$dirname'\n\n";
-                $count{must_create_local_backup}++;
-                next;
-            }
-            $count{local_backup_exists}++;
-            next;
-        }
-
-        #   If original file was a cram, be sure backup points to incoming
-        if ($original_file =~ /\.cram$/) {
-            #   Crams backed up to local storage
-            if ($offsite eq 'N') {
-                if (-d $backupsdir) { next; }   # Local directory exists, we are fine
-                my $d = substr($backupsdir,4);          # Remove /net
-                $d = $opts{backupprefix} . $d;
-                print "Create a local backup directory for '$center/$dirname' like this:\n" .
-                    "  cd " . dirname($backupsdir) . "   # As user TOPMED.  Maybe create this somewhere\n" .
-                    "  ln -s $d $dirname\n\n";
-                next;
-            }
-            #   Run is a cram to be backed up offsite
-            if ($incomingdir eq $backupsdir) { $count{offsite_backup_exists}++; next; }
-            if (! -l $backupsdir) {                 # Symlink exists, mark to be removed
-                my $d = $backupsdir . '.removeme';
-                if ((! -e $d) && (-d $backupsdir)) {
-                    system("mv $backupsdir $d");
-                    print "Local backup directory for '$center/$dirname' renamed to be removed.\n";
-                    $count{must_remove_local_backup}++;
-                }
-            }
-            #   Create the symlink for the backup
-            my $cmd = "ln -s $opts{backupprefix}" . 'topmed/incoming/topmed/' .
-                    "$center/$dirname /net/topmed/working/backups/incoming/topmed/$center/$dirname";
-            if (system($cmd)) {
-                print "$Script - Unable to create backup symlink:  $cmd\n";
-                $count{must_create_offsite_backup}++;
-            }
-            else {
-                print "$Script - Created symlink for backup for '$center/$dirname'\n";
-                $count{created_offsite_backup_link}++;
-            }
-            next;
-        }
-        print "$Script - Unable to determine type of files in '$center/$dirname'\n";
+		# 	Verify this run has a backup directory
+		if (! exists($backupruns{$centerrun})) {
+    		warn "$Script - no backup directory found for for $centerrun\n";
+    		$errs++;
+    		next;
+    	}
+    	#	Where is this backup directory supposed to be
+    	#	Does it match what we have in $opts{topdir} tree?
+    	my $formalpath = `$opts{topmedpath} wherepath $bamid localbackup`;
+    	chomp($formalpath);
+    	if ($formalpath ne $backupruns{$centerrun}) {
+    		warn "$Script - topmedpath wherepath does not match tree in $opts{topdir}\n" .
+    			"    $formalpath ne $backupruns{$centerrun}\n";
+    		$errs++;
+    		next;
+    	}
+		#	Now see if one of our samples is there
+		if (! -f "$formalpath/$cramname") {
+    		warn "$Script - Missing backup file $formalpath/$cramname\n";
+    		$errs++;
+    		next;
+    	}
     }
+	print "  Found $runs runs and detected $errs errors\n";
 }
-
-#   Generate summary
-print "Summary of check for backups for our runs:\n";
-foreach my $k (sort keys %count) {
-    $_ = $k;
-    $_ =~ s/_/ /g;
-    print "  $_ = $count{$k}\n";
-}
-
+unlink($opts{tmpfile});
 exit;
 
 
@@ -218,7 +234,7 @@ return code of 0. Any error will set a non-zero return code.
 
 =head1 AUTHOR
 
-Written by Terry Gliedt I<E<lt>tpg@umich.eduE<gt>> in 2016 and is
+Written by Terry Gliedt I<E<lt>tpg@umich.eduE<gt>> in 2016, 2019 and is
 is free software; you can redistribute it and/or modify it under the
 terms of the GNU General Public License as published by the Free Software
 Foundation; See http://www.gnu.org/copyleft/gpl.html
