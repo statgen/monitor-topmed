@@ -112,12 +112,17 @@ sub WherePath {
 
     #   Find where the original source file was backed up
     #	Of course we changed how this works, so we much look in TWO places
-    #	If the FILE exists in the oldbackupsdir, we return that cause we
+    #   If a recent file, use new backup place, else 
+    #	if the FILE exists in the oldbackupsdir, we return that cause we
     #	do not backup in two places ?? I hope ??
     if ($set eq 'localbackup') {
-    	my $backup = "$PATHOPTS{oldbackupsdir}/$centername/$rundir";  # Old path
-    	if (-f "$backup/$cramname") { return abs_path($backup); }
-        $backup = "$PATHOPTS{backupsdir}/$centername";  	# New path        
+        my $backup;
+        if ($datayear >= 4) {  $backup = "$PATHOPTS{backupsdir}/$centername"; }   # New path
+        else {
+    	    $backup = "$PATHOPTS{oldbackupsdir}/$centername/$rundir";  # Old path
+    	    if (-f "$backup/$cramname") { return abs_path($backup); }
+            $backup = "$PATHOPTS{backupsdir}/$centername";  	# New path
+        }      
         return $backup;
     }
 
