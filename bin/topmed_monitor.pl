@@ -433,7 +433,7 @@ sub Submit_awscopy {
     #   Get list of all samples yet to process
     my $sql = BuildSQL("SELECT bamid,state_b38,state_gce38bcf,state_aws38copy",
         "WHERE b.state_b38=$COMPLETED AND b.state_aws38copy=$REQUESTED AND " .
-        "b.datayear<4 AND b.send2aws='Y'");
+        "b.send2aws='Y'");
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) { return; }
