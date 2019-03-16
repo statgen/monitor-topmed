@@ -51,11 +51,12 @@ our %opts = (
     gcecachefileprefix => "topmed_gcecheck",
     gsuri => 'gs://topmed-recabs/\*/\*.flagstat',
     realm => "/usr/cluster/$ENV{PROJECT}/etc/.db_connections/$ENV{PROJECT}",
+    topmedcmd => "/usr/cluster/$ENV{PROJECT}/bin/topmedcmd.pl",
     bamfiles_table => 'bamfiles',
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help verbose cache nocache
+    help verbose cache nocache project=s
     )) || die "$Script - Failed to parse options\n";
 
 #   Simple help if requested
@@ -95,19 +96,33 @@ sub MarkState {
     my $countcannot = 0;
     foreach my $nwdid (keys %{$nwdref}) {
         #   If we have NWDID, this appears to be ready to be pulled
-        my $sql = "SELECT state_gce38push,state_gce38pull FROM $opts{bamfiles_table} " .
+        my $sql = "SELECT state_gce38push,state_gce38pull,datayear FROM $opts{bamfiles_table} " .
             "WHERE expt_sampleid='$nwdid'";
         my $sth = DoSQL($sql);
         my $href = $sth->fetchrow_hashref;
         if (! exists($href->{state_gce38push}) ||
             $href->{state_gce38push} ne $COMPLETED) {
-            print "Sample $nwdid exists in GCE, but was not pushed\n";
-            $countcannot++;
+            my $center = GetCenter($nwdid);
+            if (! $center) {
+                print "Sample $nwdid unknown, but exists in GCE\n";
+            }
+            else {
+                print "Sample $nwdid exists in GCE, but was not pushed " .
+                    "(center=$center year=$href->{datayear})\n";
+                $countcannot++;
+            }
             next;
         }
         if ($href->{state_gce38pull} == $COMPLETED) {
-            print "Sample $nwdid has already been pulled, but still exists in GCE\n";
-            $countcannot++;
+            my $center = GetCenter($nwdid);
+            if (! $center) {
+                print "Sample $nwdid unknown, but exists in GCE\n";
+            }
+            else {
+                print "Sample $nwdid has already been pulled, but still exists in GCE " .
+                    "(center=$center year=$href->{datayear})\n";
+                $countcannot++;
+            }
             next;
         }
         if ($href->{state_gce38pull} == $REQUESTED) { next; }
@@ -118,10 +133,24 @@ sub MarkState {
         $sql = "UPDATE $opts{bamfiles_table} SET state_gce38pull=$REQUESTED " .
             "WHERE expt_sampleid='$nwdid'";
         $sth = DoSQL($sql);
-        if ($opts{verbose}) { print "Requested PULL for $nwdid\n"; }
+        print "Requested PULL for $nwdid\n";
         $count++;
     }
     print "Requested $count PULLs to be done, $countcannot NWDIDs could not do PULL\n";
+}
+
+#==================================================================
+# Subroutine:
+#   GetCenter(nwd)
+#
+#   Returns:  center or null string
+#==================================================================
+sub GetCenter {
+    my ($nwd) = @_;
+    my $center = `$opts{topmedcmd} show $nwd center 2>/dev/null`;
+    chomp($center);
+    if (! $center) { $center = ''; }
+    return $center;
 }
 
 #==================================================================
