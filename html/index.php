@@ -395,12 +395,13 @@ function ViewRuns($center, $maxdirs, $iammgr) {
     $centers2show = array();                // Get list of centers for this query
     $yearstart = 4;
     $yearstop = 0;
-    if ($center == 'year1' || $center == 'year2' || $center == 'year3' || $center == 'year4') {
+    if ($center == 'year1' || $center == 'year2' || $center == 'year3' || $center == 'year4' || $center == 'year5') {
         $centers2show = $CENTERS;
         if ($center == 'year1') { $yearstart = 1; }
         if ($center == 'year2') { $yearstart = 2; $yearstop = 1; }
         if ($center == 'year3') { $yearstart = 3; $yearstop = 2; }
         if ($center == 'year4') { $yearstart = 4; $yearstop = 3; }
+        if ($center == 'year5') { $yearstart = 5; $yearstop = 4; }
     }
     else { array_push($centers2show, $center); }
 
@@ -889,6 +890,8 @@ function GetChooseLines() {
 
      $html = "Choose: " .
         "&nbsp;&nbsp;<a href='" . $_SERVER['SCRIPT_NAME'] .
+        "?center=year5&amp;maxdir=$maxdir'>Year 5</a>&nbsp;&nbsp;\n" .
+        "<a href='" . $_SERVER['SCRIPT_NAME'] .
         "?center=year4&amp;maxdir=$maxdir'>Year 4</a>&nbsp;&nbsp;\n" .
         "<a href='" . $_SERVER['SCRIPT_NAME'] .
         "?center=year3&amp;maxdir=$maxdir'>Year 3</a>&nbsp;&nbsp;\n" .
