@@ -113,7 +113,7 @@ CREATE TABLE bamfiles (
 
   datearrived  VARCHAR(12),             /* Referenced in nhlbi_qc_metrics */
   bamsize      VARCHAR(16) DEFAULT 0,   /* Referenced in nhlbi_qc_metrics */
-  datayear     INT DEFAULT 4,           /* Year of project: 1, 2 ... */
+  datayear     INT DEFAULT 5,           /* Year of project: 1, 2 ... */
   build        VARCHAR(4) DEFAULT '38', /* Build original input file user, 37, 38 etc */
   dateinit     VARCHAR(12),             /* Referenced in nhlbi_qc_metrics */
   bamname_orig VARCHAR(96) DEFAULT NULL,
@@ -167,7 +167,7 @@ my $FAILED    = 99;           # Task failed
 /*   Handy queries
     ALTER TABLE bamfiles ADD COLUMN datebai VARCHAR(12) AFTER datebackup;
     ALTER TABLE runs ADD  COLUMN offsitebackup CHAR(1) DEFAULT 'N' AFTER datayear;
-    ALTER TABLE bamfiles CHANGE expt_sampleid expt_sampleid VARCHAR(24);
+    ALTER TABLE bamfiles MODIFY COLUMN datayear INT DEFAULT 5;
     
     ALTER TABLE bamfiles DROP COLUMN colname;
 */
