@@ -19,14 +19,18 @@ if [ "$1" = "-submit" ]; then
   if [ "$filesize" = "" ]; then
     Fail "Unable to get filesize for '$cramfile'"
   fi
+  timeout='12:00:00'
   mem=16G
-  #   Large crams can require LOTS of memory
+  #   Large crams can require LOTS of memory and can take a long time
   if [ "$filesize" -gt "40255183256" ]; then
     mem=128G
+    timeout='28:00:00'
   elif [ "$filesize" -gt "35044692321" ]; then
     mem=78G
+    timeout='20:00:00'
   elif [ "$filesize" -gt "31848365056" ]; then
     mem=64G
+    timeout='18:00:00'
   elif [ "$filesize" -gt "23023087355" ]; then
     mem=48G
   elif [ "$filesize" -gt "1566897485" ]; then
@@ -37,7 +41,6 @@ if [ "$1" = "-submit" ]; then
   fi
   RandomRealHost $bamid
   MayIRun $me $bamid $realhost
-  timeout='8:00:00'
   SubmitJob $bamid "$PROJECT-bcf" $mem "$0 $*"
   exit
 fi
