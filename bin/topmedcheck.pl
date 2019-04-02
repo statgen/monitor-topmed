@@ -51,6 +51,7 @@ our %opts = (
     awsuri => 's3://nih-nhlbi-datacommons',
     gceuri => 'gs://topmed-bcf',
     gsutil => '/usr/bin/gsutil',
+    topmedpath => '/usr/cluster/topmed/bin/topmedpath.pl',
     b37gceuri => 'gs://topmed-irc-working/remapping/b37',
     b38gcebackup => 'gs://topmed-irc-share/genomes', # Serves as remapped b38 bucket
     b38gcebackupopt => '-u topmed-1366',    # gsutil option for backup bucket
@@ -1078,7 +1079,8 @@ sub Check_NFSMounts {
     foreach my $bamid (@bamidrange) {
         my $p = WhereFile($bamid, 'cram');
         if (! $p) {
-            print "Unable to find path for cram file $bamid\n";
+            print "Unable to find path for cram file $bamid:  ";
+            system("$opts{topmedpath} wherefile $bamid cram");
             next;
         }
         if (-f $p) { $success++; next; }
