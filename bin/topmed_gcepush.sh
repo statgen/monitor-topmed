@@ -63,6 +63,9 @@ remap='Y'
 if [ "$PROJECT" = "topmed" -a "$datayear" = "4" -a "$center" = "broad" ]; then
   remap='N'
 fi
+if [ "$PROJECT" = "topmed" -a "$datayear" -ge "5" ]; then
+  remap='N'
+fi
 if [ "$PROJECT" = "inpsyght" -a "$run" = "wave6" ]; then
   remap='N'
 fi
