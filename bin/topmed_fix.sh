@@ -86,7 +86,7 @@ b38=`$topmedpath wherefile $n b38`
 bcf=`$topmedpath wherefile $n bcf`
 b38path=`$topmedpath wherepath $n b38`
 bcfpath=`$topmedpath wherepath $n bcf`
-d=/tmp/nwd.$n
+d=/run/shm/nwd.$n
 mkdir -p $d
 cd $d || exit 3
 gsutil cp -r gs://topmed-bcf/$n/\* . || exit 4

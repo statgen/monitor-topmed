@@ -417,7 +417,7 @@ function CalcFlagstat {
 
   #   Get flagstat values for input file
   of=`basename $file`               # Calculate temp file for flagstat results
-  of="/tmp/$of.tmp"
+  of="/run/shm/$of.tmp"
   >&2 echo "Calculating flagstat for $file"
   $samtools flagstat  $file > $of
   if [ "$?" != "0" ]; then

@@ -59,7 +59,7 @@ our %opts = (
     redotool => '/usr/cluster/topmed/bin/topmed_redo.sh',
     samtools => '/usr/cluster/bin/samtools',
     cacheage => 60*60*24,               # If cache file older than this, refetch
-    cachefile => "/tmp/$Script.gcefiles", 
+    cachefile => "/run/shm/$Script.gcefiles", 
     #remapstatus => 'curl --silent --insecure https://104.198.71.226/api/sample-status\\?ids=',
     project => 'topmed',
     errorsfound => 0,                   # Count of errors detected

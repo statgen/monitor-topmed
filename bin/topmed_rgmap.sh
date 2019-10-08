@@ -26,7 +26,7 @@ build=b38
 
 echo "# $0 $bamid $nwdid  -- redo header for mis-mapped b38 crams"
 recab=`$topmedpath wherefile $bamid b38`
-tmpdir=/tmp
+tmpdir=/run/shm
 
 #  Create a corrected cram
 b=`basename $recab`
@@ -35,7 +35,7 @@ nwdid=`GetDB $bamid expt_sampleid`
 
 #   Build correct rg mapping file. No check of return code as we already know it
 rgmap=$tmpdir/$nwdid.rgmap
-efile=/tmp/$bamid.err
+efile=$tmpdir/$bamid.err
 /usr/cluster/topmed/bin/topmedrgmap.pl $bamid $rgmap 2> $efile
 if [ "$?" != "0" ]; then
   e=`cat $efile`
