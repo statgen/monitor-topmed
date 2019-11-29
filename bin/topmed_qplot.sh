@@ -60,11 +60,11 @@ if [ "$1" = "-submit" ]; then	#  subroutine SubmitJob will run sbatch
   filesize=`stat --printf=%s $srcfile`
   #   Large files can take a lot more time
   if [ "$filesize" -gt "40255183256" ]; then
-    timeout="20:00:00"
+    timeout="28:00:00"
   elif [ "$filesize" -gt "35044692321" ]; then
-    timeout="14:00:00"
+    timeout="24:00:00"
   elif [ "$filesize" -gt "23023087355" ]; then
-    timeout="11:00:00"
+    timeout="20:00:00"
   fi
   if [ "$timeout" != "8:00:00" ]; then
     echo "Forcing SLURM timeout to '$timeout'"

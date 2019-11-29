@@ -53,6 +53,7 @@ for (my $i=0; $i<=$#ARGV; $i++) {
 if (! -d "/usr/cluster/$ENV{PROJECT}") { die "$Script - Environment variable PROJECT '$ENV{PROJECT}' incorrect\n"; }
 
 our %opts = (
+	datatype => 'genome',		# What kind of data we are handling
     realm => "/usr/cluster/$ENV{PROJECT}/etc/.db_connections/$ENV{PROJECT}",
     topmedcmd => $Bin . "/topmedcmd.pl",
     topmedarrive => $Bin . "/topmed_arrive.sh",
@@ -61,8 +62,8 @@ our %opts = (
     topmedcram   => $Bin . "/topmed_cram.sh",
     topmedqplot  => $Bin . "/topmed_qplot.sh",
     topmedexpt  => $Bin . "/topmed_ncbiexpt.sh",
-    topmedncbiorig => $Bin . "/topmed_ncbiorig.sh",
-    topmedncbib37 => $Bin . "/topmed_ncbib37.sh",
+    #topmedncbiorig => $Bin . "/topmed_ncbiorig.sh",
+    #topmedncbib37 => $Bin . "/topmed_ncbib37.sh",
     topmedncbib38 => $Bin . "/topmed_ncbib38.sh",
     topmedgce38push => $Bin . "/topmed_gcepush.sh",
     topmedgce38pull => $Bin . "/topmed_gcepull.sh",
@@ -74,11 +75,13 @@ our %opts = (
     topmedfix => $Bin . "/topmed_fix.sh",
     topmedbcf  => $Bin . "/topmed_bcf.sh",
     topmedxml    => $Bin . "/topmed_xml.pl",
-    centers_table => 'centers',
+    centers_table => 'centers',    
     runs_table => 'runs',
-    studies_table => 'studies',
-    bamfiles_table => 'bamfiles',
+    runs_pkey => 'runid',
+    samples_table => 'bamfiles',
+    samples_pkey => 'bamid',
     topdir => "/net/$ENV{PROJECT}/incoming/$ENV{PROJECT}",
+    studies_table => 'studies',
     submitlog => '/run/shm/batchsubmit.log',
     consoledir => "/net/$ENV{PROJECT}/working/$ENV{PROJECT}-output",
     dryrun => 0,
@@ -107,17 +110,36 @@ my %validverbs = (              # List of valid directives
 
 Getopt::Long::GetOptions( \%opts,qw(
     help verbose topdir=s center=s runs=s piname=s studyname=s maxjobs=i random
-    dryrun suberr datayear=i build=i project=s descending
+    dryrun suberr datayear=i build=i project=s descending datatype=s
     )) || die "Failed to parse options\n";
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
     my $verbs = (join '|', sort keys %validverbs);
-    warn "$Script [options] $verbs\n" .
+    warn "$Script [options] [-datatype genome|rnaseq] $verbs\n" .
         "Find runs which need some action and queue a request to do it.\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
     exit 1;
+}
+if ($opts{datatype} eq 'rnaseq') {
+	$opts{samples_table} = 'tx_samples';
+	$opts{samples_pkey} = 'txseqid';
+	$opts{runs_table} = 'tx_projects';
+	$opts{runs_pkey} = 'rnaprojectid';
+	$opts{topmedarrive} = $Bin . "/rnaseq_arrive.sh";
+    $opts{topmedverify} = $Bin . "/rnaseq_verify.sh";
+    $opts{topmedbackup} = $Bin . "/rnaseq_backup.sh";
+    $opts{topmedawscopy} = $Bin . "/rnaseq_awscopy.sh";
+    $opts{topmedfix} = $Bin . "/rnaseq_fix.sh";
+	%validverbs = (
+		arrive => 1,
+		verify => 1,
+		backup => 1,
+		qplot => 1,
+		awscopy => 1,
+		fix => 1,
+	);
 }
 
 my $dbh = DBConnect($opts{realm});
@@ -127,7 +149,7 @@ my $nowdate = strftime('%Y/%m/%d %H:%M', localtime);
 if (exists($opts{runs}) &&  $opts{runs} =~ /[^0-9,]/) {
     my @r = split(',',$opts{runs});
     my $s = "'" . join("','",@r) . "'";
-    my $sql = "SELECT runid from $opts{runs_table} WHERE dirname IN ($s)";
+    my $sql = "SELECT $opts{runs_pkey} from $opts{runs_table} WHERE dirname IN ($s)";
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) {
@@ -136,7 +158,7 @@ if (exists($opts{runs}) &&  $opts{runs} =~ /[^0-9,]/) {
     @r = ();
     for (1 .. $rowsofdata) {
         my $href = $sth->fetchrow_hashref;
-        push @r, $href->{runid};
+        push @r, $href->{$opts{runs_pkey}};
     }
     if (! @r) { die "$Script - Unknown run in '$opts{runs}'\n"; }
     $s = join(',', @r);
@@ -179,59 +201,89 @@ sub Submit_arrive {
     my $runsref = GetUnArrivedRuns() || next;
     #   For each unarrived run, see if there are bamfiles that arrived
     foreach my $runid (keys %{$runsref}) {
-        #   Get list of all bams
-        my $sql = "SELECT r.dirname,b.bamname,c.centername,b.bamid,b.expt_sampleid,b.state_arrive " .
-            "FROM $opts{bamfiles_table} AS b " .
-            "JOIN $opts{runs_table} AS r ON b.runid=r.runid " .
+        #   Get list of all samples
+        my $s = '';
+        my $bs = '';
+        if ($opts{datatype} eq 'genome') { $bs = ',b.'; $s = $bs . 'bamname'; }
+        my $sql = "SELECT r.dirname$s,c.centername,b.$opts{samples_pkey},b.expt_sampleid,b.state_arrive " .
+            "FROM $opts{samples_table} AS b " .
+            "JOIN $opts{runs_table} AS r ON b.$opts{runs_pkey}=r.$opts{runs_pkey} " .
             "JOIN $opts{centers_table} AS c ON r.centerid = c.centerid " .
-            "WHERE r.runid=$runid AND r.arrived!='Y'";
+            "WHERE r.$opts{runs_pkey}=$runid AND r.arrived!='Y'";
         my $sth = DoSQL($sql);
         my $rowsofdata = $sth->rows() || next;
         for (my $i=1; $i<=$rowsofdata; $i++) {
             my $href = $sth->fetchrow_hashref;
             #   Build path to sample manually
-            my $f = $opts{topdir} . "/$href->{centername}/$href->{dirname}/" . $href->{bamname};
-            my @stats = stat($f);
-            if (! @stats) { next; }     # No real data
-            #   Check ownership of run. Things break if not owned by real owner
-            my $owner = getpwuid($stats[4]);
-            if ($owner ne $ENV{PROJECT}) {
-                print "$nowdate Ignoring run '$runsref->{$runid}' owned by $owner\n";
+            if ($opts{datatype} eq 'genome') {	# Check if file exists
+            	my $f = $opts{topdir} . "/$href->{centername}/$href->{dirname}/" . $href->{bamname};
+            	my @stats = stat($f);
+            	if (! @stats) { next; }     # No real data
+            	#   Check ownership of run. Things break if not owned by real owner
+            	my $owner = getpwuid($stats[4]);
+            	if ($owner ne $ENV{PROJECT}) {
+                	print "$nowdate Ignoring run '$runsref->{$runid}' owned by $owner\n";
+            	}
+            	#   If the mtime on the file is very recent, it might still be coming
+            	if ((time() - $stats[9]) < 3600) { next; }  # Catch it next time
             }
             #   See if we should mark this as arrived
             if ($href->{state_arrive} == $COMPLETED) { next; }
-            #   If the mtime on the file is very recent, it might still be coming
-            if ((time() - $stats[9]) < 3600) { next; }  # Catch it next time
             #   Run the command
-            my $rc = BatchSubmit("$opts{topmedarrive} $href->{bamid}");  # Not run in SLURM
+            my $rc = BatchSubmit("$opts{topmedarrive} $href->{$opts{samples_pkey}}");  # Not run in SLURM
             if ($rc > 0) {          # Unable to submit, capture output
-                rename($opts{submitlog}, "$opts{consoledir}/$href->{bamid}-arrive.out")
+                rename($opts{submitlog}, "$opts{consoledir}/$href->{$opts{samples_pkey}}-arrive.out")
             }
         }
     }
     ShowSummary('Samples arrived');
 }
 
+#==================================================================
+# Subroutine:
+#   Submit_generic(name, state1, state2)
+#		Submit jobs for steps whose checking all looks alike
+#
+#  	Parms:
+#		name - name of step to run for msgs
+#		prevstate - database column for previous step that must be complete
+#		state2run - database column for step to be submitted
+#==================================================================
+sub Submit_generic {
+    my ($name, $prevstate, $state2run) = @_;
+
+	my $k = 'topmed' . $name;		# Index to shell step bash to run
+    my $sql = BuildSQL("SELECT $opts{samples_pkey},$prevstate,$state2run",
+        " WHERE $prevstate=$COMPLETED AND $state2run!=$COMPLETED");
+    my $sth = DoSQL($sql);
+    my $rowsofdata = $sth->rows();
+    if (! $rowsofdata) { return; }
+    for (my $i=1; $i<=$rowsofdata; $i++) {
+        my $href = $sth->fetchrow_hashref;
+        #	If submitting failed step and step failed, force to requested
+        if ($opts{suberr} && $href->{$state2run} >= $FAILEDCHECKSUM) {
+            $href->{$state2run} = $REQUESTED;
+        }
+		#	Deal with special cases that don't use normal process
+		if ($name eq 'awscopy') {
+        	if ($href->{state_aws38copy} != $NOTSET && 
+        		$href->{state_aws38copy} != $REQUESTED) { next; }
+		}
+        #	Ignore anything not requested
+        if ($href->{$state2run} != $NOTSET && $href->{$state2run} != $REQUESTED) { next; }
+
+		#	Execute bash script step
+        if (! BatchSubmit("$opts{$k} -submit $href->{$opts{samples_pkey}}")) { last; }
+    }
+    ShowSummary($name);
+}
 
 #==================================================================
 # Subroutine:
 #   Submit_verify() - Submit jobs to verify input sample
 #==================================================================
 sub Submit_verify {
-    my $sql = BuildSQL("SELECT bamid,bamname,state_arrive,state_verify,checksum",
-        "WHERE b.state_arrive=$COMPLETED AND b.state_verify!=$COMPLETED");
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { return; }
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        if ($opts{suberr} && $href->{state_verify} >= $FAILEDCHECKSUM) {
-            $href->{state_verify} = $REQUESTED;
-        }
-        if ($href->{state_verify} != $NOTSET && $href->{state_verify} != $REQUESTED) { next; }
-        if (! BatchSubmit("$opts{topmedverify} -submit $href->{bamid}")) { last; }
-    }
-    ShowSummary('verify');
+	Submit_generic('verify', 'state_arrive', 'state_verify');
 }
 
 #==================================================================
@@ -239,20 +291,7 @@ sub Submit_verify {
 #   Submit_cram() - Submit jobs to create a cram if necessary
 #==================================================================
 sub Submit_cram {
-    my $sql = BuildSQL("SELECT bamid,state_verify,state_cram",
-        "WHERE b.state_verify=$COMPLETED AND b.state_cram!=$COMPLETED");
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { return; }
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        if ($opts{suberr} && $href->{state_cram} >= $FAILEDCHECKSUM) {
-            $href->{state_cram} = $REQUESTED;
-        }
-        if ($href->{state_cram} != $NOTSET && $href->{state_cram} != $REQUESTED) { next; }
-        if (! BatchSubmit("$opts{topmedcram} -submit $href->{bamid}")) { last; }
-    }
-    ShowSummary('cram');
+	Submit_generic('cram', 'state_verify', 'state_cram');
 }
 
 #==================================================================
@@ -260,20 +299,9 @@ sub Submit_cram {
 #   Submit_backup() - Submit jobs to backup files locally
 #==================================================================
 sub Submit_backup {
-    my $sql = BuildSQL("SELECT bamid,bamname,state_cram,state_backup",
-        "WHERE b.state_cram=$COMPLETED AND b.state_backup!=$COMPLETED");
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { return; }
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        if ($opts{suberr} && $href->{state_backup} >= $FAILEDCHECKSUM) {
-            $href->{state_backup} = $REQUESTED;
-        }
-        if ($href->{state_backup} != $NOTSET && $href->{state_backup} != $REQUESTED) { next; }
-        if (! BatchSubmit("$opts{topmedbackup} -submit $href->{bamid}")) { last; }
-    }
-    ShowSummary('backup');
+	my $dependency = 'state_cram';
+	if ($opts{datatype} eq 'rnaseq') { $dependency = 'state_verify' };
+	Submit_generic('backup', $dependency, 'state_backup');
 }
 
 #==================================================================
@@ -281,20 +309,7 @@ sub Submit_backup {
 #   Submit_qplot() - Submit jobs to run qplot
 #==================================================================
 sub Submit_qplot {
-    my $sql = BuildSQL("SELECT bamid,state_backup,state_qplot",
-        "WHERE b.state_backup=$COMPLETED AND b.state_qplot!=$COMPLETED");
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { return; }
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        if ($opts{suberr} && $href->{state_qplot} >= $FAILEDCHECKSUM) {
-            $href->{state_qplot} = $REQUESTED;
-        }
-        if ($href->{state_qplot} != $NOTSET && $href->{state_qplot} != $REQUESTED) { next; }
-        if (! BatchSubmit("$opts{topmedqplot} -submit $href->{bamid}")) { last; }
-    }
-    ShowSummary('qplot');
+	Submit_generic('qplot', 'state_backup', 'state_qplot');
 }
 
 #==================================================================
@@ -302,21 +317,7 @@ sub Submit_qplot {
 #   Submit_gcepush() - Submit jobs to push data to GCE for processing
 #==================================================================
 sub Submit_gcepush {
-    my $sql = BuildSQL("SELECT bamid,state_cram,state_gce38push",
-        "WHERE b.state_cram=$COMPLETED AND b.state_gce38push!=$COMPLETED");
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { return; }
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        if ($opts{suberr} && $href->{state_gce38push} >= $FAILED) {
-            $href->{state_gce38push} = $REQUESTED;
-        }
-        if ($href->{state_gce38push} != $NOTSET &&
-            $href->{state_gce38push} != $REQUESTED) { next; }
-        if (! BatchSubmit("$opts{topmedgce38push} -submit $href->{bamid}")) { last ; }
-    }
-    ShowSummary('gcepush');
+	Submit_generic('gcepush', 'state_cram', 'state_gce38push');
 }
 
 #==================================================================
@@ -324,20 +325,7 @@ sub Submit_gcepush {
 #   Submit_gcepull() - Submit jobs to pull processed data from GCE
 #==================================================================
 sub Submit_gcepull {
-    my $sql = BuildSQL("SELECT bamid,state_gce38push,state_gce38pull", 
-        "WHERE b.state_gce38push=$COMPLETED AND b.state_gce38pull!=$COMPLETED");
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { return; }
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        if ($opts{suberr} && $href->{state_gce38pull} >= $FAILED) {
-            $href->{state_gce38pull} = $REQUESTED;
-        }
-        if ($href->{state_gce38pull} != $REQUESTED) { next; }
-        if (! BatchSubmit("$opts{topmedgce38pull} -submit $href->{bamid}")) { last; }
-    }
-    ShowSummary('gcepull');
+	Submit_generic('gcepull', 'state_gce38push', 'state_gce38pull');
 }
 
 #==================================================================
@@ -345,20 +333,7 @@ sub Submit_gcepull {
 #   Submit_bcf() - Submit jobs to create BCF file locally
 #==================================================================
 sub Submit_bcf {
-    my $sql = BuildSQL("SELECT bamid,state_b38,state_gce38bcf",
-        "WHERE b.state_b38=$COMPLETED AND b.state_gce38bcf!=$COMPLETED");
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { return; }
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        if ($opts{suberr} && $href->{state_gce38bcf} >= $FAILEDCHECKSUM) {
-            $href->{state_gce38bcf} = $REQUESTED;
-        }
-        if ($href->{state_gce38bcf} != $NOTSET && $href->{state_gce38bcf} != $REQUESTED) { next; }
-        if (! BatchSubmit("$opts{topmedbcf} -submit $href->{bamid}")) { last; }
-    }
-    ShowSummary('bcf');
+	Submit_generic('bcf', 'state_b38', 'state_gce38bcf');
 }
 
 #==================================================================
@@ -366,42 +341,15 @@ sub Submit_bcf {
 #   Submit_gcecopy() - Submit jobs to copy local cram data to GCE storage
 #==================================================================
 sub Submit_gcecopy {
-    #   Get list of all samples yet to process
-    my $sql = BuildSQL("SELECT bamid,state_b38,state_gce38bcf,state_gce38copy",
-        "WHERE b.state_b38=$COMPLETED AND b.state_gce38copy!=$COMPLETED");
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { return; }
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        if ($opts{suberr} && $href->{state_gce38copy} >= $FAILEDCHECKSUM) {
-            $href->{state_gce38copy} = $REQUESTED;
-        }
-        if ($href->{state_gce38copy} != $NOTSET && $href->{state_gce38copy} != $REQUESTED) { next; }
-        if (! BatchSubmit("$opts{topmedgcecopy} -submit $href->{bamid}")) { last; }
-    }
-    ShowSummary('gcecopy');
+	Submit_generic('gcecopy', 'state_gce38bcf', 'state_gce38copy');
 }
 
 #==================================================================
 # Subroutine:
 #   Submit_gcecpbcf() - Submit jobs to copy local bcf data to GCE storage
 #==================================================================
-sub Submit_gcecpbcf {
-    my $sql = BuildSQL("SELECT bamid,state_b38,state_gce38bcf,state_gce38cpbcf",
-        "WHERE b.state_gce38bcf=$COMPLETED AND b.state_gce38cpbcf!=$COMPLETED");
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { return; }
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        if ($opts{suberr} && $href->{state_gce38cpbcf} >= $FAILEDCHECKSUM) {
-            $href->{state_gce38cpbcf} = $REQUESTED;
-        }
-        if ($href->{state_gce38cpbcf} != $NOTSET && $href->{state_gce38cpbcf} != $REQUESTED) { next; }
-        if (! BatchSubmit("$opts{topmedgcecpbcf} -submit $href->{bamid}")) { last; }
-    }
-    ShowSummary('gcecpbcf');
+sub Submit_gcecpbc {
+	Submit_generic('gcecpbc', 'state_gce38bcf', 'state_gce38cpbcf');
 }
 
 #==================================================================
@@ -409,20 +357,7 @@ sub Submit_gcecpbcf {
 #   Submit_gcecleanup() - Submit jobs to cleanup unnecessary backup files
 #==================================================================
 sub Submit_gcecleanup {
-    my $sql = BuildSQL("SELECT bamid,state_gcecleanup",
-        "WHERE b.state_gce38cpbcf=$COMPLETED AND b.state_gcecleanup!=$COMPLETED");
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { return; }
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        if ($opts{suberr} && $href->{state_gcecleanup} >= $FAILEDCHECKSUM) {
-            $href->{state_gcecleanup} = $REQUESTED;
-        }
-        if ($href->{state_gcecleanup} != $NOTSET && $href->{state_gcecleanup} != $REQUESTED) { next; }
-        if (! BatchSubmit("$opts{topmedgcecleanup} -submit $href->{bamid}")) { last; }
-    }
-    ShowSummary('gceclean');
+	Submit_generic('gcecleanup', 'state_gce38copy', 'state_gcecleanup');
 }
 
 #==================================================================
@@ -430,22 +365,7 @@ sub Submit_gcecleanup {
 #   Submit_awscopy() - Submit jobs to copy local data to AWS storage
 #==================================================================
 sub Submit_awscopy {
-    #   Get list of all samples yet to process
-    my $sql = BuildSQL("SELECT bamid,state_b38,state_gce38bcf,state_aws38copy",
-        "WHERE b.state_b38=$COMPLETED AND b.state_aws38copy=$REQUESTED AND " .
-        "b.send2aws='Y'");
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { return; }
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        if ($opts{suberr} && $href->{state_aws38copy} >= $FAILEDCHECKSUM) {
-            $href->{state_aws38copy} = $REQUESTED;
-        }
-        if ($href->{state_aws38copy} != $NOTSET && $href->{state_aws38copy} != $REQUESTED) { next; }
-        if (! BatchSubmit("$opts{topmedawscopy} -submit $href->{bamid}")) { last; }
-    }
-    ShowSummary('awscopy');
+	Submit_generic('awscopy', 'state_gce38cpbcf', 'state_aws38copy');
 }
 
 #==================================================================
@@ -453,87 +373,7 @@ sub Submit_awscopy {
 #   Submit_fix() - Submit jobs for fix
 #==================================================================
 sub Submit_fix {
-    #   Get list of all samples yet to process
-    my $sql = BuildSQL("SELECT bamid,state_backup,state_qplot",
-        "WHERE b.state_backup=$COMPLETED AND b.state_fix!=$COMPLETED");
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { return; }
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        if ($opts{suberr} && $href->{state_qplot} >= $FAILEDCHECKSUM) {
-            $href->{state_qplot} = $REQUESTED;
-        }
-        if ($href->{state_qplot} == $STARTED || $href->{state_qplot} == $SUBMITTED) { next; }
-        if (! BatchSubmit("$opts{topmedqplot} -submit $href->{bamid}")) { last; }
-    }
-    ShowSummary('fix');
-}
-
-#==================================================================
-# Subroutine:
-#   Submit_sexpt() - Submit jobs for sexpt
-#==================================================================
-sub Submit_sexpt {
-    #   Get list of all samples yet to process
-    my $sql = BuildSQL("SELECT *", 
-        "WHERE b.datayear=3 AND b.nwdid_known='Y' AND b.poorquality='N' " .
-        "b.state_cram=$COMPLETED");
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { return; }
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        if ($opts{suberr} && $href->{state_ncbiexpt} >= $FAILEDCHECKSUM) { $href->{state_ncbiexpt} = $REQUESTED; }
-        if ($href->{state_ncbiexpt} != $NOTSET && $href->{state_ncbiexpt} != $REQUESTED) { next; }
-        #   Tell NCBI about this NWDID experiment
-        if (! BatchSubmit("$opts{topmedexpt} -submit $href->{bamid}")) { last; }
-    }
-    ShowSummary('sexpt');
-}
-
-#==================================================================
-# Subroutine:
-#   Submit_sorig() - Submit jobs for sorig
-#==================================================================
-sub Submit_sorig {
-    #   Get list of all samples yet to process
-    my $sql = BuildSQL("SELECT *",
-        "WHERE b.datayear=1 AND b.state_ncbiexpt=$COMPLETED AND " .
-        "b.poorquality='N'");
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { return; }
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        if ($opts{suberr} && $href->{state_ncbiorig} >= $FAILEDCHECKSUM) { $href->{state_ncbiorig} = $REQUESTED; }
-        if ($href->{state_ncbiorig} != $NOTSET && $href->{state_ncbiorig} != $REQUESTED) { next; }
-        #   Send the secondary BAM to NCBI
-        if (! BatchSubmit("$opts{topmedncbiorig} -submit $href->{bamid}")) { last; }
-    }
-    ShowSummary('sorig');
-}
-
-#==================================================================
-# Subroutine:
-#   Submit_sb37() - Submit jobs for sb37
-#==================================================================
-sub Submit_sb37 {
-    #   Get list of all samples yet to process
-    my $sql = BuildSQL("SELECT *",
-        "WHERE b.datayear=1 AND b.state_ncbiexpt=$COMPLETED AND" .
-        "b.poorquality='N'");
-    my $sth = DoSQL($sql);
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { return; }
-    for (my $i=1; $i<=$rowsofdata; $i++) {
-        my $href = $sth->fetchrow_hashref;
-        if ($opts{suberr} && $href->{state_ncbib37} >= $FAILEDCHECKSUM) { $href->{state_ncbib37} = $REQUESTED; }
-        if ($href->{state_ncbib37} != $NOTSET && $href->{state_ncbib37} != $REQUESTED) { next; }
-        #   Send the remapped CRAM to NCBI
-        if (! BatchSubmit("$opts{topmedncbib37} -submit $href->{bamid}")) { last; }
-    }
-    ShowSummary('b37');
+	Submit_generic('fix', 'state_backup', 'state_fix');
 }
 
 #==================================================================
@@ -559,7 +399,7 @@ sub BatchSubmit {
     if ($rc == 0) {
         $opts{jobcount}++;
         if ($opts{verbose}) { print "submitted => $cmd\n"; }
-        #   Capture the bamid for ShowSummary
+        #   Capture the sampleid for ShowSummary
         if ($cmd =~ /\s(\d+)$/) {
             $opts{jobbamid} .= $1 . ' ';
         }
@@ -592,8 +432,8 @@ sub ShowSummary {
     my ($type) = @_;
 
     my $s = '';
-    if ($opts{jobcount})            { $s .= "$opts{jobcount} jobs submitted"; }
-    if ($opts{jobsnotpermitted})    { $s .=  "  $opts{jobsnotpermitted} job submissions not permitted"; }
+    if ($opts{jobcount})             { $s .= "$opts{jobcount} jobs submitted"; }
+    if ($opts{jobsnotpermitted})     { $s .=  "  $opts{jobsnotpermitted} job submissions not permitted"; }
     if ($opts{jobsfailedsubmission}) { $s .=  "  $opts{jobsfailedsubmission} job submissions failed"; }
     if (! $s) { return; }
     if ($opts{jobbamid}) { $s .= "  bamids=$opts{jobbamid}"; }
@@ -613,12 +453,12 @@ sub ShowSummary {
 #==================================================================
 sub BuildSQL {
     my ($sql, $where) = @_;
-    $sql .= " FROM $opts{bamfiles_table} AS b ";
+    $sql .= " FROM $opts{samples_table} AS b ";
     my $s = $sql;
 
     #   For a specific center
     if ($opts{center}) {
-        $s = $sql . " JOIN $opts{runs_table} AS r on b.runid=r.runid " .
+        $s = $sql . " JOIN $opts{runs_table} AS r on b.$opts{runs_pkey}=r.$opts{runs_pkey} " .
             "JOIN $opts{centers_table} AS c on r.centerid=c.centerid " .
             "WHERE c.centername='$opts{center}'";
         if ($opts{datayear}) { $s .= " AND b.datayear=$opts{datayear}"; }
@@ -629,8 +469,8 @@ sub BuildSQL {
     }
     #   For a specific run (overrides center)
     if ($opts{runs}) {
-        $s = $sql . " JOIN $opts{runs_table} AS r on b.runid=r.runid " .
-            "WHERE r.runid IN ($opts{runs})";
+        $s = $sql . " JOIN $opts{runs_table} AS r on b.$opts{runs_pkey}=r.$opts{runs_pkey} " .
+            "WHERE r.$opts{runs_pkey} IN ($opts{runs})";
         if ($opts{datayear}) { $s .= " AND b.datayear=$opts{datayear}"; }
         $opts{datayear} = '';
         if ($opts{build}) { $s .= " AND b.build=$opts{build}"; }
@@ -656,7 +496,7 @@ sub BuildSQL {
 
     #   Support randomization
     if ($opts{random}) { $s .= ' ORDER BY RAND()'; }
-    if ($opts{descending}) { $s .= ' ORDER BY b.bamid DESC'; }
+    if ($opts{descending}) { $s .= ' ORDER BY b.$opts{samples_pkey} DESC'; }
      if ($opts{verbose}) { print "SQL=$s\n"; }
     return $s;
 }
@@ -672,11 +512,11 @@ sub BuildSQL {
 sub GetUnArrivedRuns {
     my %run2dir = ();
 
-    my $sql = "SELECT runid,dirname FROM $opts{runs_table}";
+    my $sql = "SELECT $opts{runs_pkey},dirname FROM $opts{runs_table}";
     my $where = " WHERE arrived!='Y'";
     #   Maybe want some runs
     if ($opts{runs}) { 
-        $where .= " AND runid IN ($opts{runs})";
+        $where .= " AND $opts{runs_pkey} IN ($opts{runs})";
     }
     $sql .= $where;
     my $sth = DoSQL($sql);
@@ -684,7 +524,7 @@ sub GetUnArrivedRuns {
     if (! $rowsofdata) { die "$Script - Run does not exist $sql\n"; }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
-        $run2dir{$href->{runid}} = $href->{dirname};
+        $run2dir{$href->{$opts{runs_pkey}}} = $href->{dirname};
     }
     return \%run2dir;
 }
@@ -736,13 +576,17 @@ Specifies a specific center name on which to run the action, e.g. B<uw>.
 This is useful for testing.
 The default is to run against all centers.
 
+=item B<-datatype genome|rnaseq>
+
+Specifies this is a particular datatype of data. The default is 'genome'.
+
 =item B<-datayear N>
 
 Submit only jobs for samples in a specific year.
 
 =item B<-descending>
 
-Select the rows based on the bamid in B<descending> order.
+Select the rows based on the sampleid in B<descending> order.
 The MySQL default is B<ascending> order.
 
 =item B<-dryrun>
@@ -824,7 +668,7 @@ return code of 0. Any error will set a non-zero return code.
 
 =head1 AUTHOR
 
-Written by Terry Gliedt I<E<lt>tpg@umich.eduE<gt>> in 2015 and is
+Written by Terry Gliedt I<E<lt>tpg@umich.eduE<gt>> in 2015-2019 and is
 is free software; you can redistribute it and/or modify it under the
 terms of the GNU General Public License as published by the Free Software
 Foundation; See http://www.gnu.org/copyleft/gpl.html

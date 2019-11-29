@@ -20,9 +20,6 @@ use My_DB;
 use Cwd qw(realpath abs_path);
 
 our %PATHOPTS = (
-    bamfiles_table => 'bamfiles',
-    centers_table => 'centers',
-    runs_table => 'runs',
     netdir => '/net/',
     qcresultsdir => 'incoming/qc.results',
     incomingdir => 'incoming/',
@@ -31,6 +28,7 @@ our %PATHOPTS = (
     oldbackupsdir => '/net/topmed/working/backups/incoming/',
     bcfsdir => 'working/candidate_variants',
     consoledir => 'working/',
+    rnaseqdir => 'incoming/topmed/rnaseq/',
     wresults37dir => 'working/schelcj/results',
     iresults37dir => 'incoming/schelcj/results',
     results38dir => 'working/mapping/results',
@@ -39,16 +37,23 @@ our %PATHOPTS = (
     gcebcfuploaduri => 'gs://',                     # For remapped BCF data
     gceuploaduri => 'gs://',                        # For remapped CRAM data
     awsuploaduri => 's3://nih-nhlbi-datacommons',
+
+    runs_table => 'runs',
+    runs_pkey => 'runid',
+    samples_table => 'bamfiles',
+    samples_pkey => 'bamid',
+    centers_table => 'centers',
+    datatype => 'genome',
 );
 
 #==================================================================
 # Subroutine:
-#   PathInit($project)
+#   PathInit($project, $datatype)
 #
 #   Updates the %pathopts variables for this project
 #==================================================================
 sub PathInit {
-    my ($project) = @_;
+    my ($project, $datatype) = @_;
     $PATHOPTS{realm} = "/usr/cluster/$project/etc/.db_connections/$project";
     $PATHOPTS{netdir} .= $project;
     $PATHOPTS{cramdir} .= $project;
@@ -60,43 +65,113 @@ sub PathInit {
     $PATHOPTS{gcearchiveuri} .= $project . '-archives';
     $PATHOPTS{gcebcfuploaduri} .= $project . '-bcf';
     $PATHOPTS{gceuploaduri} .= $project . '-irc-share/genomes';
+
+if (defined($datatype) && $datatype eq 'rnaseq') {
+	$PATHOPTS{samples_table} = 'tx_samples';
+	$PATHOPTS{samples_pkey} = 'txseqid';
+	$PATHOPTS{runs_table} = 'tx_projects';
+	$PATHOPTS{runs_pkey} = 'rnaprojectid';
+	$PATHOPTS{datatype} = $datatype,
+	$PATHOPTS{backupsdir} = '/net/ddn/incoming/topmed/rnaseq';
+}
+
     My_DB::DBConnect($PATHOPTS{realm});        # Set up database
 }
 
 #==================================================================
 # Subroutine:
-#   $path = WherePath($bamid, $set)
-#
-#   Print paths to various things for bamid based on $set
+#   SetGlobs($sampleid) - set globals based on $PATHOPTS{datatype}
 #==================================================================
-my ($bamid, $bamname, $cramname, $piname, $datayear, $nwdid, $rundir, $centername); # For other functions
+my ($sampleid, $bamname, $cramname, $piname, $datayear, $nwdid, $rundir, $centername, $fileprefix); # Globals
+sub SetGlobs {
+    my ($sampleid) = @_;
+	if ($PATHOPTS{datatype} eq 'genome') {
+		#   Get values of interest from the database
+		my $sth = My_DB::DoSQL("SELECT * FROM $PATHOPTS{samples_table} WHERE $PATHOPTS{samples_pkey}=$sampleid");
+		my $rowsofdata = $sth->rows();
+		if (! $rowsofdata) { die "$main::Script - Sample '$b' is unknown\n"; }
+		my $href = $sth->fetchrow_hashref;
+		$bamname = $href->{bamname};
+		$cramname = $href->{cramname} || 'CRAMNAME_not_SET';
+		$piname = $href->{piname};
+		$datayear = $href->{datayear};
+		$nwdid = $href->{expt_sampleid};
+		my $runid = $href->{runid};
+		$sth = My_DB::DoSQL("SELECT centerid,dirname FROM $PATHOPTS{runs_table} WHERE $PATHOPTS{runs_pkey}=$runid");
+		$rowsofdata = $sth->rows();
+		if (! $rowsofdata) { die "$main::Script - Sample '$sampleid' run '$runid' is unknown\n"; }
+		$href = $sth->fetchrow_hashref;
+		$rundir = $href->{dirname};
+		my $centerid = $href->{centerid};
+		$sth = My_DB::DoSQL("SELECT centername FROM $PATHOPTS{centers_table} WHERE centerid=$centerid");
+		$rowsofdata = $sth->rows();
+		if (! $rowsofdata) { die "$main::Script - Sample '$sampleid' center '$centerid' is unknown\n"; }
+		$href = $sth->fetchrow_hashref;
+		$centername = $href->{centername};
+		return;
+	}
+	if ($PATHOPTS{datatype} eq 'rnaseq') {
+		#   Get values of interest from the database
+		my $sth = My_DB::DoSQL("SELECT * FROM $PATHOPTS{samples_table} WHERE $PATHOPTS{samples_pkey}=$sampleid");
+		my $rowsofdata = $sth->rows();
+		if (! $rowsofdata) { die "$main::Script - Sample '$b' is unknown\n"; }
+		my $href = $sth->fetchrow_hashref;
+		my $rnaprojectid = $href->{rnaprojectid};
+		$fileprefix = $href->{fileprefix};
+		$nwdid = $href->{expt_sampleid};
+
+		$sth = My_DB::DoSQL("SELECT centerid,dirname,datayear FROM $PATHOPTS{runs_table} WHERE $PATHOPTS{runs_pkey}=$rnaprojectid");
+		$rowsofdata = $sth->rows();
+		if (! $rowsofdata) { die "$main::Script - Sample '$sampleid' run '$rnaprojectid' is unknown\n"; }
+		$href = $sth->fetchrow_hashref;
+		$rundir = $href->{dirname};
+		$datayear = $href->{datayear};
+
+		my $centerid = $href->{centerid};
+		$sth = My_DB::DoSQL("SELECT centername FROM $PATHOPTS{centers_table} WHERE centerid=$centerid");
+		$rowsofdata = $sth->rows();
+		if (! $rowsofdata) { die "$main::Script - Sample '$sampleid' center '$centerid' is unknown\n"; }
+		$href = $sth->fetchrow_hashref;
+		$centername = $href->{centername};
+		return;
+	}
+    die "$main::Script - SetGlobs datatype ($PATHOPTS{datatype}) was unknown\n";
+}
+
+#==================================================================
+# Subroutine:
+#   $path = WherePath($sampleid, $set)
+#
+#   Print paths to various things for sampleid based on $set
+#==================================================================
 sub WherePath {
     my ($b, $set) = @_;
     if ((! defined($set) || ! $set)) { $set = 'unset'; }
-    $bamid = GetBamid($b);
+    $sampleid = GetSampleid($b);
 
-    #   Get values of interest from the database
-    my $sth = My_DB::DoSQL("SELECT * FROM $PATHOPTS{bamfiles_table} WHERE bamid=$bamid");
-    my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "$main::Script - BAM '$b' is unknown\n"; }
-    my $href = $sth->fetchrow_hashref;
-    $bamname = $href->{bamname};
-    $cramname = $href->{cramname} || 'CRAMNAME_not_SET';
-    $piname = $href->{piname};
-    $datayear = $href->{datayear};
-    $nwdid = $href->{expt_sampleid};
-    my $runid = $href->{runid};
-    $sth = My_DB::DoSQL("SELECT centerid,dirname FROM $PATHOPTS{runs_table} WHERE runid=$runid");
-    $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "$main::Script - BAM '$bamid' run '$runid' is unknown\n"; }
-    $href = $sth->fetchrow_hashref;
-    $rundir = $href->{dirname};
-    my $centerid = $href->{centerid};
-    $sth = My_DB::DoSQL("SELECT centername FROM $PATHOPTS{centers_table} WHERE centerid=$centerid");
-    $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "$main::Script - BAM '$bamid' center '$centerid' is unknown\n"; }
-    $href = $sth->fetchrow_hashref;
-    $centername = $href->{centername};
+    SetGlobs($sampleid); 			#   Get values of interest from the database
+
+	#	Handle rnaseq here 
+    if ($PATHOPTS{datatype} eq 'rnaseq') {
+    	if ($set eq 'rundir') {
+        	my $s = AbsPath("$PATHOPTS{netdir}/$PATHOPTS{rnaseqdir}/$centername/$rundir");
+        	return $s;
+        }
+    	if ($set eq 'releasefiles') {
+        	my $s = AbsPath("$PATHOPTS{netdir}/$PATHOPTS{rnaseqdir}/$centername/$rundir/releaseFiles");
+        	return $s;
+        }
+    	if ($set eq 'fileprefix') {
+        	my $s = AbsPath("$PATHOPTS{netdir}/$PATHOPTS{rnaseqdir}/$centername/$rundir/$fileprefix");
+        	return $s;
+        }
+    	if ($set eq 'localbackup') {
+        	my $s = "$PATHOPTS{backupsdir}/$centername/$rundir";
+        	return $s;
+        }
+        die "$main::Script - Unknown WherePath rnaseq option '$set'\n";
+    }
+
 
     #   BAM is in one of those $PATHOPTS{netdir} trees where without a symlink
     if ($set eq 'bam') {
@@ -111,12 +186,17 @@ sub WherePath {
     }
 
     #   Find where the original source file was backed up
-    #	Of course we changed how this works, so we much look in TWO places
+    #	Of course we changed how this works, so we much look in several places
     #   If a recent file, use new backup place, else 
     #	if the FILE exists in the oldbackupsdir, we return that cause we
     #	do not backup in two places ?? I hope ??
     if ($set eq 'localbackup') {
         my $backup;
+        if ($PATHOPTS{datatype} eq 'rnaseq' ) {
+        	$backup = "$PATHOPTS{backupsdir}/$centername";
+        	return $backup; 
+        }
+        # Genome seq here
         if ($datayear >= 4) {  $backup = "$PATHOPTS{backupsdir}/$centername"; }   # New path
         else {
     	    $backup = "$PATHOPTS{oldbackupsdir}/$centername/$rundir";  # Old path
@@ -152,12 +232,12 @@ sub WherePath {
 
     #   Try to guess where the b37 remapped CRAM lives
     if ($set eq 'b37') {
-        my $file = FindB37($centername, $piname, $nwdid, $bamid);
+        my $file = FindB37($centername, $piname, $nwdid, $sampleid);
         return dirname($file);
     }
 
     if ($set eq 'b38') {
-        my $file = FindB38($centername, $piname, $nwdid, $bamid, $datayear);
+        my $file = FindB38($centername, $piname, $nwdid, $sampleid, $datayear);
         return dirname($file);
     }
  
@@ -165,7 +245,7 @@ sub WherePath {
         my $host = 'topmed8';
         my $dir = "/net/$host/$PATHOPTS{bcfsdir}/$piname";
         mkdir $dir,0755 ||
-            die "$main::Script - Unable to create bcf path for '$bamid' to '$dir': $!\n";
+            die "$main::Script - Unable to create bcf path for '$sampleid' to '$dir': $!\n";
         return $dir;
     }
  
@@ -186,13 +266,13 @@ sub WherePath {
 
 #==================================================================
 # Subroutine:
-#   $host = WhatHost($bamid, $set)
+#   $host = WhatHost($sampleid, $set)
 #
-#   Print host name for the path to various things for bamid based on $set
+#   Print host name for the path to various things for sampleid based on $set
 #==================================================================
 sub WhatHost {
-    my ($bamid, $set) = @_;
-    $bamid = GetBamid($bamid);
+    my ($sampleid, $set) = @_;
+    $sampleid = GetSampleid($sampleid);
     my $path = WherePath(@_);
     if (! $path) { return ''; }
 
@@ -211,6 +291,9 @@ sub WhatHost {
         bcf => 1,
         remotebackup => 1,
         remotearchive => 1,
+        rundir => 1,
+        releasefiles => 1,
+        fileprefix => 1,
     );
     if (exists($sets{$set})) {
         my $host = $path;
@@ -223,16 +306,20 @@ sub WhatHost {
 
 #==================================================================
 # Subroutine:
-#   $filepath = WhereFile($bamid, $set)
+#   $filepath = WhereFile($sampleid, $set)
 #
-#   Print paths to various files for bamid based on $set
+#   Print paths to various files for sampleid based on $set
 #==================================================================
 sub WhereFile {
-    my ($bamid, $set) = @_;
-    $bamid = GetBamid($bamid);
+    my ($sampleid, $set) = @_;
+    $sampleid = GetSampleid($sampleid);
     my $path = WherePath(@_);
     if (! $path) { return ''; }
-
+    if ($PATHOPTS{datatype} eq 'rnaseq' ) {
+    	if ($set eq 'localbackup') { return $path; }
+    	die "main::Script - WhereFile '$set' not valid for datatype '$PATHOPTS{datatype}'\n";
+    }
+    
     if ($set eq 'bam') { return $path . "/$bamname"; }
  
     if ($set eq 'cram') { return $path . "/$cramname"; }
@@ -260,32 +347,32 @@ sub WhereFile {
 
 #==================================================================
 # Subroutine:
-#   GetBamid($bamid)
+#   GetSampleid($sampleid)
 #
-#   Return bamid for bamid or expt_sampleid
+#   Return sampleid for sampleid or expt_sampleid
 #==================================================================
-sub GetBamid {
-    my ($bamid) = @_;
+sub GetSampleid {
+    my ($sampleid) = @_;
     my ($sth, $rowsofdata, $href);
-    if ($bamid =~ /^\d+$/) { return $bamid; }
+    if ($sampleid =~ /^\d+$/) { return $sampleid; }
 
-    $sth = My_DB::DoSQL("SELECT bamid FROM $PATHOPTS{bamfiles_table} WHERE expt_sampleid='$bamid'");
+    $sth = My_DB::DoSQL("SELECT $PATHOPTS{samples_pkey} FROM $PATHOPTS{samples_table} WHERE expt_sampleid='$sampleid'");
     $rowsofdata = $sth->rows();
     if ($rowsofdata) {
         $href = $sth->fetchrow_hashref;
-        return $href->{bamid};
+        return $href->{$PATHOPTS{samples_pkey}};
     }
-    die "$main::Script - Invalid bamid or NWDID ($bamid). Try '$main::Script -help'\n";
+    die "$main::Script - Invalid sampleid or NWDID ($sampleid). Try '$main::Script -help'\n";
 }
 
 #==================================================================
 # Subroutine:
-#   FindB37($centername, $piname, $nwdid, $bamid)
+#   FindB37($centername, $piname, $nwdid, $sampleid)
 #
 #   Return full path to B37 cram or null
 #==================================================================
 sub FindB37 {
-    my ($centername, $piname, $nwdid, $bamid) = @_;
+    my ($centername, $piname, $nwdid, $sampleid) = @_;
     die "$main::Script - there are no local B37 files. See gs://topmed-irc-working/remapping/b37\n";
     my %files = ();
     foreach my $n ('', '2', '3', '4', '5', '6', '7', '9', '10') {     # All possible topmed hosts
@@ -299,12 +386,12 @@ sub FindB37 {
     if ($#filekeys == 0) { return $filekeys[0]; }   # One file found, return it
     #   Error condition - too many files found
     foreach (@filekeys) { print "   "; system("ls -l $_"); }
-    die "$main::Script - Found " . scalar(@filekeys) . " B37 files fir $bamid\n";
+    die "$main::Script - Found " . scalar(@filekeys) . " B37 files fir $sampleid\n";
 }
 
 #==================================================================
 # Subroutine:
-#   FindB38($centername, $piname, $nwdid, $bamid, $datayear)
+#   FindB38($centername, $piname, $nwdid, $sampleid, $datayear)
 #
 #   The path returned here is more convoluted than we want
 #   because we started allocating b38 files on 9 and 10
@@ -319,7 +406,7 @@ sub FindB37 {
 #   Caller must make the directory tree
 #==================================================================
 sub FindB38 {
-    my ($centername, $piname, $nwdid, $bamid, $datayear) = @_;
+    my ($centername, $piname, $nwdid, $sampleid, $datayear) = @_;
     if (! defined($datayear)) { $datayear=''; }
 
     if ($ENV{PROJECT} eq 'inpsyght') {
@@ -332,13 +419,13 @@ sub FindB38 {
             [ qw/working  working incoming incoming incoming incoming/ ]
         );
         # First determine the old path and if that directory exists, use it
-        my $mod = $bamid % 2;
+        my $mod = $sampleid % 2;
         my $file = "/net/$host_partialpath[0][$mod]/$host_partialpath[1][$mod]/" .
             "mapping/results/$centername/$piname/b38/$nwdid/$nwdid.recab.cram";
         if ( -f $file) { return $file; }        # If file exists, return that
 
         # File does not exist, allocate using the new scheme
-        $mod = $bamid % 6;
+        $mod = $sampleid % 6;
         $file = "/net/$host_partialpath[0][$mod]/$host_partialpath[1][$mod]/" .
             "mapping/results/$centername/$piname/b38/$nwdid/$nwdid.recab.cram";
         return $file;
@@ -350,7 +437,7 @@ sub FindB38 {
             [ qw/working working working working incoming incoming incoming incoming/ ]
         );
         # First determine the old path and if that directory exists, use it
-        my $mod = $bamid % 8;
+        my $mod = $sampleid % 8;
         my $file = "/net/$host_partialpath[0][$mod]/$host_partialpath[1][$mod]/" .
             "mapping/results/$centername/$piname/b38/$nwdid/$nwdid.recab.cram";
         return $file;

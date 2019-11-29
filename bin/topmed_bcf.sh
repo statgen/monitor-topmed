@@ -27,14 +27,16 @@ if [ "$1" = "-submit" ]; then
     timeout='28:00:00'
   elif [ "$filesize" -gt "35044692321" ]; then
     mem=78G
-    timeout='20:00:00'
+    timeout='26:00:00'
   elif [ "$filesize" -gt "31848365056" ]; then
     mem=64G
-    timeout='18:00:00'
+    timeout='24:00:00'
   elif [ "$filesize" -gt "23023087355" ]; then
     mem=48G
+	timeout='22:00:00'
   elif [ "$filesize" -gt "1566897485" ]; then
     mem=24G
+	timeout='20:00:00'
   fi
   if [ "$FORCEMEMORY" != "" ]; then
     mem=$FORCEMEMORY

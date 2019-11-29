@@ -12,8 +12,8 @@ use vars qw(@EXPORT_OK @EXPORT @ISA $DBC $DBH);
 use Exporter;
 
 @ISA = qw(Exporter);
-@EXPORT_OK = qw(DBConnect DoSQL PersistDBConnect PersistDoSQL);
-@EXPORT    = qw(DBConnect DoSQL PersistDBConnect PersistDoSQL);
+@EXPORT_OK = qw(DBConnect DoSQL SQL_Last_Insert PersistDBConnect PersistDoSQL);
+@EXPORT    = qw(DBConnect DoSQL SQL_Last_Insert PersistDBConnect PersistDoSQL);
 
 our ($DBC, $DBH);
 

@@ -38,15 +38,15 @@ DROP TABLE IF EXISTS centers;
 CREATE TABLE centers (
   centerid     INT NOT NULL AUTO_INCREMENT, /* Referenced in nhlbi_qc_metrics */
   centername   VARCHAR(16) NOT NULL,        /* Referenced in nhlbi_qc_metrics */
-  datamethod   VARCHAR(8) NOT NULL DEFAULT 'pull',
   centerdesc   VARCHAR(96) NOT NULL,
   designdesc   TEXT NOT NULL,
+  datatype     VARCHAR(64),
   PRIMARY KEY  (centerid)
 );
 INSERT INTO centers (centername,centerdesc,designdesc) VALUES('broad', 'Broad Institute','Illumina sequencing of Homo sapiens via random selection');
-INSERT INTO centers (centername,centerdesc,designdesc) VALUES('illumina', '30x whole genome sequencing using Illumina TruSeq PCR-free library protocol with 500ng-1ug input DNA');
+INSERT INTO centers (centername,centerdesc,designdesc) VALUES('illumina', 'Illumina Fast Track Services', '30x whole genome sequencing using Illumina TruSeq PCR-free library protocol with 500ng-1ug input DNA');
 INSERT INTO centers (centername,centerdesc,designdesc) VALUES('nygc', 'New York Genome Center','Whole genome sequencing using Illumina TruSeq PCR-free DNA library preparation with 500ng input DNA, sequenced to >30x mean coverage with 2x150bp reads on HiSeq X.');
-INSERT INTO centers (centername,centerdesc,designdesc) VALUES('uw', '30x Illumina whole genome sequencing using Kapa PCR-free DNA library preparation with 500ng input DNA');
+INSERT INTO centers (centername,centerdesc,designdesc) VALUES('uw', 'University of Washington Northwest Genome Center', '30x Illumina whole genome sequencing using Kapa PCR-free DNA library preparation with 500ng input DNA');
 INSERT INTO centers (centername,centerdesc,designdesc) VALUES('baylor', 'BCM','30x Illumina whole genome sequencing using Kapa PCR-free DNA library preparation with 500ng input DNA');
 INSERT INTO centers (centername,centerdesc,designdesc) VALUES('macrogen', 'Macrogen','30x Illumina whole genome sequencing using Kapa PCR-free DNA library preparation with 500ng input DNA');
 INSERT INTO centers (centername,centerdesc,designdesc) VALUES('washu', 'McDonnell Genome Center at Washington University','30x Illumina whole genome sequencing using Kapa PCR-free DNA library preparation with 500ng input DNA');
@@ -65,8 +65,7 @@ CREATE TABLE runs (
   count        INT,
   datayear     INT DEFAULT 4,          /* Year of project: 1, 2 ... */
   offsite      CHAR(1) DEFAULT 'N',    /* Original files kept offsite (N,Y,D) */
-  xmlfound     INT DEFAULT 0,          /* Remove this */
-  arrived      CHAR(1) DEFAULT 'N',    /* Y or N that all files arrived for this run */
+  arrived      CHAR(1) DEFAULT 'N',    /* Y or N that all files arrived */
 
   dateinit     VARCHAR(12),
   datecomplete VARCHAR(12),

@@ -85,16 +85,21 @@ my %VALIDSTATUS = (                 # Valid status for the verbs
 #   Initialization - Sort out the options and parameters
 #--------------------------------------------------------------
 our %opts = (
-    bamfiles_table => 'bamfiles',
+    runs_table => 'runs',
+    runs_pkey => 'runid',
+    samples_table => 'bamfiles',
+    samples_pkey => 'bamid',
+    files_table => 'na',
+    files_pkey => 'na',
+    datatype => 'genome',
     centers_table => 'centers',
     permissions_table => 'permissions',
-    runs_table => 'runs',
     ascpdest => 'asp-um-sph@gap-submit.ncbi.nlm.nih.gov:protected',    
     verbose => 0,
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help verbose with-id|bamid emsg=s project=s
+    help verbose with-id|bamid emsg=s project=s datatype=s
     )) || die "$Script - Failed to parse options\n";
 #   Non-typical code for PROJECT so non-project IDs can easily use this
 if ($opts{project}) { $ENV{PROJECT} = $opts{project}; }
@@ -105,37 +110,43 @@ if (! -d "/usr/cluster/$ENV{PROJECT}") {
    die "$Script - Environment variable PROJECT '$ENV{PROJECT}' incorrect\n";
 }
 $opts{realm} = "/usr/cluster/$ENV{PROJECT}/etc/.db_connections/$ENV{PROJECT}";
+if ($opts{datatype} eq 'rnaseq') {
+	$opts{samples_table} = 'tx_samples';
+	$opts{samples_pkey} = 'txseqid';
+	$opts{runs_table} = 'tx_projects';
+	$opts{runs_pkey} = 'rnaprojectid';
+	$opts{files_table} = 'tx_files';
+	$opts{files_pkey} = 'fileid';
+}
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
     my $m = "$Script [-p project] [options] ";
     my $verbs = join(' ', sort keys %VALIDVERBS);
     my $requests = join(' ', sort keys %VALIDSTATUS);
-    warn "$m mark bamid|nwdid action newstatus\n" .
+    warn "$m mark sampleid|nwdid action newstatus\n" .
         "    Where action: $verbs\n" .
         "    Where newstatus: $requests\n" .
         "  or\n" .
-        "$m unmark bamid|nwdid [same list as mark]\n" .
+        "$m unmark sampleid|nwdid [same list as mark]\n" .
         "  or\n" .
-        "$m set bamid|nwdid|dirname colname value\n" .
+        "$m set sampleid|nwdid|dirname colname value\n" .
         "  or\n" .
-        "$m setdate bamid|nwdid colname file\n" .
+        "$m setdate sampleid|nwdid colname file\n" .
         "  or\n" .
-        "$m show bamid|nwdid colname|run|center\n" .
+        "$m show sampleid|nwdid colname|run|center\n" .
         "  or\n" .
         "$m list centers\n" .
         "$m list runs centername\n" .
         "$m [-with-id] list samples runname\n" .
         "  or\n" .
-        "$m send2ncbi files\n" .
+        "$m whatnwdid sampleid|nwdid\n" .
         "  or\n" .
-        "$m whatnwdid bamid|nwdid\n" .
-        "  or\n" .
-        "$m whatrun bamid|nwdid\n" .
+        "$m whatrun sampleid|nwdid\n" .
         "  or\n" .
         "$m permit add operation center run\n" .
         "$m permit remove permitid\n" .
-        "$m permit test operation bamid/n" .
+        "$m permit test operation sampleid/n" .
         "\nUpdate the topmed database\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
@@ -154,7 +165,6 @@ if ($fcn eq 'set')       { Set(@ARGV); exit; }
 if ($fcn eq 'setdate')   { SetDate(@ARGV); exit; }
 if ($fcn eq 'show')      { Show(@ARGV); exit; }
 if ($fcn eq 'list')      { List(@ARGV); exit; }
-if ($fcn eq 'send2ncbi') { Send2NCBI(@ARGV); exit; }
 if ($fcn eq 'whatnwdid') { WhatNWDID(@ARGV); exit; }
 if ($fcn eq 'whatrun')   { WhatRun(@ARGV); exit; }
 
@@ -163,74 +173,74 @@ exit;
 
 #==================================================================
 # Subroutine:
-#   Mark($bamid, $op, $state)
+#   Mark($sampleid, $op, $state)
 #
-#   Set states in the bamfiles database
+#   Set states in the database
 #==================================================================
 sub Mark {
-    my ($bamid, $op, $state) = @_;
-    $bamid = GetBamid($bamid);
+    my ($sampleid, $op, $state) = @_;
+    $sampleid = GetSampleid($sampleid);
     if ((! exists($VALIDVERBS{$op})) || (! exists($VALIDSTATUS{$state}))) {
         die "$Script - Invalid 'mark' syntax. Try '$Script -help'\n";
     }
 
-    #   Make sure this is a bam we know
-    my $sth = DoSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
+    #   Make sure this is a sample we know
+    my $sth = DoSQL("SELECT $opts{samples_pkey} FROM $opts{samples_table} WHERE $opts{samples_pkey}=$sampleid");
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
+    if (! $rowsofdata) { die "$Script - Sample '$sampleid' is unknown\n"; }
 
     #   Set state for the verb
     my $col = $VALIDVERBS{$op};
     my $done = 0;
     if ($state eq 'requested') {
-        DoSQL("UPDATE $opts{bamfiles_table} SET $col=$REQUESTED WHERE bamid=$bamid");
+        DoSQL("UPDATE $opts{samples_table} SET $col=$REQUESTED WHERE $opts{samples_pkey}=$sampleid");
         $done++;
     }
     if ($state eq 'completed') {
-        DoSQL("UPDATE $opts{bamfiles_table} SET $col=$COMPLETED WHERE bamid=$bamid");
+        DoSQL("UPDATE $opts{samples_table} SET $col=$COMPLETED WHERE $opts{samples_pkey}=$sampleid");
         if ($col eq 'state_arrive') {       # Used by Kevin for tracking samples
-            DoSQL("UPDATE $opts{bamfiles_table} SET datearrived='" . time() . "' WHERE bamid=$bamid");
+            DoSQL("UPDATE $opts{samples_table} SET datearrived='" . time() . "' WHERE $opts{samples_pkey}=$sampleid");
         }
         if ($col eq 'state_b37') {          # hack for Chris until new code in place
-            DoSQL("UPDATE $opts{bamfiles_table} SET datemapping_b37='" . time() . "' WHERE bamid=$bamid");
+            DoSQL("UPDATE $opts{samples_table} SET datemapping_b37='" . time() . "' WHERE $opts{samples_pkey}=$sampleid");
         }
         $done++;
     }
     if ($state eq 'delivered') {
-        DoSQL("UPDATE $opts{bamfiles_table} SET $col=$DELIVERED WHERE bamid=$bamid");
+        DoSQL("UPDATE $opts{samples_table} SET $col=$DELIVERED WHERE $opts{samples_pkey}=$sampleid");
         $done++;
     }
     if ($state eq 'started') {
-        DoSQL("UPDATE $opts{bamfiles_table} SET $col=$STARTED WHERE bamid=$bamid");
+        DoSQL("UPDATE $opts{samples_table} SET $col=$STARTED WHERE $opts{samples_pkey}=$sampleid");
         $done++;
     }
     if ($state eq 'failed') {
-        DoSQL("UPDATE $opts{bamfiles_table} SET $col=$FAILED WHERE bamid=$bamid");
+        DoSQL("UPDATE $opts{samples_table} SET $col=$FAILED WHERE $opts{samples_pkey}=$sampleid");
         if ($col eq 'state_arrive') {       # hack for Chris until new code in place
-            DoSQL("UPDATE $opts{bamfiles_table} SET datearrived='-1' WHERE bamid=$bamid");
+            DoSQL("UPDATE $opts{samples_table} SET datearrived='-1' WHERE $opts{samples_pkey}=$sampleid");
         }
         if ($col eq 'state_b37') {          # hack for Chris until new code in place
-            DoSQL("UPDATE $opts{bamfiles_table} SET datemapping_b37='-1' WHERE bamid=$bamid");
+            DoSQL("UPDATE $opts{samples_table} SET datemapping_b37='-1' WHERE $opts{samples_pkey}=$sampleid");
         }
         $done++;
     }
     if ($state eq 'cancelled') {
-        DoSQL("UPDATE $opts{bamfiles_table} SET $col=$CANCELLED WHERE bamid=$bamid");
+        DoSQL("UPDATE $opts{samples_table} SET $col=$CANCELLED WHERE $opts{samples_pkey}=$sampleid");
         $done++;
     }
     if ($state eq 'submitted') {
-        DoSQL("UPDATE $opts{bamfiles_table} SET $col=$SUBMITTED WHERE bamid=$bamid");
+        DoSQL("UPDATE $opts{samples_table} SET $col=$SUBMITTED WHERE $opts{samples_pkey}=$sampleid");
         $done++;
     }
     if ($state eq 'notset') {
-        DoSQL("UPDATE $opts{bamfiles_table} SET $col=$NOTSET WHERE bamid=$bamid");
+        DoSQL("UPDATE $opts{samples_table} SET $col=$NOTSET WHERE $opts{samples_pkey}=$sampleid");
         $done++;
     }
     if ($done) {
-        if ($opts{verbose}) { print "$Script  'mark $bamid $op $state'  successful\n"; }
+        if ($opts{verbose}) { print "$Script  'mark $sampleid $op $state'  successful\n"; }
         if (exists($opts{emsg})) {
             print $opts{emsg} . "\n";
-            DoSQL("UPDATE $opts{bamfiles_table} SET emsg=\"$op $state -- $opts{emsg}\" WHERE bamid=$bamid");
+            DoSQL("UPDATE $opts{samples_table} SET emsg=\"$op $state -- $opts{emsg}\" WHERE $opts{samples_pkey}=$sampleid");
         }
     }
     else { die "$Script - Invalid state '$state' for '$op'. Try '$Script -help'\n"; }
@@ -240,23 +250,23 @@ sub Mark {
 # Subroutine:
 #   UnMark($dirname, $op)
 #
-#   Reset state in the bamfiles database
+#   Reset state in the database
 #==================================================================
 sub UnMark {
-    my ($bamid, $op) = @_;
-    $bamid = GetBamid($bamid);
+    my ($sampleid, $op) = @_;
+    $sampleid = GetSampleid($sampleid);
     if (! exists($VALIDVERBS{$op})) {
         die "$Script - Invalid 'unmark' syntax. Try '$Script -help'\n";
     }
 
-    #   Make sure this is a bam we know
-    my $sth = DoSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
+    #   Make sure this is a sample we know
+    my $sth = DoSQL("SELECT $opts{samples_pkey} FROM $opts{samples_table} WHERE $opts{samples_pkey}=$sampleid");
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
+    if (! $rowsofdata) { die "$Script - Sample '$sampleid' is unknown\n"; }
 
     my $col = $VALIDVERBS{$op};
-    DoSQL("UPDATE $opts{bamfiles_table} SET $col=$NOTSET WHERE bamid=$bamid");
-    if ($opts{verbose}) { print "$Script  'unmark $bamid $op'  successful\n"; }
+    DoSQL("UPDATE $opts{samples_table} SET $col=$NOTSET WHERE $opts{samples_pkey}=$sampleid");
+    if ($opts{verbose}) { print "$Script  'unmark $sampleid $op'  successful\n"; }
 }
 
 #==================================================================
@@ -267,117 +277,57 @@ sub UnMark {
 #==================================================================
 sub WhatNWDID {
     my ($nwdid) = @_;
-    my $orignwdid = $nwdid;
+    my $sampleid = GetSampleid($nwdid);
 
-    if ($nwdid =~ /^\d+/) {             # If bamid, get NWDID
-        my $sth = DoSQL("SELECT expt_sampleid FROM $opts{bamfiles_table} WHERE bamid=$nwdid");
-        if ($sth) {
-            my $href = $sth->fetchrow_hashref;
-            $nwdid = $href->{expt_sampleid};
-        }
-        else { die "$Script - NWDID '$nwdid' is unknown\n"; } 
-    }
-    else {                              # Extrace NWD from whatever was provided
-        if ($nwdid =~ /(nwd\d+)/i) { $nwdid = uc($1); }
-    }
-    if (! $nwdid) { die "$Script - NWDID/BAMID '$orignwdid' is unknown\n"; }
-
-    #   Reconstruct partial path to BAM
-    my $sth = DoSQL("SELECT runid,bamid,piname,datayear FROM $opts{bamfiles_table} WHERE expt_sampleid='$nwdid'");
+    #   Reconstruct partial path to sample
+    my $sth = DoSQL("SELECT $opts{runs_pkey},piname,expt_sampleid,datayear FROM $opts{samples_table} WHERE $opts{samples_pkey}='$sampleid'");
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "$Script - NWDID '$nwdid' is unknown\n"; }
     my $href = $sth->fetchrow_hashref;
-    my $bamid = $href->{bamid};
     my $datayear = $href->{datayear};
     my $piname = $href->{piname};
-    $sth = DoSQL("SELECT centerid,dirname FROM $opts{runs_table} WHERE runid=$href->{runid}");
+    $nwdid = $href->{expt_sampleid};
+    $sth = DoSQL("SELECT centerid,dirname FROM $opts{runs_table} WHERE $opts{runs_pkey}=$href->{$opts{runs_pkey}}");
     $href = $sth->fetchrow_hashref;
     my $run = $href->{dirname};
     $sth = DoSQL("SELECT centername FROM $opts{centers_table} WHERE centerid=$href->{centerid}");
     $href = $sth->fetchrow_hashref;
     my $center = uc($href->{centername});
-    print "$nwdid $bamid can be found in run $run PI $piname for center $center year $datayear\n";
+    print "$nwdid $sampleid can be found in run $run PI $piname for center $center year $datayear\n";
 }
 
 #==================================================================
 # Subroutine:
-#   WhatRun($bamid)
+#   WhatRun($sampleid)
 #
 #   Print interesting details about an NWDID
 #==================================================================
 sub WhatRun {
-    my ($bamid) = @_;
+    my ($sampleid) = @_;
     my $sth;
 
-    $bamid = GetBamid($bamid);
-    $sth = DoSQL("SELECT runid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
-    if (! $sth) { die "$Script - Unknown '$bamid'\n"; }
+    $sampleid = GetSampleid($sampleid);
+    $sth = DoSQL("SELECT $opts{runs_pkey} FROM $opts{samples_table} WHERE $opts{samples_pkey}=$sampleid");
+    if (! $sth) { die "$Script - Unknown '$sampleid'\n"; }
     my $href = $sth->fetchrow_hashref;
-    $sth = DoSQL("SELECT centerid,runid,dirname,count,datayear FROM $opts{runs_table} WHERE runid=$href->{runid}");
+    $sth = DoSQL("SELECT centerid,$opts{runs_pkey},dirname,count,datayear FROM $opts{runs_table} WHERE $opts{runs_pkey}=$href->{$opts{runs_pkey}}");
     $href = $sth->fetchrow_hashref;
-    my $runid = $href->{runid};
+    my $id = $href->{$opts{runs_pkey}};
     my $dirname = $href->{dirname};
     my $count = $href->{count};
     $sth = DoSQL("SELECT centername FROM $opts{centers_table} WHERE centerid=$href->{centerid}");
     $href = $sth->fetchrow_hashref;
     my $center = uc($href->{centername});
-    print "$bamid in center $center from run $dirname $runid which has $count samples\n";
+    print "$sampleid in center $center from run $dirname $id which has $count samples\n";
 }
 
 #==================================================================
 # Subroutine:
-#   Send2NCBI($files)
-#
-#   Send files to NCBI
-#==================================================================
-sub Send2NCBI {
-    my ($files) = @_;
-    my $ascpcmd = "/usr/cluster/bin/ascp -i " .
-        "/net/$ENV{PROJECT}/incoming/study.reference/send2ncbi/$ENV{PROJECT}-2-ncbi.pri " .
-        "-l 800M -k 1";
-
-    my $cmd = "$ascpcmd $files $opts{ascpdest}";
-    my $errs = "/tmp/Send2NCBI.$$";
-    foreach (1 .. 10) {             # Keep trying for auth errors
-        my $rc = system("$cmd 2> $errs");
-        if (! $rc) {
-            unlink($errs);
-            exit($rc);
-        }
-        #   Send failed. If this is an authentication error, wait and retry
-        my $sleep = 60;
-        if (open(IN, $errs)) {
-            while (<IN>) {
-                if (/Session Stop/) {
-                    print "$Script - $_";
-                    last;
-                }     
-                if (/ascp:/) {
-                    print "$Script - $_";
-                    if (/authenticate/) {
-                        $sleep = 15;
-                        last;
-                    }
-                }
-            }
-            close(IN);
-            if ($sleep) { print "$Script - WARN: ASCP error, wait and retry\n"; }
-        }
-        sleep($sleep);
-    }
-    print "$Script - FATAL: Excessive ASCP fatal errors\n";
-    unlink($errs);
-    exit(3);
-}
-
-#==================================================================
-# Subroutine:
-#   Set($bamid, $col, $val)
+#   Set($sampleid, $col, $val)
 #
 #   Set a database column
 #==================================================================
 sub Set {
-    my ($bamid, $col, $val) = @_;
+    my ($sampleid, $col, $val) = @_;
     my ($sth, $rowsofdata, $href);
 
     if (! defined($val)) { $val = ''; }
@@ -385,51 +335,51 @@ sub Set {
     if ($val ne 'NULL') { $val = "'$val'"; }    # Use quotes unless this is NULL
 
     #   This could be a run name
-    $sth = DoSQL("SELECT runid FROM $opts{runs_table} WHERE dirname='$bamid'", 0);
+    $sth = DoSQL("SELECT $opts{runs_pkey} FROM $opts{runs_table} WHERE dirname='$sampleid'", 0);
     $rowsofdata = $sth->rows();
     if ($rowsofdata) {
         if ($rowsofdata > 1) {
-            die "$Script - Eeek, there are $rowsofdata runs named '$bamid'\n";
+            die "$Script - Eeek, there are $rowsofdata runs named '$sampleid'\n";
         }
         $href = $sth->fetchrow_hashref;
-        DoSQL("UPDATE $opts{runs_table} SET $col=$val WHERE runid='$href->{runid}'");
+        DoSQL("UPDATE $opts{runs_table} SET $col=$val WHERE $opts{runs_pkey}='$href->{$opts{runs_pkey}}'");
         return;
     }
 
-    #   This is bamid or nwdid
-    $bamid = GetBamid($bamid);
+    #   This is sampleid or expt_sampleid
+    $sampleid = GetSampleid($sampleid);
 
-    #   Make sure this is a bam we know
-    $sth = DoSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
+    #   Make sure this is a sample we know
+    $sth = DoSQL("SELECT $opts{samples_pkey} FROM $opts{samples_table} WHERE $opts{samples_pkey}=$sampleid");
     $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
+    if (! $rowsofdata) { die "$Script - Sample '$sampleid' is unknown\n"; }
 
     if ($col eq 'nwdid') { $col = 'expt_sampleid'; }
-    DoSQL("UPDATE $opts{bamfiles_table} SET $col=$val WHERE bamid=$bamid");
+    DoSQL("UPDATE $opts{samples_table} SET $col=$val WHERE $opts{samples_pkey}=$sampleid");
 }
 
 #==================================================================
 # Subroutine:
-#   SetDate($bamid, $col, $val)
+#   SetDate($sampleid, $col, $val)
 #
 #   Set a database column to the date for a file
 #==================================================================
 sub SetDate {
-    my ($bamid, $col, $val) = @_;
+    my ($sampleid, $col, $val) = @_;
     my ($sth, $rowsofdata, $href);
 
-    #   This is bamid or nwdid
-    $bamid = GetBamid($bamid);
+    #   This is sampleid or expt_sampleid
+    $sampleid = GetSampleid($sampleid);
 
-    #   Make sure this is a bam we know
-    $sth = DoSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
+    #   Make sure this is a sample we know
+    $sth = DoSQL("SELECT $opts{samples_pkey} FROM $opts{samples_table} WHERE $opts{samples_pkey}=$sampleid");
     $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
+    if (! $rowsofdata) { die "$Script - Sample '$sampleid' is unknown\n"; }
 
     my @s = stat($val);
     if (! @s) { die "$Script - '$val' is not a known filename\n"; }
     my $datetime = strftime('%Y-%m-%d %H:%M:%S', localtime($s[10]));
-    DoSQL("UPDATE $opts{bamfiles_table} SET $col='$datetime' WHERE bamid=$bamid");
+    DoSQL("UPDATE $opts{samples_table} SET $col='$datetime' WHERE $opts{samples_pkey}=$sampleid");
 }
 
 #==================================================================
@@ -437,7 +387,7 @@ sub SetDate {
 #   List($fcn, $item)
 #
 #   Generate a list of data from the database
-#   Where $fcn may be centers, runs or samples
+#   Where $fcn may be centers, runs , samples or files for a sample
 #==================================================================
 sub List {
     my ($fcn, $item) = @_;
@@ -462,12 +412,12 @@ sub List {
         if (! $rowsofdata) { die "$Script - Unknown centername '$item'\n"; }
         my $href = $sth->fetchrow_hashref;
         my $centerid = $href->{centerid};
-        $sth = DoSQL("SELECT runid,dirname FROM $opts{runs_table} WHERE centerid=$centerid");
+        $sth = DoSQL("SELECT $opts{runs_pkey},dirname FROM $opts{runs_table} WHERE centerid=$centerid");
         $rowsofdata = $sth->rows();
         for (my $i=1; $i<=$rowsofdata; $i++) {
             my $href = $sth->fetchrow_hashref;
             $s = $href->{dirname};
-            if ($opts{'with-id'}) { $s .= ' ' . $href->{runid}; }
+            if ($opts{'with-id'}) { $s .= ' ' . $href->{$opts{runs_pkey}}; }
             print $s . "\n";
         }
         return;
@@ -476,21 +426,35 @@ sub List {
         if (! $item) { die "$Script - Runname was not provided\n"; }
         my $sth;
         if ($item =~ /^\d+$/) {        # Maybe runid provided
-            $sth = DoSQL("SELECT runid FROM $opts{runs_table} WHERE runid=$item", 0);
+            $sth = DoSQL("SELECT $opts{runs_pkey} FROM $opts{runs_table} WHERE $opts{runs_pkey}=$item", 0);
         }
         else {
-            $sth = DoSQL("SELECT runid FROM $opts{runs_table} WHERE dirname='$item'", 0);
+            $sth = DoSQL("SELECT $opts{runs_pkey} FROM $opts{runs_table} WHERE dirname='$item'", 0);
         }
         my $rowsofdata = $sth->rows();
         if (! $rowsofdata) { die "$Script - Unknown run '$item'\n"; }
         my $href = $sth->fetchrow_hashref;
-        my $runid = $href->{runid};
-        $sth = DoSQL("SELECT bamid,expt_sampleid FROM $opts{bamfiles_table} WHERE runid=$runid");
+        my $id = $href->{$opts{runs_pkey}};
+        $sth = DoSQL("SELECT $opts{samples_pkey},expt_sampleid FROM $opts{samples_table} WHERE $opts{runs_pkey}=$id");
         $rowsofdata = $sth->rows();
         for (my $i=1; $i<=$rowsofdata; $i++) {
             $href = $sth->fetchrow_hashref;
             $s = $href->{expt_sampleid};
-            if ($opts{'with-id'}) { $s .= ' ' . $href->{bamid}; }
+            if ($opts{'with-id'}) { $s .= ' ' . $href->{$opts{samples_pkey}}; }
+            print $s . "\n";
+        }
+        return;
+    }
+    if ($fcn eq 'files') {            	# Show all files for a sample
+        if (! $item) { die "$Script - Sample was not provided\n"; }
+       	my $sampleid = GetSampleid($item);
+        my $sth = DoSQL("SELECT $opts{samples_pkey},filename,checksum FROM $opts{files_table} WHERE $opts{samples_pkey}=$sampleid");
+        my $rowsofdata = $sth->rows();
+        for (my $i=1; $i<=$rowsofdata; $i++) {
+            my $href = $sth->fetchrow_hashref;
+            my $s = '';
+            if ($opts{'with-id'}) { $s .= $href->{$opts{samples_pkey}} . ' '; }
+            $s = $href->{filename} . ' ' . $href->{checksum};
             print $s . "\n";
         }
         return;
@@ -500,19 +464,19 @@ sub List {
 
 #==================================================================
 # Subroutine:
-#   Show($fcn, $bamid, $col)
+#   Show($fcn, $sampleid, $col)
 #
 #   Generate list of information from the database
 #   or show the value for a column
 #==================================================================
 sub Show {
-    my ($bamid, $col) = @_;
+    my ($sampleid, $col) = @_;
     my ($sth, $rowsofdata, $href);
 
     #   This could be a run name. Does not start with NWD, not all digits
-    my $b = GetBamid($bamid, 1);    # Do not die, come back with zero if failed
+    my $b = GetSampleid($sampleid, 1);    # Do not die, come back with zero if failed
     if (! $b) {                     # Not a sample, must be a run
-        $sth = DoSQL("SELECT runid,$col FROM $opts{runs_table} WHERE dirname='$bamid'", 0);
+        $sth = DoSQL("SELECT $opts{runs_pkey},$col FROM $opts{runs_table} WHERE dirname='$sampleid'", 0);
         if ($sth) {
             $rowsofdata = $sth->rows();
             if ($rowsofdata) {
@@ -521,21 +485,21 @@ sub Show {
                 return;
             }
         }
-        die "$Script - Unknown '$bamid', not a sampleid, bamid or dir of a run\n";
+        die "$Script - Unknown '$sampleid', not a sampleid, id or dir of a run\n";
     }
-    else { $bamid = $b; }               #   This is bamid or nwdid
+    else { $sampleid = $b; }               #   This is sampleid or nwd|tor
 
-    $sth = DoSQL("SELECT bamid,runid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
+    $sth = DoSQL("SELECT $opts{samples_pkey},$opts{runs_pkey} FROM $opts{samples_table} WHERE $opts{samples_pkey}=$sampleid");
     $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
+    if (! $rowsofdata) { die "$Script - Sample '$sampleid' is unknown\n"; }
     $href = $sth->fetchrow_hashref;
-    my $runid = $href->{runid};
+    my $id = $href->{$opts{runs_pkey}};
 
     #   Get run if asked for it
     if ($col eq 'run') {
-        $sth = DoSQL("SELECT centerid,dirname FROM $opts{runs_table} WHERE runid=$href->{runid}");
+        $sth = DoSQL("SELECT centerid,dirname FROM $opts{runs_table} WHERE $opts{runs_pkey}=$href->{$opts{runs_pkey}}");
         $rowsofdata = $sth->rows();
-        if (! $rowsofdata) { die "$Script - RUNID '$href->runid' is unknown\n"; }
+        if (! $rowsofdata) { die "$Script - RUNID '$href->$opts{runs_pkey}' is unknown\n"; }
         $href = $sth->fetchrow_hashref;
         print $href->{dirname} . "\n";
         return;
@@ -543,9 +507,9 @@ sub Show {
 
     #   Get center if asked for it
     if ($col eq 'center') {
-        $sth = DoSQL("SELECT centerid FROM $opts{runs_table} WHERE runid=$href->{runid}");
+        $sth = DoSQL("SELECT centerid FROM $opts{runs_table} WHERE $opts{runs_pkey}=$href->{$opts{runs_pkey}}");
         $rowsofdata = $sth->rows();
-        if (! $rowsofdata) { die "$Script - RUNID '$href->runid' is unknown\n"; }
+        if (! $rowsofdata) { die "$Script - RUNID '$href->$opts{runs_pkey}' is unknown\n"; }
         $href = $sth->fetchrow_hashref;
 
         $sth = DoSQL("SELECT centername FROM $opts{centers_table} WHERE centerid=$href->{centerid}");
@@ -557,56 +521,56 @@ sub Show {
     }
 
     #   Get value of column we asked for
-    $sth = DoSQL("SELECT $col FROM $opts{bamfiles_table} WHERE bamid=$bamid");
+    $sth = DoSQL("SELECT $col FROM $opts{samples_table} WHERE $opts{samples_pkey}=$sampleid");
     $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "$Script - BAM '$bamid' or column '$col' is unknown\n"; }
+    if (! $rowsofdata) { die "$Script - Sample '$sampleid' or column '$col' is unknown\n"; }
     $href = $sth->fetchrow_hashref;
     if (defined($href->{$col})) { print $href->{$col} . "\n"; }
 }
 
 #==================================================================
 # Subroutine:
-#   GetBamid($bamid, $flag)
+#   GetSampleid($sampleid, $flag)
 #
-#   If this is not a sampleid or bamid and FLAG is 1, do not die, return zero
+#   If this is not a sampleid or id and FLAG is 1, do not die, return zero
 #
-#   Return bamid for bamid or expt_sampleid
+#   Return pkeyid for expt_sampleid
 #==================================================================
-sub GetBamid {
-    my ($bamid, $flag) = @_;
+sub GetSampleid {
+    my ($sampleid, $flag) = @_;
     my ($sth, $rowsofdata, $href);
-    if ($bamid =~ /^\d+$/) { return $bamid; }
+    if ($sampleid =~ /^\d+$/) { return $sampleid; }
 
-    $sth = DoSQL("SELECT bamid FROM $opts{bamfiles_table} WHERE expt_sampleid='$bamid'");
+    $sth = DoSQL("SELECT $opts{samples_pkey} FROM $opts{samples_table} WHERE expt_sampleid='$sampleid'");
     $rowsofdata = $sth->rows();
     if ($rowsofdata) {
         $href = $sth->fetchrow_hashref;
-        return $href->{bamid};
+        return $href->{$opts{samples_pkey}};
     }
-    if ($flag) { return 0; }        # Not bamid or sample and do not die
-    die "$Script - Invalid bamid or NWDID ($bamid). Try '$Script -help'\n";
+    if ($flag) { return 0; }        # Not sampleid or sample and do not die
+    die "$Script - Invalid sampleid or NWD/TOR-ID ($sampleid). Try '$Script -help'\n";
 }
 
 #==================================================================
 # Subroutine:
-#   ($centerid, $runid) = GetBamidInfo($bamid)
+#   ($centerid, $id) = GetSampleidInfo($sampleid)
 #
-#   Return id for the center and run for a bamid
+#   Return id for the center and run_id for a sample
 #==================================================================
-sub GetBamidInfo {
-    my ($bamid) = @_;
+sub GetSampleidInfo {
+    my ($sampleid) = @_;
 
-    if ($bamid !~ /^\d+$/) { return (0,0); }     # No bamid, no ids
-    my $sth = DoSQL("SELECT runid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
+    if ($sampleid !~ /^\d+$/) { return (0,0); }     # No sampleid, no ids
+    my $sth = DoSQL("SELECT $opts{runs_pkey} FROM $opts{samples_table} WHERE $opts{samples_pkey}=$sampleid");
     my $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "$Script - BAM '$bamid' is unknown\n"; }
+    if (! $rowsofdata) { die "$Script - Sample '$sampleid' is unknown\n"; }
     my $href = $sth->fetchrow_hashref;
-    my $runid = $href->{runid};
-    $sth = DoSQL("SELECT centerid FROM $opts{runs_table} WHERE runid=$runid");
+    my $id = $href->{$opts{runs_pkey}};
+    $sth = DoSQL("SELECT centerid FROM $opts{runs_table} WHERE $opts{runs_pkey}=$id");
     $rowsofdata = $sth->rows();
-    if (! $rowsofdata) { die "$Script - BAM '$bamid' has no center?  How'd that happen?\n"; }
+    if (! $rowsofdata) { die "$Script - Sample '$sampleid' has no center?  How'd that happen?\n"; }
     $href = $sth->fetchrow_hashref;
-    return ($href->{centerid}, $runid);
+    return ($href->{centerid}, $id);
 }
 
 #==================================================================
@@ -620,14 +584,14 @@ topmedcmd.pl - Update the database for NHLBI TopMed
 
 =head1 SYNOPSIS
 
-  topmedcmd.pl mark 33 arrive completed   # BAM has arrived
+  topmedcmd.pl mark 33 arrive completed   # sample has arrived
   topmedcmd.pl -emsg 'No file found' mark 33 cram failed   # Action failed, set error msg
-  topmedcmd.pl mark NWD00234  arrive completed   # Same BAM has arrived
-  topmedcmd.pl unmark 33 arrive           # Reset BAM has arrived
+  topmedcmd.pl mark NWD00234  arrive completed   # Same sample has arrived
+  topmedcmd.pl unmark 33 arrive           # Reset sample has arrived
 
-  topmedcmd.pl set 33 jobidqplot 123445    # Set jobidqplot in bamfiles
-  topmedcmd.pl set NWD123433 jobidqplot 123445    # Set jobidqplot in bamfiles
-  topmedcmd.pl set 2016apr20 offsite N     # Set 2016apr20 in runs
+  topmedcmd.pl set 33 jobidqplot 123445    # Set jobidqplot in database
+  topmedcmd.pl set NWD123433 jobidqplot 123445    # Set jobidqplot in database
+  topmedcmd.pl set 2016apr20 offsite N     # Set 2016apr20 in database
 
   topmedcmd.pl -proj MYPROJ show 2199 state_cram        # Show a column
   topmedcmd.pl show 2199 center            # Show center 
@@ -641,8 +605,6 @@ topmedcmd.pl - Update the database for NHLBI TopMed
   topmedcmd.pl list runs broad             # Show all runs for center broad
   topmedcmd.pl list samples 2015dec02      # Show all samples for a run
   
-  topmedcmd.pl send2ncbi files             # Send files to NCBI
- 
   topmedcmd.pl whatnwdid bamid|nwdid       # Show details for a sample
  
   topmedcmd.pl whatrun bamid|nwdid         # Show details of the run for a sample
@@ -667,6 +629,10 @@ Functions wherefile, wherepath and whathost were moved into topmedpath.pl.
 =item B<-bamid  -with-id>
 
 Include the bamid or runid for the output from shown.
+
+=item B<-datatype genome|rnaseq>
+
+Specifies this is a particular datatype of data. The default is 'genome'.
 
 =item B<-emsg string>
 
@@ -706,9 +672,6 @@ The list of verbs and states can be seen by B<perldoc topmedcmd.pl>.
 B<set bamid|nwdid|dirname columnname value>
 Use this to set the value for a column for a particular BAM file
 or run.
-
-B<send2ncbi filelist>
-Use this to copy data to NCBI with ascp.
 
 B<show bamid|nwdid|dirname colname|center|run>
 Use this to show information about a particular bamid (or expt_sampleid)

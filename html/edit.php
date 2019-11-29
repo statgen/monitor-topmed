@@ -34,7 +34,8 @@
 #   string of HTML
 ---------------------------------------------------------------*/
 function Edit($table, $row, $showcols = array(), $htmlcomments = array()) {
-    global $iammgr, $peditor;
+    global $GLOBS;
+    $iammgr = $GLOBS['iammgr'];
     $c1 = "<br><font color='darkblue' size='-2'>&nbsp;&nbsp;&nbsp;&nbsp;";
     $c2 = '</font>';
 
@@ -42,6 +43,7 @@ function Edit($table, $row, $showcols = array(), $htmlcomments = array()) {
     if (! isset($DESC['_prikey_'])) { Nice_Exit("No primary key found for '$table'"); }
     $pkey = $DESC['_prikey_'];              // Name of primary key column
     //print "<!-- DESC=\n"; print_r($DESC); print " -->\n";
+    //print "<!-- ROW=\n"; print_r($row); print " -->\n";
 
     //  These are the keys to be shown. Use all cols if nothing provided
     //  By default do not show primary key or any key ending with '_'
@@ -57,7 +59,9 @@ function Edit($table, $row, $showcols = array(), $htmlcomments = array()) {
     
     $s = "<table border='0' width='80%' align='left'>\n" .
         "<form action='" . $_SERVER['PHP_SELF'] . "?fcn=modify' method='post'>\n" .
-        "<input type='hidden' name='$pkey' value='" . $row[$pkey] . "'>\n";
+        "<input type='hidden' name='$pkey' value='" . $row[$pkey] . "'>\n" .
+        "<input type='hidden' name='id' value='" . $row[$pkey] . "'>\n" .
+        "<input type='hidden' name='table' value='$table'>\n";
 
     foreach ($showcols as $k) {
         $val = $DESC[$k];
@@ -70,7 +74,7 @@ function Edit($table, $row, $showcols = array(), $htmlcomments = array()) {
         else { $c = ''; }
         $s .= "<tr><td align='right'><b>" . ucfirst($ss) . "</b>&nbsp;</td>";
         //  Calculated fields are just shown
-        if (substr($k,0,1) == '_' || (! $iammgr && ! $peditor)) {
+        if (substr($k,0,1) == '_' || (! $iammgr)) {
             $s .= "<td>" . $row[$k] . "$c</td></tr>\n";
             continue;
         }

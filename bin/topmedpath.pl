@@ -10,18 +10,6 @@
 #   to deal with inconsistencies from differing centers.
 #   This program can work with topmed and inpsyght
 #
-#  Regression test:
-#
-#  bams="4890 19099 15495 9702 5870 9670 6948 8615 10466 7740   57141 72522 70732 71329 82982 25804 38013 42819 73094 80438  78764 87128 85385 85873 88522 77264 85869 94934 79050 93186"
-#
-#  t=/usr/cluster/topmed/bin/topmedpath.pl \
-#  bams=85873 \ 
-#  bams="4890 19099 15495 9702 5870 9670 6948 8615 10466 7740" \
-#  keys="bam cram localbackup remotebackup remotearchive qcresults console b37 b38 bcf" \
-#  log=/tmp/j \
-#  rm $log; \
-#  for x in whathost wherefile wherepath; do echo "==== $x ====" | tee -a $log; for b in $bams; do  for k in $keys; do echo -n "$b $k  " | tee -a $log; $t $x $b $k | tee -a $log; done; done; done
-#
 # ChangeLog:
 #   $Log: topmedpath.pl,v $
 #
@@ -49,10 +37,11 @@ use Topmed::Path;
 #--------------------------------------------------------------
 our %opts = (
     verbose => 0,
+    datatype => 'genome',
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help raw realm=s verbose project=s
+    help raw realm=s verbose project=s datatype=s
     )) || die "$Script - Failed to parse options\n";
 #   Non-typical code for PROJECT so non-project IDs can easily use this
 if ($opts{project}) { $ENV{PROJECT} = $opts{project}; }
@@ -62,17 +51,21 @@ else {
 if (! -d "/usr/cluster/$ENV{PROJECT}") {
    die "$Script - Environment variable PROJECT '$ENV{PROJECT}' incorrect\n";
 }
-PathInit($ENV{PROJECT});                # Set up project variables, special handling
+
+PathInit($ENV{PROJECT}, $opts{datatype});	# Set up project variables, special handling
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
     my $m = "$Script [-p project] [options]";
-    warn "$m wherepath bamid|nwdid KEYWORD\n" .
+    warn "$m wherepath sampleid|nwdid KEYWORD\n" .
         "  or\n" .
-        "$m whathost bamid|nwdid KEYWORD\n" .
+        "$m whathost sampleid|nwdid KEYWORD\n" .
         "  or\n" .
-        "$m wherefile bamid|nwdid KEYWORD\n" .
-        "\nWHERE KEYWORD is one of bam|cram|localbackup|remotebackup|remotearchive|qcresults|console|b37|b38|bcf|gceupload|awsupload\n" .
+        "$m wherefile sampleid|nwdid KEYWORD\n" .
+        "\nWHERE KEYWORD is one of bam|cram|localbackup|remotebackup|remotearchive|" .
+        	"qcresults|console|b37|b38|bcf|gceupload|awsupload\n" .
+        "  or\n" .
+        "WHERE KEYWORD is one of rundir|releasefiles|fileprefix\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
     exit 1;
@@ -119,6 +112,8 @@ topmedpath.pl - Show paths for data in the TopMed database
   topmedcmd.pl wherefile 2199 qcresults    # Returns path for qc.results *.vb.SelfSM file (may not exist)
   topmedcmd.pl wherefile 2199 remotelbackup  # Returns GCE URI to where backup file might be
   topmedcmd.pl wherefile 2199 localbackup    # Returns path to local backup (cram)
+
+  topmedcmd.pl -datatype rnaseq wherepath 2199 rundir  # Returns real path to tx_project 
 
 =head1 DESCRIPTION
 
@@ -200,13 +195,21 @@ If B<awsupload> was specified, display the path to the AWS data.
 
 If B<awsbucket> was specified, display the bucket name for the AWS data.
 
-If B<awsbucketpath> was specified, display the path of data in the AWS bucket.
+If B<rundir> was specified for I<datatype=rnaseq>, display the path to the tx_project.
+
+If B<releasefiles> was specified for I<datatype=rnaseq>, display the path to the files for the tx_project.
+
+If B<fileprefix> was specified for I<datatype=rnaseq>, display the path to the files for the tx_project
+with the numeric prefix of the files for this sample.
+
 
 B<whathhost bamid|nwdid key>
 returns the host for the key specified.
 
+
 B<wherefile bamid|nwdid key>
 returns the path to the file for the key specified.
+This is not valid for I<datatype=rnaseq>.
 
 
 =head1 EXIT

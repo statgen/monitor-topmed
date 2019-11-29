@@ -8,7 +8,7 @@
 #   of monitor before including this. Allows this code to
 #   provide the local config values needed for different monitors.
 #
-#  This i set up to use Twitter Bootstrap
+#  This is set up to use Twitter Bootstrap
 #
 # Copyright (C) 2010-2015 Terry Gliedt, University of Michigan
 # This is free software; you can redistribute it and/or modify it under the
@@ -24,23 +24,40 @@ error_reporting(E_ALL);
 
 //  These guys can do anything for any monitor action
 $MGRS = array('tpg');
+//  These guys can request activities
+$REQMGRS = array('tblackw');
 
 $HDR['home'] = '/topmed';        // Banner URL
 $HDR['title'] = 'NHLBI TOPMed - Data Tracking';   // Banner title
 $HDR['logo'] = '/topmed/images/nhlbilogo_banner.png';     // Banner logo
 $HDR['local'] = "    <link href='/topmed/css/TOPMEDstyle.css' rel='stylesheet'>\n" .
     "    <script src='/topmed/js/TOPMEDjs.js'></script>\n";
-
 $LDB['bindir'] = '/usr/cluster/topmed/bin';
-$LDB['realm'] = $LDB['bindir'] . '/../etc/.db_connections/topmed';
-$LDB['centers'] = 'centers';            // SQL table names
-$LDB['runs'] = 'runs';
-$LDB['bamfiles'] = 'bamfiles';
-$LDB['stepstats'] = 'stepstats';
+$LDB['SLURMNODES'] = '/net/topmed/working/topmed-output/slurm.nodes';
+$LDB['centers'] = 'centers';
 $LDB['permissions'] = 'permissions';
 
-//  These guys can request activities
-$REQMGRS = array('tblackw');
+//	Figure out what kind of data we are to display
+if (strstr($_SERVER['PHP_SELF'],'rnaseq')) {
+	$LDB['datatype'] = 'rnaseq';
+	$LDB['realm'] = $LDB['bindir'] . '/../etc/.db_connections/rnaseq';
+	$LDB['datatype'] = 'rnaseq';
+	$LDB['projects'] = 'tx_projects';   	// Nicknames for tables and pkeys
+	$LDB['projects_pkey'] = 'rnaprojectid';
+	$LDB['samples'] = 'tx_samples';
+	$LDB['samples_pkey'] = 'txseqid';
+	$LDB['files'] = 'tx_files';
+	$LDB['files_pkey'] = 'fileid';
+}
+if (strstr($_SERVER['PHP_SELF'],'genome') || strstr($_SERVER['PHP_SELF'],'index')) {
+	$LDB['datatype'] = 'genome';
+	$LDB['realm'] = $LDB['bindir'] . '/../etc/.db_connections/topmed';
+	$LDB['runs'] = 'runs';
+	$LDB['runs_pkey'] = 'runid';
+	$LDB['samples'] = 'bamfiles';
+	$LDB['samples_pkey'] = 'bamid';
+	$LDB['stepstats'] = 'stepstats';
+}
 
 //  Here are common META tags
 $HDR['meta'] = <<<END
@@ -71,7 +88,7 @@ $HDR['footer'] = <<<END
 Copyright (c) 2009- University of Michigan<br/>
 Report problems to <a class='footer' href='mailto:tpg@umich.edu'>tpg@umich.edu</a><br/>
 $f
-<br/>Last Revision: June 2017 <br/>
+<br/>Last Revision: June 2019 <br/>
 
 END;
 

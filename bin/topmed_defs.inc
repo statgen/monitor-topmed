@@ -41,23 +41,21 @@ function RandomRealHost {
   bamid2host[6]=topmed7
   bamid2host[7]=topmed9
   bamid2host[8]=topmed10
-  #   See if anything is down
-  f=/run/shm/RandomRealHost.down
+  #   Maybe we want to override the nodes we use from a file
+  f=/net/topmed/working/topmed-output/slurm.nodes
   if [ -f $f ]; then
+    n=0
     while read l; do
       ll=($l)
-      bamid2host[${ll[0]}]=DOWN
-      #echo "Marked index ${ll[0]} [${ll[1]}] as DOWN"
+      bamid2host[${n}]=$ll
+      n=$((n+1))
     done < $f
   fi
-  n=`perl -e "{ print $bamid%9 }"`
-  #   See this entry is down, use first entry. If topmed down, cannot submit jobs
-  if [ "${bamid2host[$n]}" = "" -o "${bamid2host[$n]}" = "DOWN" ]; then
-    n=0
-  fi
+  #	Yet another way to override - with an environment variable
   if [ "$SLURMNODE" != "" ]; then	# Allow user to force node
     realhost=$SLURMNODE
   else
+    n=$(($bamid%9))
     realhost=${bamid2host[$n]}
   fi
 }

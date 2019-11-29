@@ -79,13 +79,31 @@ our %opts = (
     realm => "/usr/cluster/$ENV{PROJECT}/etc/.db_connections/$ENV{PROJECT}",
     centers_table => 'centers',
     runs_table => 'runs',
-    bamfiles_table => 'bamfiles',
+    runs_pkey => 'runid',
+    samples_table => 'bamfiles',
+    samples_pkey => 'bamid',
+    datatype => 'genome',
     verbose => 0,
 );
 
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose center=s runs=s project=s
+    help realm=s verbose center=s runs=s project=s datatype=s
     )) || die "Failed to parse options\n";
+if ($opts{datatype} eq 'rnaseq') {
+	$opts{samples_table} = 'tx_samples';
+	$opts{samples_pkey} = 'txseqid';
+	$opts{runs_table} = 'tx_projects';
+	$opts{runs_pkey} = 'rnaprojectid';
+	$opts{files_table} = 'tx_files';
+	$opts{files_pkey} = 'fileid';
+	%attributes2letter = (
+    	'state_arrive'    => 'a',
+    	'state_verify'    => '5',
+    	'state_backup'    => 'B',
+    	'state_aws38copy' => 'A',
+    	'state_fix'       => 'F',
+	);
+}
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
@@ -115,8 +133,8 @@ if ($fcn eq 'runstatus') {
         foreach my $runid (keys %{$runsref}) {
             my $numberbams = $runsref->{$runid};
             #   Get list of all bams for this run
-            my $sql = "SELECT bamid,$attributes_str FROM $opts{bamfiles_table} " .
-                "WHERE runid='$runid'";
+            my $sql = "SELECT $opts{samples_pkey},$attributes_str FROM $opts{samples_table} " .
+                "WHERE $opts{runs_pkey}='$runid'";
             my $sth = DoSQL($sql);
             my $rowsofdata = $sth->rows();
             if (! $rowsofdata) { next; }
@@ -165,9 +183,9 @@ if ($fcn eq 'runstatus') {
                 }
                 $s .= "$attributes2letter{$a}=unknown,";
             }
-            if ($opts{verbose}) { warn "Status runid $runid=$s\n"; }
+            if ($opts{verbose}) { warn "Status $opts{runs_pkey} $opts{runs_pkey}=$s\n"; }
             #   Update status for this run 
-            $sql = "UPDATE $opts{runs_table} SET status='$s' WHERE runid=$runid";
+            $sql = "UPDATE $opts{runs_table} SET status='$s' WHERE $opts{runs_pkey}=$runid";
             $sth = DoSQL($sql);
         }
     }
@@ -190,25 +208,25 @@ sub GetRunsCount {
     my ($cid) = @_;
     my %runs2count = ();
 
-    my $sql = "SELECT runid,dirname,count FROM $main::opts{runs_table} WHERE centerid=$cid";
+    my $sql = "SELECT $opts{runs_pkey},dirname,count FROM $opts{runs_table} WHERE centerid=$cid";
     my $sth = My_DB::DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) {
-        if ($main::opts{verbose}) { warn "$main::Script Found no runs for center '$cid'\n"; }
+        if ($opts{verbose}) { warn "$Script Found no runs for center '$cid'\n"; }
         return \%runs2count;
     }
     my %theseruns = ();
-    if ($main::opts{runs}) {              # We only want some runs
-        $main::opts{runs} =~ s/,/ /g;
-        foreach my $r (split(' ', $main::opts{runs})) {
+    if ($opts{runs}) {              # We only want some runs
+        $opts{runs} =~ s/,/ /g;
+        foreach my $r (split(' ', $opts{runs})) {
             $theseruns{$r} = 1;
-            print "$main::Script - Using only run '$r'\n";
+            print "$Script - Using only run '$r'\n";
         }
     }
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
-        if ($main::opts{runs} && (! exists($theseruns{$href->{dirname}}))) { next; }
-        $runs2count{$href->{runid}} = $href->{count};
+        if ($opts{runs} && (! exists($theseruns{$href->{dirname}}))) { next; }
+        $runs2count{$href->{$opts{runs_pkey}}} = $href->{count};
     }
     return \%runs2count;
 }

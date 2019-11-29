@@ -38,9 +38,14 @@ for h in ddn topmed topmed2 topmed3 topmed4 topmed5 topmed6 topmed7 topmed9 topm
       #echo "$r is not a local directory"
       continue;
     fi
-    #   Check if this is a known run for this senter
+    #   Check if this is a known run for this center
     if [ "${#runs[$r]}" = "1" ]; then
       #echo "$r is known, ignoring"
+      continue;
+    fi
+    #   Do not process rnaseq
+    if [ "$center" = "rnaseq" ]; then
+      #echo "Center $center is not automagically processed, ignoring"
       continue;
     fi
     #   This is not something I know about
