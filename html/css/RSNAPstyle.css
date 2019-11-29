@@ -1,0 +1,69 @@
+/*
+    Class names used here match names found in the HTML
+    Color reference: http://www.webreference.com/html/reference/color/
+    CSS reference:   http://meiert.com/en/indices/css-properties/
+                     http://cssdog.com/css_syntax.html
+*/
+DIV.footer {
+font-size: 10pt;
+text-align: center;
+}
+
+TABLE.hdr {
+background-color: white;
+border-width: 2px;
+border-style: solid;
+color: #000080;
+}
+TD.hdr2 {
+border-style: none;
+text-align: center;
+font-weight: bold;
+font-size: 16pt;
+}
+TH.heading {
+text-align: center;
+font-weight: bold;
+font-size: 8pt;
+}
+H5.group {
+font-weight: bold;
+font-size: 11pt;
+color: #15A326;
+}
+TR.index {
+font-weight: bold;
+font-size: 8pt;
+}
+.perfect {
+color: #808080  ;
+}
+.ok {
+color: #11911a;
+}
+.abitlate {
+color: #472BE3;
+}
+.late {
+color: #911188;
+}
+.tooold {
+color: #b82e45;
+}
+.yikes {
+color: #ff0000;
+}
+
+P.intro {
+color: #808080;
+font-size: 9pt;
+}
+
+SPAN.surprise {
+color: #ff0000;
+font-weight: bold;
+font-size: 9pt;
+}
+
+/* Used to hide form fields */
+.hide { display:none; }

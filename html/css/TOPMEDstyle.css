@@ -1,0 +1,141 @@
+/*
+    Class names used here match names found in the HTML
+    Color reference: http://www.webreference.com/html/reference/color/
+    CSS reference:   http://meiert.com/en/indices/css-properties/
+                     http://cssdog.com/css_syntax.html
+*/
+DIV.footer {
+font-size: 10pt;
+text-align: center;
+}
+
+TABLE.hdr {
+background-color: white;
+border-width: 2px;
+border-style: solid;
+color: #000080;
+}
+TD.hdr2 {
+border-style: none;
+text-align: center;
+font-weight: bold;
+font-size: 16pt;
+}
+TH.heading {
+text-align: center;
+font-weight: bold;
+font-size: 8pt;
+}
+H5.group {
+font-weight: bold;
+font-size: 11pt;
+color: #15A326;
+}
+TR.index {
+font-weight: bold;
+font-size: 8pt;
+}
+.perfect {
+color: #808080  ;
+}
+.ok {
+color: #11911a;
+}
+.abitlate {
+color: #472BE3;
+}
+.late {
+color: #911188;
+}
+.tooold {
+color: #b82e45;
+}
+.yikes {
+color: #ff0000;
+}
+
+P.intro {
+color: #808080;
+font-size: 9pt;
+}
+DIV.indent {
+margin-left: 2cm;
+}
+SPAN.surprise {
+color: #ff0000;
+font-weight: bold;
+font-size: 9pt;
+}
+
+/* Used to provide quick view of status on the summary page */
+.separator {
+border-right: 2px solid white;
+}
+SPAN.notset {
+background-color: white;
+}
+SPAN.cancelled {
+background-color: pink;
+}
+SPAN.requested {
+background-color: gray;
+color: white;
+}
+SPAN.started {
+background-color: darkblue;
+color: white;
+}
+SPAN.submitted {
+background-color: dodgerblue;
+color: white;
+}
+SPAN.ignorethis {
+background-color: black;
+color: white;
+}
+SPAN.failedchecksum {
+background-color: #ff3399;
+color: white;
+}
+SPAN.failed {
+background-color: red;
+color: white;
+}
+SPAN.completed {
+background-color: lightgreen;
+}
+SPAN.delivered {
+background-color: green;
+}
+
+SPAN.note {
+color: darkgreen;
+}
+SPAN.requestcancel {
+font-size: 8pt;
+}
+SPAN.done {
+background-color: lightgreen;
+}
+SPAN.processing {
+background-color: darkblue;
+color: white;
+}
+SPAN.unknown {
+background-color: gray;
+color: white;
+}
+
+/* Used to hide form fields */
+.hide { display:none; }
+
+/* Use <hr> as a separator */
+HR.separator {
+display: block;
+margin-top: 0.5em;
+margin-bottom: 0.5em;
+margin-left: auto;
+margin-right: auto;
+border-style: inset;
+border-width: 3px;
+}

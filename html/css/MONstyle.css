@@ -1,0 +1,143 @@
+/*
+    Class names used here match names found in the HTML
+    Color reference: http://www.webreference.com/html/reference/color/
+    CSS reference:   http://meiert.com/en/indices/css-properties/
+                     http://cssdog.com/css_syntax.html
+*/
+BODY.page {
+background-color: white;
+color: black;
+font-weight: normal;
+font-family: Tahoma, Verdana, sans-serif;
+}
+
+TABLE.hdr {
+background-color: white;
+border-width: 2px;
+border-style: solid;
+color: #000080;
+}
+TD.hdr {
+border-style: none;
+text-align: center;
+font-weight: bold;
+font-size: 20pt;
+}
+TD.hdr2 {
+border-style: none;
+text-align: center;
+font-weight: bold;
+font-size: 16pt;
+}
+A.hdr {
+color: #000080;
+font-size: 20pt;
+text-decoration: none;
+border-style:none;
+}
+A.nolink {
+text-decoration: none;
+}
+SPAN.hdr {
+font-size: 30pt;
+}
+
+INPUT.lzgo {
+font-weight: bold;
+font-size: 120%;
+}
+TD.lzprompt {
+font-weight: bold;
+}
+TD.lzinput {
+font-weight: bold;
+}
+TD.lzcomment {
+font-size: 75%;
+font-weight: bold;
+color: green;
+}
+TD.optsprompt {
+font-weight: bold;
+}
+SPAN.lzcomment {
+font-size: 75%;
+font-weight: bold;
+color: green;
+}
+SPAN.lzminihdr {
+font-size: 75%;
+font-weight: bold;
+color: red;
+}
+DIV.left {
+ text-align: left
+}
+DIV.right {
+ text-align: right
+}
+DIV.adminshow {
+background-color: lightgray;
+border-width: 2px;
+border-style: solid;
+color: #000080;
+width: 80%;
+padding-left: 1cm;
+margin-left: 2cm;
+}
+DIV.indent {
+margin-left: 2cm;
+}
+
+/* Used to provide quick view of status on the summary page (showcore.php) */
+SPAN.notset {
+background-color: white;
+}
+SPAN.cancelled {
+background-color: pink;
+}
+SPAN.waiting {
+background-color: yellow;
+}
+SPAN.requested {
+background-color: gray;
+color: white;
+}
+SPAN.queued {
+background-color: gray;
+color: white;
+}
+SPAN.started {
+background-color: darkblue;
+color: white;
+}
+SPAN.failed {
+background-color: red;
+}
+SPAN.completed {
+background-color: lightgreen;
+}
+
+/* Should match those above for event status (showcore.php) */
+SPAN.enotset {
+color: black;
+}
+SPAN.ecancelled {
+color: pink;
+}
+SPAN.erequested {
+color: gray;
+}
+SPAN.equeued {
+color: gray;
+}
+SPAN.estarted {
+color: blue;
+}
+SPAN.efailed {
+color: red;
+}
+SPAN.ecompleted {
+color: green;
+}
+
