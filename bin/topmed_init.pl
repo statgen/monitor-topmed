@@ -6,7 +6,8 @@
 # Description:
 #   Use this program to check for files that are arriving
 #   and initialize the NHLBI TOPMED database
-#   This program can work with topmed and inpsyght
+#   This program can work with topmed and inpsyght genome data
+#	as well as RNS sequence and methylation data
 #
 # ChangeLog:
 #   $Log: topmed_init.pl,v $
@@ -44,27 +45,41 @@ for (my $i=0; $i<=$#ARGV; $i++) {
 if (! -d "/usr/cluster/$ENV{PROJECT}") { die "$Script - Environment variable PROJECT '$ENV{PROJECT}' incorrect\n"; }
 
 my $NOTSET = 0;
+
 our %opts = (
+	datatype => 'genome',		# What kind of data we are handling
     realm => "/usr/cluster/$ENV{PROJECT}/etc/.db_connections/$ENV{PROJECT}",
     centers_table => 'centers',
     runs_table => 'runs',
-    bamfiles_table => 'bamfiles',
+    runs_pkey => 'runid',
+    samples_table => 'bamfiles',
+    samples_pkey => 'bamid',
     topdir => "/net/$ENV{PROJECT}/incoming/$ENV{PROJECT}",
     runcount => 0,
     count => 0,
     countruns => '',
-    arrivedsecs => 86400*21,# If no new files in a bit, stop looking at run
-    ignorearrived => 0,     # If set, ignored arrived database field
+    arrivedsecs => 86400*21,	# If no new files in a bit, stop looking at run
+    ignorearrived => 0,     	# If set, ignored arrived database field
     verbose => 0,
 );
 Getopt::Long::GetOptions( \%opts,qw(
-    help realm=s verbose center=s run=s ignorearrived project=s
+    help realm=s verbose center=s run=s ignorearrived project=s datatype=s
     )) || die "Failed to parse options\n";
+
+#	Set %opts based on datatype
+if ($opts{datatype} eq 'rnaseq') {
+	$opts{runs_table} = 'tx_projects',
+	$opts{runs_index} = 'rnaprojectid',
+	$opts{samples_table} = 'tx_samples',
+	$opts{files_table} = 'tx_files',
+	$opts{topdir} = "/net/$ENV{PROJECT}/incoming/$ENV{PROJECT}/rnaseq";
+}
+if ($opts{verbose}) { warn "$Script - processing datatype=$opts{datatype}\n"; }
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$Script [options] updatedb\n" .
-        "Monitor NHLBI data arriving in a directory (default=$opts{topdir}').\n" .
+    warn "$Script [options] [-datatype genome|rnaseq] updatedb\n" .
+        "Monitor TOPMed data arriving in a directory (default=$opts{topdir}').\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
     exit 1;
@@ -78,18 +93,18 @@ chdir($opts{topdir}) ||
     die "$Script Unable to CD to '$opts{topdir}': $!\n";
 
 #--------------------------------------------------------------
-#   For each center watch for a new run to arrive
+#   For each center watch for a new data to arrive
 #--------------------------------------------------------------
 my $centersref = GetCenters();
 foreach my $centerid (keys %{$centersref}) {
     my $c = $centersref->{$centerid};
     my $d = $opts{topdir} . '/' . $c;
     if (! chdir($d)) {
-        warn "$Script Unable to CD to '$d': $!\n";
+        #warn "$Script Unable to CD to '$d': $!\n";
         next;
     }
-    #   Get all the known batch runs for this center that are not fully arrived
-    my $sql = "SELECT runid,dirname,arrived FROM $opts{runs_table} WHERE centerid=$centerid";
+    #   Get all the known batch data for this center that are not fully arrived
+    my $sql = "SELECT $opts{runs_index},dirname,arrived FROM $opts{runs_table} WHERE centerid=$centerid";
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     my %knownruns = ();
@@ -97,7 +112,7 @@ foreach my $centerid (keys %{$centersref}) {
     for (my $i=1; $i<=$rowsofdata; $i++) {
         foreach my $href ($sth->fetchrow_hashref) {
             $dir = $href->{dirname};            
-            $knownruns{$dir}{runid} = $href->{runid};
+            $knownruns{$dir}{$opts{runs_index}} = $href->{$opts{runs_index}};
             $knownruns{$dir}{arrived} = $href->{arrived};
             if ($opts{ignorearrived}) { $knownruns{$dir}{arrived} = 'N'; }
         }
@@ -107,24 +122,277 @@ foreach my $centerid (keys %{$centersref}) {
     my $dirsref = GetDirs('.');
     my $runid;
     foreach my $d (@{$dirsref}) {
-        $runid = $knownruns{$d}{runid} || CreateRun($centerid, $d);
+    	if ($opts{verbose}) { warn "$Script - checking '$d'\n"; }
+        $runid = $knownruns{$d}{$opts{runs_index}} || CreateRun($centerid, $d);
         if (! defined($runid)) {
-            if ($opts{verbose}) { warn "$Script RUNID not defined for dir=$d\n"; }
+            if ($opts{verbose}) { warn "$Script ID not defined for dir=$d\n"; }
             next;
         }
         if ($opts{run} && $opts{run} ne $d) { next; }
         #   Check if this run has arrived, no need to look at it further
         if (defined($knownruns{$d}{arrived}) && $knownruns{$d}{arrived} eq 'Y') { next; }
-        if ($opts{verbose}) { print "Try to add BAMs in '$d' [$runid]\n"; }
-        AddBams($runid, $d);
+        #	Add database entries for each sample in this set
+        if ($opts{datatype} eq 'genome') { AddBams($runid, $d); next;}
+        if ($opts{datatype} eq 'rnaseq') { AddProjects($runid, $d); next;}
+        warn "$Script Unable to process data '$opts{datatype}' for dir=$d\n";
     }
 }
 
 $nowdate = strftime('%Y/%m/%d %H:%M', localtime);
-
 if ($opts{runcount}) { print "$nowdate  Added $opts{runcount} runs\n"; }
-if ($opts{count})    { print "$nowdate  Added $opts{count} bams from: $opts{countruns}\n"; }
+if ($opts{count})    { print "$nowdate  Added $opts{count} samlpes from: $opts{countruns}\n"; }
 exit;
+
+#==================================================================
+# Subroutine:
+#   AddProjects - Add database entries for each set of samples in this directory
+#
+# Arguments:
+#   rnaprojectid - project id
+#   d - directory
+#
+# Returns:
+#   Boolean if any samples were added or not
+#==================================================================
+sub AddProjects {
+    my ($rnaprojectid, $d) = @_;
+    if (! -d $d) {
+        print "$Script - Unable to read directory '$d': $!\n";
+        return 0;
+    }
+   	if ($opts{verbose}) { warn "$Script - AddProjects($rnaprojectid, $d)\n"; }
+
+	my $tabref = ParseTab("$d/lookup.*.tab");
+	if (! $tabref) {
+		warn "$Script - Unable to parse tab file '$d/lookup.*.tab'\n";
+		return 0;
+	}
+
+	#------------------------------------------------------------------
+    #	We assume if there is a Manifest, all the files are in place.
+    #	Read the MD5 and collect into useful data structures
+    #	Assumes each file in this data is uniquely named
+	#------------------------------------------------------------------
+    my $manifestfile = "$d/Manifest.txt";
+    my %expt_sampleids = ();
+    my %fullfiletodata = ();
+	if (! open(IN, $manifestfile)) {
+		warn "$Script - Unable to read file '$manifestfile': $!\n";
+		return 0;
+	}	
+	while (my $l = <IN>) {          # Read md5 checksum file
+		chomp($l);
+		my ($fullfn, $check) = NormalizeMD5Line($l, $manifestfile, 1);
+		if (! $check) {
+			warn "$Script - Unable to parse checksum from '$manifestfile'";
+			return 0;
+		}
+		#	Until we know otherwise, assume first part of $fn is the sampleid
+		my $fileprefix = '';
+		if ($fullfn =~ /^(\w+)\./) { $fileprefix = $1; }
+		if (! $fileprefix) {
+			warn "$Script - Unable to parse out filename from '$manifestfile'  Line=$l\n";
+			return 0;
+		}
+		#	Extract real sampleid from file based on TAB file
+		my $sampleid = $tabref->{$fileprefix}->{expt_sampleid};
+		if (! $sampleid) {
+			warn "$Script - Unable to find expt_sampleid for '$fileprefix' in '$manifestfile'\nLINE=$l\n";
+			return 0;
+		}
+
+		#	Save what we will need
+		$fullfiletodata{$fullfn} = $check . ' ' . $fileprefix . ' ' . $sampleid;
+		$expt_sampleids{$sampleid} = $tabref->{$fileprefix};	# Cheap way to get unique list
+	}
+	close(IN);
+
+	#------------------------------------------------------------------
+	#	Create all sample entries from manifest, capture txseqid
+	#------------------------------------------------------------------
+	my $totalsamples = 0;
+	my $txseqid;
+	foreach my $samp (sort keys %expt_sampleids) {
+		$totalsamples++;
+		#   Create database record for this sample. It might already exist
+		my $sql = "INSERT INTO $opts{samples_table} " .
+			"(rnaprojectid,expt_sampleid,rnasubject,fileprefix,notes,dateinit) " .
+			"VALUES($rnaprojectid,'$samp','$expt_sampleids{$samp}->{rnasubject}'," .
+			"'$expt_sampleids{$samp}->{fileprefix}'," .
+			"'$expt_sampleids{$samp}->{notes}',$nowdate)";
+		my $sth = DoSQL($sql, 0);			# Do not fail if it exists
+		if ($sth) { $txseqid  = SQL_Last_Insert(); }	# Index to this sample
+		if (! $txseqid) {	#	Sample exists I hope. Need to know index for it
+			$sql = "SELECT txseqid FROM $opts{samples_table} " .
+				"WHERE expt_sampleid='$samp'";
+			$sth = DoSQL($sql);
+			my $href = $sth->fetchrow_hashref;
+			$txseqid = $href->{txseqid};
+		}
+		if (! $txseqid) {
+			warn "$Script - No database record created for '$samp'\n";
+			return 0;
+		}
+		$expt_sampleids{$samp} = $txseqid;
+	}
+	#	Update count of samples for this project
+	my $sql = "UPDATE $opts{runs_table} SET arrived='Y',count=$totalsamples WHERE rnaprojectid=$rnaprojectid";
+	if ($opts{verbose}) { print "SQL=$sql\n"; }
+	my $sth = DoSQL($sql);
+
+	#------------------------------------------------------------------
+	#	Create all file entries
+	#------------------------------------------------------------------
+	my $totalfilecount = 0;
+	my $samplefilecount = 0;
+	my $lasttxseqid = '';
+	foreach my $fullfn (sort keys %fullfiletodata) {
+		my ($check, $fileprefix, $sampleid) = split(' ', $fullfiletodata{$fullfn});
+		my $txseqid = $expt_sampleids{$sampleid};
+		#	Is this a new sample? If so, update file count for previous sample
+		if ($txseqid ne $lasttxseqid) {
+			if ($lasttxseqid) {				# Correct count for last sample
+				my $sql = "UPDATE $opts{samples_table} SET count=$samplefilecount WHERE txseqid=$lasttxseqid";
+				if ($opts{verbose}) { print "SQL=$sql\n"; }
+				my $sth = DoSQL($sql);
+				$samplefilecount = 0;
+			}
+		}
+		$lasttxseqid = $txseqid;
+
+		#	Now create database record in $opts{files_table} for this file
+		if (AddRNAFile($txseqid, $fullfn, 'N', $check)) { $samplefilecount++; $totalfilecount++; };
+		if ($fullfn !~ /\.tar/) { next; }
+
+		# 	This is a tar file, create records for each file in tar
+		my $path = "$d/releaseFiles/$fullfn";
+		if (! -f $path) {
+			warn "$Script - TAR file '$path' was not found\n";
+			return 0;
+		}
+		warn "  Processing tar $path for sample index $txseqid\n";
+		my $z = '';
+		if ($fullfn =~ /.gz$/) { $z = '-z'; }
+		foreach my $l (split("\n", `tar $z -t -f $path`)) {	# Get filenames in tar
+			#if ($l =~ /.+\/($fileprefix\/.+)/) { $l = $1; } 	# Strip useless prefix
+			if ($l =~ /\/$/) { next; }		# Not interested in directory names
+			if (AddRNAFile($txseqid, $l, 'Y', ' ')) { $samplefilecount++; $totalfilecount++; };
+		}
+	}
+	#	Update count of files for last sample
+	$sql = "UPDATE $opts{samples_table} SET count=$samplefilecount WHERE txseqid=$txseqid";
+	if ($opts{verbose}) { print "SQL=$sql\n"; }
+	$sth = DoSQL($sql);
+
+	#	Give summary of what happened
+	print "Created $totalsamples samples with $totalfilecount files\n";
+    return $totalsamples;
+}
+
+#==================================================================
+# Subroutine:
+#   ParseTab - Parse tab file which maps NWGC ids to TOR ids
+#	Column names must map to our database columns
+#	This format will be very unstable and require lots of crude
+#	hardcoded things. Ugh
+#
+# Arguments:
+#   tabfilepath - path to tab file to parse
+#
+# Returns:
+#   Reference to a hash of fileprefix to a hash of other column data
+#==================================================================
+sub ParseTab {
+    my ($tabfilepath) = @_;
+
+	#------------------------------------------------------------------
+    #	Figure out which columns map to which database columns
+	#------------------------------------------------------------------
+	my @file = split("\n", `/bin/ls $tabfilepath 2>&1`);
+	if ($#file != 0) {
+		warn "$Script - Unable to find a lone TAB file. FILES=$tabfilepath\n";
+		return 0;
+	}
+	if (! open(IN, $file[0])) {
+		warn "$Script - Unable to read TAB file '$file[0]': $!\n";
+		return 0;
+	}
+	# First line is header which will vary by the whim of each project
+	my %tabcol2dbcol = (
+		notes => 'notes',
+		'nwgc sample id' => 'fileprefix',
+		'investigator id' => 'rnasubject',
+		torid => 'expt_sampleid',
+	);
+	my %arrayindex2dbcol = ();
+	my $l = lc(<IN>);
+	chomp($l);
+	my @hdrcols = split("\t", $l);
+	for (my $i=0; $i<=$#hdrcols; $i++) {
+		if (! exists($tabcol2dbcol{$hdrcols[$i]})) {
+			warn "$Script - Ignoring column '$hdrcols[$i]' in TAB file '$file[0]' HDR='$l'\n";
+			next;
+		}
+		$arrayindex2dbcol{$i} = $tabcol2dbcol{$hdrcols[$i]};	# Index to db column name
+	}
+	if (scalar(keys %tabcol2dbcol) != scalar(keys %arrayindex2dbcol)) {
+		warn "$Script - Unable to which TAB file columns to map to which database " .
+				"columns. TAB file='$file[0]'. HDR=$l\n";
+	}
+
+	# 	Now we know which tab column maps to which database column
+	#	Save as hash of hashes.  fileprefix to hash of other fields
+	my %parsedtabfile = ();
+	while ($l = <IN>) {
+		chomp($l);
+		my @c = split("\t", $l);
+		my %tabhash = ();
+		my $fp = '';
+		foreach my $cindex (keys %arrayindex2dbcol) {
+			my $dbcol = $arrayindex2dbcol{$cindex};	# DB column name
+			if ($dbcol eq 'fileprefix') { $fp = $c[$cindex]; }
+			$tabhash{$dbcol} = $c[$cindex];
+		}
+		$parsedtabfile{$fp} = \%tabhash;		# Save hash of this line
+	}
+	close(IN);
+	return \%parsedtabfile;				# Return reference of hash of hashes
+}
+
+#==================================================================
+# Subroutine:
+#   AddRNAFile - Add new or update a filename in $opts{files_table}
+#
+# Arguments:
+#   txseqid - index to a sampleid
+#	filename - name of file for sample
+#	intar - flag if this file is in a tar
+#	checksum - checksum for this file
+#
+# Returns:
+#   Boolean INSERT was successful
+#==================================================================
+sub AddRNAFile {
+    my ($txseqid, $filename, $intar, $checksum) = @_;
+
+	#	This filename may not ever be in the database yet
+    my $sql = "SELECT fileid,txseqid FROM $opts{files_table} " .
+    	"WHERE filename='$filename'";
+    my $sth = DoSQL($sql,0);
+    my $href = $sth->fetchrow_hashref;
+    if ($href) {					# filename already exists
+    	warn "  File '$filename' already in database (fileid=$href->{fileid} " .
+    		"txsequid=$href->{txseqid})\n";
+    	return 0;
+    }
+
+   	$sql = "INSERT INTO $opts{files_table} " .
+    	"(txseqid,filename,intar,checksum,dateinit) " .
+       	"VALUES($txseqid,'$filename','$intar', '$checksum', $nowdate)";
+   	if ($opts{verbose}) { print "SQL=$sql\n"; }
+   	$sth = DoSQL($sql);
+    return 1;
+}
 
 #==================================================================
 # Subroutine:
@@ -194,9 +462,10 @@ sub AddBams {
         print "$Script - Unable to read directory '$d': $!\n";
         return 0;
     }
+   	if ($opts{verbose}) { warn "$Script - AddBams($runid, $d)\n"; }
 
     #   Get all the known bams for this directory/run   Get NWD name and original name
-    my $sql = "SELECT bamname,bamname_orig FROM $opts{bamfiles_table} WHERE runid=$runid";
+    my $sql = "SELECT bamname,bamname_orig FROM $opts{samples_table} WHERE $opts{samples_pkey}=$runid";
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     my %knownbams = ();
@@ -234,7 +503,6 @@ sub AddBams {
     #   and rename the md5 file so we do not process it again
     my $newbams = 0;
     my ($fn, $checksum);
-    my $md5lines = '';
     foreach my $origf (@md5files) {
         my $f = "$d/$origf";
         if (! open(IN, $f)) {
@@ -250,7 +518,7 @@ sub AddBams {
             if (exists($knownorigbam{$fn})) { next; }    # Skip known original bams
 
             #   New BAM, create database record for it. Actual BAM may not exist yet
-            $sql = "INSERT INTO $opts{bamfiles_table} " .
+            $sql = "INSERT INTO $opts{samples_table} " .
                 "(runid,bamname,checksum,dateinit) " .
                 "VALUES($runid,'$fn','$checksum', $nowdate)";
             if ($opts{verbose}) { print "SQL=$sql\n"; }
@@ -269,7 +537,7 @@ sub AddBams {
     }
 
     #   Get number of database records
-    $sql = "SELECT bamid FROM $opts{bamfiles_table} WHERE runid=$runid";
+    $sql = "SELECT $opts{samples_pkey} FROM $opts{samples_table} WHERE $opts{runs_pkey}=$runid";
     $sth = DoSQL($sql);
     my $numbamrecords = $sth->rows();
     $sql = "UPDATE $opts{runs_table}  SET count=$numbamrecords WHERE runid=$runid";
@@ -289,7 +557,7 @@ sub AddBams {
 
     #   If SOME ALL the sample has been processed as arrived, maybe we do not
     #   need to look at this run any more.
-    $sql = "SELECT bamid from $opts{bamfiles_table} WHERE state_arrive!=$NOTSET";
+    $sql = "SELECT $opts{samples_pkey} FROM $opts{samples_table} WHERE state_arrive!=$NOTSET";
     $sth = DoSQL($sql);
     my $numberarrived = $sth->rows();
     if (! $numberarrived) { return 1; }         # No sample processed, keep looking
@@ -338,12 +606,14 @@ sub OldestBAM {
 # Arguments:
 #   l - line from an md5 file (well, what they pretend is an md5 file)
 #   f - name of file (for error msgs only)
+#	nocheck - boolean to avoid checking filetype
 #
 # Returns:
 #   array of filename and checksum or NULL
 #==================================================================
 sub NormalizeMD5Line {
-    my ($l, $f) = @_;
+    my ($l, $f, $nocheck) = @_;
+    if (! defined($nocheck)) { $nocheck = 0; }
     my @retvals = ();
     if ($l =~ /^#/) { return @retvals; }
 
@@ -355,7 +625,7 @@ sub NormalizeMD5Line {
         return @retvals;
     }
     if ($fn =~ /\//) { $fn = basename($fn); }   # Path should not be qualified, but ...
-    if ($fn !~ /bam$/ && $fn !~ /cram$/) {      # File better be a bam or cram
+    if ((! $nocheck) && $fn !~ /bam$/ && $fn !~ /cram$/) {	# File better be a bam or cram
         #   Only generate error message for true errors, not dumb ones :-(
         if ($fn !~ /bai$/) { print "$Script - Invalid BAM name '$fn' in '$f'. Line: $l"; }
         return @retvals;
@@ -412,6 +682,11 @@ creates records for new run directories and/or new BAMs
 Specifies a specific center name on which to run the action, e.g. B<uw>.
 This is useful for testing.
 The default is to run against all centers.
+
+=item B<-datatype TYPE>
+
+Specifies the type of data to check.
+The default is B<genome>.
 
 =item B<-help>
 
