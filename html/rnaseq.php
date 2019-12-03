@@ -74,9 +74,9 @@ if ($GLOBS['iammgr']) {
 print doheader($HDR['title'], 1);
 
 //  Real parameters for each form, default is ''
-$parmcols = array('fcn', 'maxdir', 's', 'col', 'desc', 'center', 'datayear',
-    'run', 'runid', 'bamid', 'centerid', 'fetchpath', 'hostname',
-    'sample', 'table', 'pkey', 'op', 'id', 'samplestate');
+//	Removed these Npv 30: 'desc', 'sample', 'pkey', 'runid', 'bamid', 'centerid', 'fetchpath', 'hostname',
+$parmcols = array('fcn', 'maxdir', 's', 'col', 'center', 'datayear',   
+    'table', 'op', 'id', 'samplestate', 'run');
 //	Capture $parmcols in hash $PARMS so we can access them from anywhere easily
 $PARMS = isolate_parms($parmcols);
 //extract (isolate_parms($parmcols));
@@ -357,9 +357,11 @@ function ViewSampleDetail($tablenick, $id, $sql) {
         $html .= "<td align='left' colspan='4'>$d</td>";
         $html .= "</tr>\n";
     }
-    $html .= "</table>\n" .
-        "<p align='right'><font size='-1'><a href='javascript:window.close()'>Close</a>&nbsp;&nbsp;&nbsp;</p>\n" .
-        "</div>\n";
+    $html .= "</table></div></br>\n";
+    $html .= "<font size='-1'><table border='0' align='center' width='80%'><tr>" .
+		"<td align='left'>&nbsp;&nbsp;&nbsp;<a href='javascript:window.location.reload()'>Reload</a></td>" .
+		"<td align='right'><a href='javascript:window.close()'>Close</a>&nbsp;&nbsp;&nbsp;</td>" .
+		"</tr></table></font>\n";
     return $html;
 }
 
