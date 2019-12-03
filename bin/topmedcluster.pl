@@ -46,8 +46,12 @@ if (! -d "/usr/cluster/$ENV{PROJECT}") { die "$Script - Environment variable PRO
 our %opts = (
     realm => "/usr/cluster/$ENV{PROJECT}/etc/.db_connections/$ENV{PROJECT}",
     netdir => "/net/$ENV{PROJECT}",
-    bamfiles_table => 'bamfiles',
+    samples_table => 'bamfiles',
+    samples_pkey => 'bamid',
     runs_table => 'runs',
+    runs_pkey => 'runid',
+    datatype => 'genome',
+    allusers => '1',
     squeuecmdprev => "/usr/cluster/bin/squeue -a -o '%.9i %.15P %.18q %.18j %.8u %.2t %.8M %.6D %R %.9n' -p ",
     squeuecmd => "/usr/cluster/bin/squeue -a -o '%.9i %.15P %.18q %.18j %.8u %.2t %.8M %.6D %R %.9n' -p ",
     maxlongjobs => 6,
@@ -59,7 +63,7 @@ our %opts = (
 if ($ENV{PROJECT} eq 'topmed') { $opts{squeuecmd} .= 'topmed-working'; }
 else {$opts{squeuecmd} .= $ENV{PROJECT}; }
 Getopt::Long::GetOptions( \%opts,qw(
-    help verbose maxlongjobs=i force project=s
+    help verbose allusers maxlongjobs=i force project=s datatype=s
     )) || die "$Script - Failed to parse options\n";
 
 #   Simple help if requested
@@ -72,6 +76,14 @@ if ($#ARGV < 0 || $opts{help}) {
 }
 my $fcn = shift @ARGV;
 my @squeuelines = ();                   # Global data for functions
+if ($opts{datatype} eq 'rnaseq') {
+	$opts{samples_table} = 'tx_samples';
+	$opts{samples_pkey} = 'txseqid';
+	$opts{runs_table} = 'tx_projects';
+	$opts{runs_pkey} = 'rnaprojectid';
+	$opts{files_table} = 'tx_files';
+	$opts{files_pkey} = 'fileid';
+}
 
 #--------------------------------------------------------------
 #   Get squeue results, save in memory file every so often
@@ -158,6 +170,7 @@ sub SQueue {
     DBConnect($opts{realm});
     foreach my $l (@squeuelines) {
         my @c = split(' ', $l);
+        if ($c[0] eq 'JOBID') { next; }		# Skip header
         #   Should be none of these, but if so, we want to know about it
         if ($c[1] eq 'nomosix' && $c[8] =~ /$ENV{PROJECT}/) {    # nomosix on my node
             $mosixrunning{$c[4]}++;    # Count of running jobs for this user
@@ -165,7 +178,7 @@ sub SQueue {
         }
         if ($c[4] ne $ENV{PROJECT}) {  # Save partition and not my user
             $nottopmed{$c[1]}{$c[4]}++;
-            next;
+            if ($opts{allusers} == 0) { next; }
         }
         $partitions{$c[1]} = 1;
         if ($c[5] eq 'PD') {        # Queued
@@ -403,13 +416,13 @@ sub ReFormatPartitionData {
     my $nwdid = '?';
     my $dir = '?';
     if ($c[3] =~ /^(\d+)/) {
-        my $bamid=$1;
-        my $sth = DoSQL("SELECT runid,expt_sampleid FROM $opts{bamfiles_table} WHERE bamid=$bamid");
+        my $id=$1;
+        my $sth = DoSQL("SELECT $opts{runs_pkey},expt_sampleid FROM $opts{samples_table} WHERE $opts{samples_pkey}=$id");
         if ($sth) {
             my $href = $sth->fetchrow_hashref;
             if (exists($href->{expt_sampleid})) { $nwdid = $href->{expt_sampleid}; }
-            if (exists($href->{runid})) {
-                $sth = DoSQL("SELECT dirname FROM $opts{runs_table} WHERE runid=$href->{runid}");
+            if (exists($href->{$opts{runs_pkey}})) {
+                $sth = DoSQL("SELECT dirname FROM $opts{runs_table} WHERE $opts{runs_pkey}=$href->{$opts{runs_pkey}}");
                 if ($sth) {
                     $href = $sth->fetchrow_hashref;
                     $dir = $href->{dirname};
@@ -444,6 +457,14 @@ This program supports simple commands to show information about the cluster syst
 =head1 OPTIONS
 
 =over 4
+
+=item B<-allusers>
+
+Do not break out 'foreign users', but show them as topmed users so we can see them
+
+=item B<-datatype genome|rnaseq>
+
+Specifies this is a particular datatype of data. The default is 'genome'.
 
 =item B<-help>
 
