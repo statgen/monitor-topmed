@@ -348,8 +348,8 @@ sub Submit_gcecopy {
 # Subroutine:
 #   Submit_gcecpbcf() - Submit jobs to copy local bcf data to GCE storage
 #==================================================================
-sub Submit_gcecpbc {
-	Submit_generic('gcecpbc', 'state_gce38bcf', 'state_gce38cpbcf');
+sub Submit_gcecpbcf {
+	Submit_generic('gcecpbcf', 'state_gce38bcf', 'state_gce38cpbcf');
 }
 
 #==================================================================
