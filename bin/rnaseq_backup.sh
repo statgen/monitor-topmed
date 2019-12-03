@@ -27,7 +27,7 @@ if [ "$1" = "" ]; then
   echo "Backup data of a sample to GCE"
   exit 1
 fi
-set -x
+
 #	Must set bamid, legacy decision from genome
 bamid=$1
 sampleid=$1
