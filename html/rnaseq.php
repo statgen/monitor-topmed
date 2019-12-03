@@ -357,7 +357,7 @@ function ViewSampleDetail($tablenick, $id, $sql) {
         $html .= "<td align='left' colspan='4'>$d</td>";
         $html .= "</tr>\n";
     }
-    $html .= "</table></div></br>\n";
+    $html .= "</table></div><br/>\n";
     $html .= "<font size='-1'><table border='0' align='center' width='80%'><tr>" .
 		"<td align='left'>&nbsp;&nbsp;&nbsp;<a href='javascript:window.location.reload()'>Reload</a></td>" .
 		"<td align='right'><a href='javascript:window.close()'>Close</a>&nbsp;&nbsp;&nbsp;</td>" .

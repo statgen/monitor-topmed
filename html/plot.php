@@ -87,7 +87,7 @@ if ($fcn == 'plot') {
         //  "</td>" .
         "<td align='right'>" .
         "<a href='$reshowurl'>Reshow Plots</a>" .
-        "</td></tr></form></table></b></br>\n";   
+        "</td></tr></form></table></b><br/>\n";   
         
     // Plot totals of all states for each step
     print "<p><b>Legend: <font size='-1'>" .

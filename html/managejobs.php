@@ -21,12 +21,12 @@ function JOBFunctions($fcn) {
 
 	if ($fcn == 'queue') {
 		print "<center>" . $GLOBS['showstatus'] . "&nbsp;&nbsp;&nbsp;</center>\n";
-		$c = $LDB['bindir'] . "/topmedcluster.pl squeue 2>&1";
-		print "<pre>\n" . shell_exec($c) . "</pre>\n";
 		print "<font size='-1'><table border='0' align='center' width='80%'><tr>" .
 			"<td align='left'>&nbsp;&nbsp;&nbsp;<a href='javascript:window.location.reload()'>Reload</a></td>" .
 			"<td align='right'><a href='javascript:window.close()'>Close</a>&nbsp;&nbsp;&nbsp;</td>" .
-			"</tr></table></font>\n";
+			"</tr></table></font><br/>\n";
+		$c = $LDB['bindir'] . "/topmedcluster.pl squeue 2>&1";
+		print "<pre>\n" . shell_exec($c) . "</pre>\n";
 		exit;
 	}
 	if ($fcn == 'showout') {                // Show output from a SLURM job

@@ -18,9 +18,9 @@ print doheader($HDR['title'], 1);
 
 print "<h4>Use these links to look at NHLBI TopMed data</h4>" .
 	"<ul>\n" .
-	"<li><a href='genome.php' target='genome'>Genome Sequence data pages</a></br></li>\n" .
-	"<li><a href='rnaseq.php' target='rnaseq'>RNA Sequence data pages</a></br></li>\n" .
-	//"<li><a href='origindex.php' target='genome'>Original Genome data pages</a></br></li>\n" .
+	"<li><a href='genome.php' target='genome'>Genome Sequence data pages</a><br/></li>\n" .
+	"<li><a href='rnaseq.php' target='rnaseq'>RNA Sequence data pages</a><br/></li>\n" .
+	//"<li><a href='origindex.php' target='genome'>Original Genome data pages</a><br/></li>\n" .
 	"</u>\n";
 	
 print dofooter($HDR['footer']);
