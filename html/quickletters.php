@@ -51,15 +51,13 @@ $quickcols = array(                     // Map of status column to topmedcmd ver
     'state_arrive'   => 'arrived',
     'state_verify'   => 'verify',
     'state_backup'   => 'backup',
-    'state_aws38copy'=> 'awscopy',
-    'state_fix'      => 'fix'
+    'state_aws38copy'=> 'awscopy'
 );
 $quickletter = array(                   	// Map of status column to letter we see
 	'state_arrive'   => 'a',
 	'state_verify'   => '5',
 	'state_backup'   => 'B',
-	'state_aws38copy'=> 'A',
-	'state_fix'      => 'F'
+	'state_aws38copy'=> 'A'
 );
 $separator_actions = array();
 if ($LDB['datatype'] == 'genome') {

@@ -101,7 +101,6 @@ if ($opts{datatype} eq 'rnaseq') {
     	'state_verify'    => '5',
     	'state_backup'    => 'B',
     	'state_aws38copy' => 'A',
-    	'state_fix'       => 'F',
 	);
 }
 
