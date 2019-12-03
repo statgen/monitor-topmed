@@ -23,7 +23,6 @@ function JOBFunctions($fcn) {
 		print "<center>" . $GLOBS['showstatus'] . "&nbsp;&nbsp;&nbsp;</center>\n";
 		$c = $LDB['bindir'] . "/topmedcluster.pl squeue 2>&1";
 		print "<pre>\n" . shell_exec($c) . "</pre>\n";
-
 		print "<font size='-1'><table border='0' align='center' width='80%'><tr>" .
 			"<td align='left'>&nbsp;&nbsp;&nbsp;<a href='javascript:window.location.reload()'>Reload</a></td>" .
 			"<td align='right'><a href='javascript:window.close()'>Close</a>&nbsp;&nbsp;&nbsp;</td>" .
@@ -88,7 +87,7 @@ function JOBFunctions($fcn) {
 
 	if ($fcn == 'logs') {
 		$p = getenv('PROJECT');
-		print "<center>$" . $GLOBS['showstatus'] . " &nbsp;&nbsp;&nbsp;</center>\n<pre>\n";
+		print "<center>" . $GLOBS['links'] . " &nbsp;&nbsp;&nbsp;</center>\n<pre>\n";
 		$d = "/net/$p/working/$p-output/";
 		if (! chdir($d)) { print "Cannot CD to '$d': $!\n"; }
 		else {
