@@ -195,14 +195,102 @@ SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0;
 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0;
 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='TRADITIONAL,ALLOW_INVALID_DATES';
 
-/*  This table is regularly loaded from a tab delimited summary file from NCBI
+
+/* --------------------------------------------------------------
+#       NHLBI TOPMed tracking entries for RNA data
+#--------------------------------------------------------------- 
+*/
+
+/* Lists all directories of data (e.g. runs). Must be tied to a center */
+DROP TABLE IF EXISTS tx_projects;
+CREATE TABLE tx_projects (
+   rnaprojectid  INT NOT NULL AUTO_INCREMENT,
+   centerid     INT,
+   dirname      VARCHAR(256) NOT NULL,   	/* Path to where files can be found */
+   count        INT,                        /* Count of RNA samples in this project */
+   datayear     INT DEFAULT 2019,           /* Year when data arrived, cannot use YEAR(NOW()) */
+   arrived      CHAR(1) DEFAULT 'N',        /* Y or N that all files arrived */
+   status       VARCHAR(256),
+   dateinit     VARCHAR(12),
+   datecomplete VARCHAR(12),
+   comments     TEXT,
+
+   PRIMARY KEY  (rnaprojectid)
+);
+
+/* Not sure these are needed */
+/* CREATE INDEX index_rnaprojectid_rnaprojectpath ON tx_projects(rnaprojectid,projectpath); */
+/* CREATE INDEX index_rnaprojectpath ON tx_projects(projectpath); */
+
+/* All samples and their data. Must be tied to a tx_projects */
+DROP TABLE IF EXISTS tx_samples;
+CREATE TABLE tx_samples (
+   txseqid       INT         NOT NULL AUTO_INCREMENT,
+   rnaprojectid  INT         NOT NULL,      /* tx_projects id  */
+   expt_sampleid VARCHAR(24),               /* NWDID or really TOR ID */
+   fileprefix    VARCHAR(64),     		    /* Prefix of all filenames for this sample */
+   count         INT  DEFAULT 0,            /* How many files for this sample */
+   rnasubject    VARCHAR(64),               /* Investigator ID */
+   notes         TEXT,                      /* Notes from tab/xls file */
+   piname        VARCHAR(96),
+   dateinit      VARCHAR(12),
+   datearrived   VARCHAR(12),				/* Needed for tracking state of steps */
+   emsg          VARCHAR(255),
+   /* Fields to track state for each step */
+   /*
+   my $NOTSET    = 0;            # Not set
+   my $REQUESTED = 1;            # Task requested
+   my $SUBMITTED = 2;            # Task submitted to be run
+   my $STARTED   = 3;            # Task started
+   my $DELIVERED = 19;           # Data delivered, but not confirmed
+   my $COMPLETED = 20;           # Task completed successfully
+   my $IGNORETHIS = 80;          # Task is to be ignored
+   my $FAILEDCHECKSUM = 88;      # Task failed, because checksum at NCBI bad
+   my $CANCELLED = 89;           # Task cancelled
+   my $FAILED    = 99;           # Task failed
+   */
+   state_arrive   INT DEFAULT 0,
+   state_verify   INT DEFAULT 0,
+   state_backup   INT DEFAULT 0,
+   state_aws38copy INT DEFAULT 0,    /* Copy local data to AWS bucket */
+   state_fix INT DEFAULT 0,          /* Track efforts to fix screwups */
+
+   PRIMARY KEY  (txseqid)
+);
+CREATE INDEX index_rnatxseqid     ON tx_samples(rnaprojectid);
+CREATE INDEX index_rnatx_sampleid ON tx_samples(expt_sampleid);
+
+/* Each sample can have a number of associated files */
+DROP TABLE IF EXISTS tx_files;
+CREATE TABLE tx_files (
+   fileid        INT         PRIMARY KEY AUTO_INCREMENT,
+   txseqid       INT         NOT NULL,     /* Which tx_samples */
+   filename      VARCHAR(256) NOT NULL,
+   checksum      VARCHAR(32) DEFAULT ' ',
+   intar         CHAR(1) DEFAULT 'N',      /* Is this file in tar file */
+   dateinit      VARCHAR(12),
+
+   CONSTRAINT unique_txseqid_filename UNIQUE (txseqid, filename)
+);
+CREATE INDEX index_rnatxfileid ON tx_files(fileid);
+CREATE INDEX index_fileid_txseqid ON tx_files(fileid,txseqid);
+
+/*   Handy queries
+    ALTER TABLE tx_samples ADD COLUMN datebai VARCHAR(12) AFTER datebackup;
+    ALTER TABLE tx_samples ADD  COLUMN offsitebackup CHAR(1) DEFAULT 'N' AFTER datayear;
+    ALTER TABLE tx_samples MODIFY COLUMN datayear INT DEFAULT 5;
+    ALTER TABLE tx_samples DROP COLUMN colname;
+*/
+
+/* --------------------------------------------------------------
+    This is no longer used
+    This table is regularly loaded from a tab delimited summary file from NCBI
     The NCBI data is loaded into this table to make it easier for us to garner
     the state of data sent there.
 
     mysql -h f-db.sph.umich.edu -u USER --password=PASSWORD --local-infile=1 nhlbi    
     load data local infile 'ncbi_summary' into table ncbi_summary;
 
-*/
 DROP TABLE IF EXISTS ncbi_summary;
 CREATE TABLE ncbi_summary (
   realm         VARCHAR(12),
@@ -227,11 +315,11 @@ CREATE TABLE ncbi_summary (
   suppressed_analyses   VARCHAR(64),
   PRIMARY KEY  (file_name)
 );
-
+*/
 
 /* ####################################################
-   Daily statisitics for steps
-   #################################################### */
+   Daily statisitics for steps - no longer used
+   ####################################################
 DROP TABLE IF EXISTS stepstats;
 CREATE TABLE stepstats (
   yyyymmdd CHAR(10) NOT NULL,
@@ -282,19 +370,20 @@ CREATE TABLE stepstats (
   avetime_bcf       INT DEFAULT 0,
   ncbicount_bcf     INT DEFAULT 0,
 
-  bamcount           INT DEFAULT 0,      /* Count of all arrived bams */
-  errcount           INT DEFAULT 0,      /* Count of all errors for bams */
-  errorigcount       INT DEFAULT 0,      /* Count of original bams sent to NCBI in error */
-  loadedorigbamcount INT DEFAULT 0,      /* Count of loaded original BAMs at NCBI */
-  errckorigcount     INT DEFAULT 0,      /* Count of original bams at NCBI with checsum error */
-  errb37count        INT DEFAULT 0,      /* Count of primary bams sent to NCBI in error */
-  loadedb37bamcount  INT DEFAULT 0,      /* Count of loaded primary BAMs at NCBI */
-  errckb37count      INT DEFAULT 0,      /* Count of primary bams at NCBI with checsum error */
-  errb38count        INT DEFAULT 0,      /* Count of tertiary bams sent to NCBI in error */
-  loadedb38bamcount  INT DEFAULT 0,      /* Count of loaded tertiary BAMs at NCBI */
-  errckb38count      INT DEFAULT 0,      /* Count of tertiary bams at NCBI with checsum error */
+  bamcount           INT DEFAULT 0,      // Count of all arrived bams
+  errcount           INT DEFAULT 0,      // Count of all errors for bams
+  errorigcount       INT DEFAULT 0,      // Count of original bams sent to NCBI in error
+  loadedorigbamcount INT DEFAULT 0,      // Count of loaded original BAMs at NCBI
+  errckorigcount     INT DEFAULT 0,      // Count of original bams at NCBI with checsum error
+  errb37count        INT DEFAULT 0,      // Count of primary bams sent to NCBI in error
+  loadedb37bamcount  INT DEFAULT 0,      // Count of loaded primary BAMs at NCBI
+  errckb37count      INT DEFAULT 0,      // Count of primary bams at NCBI with checsum error
+  errb38count        INT DEFAULT 0,      // Count of tertiary bams sent to NCBI in error
+  loadedb38bamcount  INT DEFAULT 0,      // Count of loaded tertiary BAMs at NCBI
+  errckb38count      INT DEFAULT 0,      // Count of tertiary bams at NCBI with checsum error
   PRIMARY KEY  (yyyymmdd)
 );
+*/
 
 /* ####################################################
    View of Kevin's web interface columns
