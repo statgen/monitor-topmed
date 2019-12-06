@@ -69,24 +69,23 @@ function ViewRuns($center, $maxdir) {
     //  Get list of centers doing:  select distinct(project) from status;
     $html = "<h3 align='center'>Summary of Genome Sequence Data</h3>\n" .
         "<center>" . GetChooseLines() . "<br/>" . $GLOBS['links'] . "</center>\n";
-    $yearstart = 4;
-    $yearstop = 0;
+    $yearstart = 5;
+    $yearstop = 1;
     $centers2show = array();                // Get list of centers for this query
     //	For some reason we're using center to spcify year. That's dumb
     if ($center) {
-		if ($center == 'year1' || $center == 'year2' || $center == 'year3' || $center == 'year4' || $center == 'year5') {
+		if (preg_match('/year(\d)/',$center,$m)) {
 			$centers2show = $GLOBS['centers'];
-			if ($center == 'year1') { $yearstart = 1; }
-			if ($center == 'year2') { $yearstart = 2; $yearstop = 1; }
-			if ($center == 'year3') { $yearstart = 3; $yearstop = 2; }
-			if ($center == 'year4') { $yearstart = 4; $yearstop = 3; }
-			if ($center == 'year5') { $yearstart = 5; $yearstop = 4; }
+			$yearstart = $m[1];
+			$yearstop = $m[1];
+			if ($m[1] > '1') { $yearstop = $m[1] - 1; }
 		}
 		else { array_push($centers2show, $center); }
     }
     else { $centers2show = $GLOBS['centers']; }
 
     //  Show data for center by datayear
+    $lineshown = 0;
     for ($datayear=$yearstart; $datayear>$yearstop; $datayear--) {
         //  For each center show details from database ($rows)
         foreach ($centers2show as $centr) {
@@ -95,9 +94,12 @@ function ViewRuns($center, $maxdir) {
             if (! $h) { continue; }
             $html .= "<br><div class='indent'><b>" . strtoupper($centr) .
                 ", Year $datayear</b></div>$h\n";
+            $lineshown++;
         }
-        $html .= "<br>";
-        if ($datayear > 1) { $html .= "<hr width='80%' class='separator'>\n"; }
+        if ($lineshown) {
+        	$html .= "<br>";
+        	if ($datayear > 1) { $html .= "<hr width='80%' class='separator'>\n"; }
+        }
     }
     $html .= "<div class='indent'>\n" . $GLOBS['statusruns'] . "</div>\n";
     return $html;

@@ -83,7 +83,7 @@ $PARMS = isolate_parms($parmcols);
 
 //	Set defaults
 if ($LDB['datatype'] == 'genome') {
-	if ($PARMS['center'] == '') { $PARMS['center'] = 'year4'; }
+	//if ($PARMS['center'] == '') { $PARMS['center'] = 'year4'; }
 	if ($PARMS['fcn'] == '')    { $PARMS['fcn'] = 'runs'; }
 	if ($PARMS['maxdir'] == '') { $PARMS['maxdir'] = 0; }
 }
