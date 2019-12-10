@@ -14,6 +14,7 @@
 include_once 'local_config.php';
 if ($LDB['datatype'] == 'genome') { include_once 'gen_seq.php'; }
 if ($LDB['datatype'] == 'rnaseq') { include_once 'rna_seq.php'; }
+if ($LDB['datatype'] == 'methyl') { include_once 'methyl_seq.php'; }
 include_once 'managejobs.php';
 include_once 'iammgrfcns.php';
 include_once 'common.php';
@@ -35,6 +36,9 @@ $GLOBS['links'] = "LINKS: " .
     "return false;'>Tail_Logs</a> &nbsp;";
 
 if ($LDB['datatype'] == 'rnaseq') {
+	$$GLOBS['validfunctions'] = array('all', 'verify', 'backup', 'awscopy');
+}
+if ($LDB['datatype'] == 'methyl') {
 	$$GLOBS['validfunctions'] = array('all', 'verify', 'backup', 'awscopy');
 }
 if ($LDB['datatype'] == 'genome') {
@@ -92,6 +96,11 @@ if ($LDB['datatype'] == 'rnaseq') {
 	if ($PARMS['center'] == '')     { $PARMS['center'] = 'uw'; }
 	if ($PARMS['fcn'] == '' || $PARMS['fcn'] == 'runs')     { $PARMS['fcn'] = 'projects'; }
 }
+if ($LDB['datatype'] == 'methyl') {
+	if ($PARMS['datayear'] == '')   { $PARMS['datayear'] = '2019'; }
+	if ($PARMS['center'] == '')     { $PARMS['center'] = 'usc'; }
+	if ($PARMS['fcn'] == '' || $PARMS['fcn'] == 'runs')     { $PARMS['fcn'] = 'projects'; }
+}
 
 DB_Connect($LDB['realm']);
 GetCenters();                       // Get maps to identify centers
@@ -105,6 +114,9 @@ if ($LDB['datatype'] == 'rnaseq') {
 
 if ($LDB['datatype'] == 'genome') {
 	GENFunctions($fcn);
+}
+if ($LDB['datatype'] == 'methyl') {
+	MethylFunctions($fcn);
 }
 JOBFunctions($fcn);		// Handle JOBs
 if ($GLOBS['iammgr']) { ImmgrFunctions($fcn);  }	// Handle functions for managers
@@ -231,42 +243,21 @@ function ShowTable($table, $sql='', $tfoot=0) {
 #   html = ShowSamples()
 #   Show list of samples files for a particular set of data
 ---------------------------------------------------------------*/
-function ShowSamples($id, $hdrcols, $tablenick, $parenttablenick) {
+function ShowSamples($sql, $hdrcols, $tablenick, $hdr, $controls=1) {
     global $LDB, $GLOBS, $PARMS;
     $html = '';
     $maxdir = 0;                    // For now, show all samples
-	$samplestable = $tablenick;
-    $samplespkey = $samplestable . '_pkey';
-    $projtable = $parenttablenick;
-	$projpkey = $parenttablenick . '_pkey';
-    $samplestable = $LDB[$samplestable];
-    $samplespkey = $LDB[$samplespkey];
-    $projtable = $LDB[$projtable];
-    $projpkey = $LDB[$projpkey];
-
-    //  Figure out project for this sample
-    $sql = "SELECT dirname,centerid,count FROM $projtable WHERE $projpkey=$id";
-    $result = SQL_Query($sql, 0);
-    $e = DB_CheckError($result);
-    if ($e) { return EMsg("Surprise: Unable to find $projtable $projpkey=$id: $e", 1); }
-    $row = SQL_Fetch($result);
-    $projectname = $row['dirname'];
-    $count = $row['count'];
-    $centername = $GLOBS['centerid2name'][$row['centerid']];
-	$center = strtoupper($centername);
+    $pkey = $tablenick . '_pkey';
+ 	$table = $LDB[$tablenick];
+    $pkey = $LDB[$pkey];
 
     //  Get all samples from this project
-    $sql = "SELECT * FROM $samplestable WHERE $projpkey=$id";
     if ($maxdir) { $sql .= " LIMIT $maxdir"; }
     $result = SQL_Query($sql);
     $numrows = SQL_NumRows($result);
 
     //  Show details for each sample
-    $url = $_SERVER['SCRIPT_NAME'] . "?center=$centername&amp;maxdir=$maxdir";
-    $html .= "<h3 align='center'>$count Samples for '$projectname' [$id] in center " .
-        "<a href='$url'>$center</a></h3>\n";
-    $html .= "<p align='center'/>" . $GLOBS['links'] . "</p>\n";
-
+    $html .= $hdr . "<p align='center'/>" . $GLOBS['links'] . "</p>\n";
     $html .= "<table align='center' width='100%' border='1'><tr>\n";
     foreach ($hdrcols as $c) {
         $html .= "<th class='heading'>" . ucfirst($c) . "</th>\n";
@@ -280,7 +271,7 @@ function ShowSamples($id, $hdrcols, $tablenick, $parenttablenick) {
         foreach ($hdrcols as $c) {
             if ($c == 'QUIKSTAT') {
                 $u = $_SERVER['SCRIPT_NAME'] . "?fcn=showout&amp;table=$tablenick&amp;id=" .
-                    $row[$samplespkey] . "&amp;samplestate=XX";
+                    $row[$pkey] . "&amp;samplestate=XX";
                 $u = "<a href='$u' onclick='javascript:popup2(\"$u\",680,720); return false;'>XX</a>";
                 $d = QuickStatus($row, $u);     // Pass on URL for failing states
             }
@@ -290,18 +281,20 @@ function ShowSamples($id, $hdrcols, $tablenick, $parenttablenick) {
         }           
 
         $html .= "<td align='center'>";
-		if ($LDB['datatype'] == 'rnaseq') {
-         	$u = $_SERVER['SCRIPT_NAME'] . "?fcn=files&amp;id=" . $row[$samplespkey];
-         	$html .= "<a href='$u' onclick='javascript:popup2(\"$u\",800,720); return false;'>" .
-            "<font color='green' size='-2'>Files</font></a>&nbsp;";
-     	}
-        $u = $_SERVER['SCRIPT_NAME'] ."?fcn=detail&amp;table=$tablenick&amp;id=" . $row[$samplespkey];
-        $html .= "<a href='$u' onclick='javascript:popup2(\"$u\",680,720); return false;'>" .
-            "<font color='green' size='-2'>Details</font></a>&nbsp;";
-        if ($GLOBS['iammgr']) {
-            $u = $_SERVER['SCRIPT_NAME'] ."?fcn=edit&amp;table=$tablenick&amp;id=" . $row[$samplespkey];
-            $html .= "<a href='$u' onclick='javascript:popup2(\"$u\",680,720); return false;'>" .
-                "<font color='red' size='-2'>Edit</font></a>";
+        if ($controls) {
+			if ($LDB['datatype'] == 'rnaseq') {
+				$u = $_SERVER['SCRIPT_NAME'] . "?fcn=files&amp;id=" . $row[$pkey];
+				$html .= "<a href='$u' onclick='javascript:popup2(\"$u\",800,720); return false;'>" .
+				"<font color='green' size='-2'>Files</font></a>&nbsp;";
+			}
+			$u = $_SERVER['SCRIPT_NAME'] ."?fcn=detail&amp;table=$tablenick&amp;id=" . $row[$pkey];
+			$html .= "<a href='$u' onclick='javascript:popup2(\"$u\",680,720); return false;'>" .
+				"<font color='green' size='-2'>Details</font></a>&nbsp;";
+			if ($GLOBS['iammgr']) {
+				$u = $_SERVER['SCRIPT_NAME'] ."?fcn=edit&amp;table=$tablenick&amp;id=" . $row[$pkey];
+				$html .= "<a href='$u' onclick='javascript:popup2(\"$u\",680,720); return false;'>" .
+					"<font color='red' size='-2'>Edit</font></a>";
+			}
         }
         $html .= "</td></tr>\n";
     }
