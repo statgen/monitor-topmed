@@ -190,7 +190,34 @@ function ShowRunYear($cid, $maxdirs, $datayear, $iammgr) {
 function ViewBams($id, $maxdir) {
     global $LDB, $GLOBS, $PARMS;
     $hdrcols  = array('bamname', 'QUIKSTAT', 'bamsize', 'piname');
-	return ShowSamples($id, $hdrcols, 'samples', 'runs');
+
+	$samplestable = 'samples';
+    $samplespkeynick = $samplestable . '_pkey';
+ 	$samplestable = $LDB[$samplestable];
+    $samplespkey = $LDB[$samplespkeynick];
+	$runstable = 'runs';
+    $runspkeynick = $runstable . '_pkey';
+ 	$runstable = $LDB[$runstable];
+    $runspkey = $LDB[$runspkeynick];
+
+    //  Get columns of interest and id of center
+    $sql = "SELECT centerid,dirname,count FROM $runstable WHERE $runspkey=$id";
+    $result = SQL_Query($sql, 0);
+    $row = SQL_Fetch($result);
+    $centerid = $row['centerid'];
+    $dirname = $row['dirname'];
+    $count = $row['count'];
+    $sql = "SELECT centername FROM " . $LDB['centers'] . " WHERE " . $LDB['centers_pkey'] . "=$centerid";
+    $result = SQL_Query($sql, 0);
+    $row = SQL_Fetch($result);
+    $center = $row['centername'];
+
+    $sql = "SELECT * FROM $samplestable WHERE $runspkey=$id";
+    $url = $_SERVER['SCRIPT_NAME'] . "?center=$center&amp;maxdir=$maxdir";
+    $hdr = "<h3 align='center'>$count Samples for '$dirname' in center " .
+        "<a href='$url'>$center</a></h3>\n";
+
+	return ShowSamples($sql, $hdrcols, 'samples', $hdr);
 }
 
 ?>

@@ -32,8 +32,9 @@ function RNAFunctions($fcn) {
 		print dofooter($HDR['footer']);
 		exit;
 	}
+
 	if ($fcn == 'files') {
-		print ViewFiles($PARMS['id'], $PARMS['sample'] );
+		print ViewFiles($PARMS['id']);
 		print "<center>" . GetChooseLines() . "<br/>" . $GLOBS['links'] . "</center>\n";
 		print dofooter($HDR['footer']);
 		exit;
@@ -141,11 +142,11 @@ function ShowProjectYear($cid, $maxdir, $datayear) {
         }
             
         $html .= "<td align='center'>";
-        $u = $_SERVER['SCRIPT_NAME'] ."?fcn=detail&amp;table=$tablenick&amp;id=" . $row['rnaprojectid'];
+        $u = $_SERVER['SCRIPT_NAME'] ."?fcn=detail&amp;table=$tablenick&amp;id=" . $row[$projpkey];
         $html .= "<a href='$u' onclick='javascript:popup2(\"$u\",680,720); return false;'>" .
             "<font color='green' size='-2'>Details</font></a>&nbsp;";
         if ($GLOBS['iammgr']) {
-            $u = $_SERVER['SCRIPT_NAME'] ."?fcn=edit&amp;table=$tablenick&amp;id=" . $row['rnaprojectid'];
+            $u = $_SERVER['SCRIPT_NAME'] ."?fcn=edit&amp;table=$tablenick&amp;id=" . $row[$projpkey];
             $html .= "<a href='$u' onclick='javascript:popup2(\"$u\",680,720); return false;'>" .
                 "<font color='red' size='-2'>Edit</font></a>";
         }
@@ -162,7 +163,38 @@ function ShowProjectYear($cid, $maxdir, $datayear) {
 function ViewSamples($id, $maxdir) {
     global $LDB, $GLOBS, $PARMS;
     $hdrcols  = array('expt_sampleid', 'QUIKSTAT', 'count', 'fileprefix', 'rnasubject');
-	return ShowSamples($id, $hdrcols, 'samples', 'projects');
+
+	$samplestable = 'samples';
+    $samplespkeynick = $samplestable . '_pkey';
+ 	$samplestable = $LDB[$samplestable];
+    $samplespkey = $LDB[$samplespkeynick];
+	$projectstable = 'projects';
+    $projectspkeynick = $projectstable . '_pkey';
+ 	$projectstable = $LDB[$projectstable];
+    $projectspkey = $LDB[$projectspkeynick];
+    //  Get parent for this sample
+    $sql = "SELECT $projectspkey FROM $samplestable WHERE $samplespkey=$id";
+    $result = SQL_Query($sql, 0);
+    $row = SQL_Fetch($result);
+    $projectid = $row[$projectspkey];
+    //  From parent table get columns of interest and id of center
+    $sql = "SELECT centerid,dirname,count FROM $projectstable WHERE $projectspkey=$projectid";
+    $result = SQL_Query($sql, 0);
+    $row = SQL_Fetch($result);
+    $centerid = $row['centerid'];
+    $dirname = $row['dirname'];
+    $count = $row['count'];
+    $sql = "SELECT centername FROM " . $LDB['centers'] . " WHERE " . $LDB['centers_pkey'] . "=$centerid";
+    $result = SQL_Query($sql, 0);
+    $row = SQL_Fetch($result);
+    $center = $row['centername'];
+
+    $sql = "SELECT * FROM $samplestable WHERE $projectspkey=$id";
+    $url = $_SERVER['SCRIPT_NAME'] . "?center=$center&amp;maxdir=$maxdir";
+    $hdr = "<h3 align='center'>$count Samples for '$dirname' in center " .
+        "<a href='$url'>$center</a></h3>\n";
+
+	return ShowSamples($sql, $hdrcols, 'samples', $hdr);
 }
 
 /*---------------------------------------------------------------
@@ -179,39 +211,22 @@ function ViewFiles($id, $sample) {
     $samplestable = 'samples';
     $samplespkey = $samplestable . '_pkey';
     $samplespkey = $LDB[$samplespkey];
+    $samplestable = $LDB[$samplestable];
     $center = $PARMS['center'];
     $html = '';
  
     //  Generate HTML header for page
-    $sql = "SELECT * FROM $filestable WHERE $samplespkey=$id ORDER BY $filespkey";
+    $sql = "SELECT expt_sampleid FROM $samplestable WHERE $samplespkey=$id";
     $result = SQL_Query($sql);
-    $numrows = SQL_NumRows($result);
+    $row = SQL_Fetch($result);
+    $sample = $row['expt_sampleid'];
 
-    //  Show details for each file
-    $url = $_SERVER['SCRIPT_NAME'] . "?center=$centername&amp;maxdir=" . $PARMS['maxdir'];
-    $html .= "<h3 align='center'>Files Associated with Sample '$sample' [$id] in center " .
+    $sql = "SELECT * FROM $filestable WHERE $samplespkey=$id ORDER BY $filespkey";
+    $url = $_SERVER['SCRIPT_NAME'] . "?center=$center&amp;maxdir=$maxdir";
+    $hdr = "<h3 align='center'>Files Associated with Sample '$sample' [$id] in center " .
         "<a href='$url'>$center</a></h3>\n";
-    $html .= "<p align='center'/>" . $GLOBS['links'] . "</p>\n";
 
-    $html .= "<table align='center' width='100%' border='1'><tr>\n";
-    foreach ($hdrcols as $c) {
-        $html .= "<th class='heading'>" . ucfirst($c) . "</th>\n";
-    }
-    if ($GLOBS['iammgr']) { $html .= "<th>&nbsp;</th>"; }
-    $html .= "</tr>\n";
-
-    for ($i=0; $i<$numrows; $i++) {
-        $row = SQL_Fetch($result);
-        reset($hdrcols);
-        foreach ($hdrcols as $c) {
-            $d = $row[$c];
-            if ((! isset($d)) || ($d == '')) { $d = '&nbsp;'; }
-            $html .= "<td align='center'>$d</td>\n";
-        }
-        $html .= "</tr>\n";
-    }
-    $html .= "</table>\n";
-    return $html;
+	return ShowSamples($sql, $hdrcols, 'samples', $hdr, 0);
 }
 
 ?>
