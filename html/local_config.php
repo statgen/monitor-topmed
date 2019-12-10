@@ -35,19 +35,30 @@ $HDR['local'] = "    <link href='/topmed/css/TOPMEDstyle.css' rel='stylesheet'>\
 $LDB['bindir'] = '/usr/cluster/topmed/bin';
 $LDB['SLURMNODES'] = '/net/topmed/working/topmed-output/slurm.nodes';
 $LDB['centers'] = 'centers';
+$LDB['centers_pkey'] = 'centerid';
 $LDB['permissions'] = 'permissions';
 
 //	Figure out what kind of data we are to display
 if (strstr($_SERVER['PHP_SELF'],'rnaseq')) {
 	$LDB['datatype'] = 'rnaseq';
 	$LDB['realm'] = $LDB['bindir'] . '/../etc/.db_connections/rnaseq';
-	$LDB['datatype'] = 'rnaseq';
 	$LDB['projects'] = 'tx_projects';   	// Nicknames for tables and pkeys
 	$LDB['projects_pkey'] = 'rnaprojectid';
 	$LDB['samples'] = 'tx_samples';
 	$LDB['samples_pkey'] = 'txseqid';
 	$LDB['files'] = 'tx_files';
 	$LDB['files_pkey'] = 'fileid';
+}
+if (strstr($_SERVER['PHP_SELF'],'methyl')) {
+	$LDB['datatype'] = 'methyl';
+	$LDB['realm'] = $LDB['bindir'] . '/../etc/.db_connections/methyl';
+	$LDB['datatype'] = 'methyl';
+	$LDB['projects'] = 'methyl_projects';   	// Nicknames for tables and pkeys
+	$LDB['projects_pkey'] = 'methylprojectid';
+	$LDB['samples'] = 'methyl_samples';
+	$LDB['samples_pkey'] = 'methylid';
+	$LDB['batches'] = 'methyl_batch';
+	$LDB['batches_pkey'] = 'methylbatchid';
 }
 if (strstr($_SERVER['PHP_SELF'],'genome') || strstr($_SERVER['PHP_SELF'],'index')) {
 	$LDB['datatype'] = 'genome';
@@ -88,7 +99,7 @@ $HDR['footer'] = <<<END
 Copyright (c) 2009- University of Michigan<br/>
 Report problems to <a class='footer' href='mailto:tpg@umich.edu'>tpg@umich.edu</a><br/>
 $f
-<br/>Last Revision: June 2019 <br/>
+<br/>Last Revision: Dec 2019 <br/>
 
 END;
 
