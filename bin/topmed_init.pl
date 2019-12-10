@@ -69,16 +69,28 @@ Getopt::Long::GetOptions( \%opts,qw(
 #	Set %opts based on datatype
 if ($opts{datatype} eq 'rnaseq') {
 	$opts{runs_table} = 'tx_projects',
-	$opts{runs_index} = 'rnaprojectid',
+	$opts{runs_pkey} = 'rnaprojectid',
 	$opts{samples_table} = 'tx_samples',
+	$opts{samples_pkey} = 'txseqid',
 	$opts{files_table} = 'tx_files',
+	$opts{files_pkey} = 'fileid',
 	$opts{topdir} = "/net/$ENV{PROJECT}/incoming/$ENV{PROJECT}/rnaseq";
+}
+if ($opts{datatype} =~ /^meth/) {
+	$opts{datatype} = 'methyl',
+	$opts{runs_table} = 'methyl_projects',
+	$opts{runs_pkey} = 'methylprojectid',
+	$opts{samples_table} = 'methyl_samples',
+	$opts{samples_pkey} = 'methylid',
+	$opts{files_table} = 'methyl_batch',
+	$opts{files_pkey} = 'methylbatchid',
+	$opts{topdir} = "/net/$ENV{PROJECT}/incoming/$ENV{PROJECT}/methylation";
 }
 if ($opts{verbose}) { warn "$Script - processing datatype=$opts{datatype}\n"; }
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    warn "$Script [options] [-datatype genome|rnaseq] updatedb\n" .
+    warn "$Script [options] [-datatype genome|rnaseq|methyl] updatedb\n" .
         "Monitor TOPMed data arriving in a directory (default=$opts{topdir}').\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
@@ -104,7 +116,7 @@ foreach my $centerid (keys %{$centersref}) {
         next;
     }
     #   Get all the known batch data for this center that are not fully arrived
-    my $sql = "SELECT $opts{runs_index},dirname,arrived FROM $opts{runs_table} WHERE centerid=$centerid";
+    my $sql = "SELECT $opts{runs_pkey},dirname,arrived FROM $opts{runs_table} WHERE centerid=$centerid";
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     my %knownruns = ();
@@ -112,7 +124,7 @@ foreach my $centerid (keys %{$centersref}) {
     for (my $i=1; $i<=$rowsofdata; $i++) {
         foreach my $href ($sth->fetchrow_hashref) {
             $dir = $href->{dirname};            
-            $knownruns{$dir}{$opts{runs_index}} = $href->{$opts{runs_index}};
+            $knownruns{$dir}{$opts{runs_pkey}} = $href->{$opts{runs_pkey}};
             $knownruns{$dir}{arrived} = $href->{arrived};
             if ($opts{ignorearrived}) { $knownruns{$dir}{arrived} = 'N'; }
         }
@@ -123,7 +135,7 @@ foreach my $centerid (keys %{$centersref}) {
     my $runid;
     foreach my $d (@{$dirsref}) {
     	if ($opts{verbose}) { warn "$Script - checking '$d'\n"; }
-        $runid = $knownruns{$d}{$opts{runs_index}} || CreateRun($centerid, $d);
+        $runid = $knownruns{$d}{$opts{runs_pkey}} || CreateRun($centerid, $d);
         if (! defined($runid)) {
             if ($opts{verbose}) { warn "$Script ID not defined for dir=$d\n"; }
             next;
@@ -131,9 +143,12 @@ foreach my $centerid (keys %{$centersref}) {
         if ($opts{run} && $opts{run} ne $d) { next; }
         #   Check if this run has arrived, no need to look at it further
         if (defined($knownruns{$d}{arrived}) && $knownruns{$d}{arrived} eq 'Y') { next; }
+
+		#warn "$Script - d=$d $opts{datatype} would have been called. arrived='$knownruns{$d}{arrived}'<br>\n"; next;
         #	Add database entries for each sample in this set
         if ($opts{datatype} eq 'genome') { AddBams($runid, $d); next;}
-        if ($opts{datatype} eq 'rnaseq') { AddProjects($runid, $d); next;}
+        if ($opts{datatype} eq 'rnaseq') { AddRNAProjects($runid, $d); next;}
+        if ($opts{datatype} eq 'methyl') { AddMethylBatches($runid, $d); next;}
         warn "$Script Unable to process data '$opts{datatype}' for dir=$d\n";
     }
 }
@@ -145,16 +160,258 @@ exit;
 
 #==================================================================
 # Subroutine:
-#   AddProjects - Add database entries for each set of samples in this directory
+#   AddMethylBatches - Add database entries for each set of files/samples in this directory
 #
 # Arguments:
-#   rnaprojectid - project id
+#   methylprojectid - parent id
 #   d - directory
 #
 # Returns:
 #   Boolean if any samples were added or not
 #==================================================================
-sub AddProjects {
+sub AddMethylBatches {
+    my ($methylprojectid, $d) = @_;
+    if (! -d $d) {
+        print "$Script - Unable to read directory '$d': $!\n";
+        return 0;
+    }
+   	if ($opts{verbose}) { warn "$Script - AddProjects($methylprojectid, $d)\n"; }
+
+	#------------------------------------------------------------------
+    #	We assume if there is a Manifest, all the files are in place.
+    #	Read the MD5 and collect into useful data structures
+	#------------------------------------------------------------------
+    my $manifestfile = "$d/Manifest.txt";
+    my %batchnames = ();
+	if (! open(IN, $manifestfile)) {
+		warn "$Script - Unable to read file '$manifestfile': $!\n";
+		return 0;
+	}	
+	my $totalbatch = 0;
+	while (my $l = <IN>) {          # Read md5 checksum file
+		chomp($l);
+		my ($name, $checksum) = NormalizeMD5Line($l, $manifestfile, 1);
+		if (! $checksum) {
+			warn "$Script - Unable to parse checksum from '$manifestfile'\n";
+			return 0;
+		}
+		my ($bname, $n) = ('', 99);
+		if ($name =~ /^(\S+)-LEVEL(\d)/) { ($bname,$n) = ($1, $2); }
+		if ($n == 99) {
+			warn "$Script - zip name could not be parsed '$manifestfile'\n";
+			return 0;
+		}
+		my $size = (stat "$d/$name")[7];
+		if (! $size) {
+			warn "$Script - zip name '$d/$name' does not exist\n";
+			return 0;
+		}
+
+		#	Save the important stuff
+		my $k = 'file' . $n; 
+		$batchnames{$bname}{$k}{filename} = $name;
+		$batchnames{$bname}{$k}{checksum} = $checksum;
+		$batchnames{$bname}{$k}{size} = $size;
+		if ($n == 0) { $totalbatch++; }
+	}
+	close(IN);
+
+	#------------------------------------------------------------------
+	#	Manifest parsed. Create methyl_batch entries
+	#------------------------------------------------------------------
+	foreach my $bname (keys %batchnames) {
+		foreach my $n (qw(0 1 2 3)) {
+			my $k = 'file' . $n; 
+			if (! exists($batchnames{$bname}{$k})) {
+				warn "$Script - Batch '$bname is missing LEVEL $n entry\n";
+				return 0;
+			}
+		}
+	}
+	my $methylbatchid;
+	foreach my $bname (keys %batchnames) {
+		my $sql = "INSERT INTO $opts{files_table} " .
+			"(methylprojectid,batchname,count,dateinit, " .
+			"file0, file0checksum, file0size," .
+			"file1, file1checksum, file1size," .
+			"file2, file2checksum, file2size," .
+			"file3, file3checksum, file3size)";
+		my $values = " VALUES($methylprojectid,'$bname',0,$nowdate,";
+		for (my $i=0; $i<=3; $i++) {
+			my $k = 'file' . $i; 
+			$values .= "'" . $batchnames{$bname}{$k}{filename} . 
+				"','" . $batchnames{$bname}{$k}{checksum} .
+				"'," . $batchnames{$bname}{$k}{size} . ',';
+		}
+		chop($values);
+		$values .= ")";
+		my $sth = DoSQL($sql . $values);
+		if ($sth) { $methylbatchid  = SQL_Last_Insert($sth); }	# Index to this sample
+		if (! $methylbatchid) {
+			warn "$Script - INSERT for '$bname failed\n";
+			return 0;
+		}
+		#	Save index to entry so we can create samples
+		$batchnames{$bname}{id} = $methylbatchid
+	}
+
+	#------------------------------------------------------------------
+	#	Batch entries created, Create samples by tearing apart LEVEL0 zip
+	#------------------------------------------------------------------
+	my $tmpdir = "/run/shm/$$";
+	mkdir $tmpdir;
+	my $totalsamples = 0;
+	foreach my $bname (keys %batchnames) {
+		my $cmd = "unzip -d $tmpdir $d/$batchnames{$bname}{file0}{filename} '*/Manifest*.txt'";
+		my $manfile;
+		foreach my $l (split("\n", `$cmd`)) {
+			if ($l =~ /inflating:\s+(\S+)/) { $manfile = $1; last; }
+		}
+		#	Be sure to remove DOS \r characters. Some files have them, some not
+		#	Some files have NO \n, only \r !  Piece of crap data !
+		if (! open(IN, $manfile)) {
+			warn "$Script - Unable to read LEVEL0 Manifest file '$manfile'\n";
+			return 0;
+		}
+		open(OUT, '>' . $manfile . '.out');
+		while (my $l = <IN>) { $l =~ s/\r/\n/g; print OUT $l; }
+		close(IN);
+		close(OUT);
+		if (! open(IN, $manfile . '.out')) {
+			warn "$Script - Unable to read LEVEL0 Manifest file '$manfile'\n";
+			return 0;
+		}
+		# 	Parse the header line to figure out what fields are in what columns
+		my $hdr = <IN>;
+		chomp($hdr);
+		my %cols = (
+			'grn.idat'        => 99,		# 99 means the column is not known
+			'red.idat'        => 99,
+			'.sdf'            => 99,
+			'meth.raw.csv'    => 99,
+			'unmeth.raw.csv'  => 99,
+			'beta.raw.csv'    => 99,
+			'pvalue.csv'      => 99,
+			'rgset.snp.csv'   => 99,
+			'meth.noob.csv'   => 99,
+			'unmeth.noob.csv' => 99,
+			'beta.noob.csv'   => 99,
+			'noob.correct.csv'=> 99,
+			'sampleid'        => 1,			# I hope these are always here
+			'array'           => 2,
+			'p05'             => 3,
+			'p01'             => 4,
+		);
+		my %cols2dbcol = (					# Map hdr column to database column
+			'grn.idat'        => 'grn_idat',
+			'red.idat'        => 'red_idat',
+			'.sdf'            => 'sdf',
+			'meth.raw.csv'    => 'meth_raw',
+			'unmeth.raw.csv'  => 'unmeth_raw',
+			'beta.raw.csv'    => 'beta_raw',
+			'pvalue.csv'      => 'pvalue',
+			'rgset.snp.csv'   => 'rgset_snp',
+			'meth.noob.csv'   => 'meth_noob',
+			'unmeth.noob.csv' => 'unmeth_noob',
+			'beta.noob.csv'   => 'beta_noob',
+			'noob.correct.csv'=> 'noob_correct',
+			'sampleid'        => 'expt_sampleid',
+			'array'           => 'array',
+			'p05'             => 'p05',
+			'p01'             => 'p01',
+		);
+		my @c = split("\t", $hdr);
+		for (my $i=1; $i<=$#c; $i++) {
+			foreach my $col (keys %cols) {
+				if ($c[$i] =~ /\($col/i) { $cols{$col} = $i; last; }
+			}
+		}
+		#	See if we found a column index for every %cols
+		foreach my $c (keys %cols) {
+			if ($cols{$c} eq '99') {
+				warn "$Script - Unable to find index for column '$c' in LEVEL0 Manifest file '$manfile'\nHDR=$hdr\n";
+				return 0;
+			}
+		}
+		#------------------------------------------------------------------
+		#	Manifest hdr parsed. Create samples entries
+		#------------------------------------------------------------------
+		my $methylid;
+		my $samplecount = 0;
+		while (my $l = <IN>) {          # Read line from Manifest file
+			if ($l =~ /^</) { next; }	# Ignore start/end like <B0001> and </B0001>
+			if ($l !~ /\S/) { next; }	# and blank lines
+			chomp($l);
+			my @c = split("\t", $l);
+			if ($c[$cols{'grn.idat'}] !~ /^\S+\-(\S+)\-(\S{3})_(\S{6})/) {
+				warn "$Script - Unable to parse grn.idat column '" . $c[$cols{'grn.idat'}] .
+					"' from:\nLINE=$l\n";
+				if ($c[$cols{'grn.idat'}] !~ /Failure/) { return 0; }
+				next;
+			}
+			my ($type, $version, $rowcol) = ($1, $2, $3);
+			my $sql = "INSERT INTO $opts{samples_table} " .
+				"(methylbatchid,expt_sampleid,array,p05,p01,type,version,rowcol,";
+			my $values .= "VALUES(" . $batchnames{$bname}{id} . "," .
+				"'$c[$cols{'sampleid'}]'," .
+				"'$c[$cols{'array'}]'," .
+				"$c[$cols{'p05'}]," .
+				"$c[$cols{'p01'}]," .
+				"'$type', '$version', '$rowcol',";
+			foreach my $k (keys %cols){
+				if ($cols{$k} <= 4) { next; }
+				#	Mismatch between %cols index and SQL column name :-(
+				$sql .= $cols2dbcol{$k} . ',';	# Get DB column
+				if ($c[$cols{$k}]) { $values .= "'Y',"; }
+				else { $values .= "'N',"; }
+			}
+			chop($sql);					# Drop trailing comma
+			$sql .= ') ';
+			chop($values);
+			$values .= ')';
+			my $sth = DoSQL($sql . $values);
+			$methylid  = SQL_Last_Insert($sth);
+			if (! $methylid) {	#	Sample exists I hope. Need to know index for it
+				warn "$Script - No database record created for '$c[$cols{'sampleid'}]'\n";
+				return 0;
+			}
+			$totalsamples++;
+			$samplecount++;
+		}
+		close(IN);
+
+		#	Update count of samples for this batch
+		my $sql = "UPDATE $opts{files_table} SET count=$samplecount WHERE $opts{files_pkey}=$batchnames{$bname}{id}";
+		if ($opts{verbose}) { print "SQL=$sql\n"; }
+		my $sth = DoSQL($sql);	
+	}
+
+	#	Update count of samples for this project
+	my $sql = "UPDATE $opts{runs_table} SET arrived='Y' WHERE methylprojectid=$methylprojectid";
+	if ($opts{verbose}) { print "SQL=$sql\n"; }
+	my $sth = DoSQL($sql);
+	$sql = "UPDATE $opts{runs_table} SET count=$totalsamples WHERE methylprojectid=$methylprojectid";
+	if ($opts{verbose}) { print "SQL=$sql\n"; }
+	$sth = DoSQL($sql);
+
+	#	Give summary of what happened
+	system("rm -rf $tmpdir");
+	print "Created $totalsamples samples in $totalbatch batch files\n";
+    return $totalsamples;
+}
+
+#==================================================================
+# Subroutine:
+#   AddRNAProjects - Add database entries for each set of samples in this directory
+#
+# Arguments:
+#   rnaprojectid - parent id
+#   d - directory
+#
+# Returns:
+#   Boolean if any samples were added or not
+#==================================================================
+sub AddRNAProjects {
     my ($rnaprojectid, $d) = @_;
     if (! -d $d) {
         print "$Script - Unable to read directory '$d': $!\n";
@@ -184,7 +441,7 @@ sub AddProjects {
 		chomp($l);
 		my ($fullfn, $check) = NormalizeMD5Line($l, $manifestfile, 1);
 		if (! $check) {
-			warn "$Script - Unable to parse checksum from '$manifestfile'";
+			warn "$Script - Unable to parse checksum from '$manifestfile'\n";
 			return 0;
 		}
 		#	Until we know otherwise, assume first part of $fn is the sampleid
@@ -220,8 +477,8 @@ sub AddProjects {
 			"VALUES($rnaprojectid,'$samp','$expt_sampleids{$samp}->{rnasubject}'," .
 			"'$expt_sampleids{$samp}->{fileprefix}'," .
 			"'$expt_sampleids{$samp}->{notes}',$nowdate)";
-		my $sth = DoSQL($sql, 0);			# Do not fail if it exists
-		if ($sth) { $txseqid  = SQL_Last_Insert(); }	# Index to this sample
+		my $sth = DoSQL($sql);
+		if ($sth) { $txseqid  = SQL_Last_Insert($sth); }	# Index to this sample
 		if (! $txseqid) {	#	Sample exists I hope. Need to know index for it
 			$sql = "SELECT txseqid FROM $opts{samples_table} " .
 				"WHERE expt_sampleid='$samp'";
@@ -437,7 +694,7 @@ sub CreateRun {
         "VALUES($cid,'$d','',0,'$nowdate')";
     my $sth = DoSQL($sql);
     my $runid = $sth->{mysql_insertid};
-    print "$Script - Added run '$d' [ $runid ]\n";
+    print "$Script - Added run/project '$d' [ $runid ]\n";
     $opts{runcount}++;
     return $runid;
 }
@@ -537,10 +794,11 @@ sub AddBams {
     }
 
     #   Get number of database records
+   	#	We no longer have data arriving piecemeal - set arrived
     $sql = "SELECT $opts{samples_pkey} FROM $opts{samples_table} WHERE $opts{runs_pkey}=$runid";
     $sth = DoSQL($sql);
     my $numbamrecords = $sth->rows();
-    $sql = "UPDATE $opts{runs_table}  SET count=$numbamrecords WHERE runid=$runid";
+    $sql = "UPDATE $opts{runs_table}  SET arrived='Y',count=$numbamrecords WHERE runid=$runid";
     $sth = DoSQL($sql);
 
     #   Last sanity check, see if number of BAM files matches records
@@ -554,8 +812,9 @@ sub AddBams {
             "If data is incoming, this might be OK\n";
         }
     }
+    return 1;								# No need to check/set arrived
 
-    #   If SOME ALL the sample has been processed as arrived, maybe we do not
+    #   If ALL the samples has been processed as arrived, maybe we do not
     #   need to look at this run any more.
     $sql = "SELECT $opts{samples_pkey} FROM $opts{samples_table} WHERE state_arrive!=$NOTSET";
     $sth = DoSQL($sql);

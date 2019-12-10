@@ -50,6 +50,7 @@ INSERT INTO centers (centername,centerdesc,designdesc) VALUES('uw', 'University 
 INSERT INTO centers (centername,centerdesc,designdesc) VALUES('baylor', 'BCM','30x Illumina whole genome sequencing using Kapa PCR-free DNA library preparation with 500ng input DNA');
 INSERT INTO centers (centername,centerdesc,designdesc) VALUES('macrogen', 'Macrogen','30x Illumina whole genome sequencing using Kapa PCR-free DNA library preparation with 500ng input DNA');
 INSERT INTO centers (centername,centerdesc,designdesc) VALUES('washu', 'McDonnell Genome Center at Washington University','30x Illumina whole genome sequencing using Kapa PCR-free DNA library preparation with 500ng input DNA');
+INSERT INTO centers (centername,centerdesc,designdesc) VALUES('usc', 'University of Southern California','');
 
 /*  The second of these is used to overwhelm a bug on the part of NCBI */
 UPDATE centers set centerdesc='New York Genome Center' where centerid=3;
@@ -187,7 +188,7 @@ CREATE INDEX index_state_b37 ON bamfiles(state_b37);
 CREATE INDEX index_state_b38 ON bamfiles(state_b38);
 CREATE INDEX index_state_gce38push ON bamfiles(state_gce38push);
 CREATE INDEX index_state_gce38pull ON bamfiles(state_gce38pull);
-ALTER TABLE bamfiles ADD UNIQUE (expt_sampleid);
+CREATE UNIQUE INDEX index_bamsampleid ON bamfiles(expt_sampleid);
 
 -- MySQL Workbench Forward Engineering
 
@@ -226,9 +227,10 @@ CREATE TABLE tx_projects (
 DROP TABLE IF EXISTS tx_samples;
 CREATE TABLE tx_samples (
    txseqid       INT         NOT NULL AUTO_INCREMENT,
-   rnaprojectid  INT         NOT NULL,      /* tx_projects id  */
+   rnaprojectid  INT         NOT NULL,      /* Project from above  */
    expt_sampleid VARCHAR(24),               /* NWDID or really TOR ID */
    fileprefix    VARCHAR(64),     		    /* Prefix of all filenames for this sample */
+   /* Columns to manage actions by the monitor */
    count         INT  DEFAULT 0,            /* How many files for this sample */
    rnasubject    VARCHAR(64),               /* Investigator ID */
    notes         TEXT,                      /* Notes from tab/xls file */
@@ -236,35 +238,23 @@ CREATE TABLE tx_samples (
    dateinit      VARCHAR(12),
    datearrived   VARCHAR(12),				/* Needed for tracking state of steps */
    emsg          VARCHAR(255),
-   /* Fields to track state for each step */
-   /*
-   my $NOTSET    = 0;            # Not set
-   my $REQUESTED = 1;            # Task requested
-   my $SUBMITTED = 2;            # Task submitted to be run
-   my $STARTED   = 3;            # Task started
-   my $DELIVERED = 19;           # Data delivered, but not confirmed
-   my $COMPLETED = 20;           # Task completed successfully
-   my $IGNORETHIS = 80;          # Task is to be ignored
-   my $FAILEDCHECKSUM = 88;      # Task failed, because checksum at NCBI bad
-   my $CANCELLED = 89;           # Task cancelled
-   my $FAILED    = 99;           # Task failed
-   */
+   /* Fields to track state for each step. Uses same values as in bamfiles state_* */
    state_arrive   INT DEFAULT 0,
    state_verify   INT DEFAULT 0,
    state_backup   INT DEFAULT 0,
-   state_aws38copy INT DEFAULT 0,    /* Copy local data to AWS bucket */
-   state_fix INT DEFAULT 0,          /* Track efforts to fix screwups */
+   state_aws38copy INT DEFAULT 0,    		/* Copy local data to AWS bucket */
+   state_fix INT DEFAULT 0,          		/* Track efforts to fix screwups */
 
    PRIMARY KEY  (txseqid)
 );
 CREATE INDEX index_rnatxseqid     ON tx_samples(rnaprojectid);
-CREATE INDEX index_rnatx_sampleid ON tx_samples(expt_sampleid);
+CREATE UNIQUE INDEX index_rnatx_sampleid ON tx_samples(expt_sampleid);
 
 /* Each sample can have a number of associated files */
 DROP TABLE IF EXISTS tx_files;
 CREATE TABLE tx_files (
    fileid        INT         PRIMARY KEY AUTO_INCREMENT,
-   txseqid       INT         NOT NULL,     /* Which tx_samples */
+   txseqid       INT         NOT NULL,     /* Sample from above */
    filename      VARCHAR(256) NOT NULL,
    checksum      VARCHAR(32) DEFAULT ' ',
    intar         CHAR(1) DEFAULT 'N',      /* Is this file in tar file */
@@ -274,6 +264,102 @@ CREATE TABLE tx_files (
 );
 CREATE INDEX index_rnatxfileid ON tx_files(fileid);
 CREATE INDEX index_fileid_txseqid ON tx_files(fileid,txseqid);
+
+/* --------------------------------------------------------------
+#       NHLBI TOPMed tracking entries for Methylation data
+#--------------------------------------------------------------- 
+*/
+
+/* Lists all directories of data (e.g. runs). Must be tied to a center */
+DROP TABLE IF EXISTS methyl_projects;
+CREATE TABLE methyl_projects (
+   methylprojectid  INT NOT NULL AUTO_INCREMENT,
+   centerid     INT,
+   dirname      VARCHAR(256) NOT NULL,   	/* Path to where batch directies can be found */
+   count        INT,                        /* Count of methyl samples in this project */
+   datayear     INT DEFAULT 2019,           /* Year when data arrived, cannot use YEAR(NOW()) */
+   arrived      CHAR(1) DEFAULT 'N',        /* Y or N that all files arrived */
+   status       VARCHAR(256),
+   dateinit     VARCHAR(12),
+   datecomplete VARCHAR(12),
+   comments     TEXT,
+
+   PRIMARY KEY  (methylprojectid)
+);
+
+/* All data files. Must be tied to a methyl_projects */
+DROP TABLE IF EXISTS methyl_batch;
+CREATE TABLE methyl_batch (
+   methylbatchid    INT      NOT NULL AUTO_INCREMENT,
+   methylprojectid  INT      NOT NULL,      /* Project from above */
+   batchname     VARCHAR(24),               /* E.g. CRA-B0001 */
+   count        INT,                        /* Count of Methylation samples in this batch */
+   /* Sample is really four zip files */
+   file0         VARCHAR(64),               /* Name of file */
+   file0checksum VARCHAR(32) DEFAULT ' ',
+   file0size     BIGINT,
+   file1         VARCHAR(64),
+   file1checksum VARCHAR(32) DEFAULT ' ',
+   file1size     BIGINT,
+   file2         VARCHAR(64),
+   file2checksum VARCHAR(32) DEFAULT ' ',
+   file2size     BIGINT,
+   file3         VARCHAR(64),
+   file3checksum VARCHAR(32) DEFAULT ' ',
+   file3size     BIGINT,
+   /* Columns to manage actions by the monitor */
+   dateinit      VARCHAR(12),               /* When project data arrived */
+   datearrived   VARCHAR(12),				/* Date of level0 file */
+   emsg          VARCHAR(255),
+   /* Fields to track state for each step. Uses same values as in bamfiles state_* */
+   state_arrive   INT DEFAULT 0,
+   state_verify   INT DEFAULT 0,
+   state_backup   INT DEFAULT 0,
+   state_aws38copy INT DEFAULT 0,    		/* Copy local data to AWS bucket */
+   state_fix INT DEFAULT 0,          		/* Track efforts to fix screwups */
+
+   PRIMARY KEY  (methylbatchid)
+);
+CREATE INDEX index_rnamethylbatchid ON methyl_batch(methylprojectid);
+CREATE INDEX index_rnabatchname ON methyl_batch(batchname);
+
+/* All samples must be tied to a methyl_batch */
+DROP TABLE IF EXISTS methyl_samples;
+CREATE TABLE methyl_samples (
+   methylid   INT   NOT NULL AUTO_INCREMENT,
+   methylbatchid    INT      NOT NULL,      /* methyl_batch id above */
+   expt_sampleid VARCHAR(24),               /* NWDID or really TOE ID */
+   array         CHAR(1),                   /* Array from Manifest */
+   p05           FLOAT,                     /* p<0.05 from Manifest */
+   p01           FLOAT,                     /* p<0.01 from Manifest */
+   type          VARCHAR(8),                /* E.g. BIS or OXY from grn.idat file */
+   version       VARCHAR(3),                /* E.g. v01 from grn.idat file */
+   rowcol        CHAR(6),                   /* E.g. R03C01 from grn.idat file */
+   methmatch     VARCHAR(24) DEFAULT '',    /* Future use */
+   subject       VARCHAR(24) DEFAULT '',    /* Future use */
+   /* Flags indicating if Manifest said various files existed
+      Y - exists as indicated by single Manifest file
+      C - exists as indicated by a combined Manifest file
+      N - does not exist
+   */
+   grn_idat      CHAR(1) DEFAULT 'N',
+   red_idat      CHAR(1) DEFAULT 'N',
+   sdf           CHAR(1) DEFAULT 'N',
+   meth_raw      CHAR(1) DEFAULT 'N',
+   unmeth_raw    CHAR(1) DEFAULT 'N',
+   beta_raw      CHAR(1) DEFAULT 'N',
+   pvalue        CHAR(1) DEFAULT 'N',
+   rgset_snp     CHAR(1) DEFAULT 'N',
+   meth_noob     CHAR(1) DEFAULT 'N',
+   unmeth_noob   CHAR(1) DEFAULT 'N',
+   beta_noob     CHAR(1) DEFAULT 'N',
+   noob_correct  CHAR(1) DEFAULT 'N',
+
+   PRIMARY KEY  (methylid)
+);
+CREATE INDEX index_rnamethylid      ON methyl_samples(methylbatchid);
+CREATE INDEX index_rnaexpt_sampleid ON methyl_samples(expt_sampleid);
+CREATE UNIQUE INDEX index_methsampleid ON methyl_samples(expt_sampleid);
 
 /*   Handy queries
     ALTER TABLE tx_samples ADD COLUMN datebai VARCHAR(12) AFTER datebackup;
