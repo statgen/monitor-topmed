@@ -118,17 +118,25 @@ if ($opts{datatype} eq 'rnaseq') {
 	$opts{files_table} = 'tx_files';
 	$opts{files_pkey} = 'fileid';
 }
+if ($opts{datatype} eq 'methyl') {
+	$opts{toe_table} = 'methyl_samples';		# True NWDID but we do not act on these
+	$opts{toe_pkey} = 'methylid';
+	$opts{runs_table} = 'methyl_projects';
+	$opts{runs_pkey} = 'methylprojectid';
+	$opts{samples_table} = 'methyl_batch';		# Really batch, but acts like sample
+	$opts{samples_pkey} = 'methylbatchid';
+}
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
     my $m = "$Script [-p project] [options] ";
     my $verbs = join(' ', sort keys %VALIDVERBS);
     my $requests = join(' ', sort keys %VALIDSTATUS);
-    warn "$m mark sampleid|nwdid action newstatus\n" .
+    warn "$m mark batchid|sampleid|nwdid action newstatus\n" .
         "    Where action: $verbs\n" .
         "    Where newstatus: $requests\n" .
         "  or\n" .
-        "$m unmark sampleid|nwdid [same list as mark]\n" .
+        "$m unmark batchid|sampleid|nwdid [same list as mark]\n" .
         "  or\n" .
         "$m set sampleid|nwdid|dirname colname value\n" .
         "  or\n" .
@@ -271,7 +279,7 @@ sub UnMark {
 
 #==================================================================
 # Subroutine:
-#   WhatNWDID($nwdid)
+#   WhatNWDID($nwdid)	Only valid for genome
 #
 #   Print interesting details about an NWDID
 #==================================================================
@@ -335,16 +343,18 @@ sub Set {
     if ($val ne 'NULL') { $val = "'$val'"; }    # Use quotes unless this is NULL
 
     #   This could be a run name
-    $sth = DoSQL("SELECT $opts{runs_pkey} FROM $opts{runs_table} WHERE dirname='$sampleid'", 0);
-    $rowsofdata = $sth->rows();
-    if ($rowsofdata) {
-        if ($rowsofdata > 1) {
-            die "$Script - Eeek, there are $rowsofdata runs named '$sampleid'\n";
+    #if ($opts{datatype} ne 'methyl') {			# Methyl is completely different
+    	$sth = DoSQL("SELECT $opts{runs_pkey} FROM $opts{runs_table} WHERE dirname='$sampleid'", 0);
+    	$rowsofdata = $sth->rows();
+    	if ($rowsofdata) {
+        	if ($rowsofdata > 1) {
+            	die "$Script - Eeek, there are $rowsofdata runs named '$sampleid'\n";
+        	}
+        	$href = $sth->fetchrow_hashref;
+        	DoSQL("UPDATE $opts{runs_table} SET $col=$val WHERE $opts{runs_pkey}='$href->{$opts{runs_pkey}}'");
+        	return;
         }
-        $href = $sth->fetchrow_hashref;
-        DoSQL("UPDATE $opts{runs_table} SET $col=$val WHERE $opts{runs_pkey}='$href->{$opts{runs_pkey}}'");
-        return;
-    }
+    #}
 
     #   This is sampleid or expt_sampleid
     $sampleid = GetSampleid($sampleid);
@@ -442,6 +452,15 @@ sub List {
             $s = $href->{expt_sampleid};
             if ($opts{'with-id'}) { $s .= ' ' . $href->{$opts{samples_pkey}}; }
             print $s . "\n";
+        }
+        return;
+    }
+    if ($opts{datatype} eq 'methyl' && $fcn =~ /batch/) { 	# Show files for a batch
+        my $sth = DoSQL("SELECT file0,file1,file2,file3 FROM $opts{samples_table} WHERE $opts{samples_pkey}=$item");
+        my $rowsofdata = $sth->rows();
+        for (my $i=1; $i<=$rowsofdata; $i++) {
+            my $href = $sth->fetchrow_hashref;
+            print $href->{file0} . "\n"  . $href->{file1} . "\n"  . $href->{file2} . "\n"  . $href->{file3} . "\n";
         }
         return;
     }

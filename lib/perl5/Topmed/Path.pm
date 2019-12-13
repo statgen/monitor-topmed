@@ -28,7 +28,8 @@ our %PATHOPTS = (
     oldbackupsdir => '/net/topmed/working/backups/incoming/',
     bcfsdir => 'working/candidate_variants',
     consoledir => 'working/',
-    rnaseqdir => 'incoming/topmed/rnaseq/',
+    rnaseqdir => 'incoming/topmed/rnaseq',
+    methyldir => 'incoming/topmed/methylation',
     wresults37dir => 'working/schelcj/results',
     iresults37dir => 'incoming/schelcj/results',
     results38dir => 'working/mapping/results',
@@ -66,14 +67,22 @@ sub PathInit {
     $PATHOPTS{gcebcfuploaduri} .= $project . '-bcf';
     $PATHOPTS{gceuploaduri} .= $project . '-irc-share/genomes';
 
-if (defined($datatype) && $datatype eq 'rnaseq') {
-	$PATHOPTS{samples_table} = 'tx_samples';
-	$PATHOPTS{samples_pkey} = 'txseqid';
-	$PATHOPTS{runs_table} = 'tx_projects';
-	$PATHOPTS{runs_pkey} = 'rnaprojectid';
-	$PATHOPTS{datatype} = $datatype,
-	$PATHOPTS{backupsdir} = '/net/ddn/incoming/topmed/rnaseq';
-}
+	if (defined($datatype) && $datatype eq 'rnaseq') {
+		$PATHOPTS{samples_table} = 'tx_samples';
+		$PATHOPTS{samples_pkey} = 'txseqid';
+		$PATHOPTS{runs_table} = 'tx_projects';
+		$PATHOPTS{runs_pkey} = 'rnaprojectid';
+		$PATHOPTS{datatype} = $datatype,
+		$PATHOPTS{backupsdir} = '/net/ddn/incoming/topmed/rnaseq';
+	}
+	if (defined($datatype) && $datatype eq 'methyl') {
+		$PATHOPTS{samples_table} = 'methyl_batch';
+		$PATHOPTS{samples_pkey} = 'methylbatchid';
+		$PATHOPTS{runs_table} = 'methyl_projects';
+		$PATHOPTS{runs_pkey} = 'methylprojectid';
+		$PATHOPTS{datatype} = $datatype,
+		$PATHOPTS{backupsdir} = '/net/ddn/incoming/topmed/methylation';
+	}
 
     My_DB::DBConnect($PATHOPTS{realm});        # Set up database
 }
@@ -82,7 +91,7 @@ if (defined($datatype) && $datatype eq 'rnaseq') {
 # Subroutine:
 #   SetGlobs($sampleid) - set globals based on $PATHOPTS{datatype}
 #==================================================================
-my ($sampleid, $bamname, $cramname, $piname, $datayear, $nwdid, $rundir, $centername, $fileprefix); # Globals
+my ($sampleid, $bamname, $cramname, $piname, $datayear, $nwdid, $rundir, $batchname, $centername, $fileprefix); # Globals
 sub SetGlobs {
     my ($sampleid) = @_;
 	if ($PATHOPTS{datatype} eq 'genome') {
@@ -119,15 +128,36 @@ sub SetGlobs {
 		my $rnaprojectid = $href->{rnaprojectid};
 		$fileprefix = $href->{fileprefix};
 		$nwdid = $href->{expt_sampleid};
-
 		$sth = My_DB::DoSQL("SELECT centerid,dirname,datayear FROM $PATHOPTS{runs_table} WHERE $PATHOPTS{runs_pkey}=$rnaprojectid");
 		$rowsofdata = $sth->rows();
 		if (! $rowsofdata) { die "$main::Script - Sample '$sampleid' run '$rnaprojectid' is unknown\n"; }
 		$href = $sth->fetchrow_hashref;
 		$rundir = $href->{dirname};
 		$datayear = $href->{datayear};
-
 		my $centerid = $href->{centerid};
+		$sth = My_DB::DoSQL("SELECT centername FROM $PATHOPTS{centers_table} WHERE centerid=$centerid");
+		$rowsofdata = $sth->rows();
+		if (! $rowsofdata) { die "$main::Script - Sample '$sampleid' center '$centerid' is unknown\n"; }
+		$href = $sth->fetchrow_hashref;
+		$centername = $href->{centername};
+		return;
+	}
+	if ($PATHOPTS{datatype} eq 'methyl') {
+		#   Get values of interest from the database
+		my $sth = My_DB::DoSQL("SELECT methylprojectid,batchname FROM $PATHOPTS{samples_table} WHERE $PATHOPTS{samples_pkey}=$sampleid");
+		my $rowsofdata = $sth->rows();
+		if (! $rowsofdata) { die "$main::Script - Sample '$b' is unknown\n"; }
+		my $href = $sth->fetchrow_hashref;
+		my $methylprojectid = $href->{methylprojectid};
+		$batchname = $href->{batchname};
+
+		$sth = My_DB::DoSQL("SELECT centerid,dirname FROM $PATHOPTS{runs_table} WHERE $PATHOPTS{runs_pkey}=$methylprojectid");
+		$rowsofdata = $sth->rows();
+		if (! $rowsofdata) { die "$main::Script - Sample '$sampleid' run '$methylprojectid' is unknown\n"; }
+		$href = $sth->fetchrow_hashref;
+		$rundir = $href->{dirname};
+		my $centerid = $href->{centerid};
+
 		$sth = My_DB::DoSQL("SELECT centername FROM $PATHOPTS{centers_table} WHERE centerid=$centerid");
 		$rowsofdata = $sth->rows();
 		if (! $rowsofdata) { die "$main::Script - Sample '$sampleid' center '$centerid' is unknown\n"; }
@@ -172,8 +202,25 @@ sub WherePath {
         die "$main::Script - Unknown WherePath rnaseq option '$set'\n";
     }
 
+	#	Handle methylation here 
+    if ($PATHOPTS{datatype} eq 'methyl') {
+    	if ($set eq 'rundir') {
+        	my $s = "$PATHOPTS{netdir}/$PATHOPTS{methyldir}/$centername/$rundir";
+        	return $s;
+        }
+    	if ($set eq 'batch') {
+        	my $s = "$PATHOPTS{netdir}/$PATHOPTS{methyldir}/$centername/$rundir/$batchname";
+        	return $s;
+        }
+    	if ($set eq 'localbackup') {
+        	my $s = "$PATHOPTS{backupsdir}/$centername/$rundir";
+        	return $s;
+        }
+        die "$main::Script - Unknown WherePath methyl option '$set'\n";
+    }
 
-    #   BAM is in one of those $PATHOPTS{netdir} trees where without a symlink
+    #   Genome Sequence here
+    #	BAM is in one of those $PATHOPTS{netdir} trees where without a symlink
     if ($set eq 'bam') {
         my $bamfdir = AbsPath("$PATHOPTS{netdir}/$PATHOPTS{incomingdir}/$centername/$rundir");
         return $bamfdir;
@@ -192,10 +239,6 @@ sub WherePath {
     #	do not backup in two places ?? I hope ??
     if ($set eq 'localbackup') {
         my $backup;
-        if ($PATHOPTS{datatype} eq 'rnaseq' ) {
-        	$backup = "$PATHOPTS{backupsdir}/$centername";
-        	return $backup; 
-        }
         # Genome seq here
         if ($datayear >= 4) {  $backup = "$PATHOPTS{backupsdir}/$centername"; }   # New path
         else {
@@ -316,6 +359,10 @@ sub WhereFile {
     my $path = WherePath(@_);
     if (! $path) { return ''; }
     if ($PATHOPTS{datatype} eq 'rnaseq' ) {
+    	if ($set eq 'localbackup') { return $path; }
+    	die "main::Script - WhereFile '$set' not valid for datatype '$PATHOPTS{datatype}'\n";
+    }
+    if ($PATHOPTS{datatype} eq 'methyl' ) {
     	if ($set eq 'localbackup') { return $path; }
     	die "main::Script - WhereFile '$set' not valid for datatype '$PATHOPTS{datatype}'\n";
     }
@@ -455,8 +502,14 @@ sub FindB38 {
 #
 #   Return full path or null string
 #==================================================================
-sub AbsPath {
+sub AbsPath {	
     my ($p) = @_;
+    #	We seem to have lots of NFS failures which result in
+    #	NULL paths - making it harder to determine this is
+    #	an NFS problem and not a code problem.
+    #	Forget about abs_path
+	return $p;
+
     if (-l $p) {
         #   This is symlink, replace prefix with absolute path
         if ($p =~ /^\.\.[\.\/]+([a-z].+)/) {

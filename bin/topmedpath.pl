@@ -56,15 +56,16 @@ PathInit($ENV{PROJECT}, $opts{datatype});	# Set up project variables, special ha
 
 #   Simple help if requested
 if ($#ARGV < 0 || $opts{help}) {
-    my $m = "$Script [-p project] [options]";
-    warn "$m wherepath sampleid|nwdid KEYWORD\n" .
+    my $m = "$Script [-p project] [-datatype genome|rnaseq|methyl] [options]";
+    warn "$m wherepath id KEYWORD\n" .
         "  or\n" .
-        "$m whathost sampleid|nwdid KEYWORD\n" .
+        "$m whathost id KEYWORD\n" .
         "  or\n" .
-        "$m wherefile sampleid|nwdid KEYWORD\n" .
+        "$m wherefile id KEYWORD\n" .
         "\nWHERE KEYWORD is one of bam|cram|localbackup|remotebackup|remotearchive|" .
         	"qcresults|console|b37|b38|bcf|gceupload|awsupload\n" .
         "  or\n" .
+        "WHERE ID is nwdid or sampleid or batchid\n" .
         "WHERE KEYWORD is one of rundir|releasefiles|fileprefix\n" .
         "More details available by entering: perldoc $0\n\n";
     if ($opts{help}) { system("perldoc $0"); }
@@ -133,6 +134,11 @@ See B<perldoc DBIx::Connector> for details defining the database.
 =item B<-help>
 
 Generates this output.
+
+=item B<-datatype genome|rnaseq|methyl>
+
+Allows one to specify the type of data to work with. 
+The default is B<genome>.
 
 =item B<-project projectname>
 

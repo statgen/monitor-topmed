@@ -78,10 +78,10 @@ if (! -d "/usr/cluster/$ENV{PROJECT}") { die "$Script - Environment variable PRO
 our %opts = (
     realm => "/usr/cluster/$ENV{PROJECT}/etc/.db_connections/$ENV{PROJECT}",
     centers_table => 'centers',
-    runs_table => 'runs',
-    runs_pkey => 'runid',
-    samples_table => 'bamfiles',
-    samples_pkey => 'bamid',
+    status_table => 'runs',
+    status_pkey => 'runid',
+    state_table => 'bamfiles',
+    state_pkey => 'bamid',
     datatype => 'genome',
     verbose => 0,
 );
@@ -90,12 +90,22 @@ Getopt::Long::GetOptions( \%opts,qw(
     help realm=s verbose center=s runs=s project=s datatype=s
     )) || die "Failed to parse options\n";
 if ($opts{datatype} eq 'rnaseq') {
-	$opts{samples_table} = 'tx_samples';
-	$opts{samples_pkey} = 'txseqid';
-	$opts{runs_table} = 'tx_projects';
-	$opts{runs_pkey} = 'rnaprojectid';
-	$opts{files_table} = 'tx_files';
-	$opts{files_pkey} = 'fileid';
+	$opts{state_table} = 'tx_samples';			# Table of rows with state_ flags
+	$opts{state_pkey} = 'txseqid';
+	$opts{status_table} = 'tx_projects';		# Table of rows with status column
+	$opts{status_pkey} = 'rnaprojectid';
+	%attributes2letter = (
+    	'state_arrive'    => 'a',
+    	'state_verify'    => '5',
+    	'state_backup'    => 'B',
+    	'state_aws38copy' => 'A',
+	);
+}
+if ($opts{datatype} eq 'xxmethyl') {			# This is not really used for methyl
+	$opts{state_table} = 'methyl_batch';		# Table of rows with state_ flags
+	$opts{state_pkey} = 'methylbatchid';
+	$opts{status_table} = 'methyl_batch';		# Table of rows with status column
+	$opts{status_pkey} = 'methylbatchid';
 	%attributes2letter = (
     	'state_arrive'    => 'a',
     	'state_verify'    => '5',
@@ -132,8 +142,8 @@ if ($fcn eq 'runstatus') {
         foreach my $runid (keys %{$runsref}) {
             my $numberbams = $runsref->{$runid};
             #   Get list of all bams for this run
-            my $sql = "SELECT $opts{samples_pkey},$attributes_str FROM $opts{samples_table} " .
-                "WHERE $opts{runs_pkey}='$runid'";
+            my $sql = "SELECT $opts{state_pkey},$attributes_str FROM $opts{state_table} " .
+                "WHERE $opts{status_pkey}='$runid'";
             my $sth = DoSQL($sql);
             my $rowsofdata = $sth->rows();
             if (! $rowsofdata) { next; }
@@ -182,9 +192,9 @@ if ($fcn eq 'runstatus') {
                 }
                 $s .= "$attributes2letter{$a}=unknown,";
             }
-            if ($opts{verbose}) { warn "Status $opts{runs_pkey} $opts{runs_pkey}=$s\n"; }
+            if ($opts{verbose}) { warn "$opts{status_table} $opts{status_pkey}=$runid Status=$s\n"; next; }
             #   Update status for this run 
-            $sql = "UPDATE $opts{runs_table} SET status='$s' WHERE $opts{runs_pkey}=$runid";
+            $sql = "UPDATE $opts{status_table} SET status='$s' WHERE $opts{status_pkey}=$runid";
             $sth = DoSQL($sql);
         }
     }
@@ -207,7 +217,7 @@ sub GetRunsCount {
     my ($cid) = @_;
     my %runs2count = ();
 
-    my $sql = "SELECT $opts{runs_pkey},dirname,count FROM $opts{runs_table} WHERE centerid=$cid";
+    my $sql = "SELECT $opts{status_pkey},dirname,count FROM $opts{status_table} WHERE centerid=$cid";
     my $sth = My_DB::DoSQL($sql);
     my $rowsofdata = $sth->rows();
     if (! $rowsofdata) {
@@ -225,7 +235,7 @@ sub GetRunsCount {
     for (my $i=1; $i<=$rowsofdata; $i++) {
         my $href = $sth->fetchrow_hashref;
         if ($opts{runs} && (! exists($theseruns{$href->{dirname}}))) { next; }
-        $runs2count{$href->{$opts{runs_pkey}}} = $href->{count};
+        $runs2count{$href->{$opts{status_pkey}}} = $href->{count};
     }
     return \%runs2count;
 }
@@ -236,7 +246,6 @@ sub GetRunsCount {
 #   Perldoc Documentation
 #==================================================================
 __END__
-
 =head1 NAME
 
 topmed_status.pl - automatically update the states for runs
@@ -306,4 +315,3 @@ terms of the GNU General Public License as published by the Free Software
 Foundation; See http://www.gnu.org/copyleft/gpl.html
 
 =cut
-

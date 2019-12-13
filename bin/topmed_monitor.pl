@@ -62,11 +62,8 @@ our %opts = (
     topmedcram   => $Bin . "/topmed_cram.sh",
     topmedqplot  => $Bin . "/topmed_qplot.sh",
     topmedexpt  => $Bin . "/topmed_ncbiexpt.sh",
-    #topmedncbiorig => $Bin . "/topmed_ncbiorig.sh",
-    #topmedncbib37 => $Bin . "/topmed_ncbib37.sh",
-    topmedncbib38 => $Bin . "/topmed_ncbib38.sh",
-    topmedgce38push => $Bin . "/topmed_gcepush.sh",
-    topmedgce38pull => $Bin . "/topmed_gcepull.sh",
+    topmedgcepush => $Bin . "/topmed_gcepush.sh",
+    topmedgcepull => $Bin . "/topmed_gcepull.sh",
     topmedgce38post => $Bin . "/topmed_gcepost.sh",
     topmedgcecopy => $Bin . "/topmed_gcecopy.sh",
     topmedgcecpbcf => $Bin . "/topmed_gcecpbcf.sh",
@@ -136,7 +133,26 @@ if ($opts{datatype} eq 'rnaseq') {
 		arrive => 1,
 		verify => 1,
 		backup => 1,
-		qplot => 1,
+		awscopy => 1,
+		fix => 1,
+	);
+}
+if ($opts{datatype} eq 'methyl') {
+	$opts{samples2_table} = 'methyl_samples';
+	$opts{samples2_pkey} = 'methylid';
+	$opts{samples_table} = 'methyl_batch';
+	$opts{samples_pkey} = 'methylbatchid';
+	$opts{runs_table} = 'methyl_projects';
+	$opts{runs_pkey} = 'methylprojectid';
+	$opts{topmedarrive} = $Bin . "/methyl_arrive.sh";
+    $opts{topmedverify} = $Bin . "/methyl_verify.sh";
+    $opts{topmedbackup} = $Bin . "/methyl_backup.sh";
+    $opts{topmedawscopy} = $Bin . "/methyl_awscopy.sh";
+    $opts{topmedfix} = $Bin . "/methyl_fix.sh";
+	%validverbs = (
+		arrive => 1,
+		verify => 1,
+		backup => 1,
 		awscopy => 1,
 		fix => 1,
 	);
@@ -204,8 +220,10 @@ sub Submit_arrive {
         #   Get list of all samples
         my $s = '';
         my $bs = '';
+        my $dir = 'r.dirname';
         if ($opts{datatype} eq 'genome') { $bs = ',b.'; $s = $bs . 'bamname'; }
-        my $sql = "SELECT r.dirname$s,c.centername,b.$opts{samples_pkey},b.expt_sampleid,b.state_arrive " .
+        if ($opts{datatype} eq 'methyl') { $dir = 'batchname'; }
+        my $sql = "SELECT b.$dir$s,c.centername,b.$opts{samples_pkey},b.state_arrive " .
             "FROM $opts{samples_table} AS b " .
             "JOIN $opts{runs_table} AS r ON b.$opts{runs_pkey}=r.$opts{runs_pkey} " .
             "JOIN $opts{centers_table} AS c ON r.centerid = c.centerid " .
@@ -216,7 +234,7 @@ sub Submit_arrive {
             my $href = $sth->fetchrow_hashref;
             #   Build path to sample manually
             if ($opts{datatype} eq 'genome') {	# Check if file exists
-            	my $f = $opts{topdir} . "/$href->{centername}/$href->{dirname}/" . $href->{bamname};
+            	my $f = $opts{topdir} . "/$href->{centername}/$href->{$dir}/" . $href->{bamname};
             	my @stats = stat($f);
             	if (! @stats) { next; }     # No real data
             	#   Check ownership of run. Things break if not owned by real owner
@@ -301,6 +319,7 @@ sub Submit_cram {
 sub Submit_backup {
 	my $dependency = 'state_cram';
 	if ($opts{datatype} eq 'rnaseq') { $dependency = 'state_verify' };
+	if ($opts{datatype} eq 'methyl') { $dependency = 'state_verify' };
 	Submit_generic('backup', $dependency, 'state_backup');
 }
 

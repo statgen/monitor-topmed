@@ -279,7 +279,6 @@ CREATE TABLE methyl_projects (
    count        INT,                        /* Count of methyl samples in this project */
    datayear     INT DEFAULT 2019,           /* Year when data arrived, cannot use YEAR(NOW()) */
    arrived      CHAR(1) DEFAULT 'N',        /* Y or N that all files arrived */
-   status       VARCHAR(256),
    dateinit     VARCHAR(12),
    datecomplete VARCHAR(12),
    comments     TEXT,
@@ -317,6 +316,7 @@ CREATE TABLE methyl_batch (
    state_backup   INT DEFAULT 0,
    state_aws38copy INT DEFAULT 0,    		/* Copy local data to AWS bucket */
    state_fix INT DEFAULT 0,          		/* Track efforts to fix screwups */
+   status       VARCHAR(256),
 
    PRIMARY KEY  (methylbatchid)
 );

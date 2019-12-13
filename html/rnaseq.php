@@ -36,13 +36,13 @@ $GLOBS['links'] = "LINKS: " .
     "return false;'>Tail_Logs</a> &nbsp;";
 
 if ($LDB['datatype'] == 'rnaseq') {
-	$$GLOBS['validfunctions'] = array('all', 'verify', 'backup', 'awscopy');
+	$GLOBS['validfunctions'] = array('all', 'verify', 'backup', 'awscopy');
 }
 if ($LDB['datatype'] == 'methyl') {
-	$$GLOBS['validfunctions'] = array('all', 'verify', 'backup', 'awscopy');
+	$GLOBS['validfunctions'] = array('all', 'verify', 'backup', 'awscopy');
 }
 if ($LDB['datatype'] == 'genome') {
-	$$GLOBS['validfunctions'] = array('all', 'verify', 'cram', 'backup', 'qplot',
+	$GLOBS['validfunctions'] = array('all', 'verify', 'cram', 'backup', 'qplot',
     	'gcepush', 'gcepull', 'bcf', 'gcecopy', 'gcecpbcf', 'gcecleanup', 'awscopy', 'fix');
 }
 

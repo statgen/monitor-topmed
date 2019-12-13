@@ -53,7 +53,7 @@ $quickcols = array(                     // Map of status column to topmedcmd ver
     'state_backup'   => 'backup',
     'state_aws38copy'=> 'awscopy'
 );
-$quickletter = array(                   	// Map of status column to letter we see
+$quickletter = array(                	// Map of status column to letter we see
 	'state_arrive'   => 'a',
 	'state_verify'   => '5',
 	'state_backup'   => 'B',
@@ -61,7 +61,7 @@ $quickletter = array(                   	// Map of status column to letter we se
 );
 $separator_actions = array();
 if ($LDB['datatype'] == 'genome') {
-	$quickcols = array(                     // Map of status column to topmedcmd verb
+	$quickcols = array(               	// Map of status column to topmedcmd verb
 		'state_arrive'   => 'arrived',
 		'state_verify'   => 'verify',
 		'state_cram'     => 'cramed',

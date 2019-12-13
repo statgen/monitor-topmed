@@ -95,7 +95,7 @@ function ViewProjects($center, $maxdir) {
 ---------------------------------------------------------------*/
 function ShowProjectYear($cid, $maxdir, $datayear) {
     global $LDB, $GLOBS;
-    $hdrcols  = array('dirname', 'status', 'count');
+    $hdrcols  = array('dirname', 'datayear', 'count');
     $tablenick = 'projects';
     $projtable = $tablenick;
     $projpkey = $projtable . '_pkey';
@@ -136,7 +136,6 @@ function ShowProjectYear($cid, $maxdir, $datayear) {
                 $u = $_SERVER['SCRIPT_NAME'] . "?fcn=batches&amp;id=" . $row[$projpkey];
                 $d = "<a href='$u'>$d</a>";
             }
-            if ($c == 'status') { $d = CalcRunStatus($d); }
             $html .= "<td align='center'>$d</td>\n";
         }
             
@@ -161,7 +160,7 @@ function ShowProjectYear($cid, $maxdir, $datayear) {
 ---------------------------------------------------------------*/
 function ViewSamples($id, $maxdir) {
     global $LDB, $GLOBS, $PARMS;
-    $hdrcols  = array('expt_sampleid', 'QUIKSTAT', 'type', 'version', 'rowcol');
+    $hdrcols  = array('expt_sampleid', 'type', 'version', 'rowcol');
 
 	$samplestable = 'samples';
     $samplespkeynick = $samplestable . '_pkey';
@@ -209,7 +208,7 @@ function ViewSamples($id, $maxdir) {
 ---------------------------------------------------------------*/
 function ViewBatches($id, $sample) {
     global $LDB, $GLOBS, $PARMS;
-    $hdrcols  = array('batchname', 'count', 'file0' );
+    $hdrcols  = array('batchname', 'status', 'count', 'file0' );
     $projtable = 'projects';
     $projpkey = $projtable . '_pkey';
     $projtable = $LDB[$projtable];
@@ -255,6 +254,12 @@ function ViewBatches($id, $sample) {
         	if ($c == 'batchname') {
                 $u = $_SERVER['SCRIPT_NAME'] . "?fcn=samples&amp;id=" . $row[$batchespkey];
                 $d = "<a href='$u'>$d</a>";
+            }
+            if ($c == 'status') {
+                $u = $_SERVER['SCRIPT_NAME'] . "?fcn=showout&amp;table=$tablenick&amp;id=" .
+                    $row[$pkey] . "&amp;samplestate=XX";
+                $u = "<a href='$u' onclick='javascript:popup2(\"$u\",680,720); return false;'>XX</a>";
+                $d = QuickStatus($row, $u);     // Pass on URL for failing states
             }
             if ((! isset($d)) || ($d == '')) { $d = '&nbsp;'; }
             $html .= "<td align='center'>$d</td>\n";
