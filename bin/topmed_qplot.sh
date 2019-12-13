@@ -69,10 +69,10 @@ if [ "$1" = "-submit" ]; then	#  subroutine SubmitJob will run sbatch
   if [ "$timeout" != "8:00:00" ]; then
     echo "Forcing SLURM timeout to '$timeout'"
   fi
- timeout="28:00:00"  # This stinks. J takes the entire cluster, our work runs 5 times slower
+  #timeout="28:00:00"  # This stinks. J takes the entire cluster, our work runs 5 times slower
  RandomRealHost $bamid
   MayIRun $me $bamid $realhost
-  SubmitJob $bamid "$PROJECT-qplot" '8G' "$0 $*"
+  SubmitJob $bamid "$PROJECT-qplot" '12G' "$0 $*"
   exit
 fi
 
