@@ -191,7 +191,7 @@ function ViewSamples($id, $maxdir) {
 
     $sql = "SELECT * FROM $samplestable WHERE $projectspkey=$id";
     $url = $_SERVER['SCRIPT_NAME'] . "?center=$center&amp;maxdir=$maxdir";
-    $hdr = "<h3 align='center'>$count Samples for '$dirname' in center " .
+    $hdr = "<h3 align='center'>$count Samples for '$dirname' [$id] in center " .
         "<a href='$url'>$center</a></h3>\n";
 
 	return ShowSamples($sql, $hdrcols, 'samples', $hdr);
