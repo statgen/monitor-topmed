@@ -95,7 +95,7 @@ function ViewProjects($center, $maxdir) {
 ---------------------------------------------------------------*/
 function ShowProjectYear($cid, $maxdir, $datayear) {
     global $LDB, $GLOBS;
-    $hdrcols  = array('dirname', 'datayear', 'count');
+    $hdrcols  = array('dirname', 'status', 'datayear', 'count');
     $tablenick = 'projects';
     $projtable = $tablenick;
     $projpkey = $projtable . '_pkey';
@@ -136,6 +136,7 @@ function ShowProjectYear($cid, $maxdir, $datayear) {
                 $u = $_SERVER['SCRIPT_NAME'] . "?fcn=batches&amp;id=" . $row[$projpkey];
                 $d = "<a href='$u'>$d</a>";
             }
+            if ($c == 'status') { $d = CalcRunStatus($d); }
             $html .= "<td align='center'>$d</td>\n";
         }
             
@@ -196,7 +197,7 @@ function ViewSamples($id, $maxdir) {
 
     $sql = "SELECT * FROM $samplestable WHERE $batchespkey=$id";
     $url = $_SERVER['SCRIPT_NAME'] . "?center=$center&amp;maxdir=$maxdir";
-    $hdr = "<h3 align='center'>$count Samples for '$dirname' in center " .
+    $hdr = "<h3 align='center'>$count Samples for '$dirname' [$id] in center " .
         "<a href='$url'>$center</a></h3>\n";
 
 	return ShowSamples($sql, $hdrcols, 'samples', $hdr);
