@@ -376,7 +376,6 @@ sub AddMethylBatches {
 				return 0;
 			}
 			$totalsamples++;
-			$samplecount++;
 		}
 		close(IN);
 
@@ -384,6 +383,7 @@ sub AddMethylBatches {
 		my $sql = "UPDATE $opts{files_table} SET count=$samplecount WHERE $opts{files_pkey}=$batchnames{$bname}{id}";
 		if ($opts{verbose}) { print "SQL=$sql\n"; }
 		my $sth = DoSQL($sql);	
+		$samplecount++;               # fix samplecount and/or totalsamples
 	}
 
 	#	Update count of samples for this project
