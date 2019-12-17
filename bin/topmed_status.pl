@@ -101,11 +101,15 @@ if ($opts{datatype} eq 'rnaseq') {
     	'state_aws38copy' => 'A',
 	);
 }
-if ($opts{datatype} eq 'xxmethyl') {			# This is not really used for methyl
+if ($opts{datatype} eq 'methyl') {		    	# This is not really used for methyl
 	$opts{state_table} = 'methyl_batch';		# Table of rows with state_ flags
 	$opts{state_pkey} = 'methylbatchid';
-	$opts{status_table} = 'methyl_batch';		# Table of rows with status column
-	$opts{status_pkey} = 'methylbatchid';
+
+	#$opts{status_table} = 'methyl_batch';		# Table of rows with status column
+	#$opts{status_pkey} = 'methylbatchid';
+
+	$opts{status_table} = 'methyl_projects';		# Table of rows with status column  ??
+	$opts{status_pkey} = 'methylprojectid';
 	%attributes2letter = (
     	'state_arrive'    => 'a',
     	'state_verify'    => '5',
@@ -141,7 +145,7 @@ if ($fcn eq 'runstatus') {
         if (! %$runsref) { next; }          # No directories we want
         foreach my $runid (keys %{$runsref}) {
             my $numberbams = $runsref->{$runid};
-            #   Get list of all bams for this run
+            #   Get list of all states for this run
             my $sql = "SELECT $opts{state_pkey},$attributes_str FROM $opts{state_table} " .
                 "WHERE $opts{status_pkey}='$runid'";
             my $sth = DoSQL($sql);
