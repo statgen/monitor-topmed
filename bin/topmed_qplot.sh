@@ -51,7 +51,7 @@ function RC_Check {
 if [ "$1" = "-submit" ]; then	#  subroutine SubmitJob will run sbatch
   shift	 	 	 	            #  with the current shell script and args
   bamid=`GetDB $1 bamid`
-  timeout="8:00:00"
+  timeout="12:00:00"
   #   Figure out index file name
   srcfile=`$topmedpath wherefile $bamid bam`
   if [ ! -f $srcfile ]; then      # BAM should exist, but if not, try CRAM

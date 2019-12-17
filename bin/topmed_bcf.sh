@@ -20,22 +20,22 @@ if [ "$1" = "-submit" ]; then
     Fail "Unable to get filesize for '$cramfile'"
   fi
   timeout='12:00:00'
-  mem=20G
+  mem=32G
   #   Large crams can require LOTS of memory and can take a long time
   if [ "$filesize" -gt "40255183256" ]; then
     mem=132G
     timeout='28:00:00'
   elif [ "$filesize" -gt "35044692321" ]; then
-    mem=82G
+    mem=96G
     timeout='26:00:00'
   elif [ "$filesize" -gt "31848365056" ]; then
-    mem=68G
+    mem=84G
     timeout='24:00:00'
   elif [ "$filesize" -gt "23023087355" ]; then
-    mem=52G
+    mem=69G
 	timeout='22:00:00'
   elif [ "$filesize" -gt "1566897485" ]; then
-    mem=28G
+    mem=40G
 	timeout='20:00:00'
   fi
   if [ "$FORCEMEMORY" != "" ]; then
