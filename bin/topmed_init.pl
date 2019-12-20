@@ -230,7 +230,17 @@ sub AddMethylBatches {
 	}
 	my $methylbatchid;
 	foreach my $bname (keys %batchnames) {
-		my $sql = "INSERT INTO $opts{files_table} " .
+		#   This needs to be restartable, so I must first check if this file already exists
+		my $sql = "SELECT $opts{files_pkey} from $opts{files_table} WHERE " .
+		    "methylprojectid='$methylprojectid' AND batchname='$bname'";
+		my $sth = DoSQL($sql);
+		my $href = $sth->fetchrow_hashref;
+		my $x = $href->{$opts{files_pkey}};
+		if ($x) {
+		    if ($opts{verbose}) { warn "$Script - Ignoring existing file '$bname' [$x]\n"; }
+		    next;
+        }
+		$sql = "INSERT INTO $opts{files_table} " .
 			"(methylprojectid,batchname,count,dateinit, " .
 			"file0, file0checksum, file0size," .
 			"file1, file1checksum, file1size," .
@@ -245,7 +255,7 @@ sub AddMethylBatches {
 		}
 		chop($values);
 		$values .= ")";
-		my $sth = DoSQL($sql . $values);
+		$sth = DoSQL($sql . $values);
 		if ($sth) { $methylbatchid  = SQL_Last_Insert($sth); }	# Index to this sample
 		if (! $methylbatchid) {
 			warn "$Script - INSERT for '$bname failed\n";
@@ -349,8 +359,16 @@ sub AddMethylBatches {
 				if ($c[$cols{'grn.idat'}] !~ /Failure/) { return 0; }
 				next;
 			}
+		    #   This needs to be restartable, so I must first check if this sample already exists
+		    my $sql = "SELECT $opts{files_pkey} from $opts{files_table} WHERE " .
+		        "methylprojectid=$batchnames{$bname}{id} AND expt_sampleid='" . $c[$cols{'sampleid'}] . "'";
+		    my $sth = DoSQL($sql);
+		    if ($sth) {
+		        if ($opts{verbose}) { warn "$Script - Ignoring existing sample '" . $c[$cols{'sampleid'}] . "'\n"; }
+		        next;
+            }
 			my ($type, $version, $rowcol) = ($1, $2, $3);
-			my $sql = "INSERT INTO $opts{samples_table} " .
+			$sql = "INSERT INTO $opts{samples_table} " .
 				"(methylbatchid,expt_sampleid,array,p05,p01,type,version,rowcol,";
 			my $values .= "VALUES(" . $batchnames{$bname}{id} . "," .
 				"'$c[$cols{'sampleid'}]'," .
@@ -369,7 +387,7 @@ sub AddMethylBatches {
 			$sql .= ') ';
 			chop($values);
 			$values .= ')';
-			my $sth = DoSQL($sql . $values);
+			$sth = DoSQL($sql . $values);
 			$methylid  = SQL_Last_Insert($sth);
 			if (! $methylid) {	#	Sample exists I hope. Need to know index for it
 				warn "$Script - No database record created for '$c[$cols{'sampleid'}]'\n";
@@ -471,29 +489,40 @@ sub AddRNAProjects {
 	my $txseqid;
 	foreach my $samp (sort keys %expt_sampleids) {
 		$totalsamples++;
+		#   This needs to be restartable, so I must first check if this sample already exists
+		my $sql = "SELECT $opts{samples_pkey} from $opts{samples_table} WHERE " .
+		    "rnaprojectid=$rnaprojectid AND expt_sampleid='$samp'";
+		my $sth = DoSQL($sql);
+		my $href = $sth->fetchrow_hashref;
+		$txseqid = $href->{txseqid};
+		if ($txseqid) {
+		    if ($opts{verbose}) { warn "$Script - Ignoring existing sample '$samp' [$txseqid]\n"; }
+		    $expt_sampleids{$samp}{txseqid} = $txseqid;
+		    next;
+        }
 		#   Create database record for this sample. It might already exist
-		my $sql = "INSERT INTO $opts{samples_table} " .
+		$sql = "INSERT INTO $opts{samples_table} " .
 			"(rnaprojectid,expt_sampleid,rnasubject,fileprefix,notes,dateinit) " .
 			"VALUES($rnaprojectid,'$samp','$expt_sampleids{$samp}->{rnasubject}'," .
 			"'$expt_sampleids{$samp}->{fileprefix}'," .
 			"'$expt_sampleids{$samp}->{notes}',$nowdate)";
-		my $sth = DoSQL($sql);
+		$sth = DoSQL($sql);
 		if ($sth) { $txseqid  = SQL_Last_Insert($sth); }	# Index to this sample
 		if (! $txseqid) {	#	Sample exists I hope. Need to know index for it
 			$sql = "SELECT txseqid FROM $opts{samples_table} " .
 				"WHERE expt_sampleid='$samp'";
 			$sth = DoSQL($sql);
-			my $href = $sth->fetchrow_hashref;
+			$href = $sth->fetchrow_hashref;
 			$txseqid = $href->{txseqid};
 		}
 		if (! $txseqid) {
 			warn "$Script - No database record created for '$samp'\n";
 			return 0;
 		}
-		$expt_sampleids{$samp} = $txseqid;
+		$expt_sampleids{$samp}{txseqid} = $txseqid;
 	}
 	#	Update count of samples for this project
-	my $sql = "UPDATE $opts{runs_table} SET arrived='Y',count=$totalsamples WHERE rnaprojectid=$rnaprojectid";
+	my $sql = "UPDATE $opts{runs_table} SET count=$totalsamples WHERE rnaprojectid=$rnaprojectid";
 	if ($opts{verbose}) { print "SQL=$sql\n"; }
 	my $sth = DoSQL($sql);
 
@@ -505,7 +534,7 @@ sub AddRNAProjects {
 	my $lasttxseqid = '';
 	foreach my $fullfn (sort keys %fullfiletodata) {
 		my ($check, $fileprefix, $sampleid) = split(' ', $fullfiletodata{$fullfn});
-		my $txseqid = $expt_sampleids{$sampleid};
+		my $txseqid = $expt_sampleids{$sampleid}{txseqid};
 		#	Is this a new sample? If so, update file count for previous sample
 		if ($txseqid ne $lasttxseqid) {
 			if ($lasttxseqid) {				# Correct count for last sample
@@ -537,6 +566,9 @@ sub AddRNAProjects {
 		}
 	}
 	#	Update count of files for last sample
+	$sql = "UPDATE $opts{runs_table} SET arrived='Y' WHERE rnaprojectid=$rnaprojectid";
+	if ($opts{verbose}) { print "SQL=$sql\n"; }
+	$sth = DoSQL($sql);
 	$sql = "UPDATE $opts{samples_table} SET count=$samplefilecount WHERE txseqid=$txseqid";
 	if ($opts{verbose}) { print "SQL=$sql\n"; }
 	$sth = DoSQL($sql);
@@ -632,7 +664,7 @@ sub ParseTab {
 sub AddRNAFile {
     my ($txseqid, $filename, $intar, $checksum) = @_;
 
-	#	This filename may not ever be in the database yet
+	#	This filename may not even be in the database yet
     my $sql = "SELECT fileid,txseqid FROM $opts{files_table} " .
     	"WHERE filename='$filename'";
     my $sth = DoSQL($sql,0);

@@ -214,42 +214,28 @@ exit;
 #   Submit_arrive() - Mark new file as arrived
 #==================================================================
 sub Submit_arrive {
+    #   No longer have runs arriving piecemeal. All the data is there
     my $runsref = GetUnArrivedRuns() || next;
-    #   For each unarrived run, see if there are bamfiles that arrived
+    #   For each run with an unarrived sample
     foreach my $runid (keys %{$runsref}) {
-        #   Get list of all samples
+        my $dir = $runsref->{$runid};       # We know name of run and runid
+        #   Get list of all samples not arrived for this run
         my $s = '';
-        my $bs = '';
-        my $dir = 'r.dirname';
-        if ($opts{datatype} eq 'genome') { $bs = ',b.'; $s = $bs . 'bamname'; }
-        if ($opts{datatype} eq 'methyl') { $dir = 'batchname'; }
-        my $sql = "SELECT b.$dir$s,c.centername,b.$opts{samples_pkey},b.state_arrive " .
+         my $sql = "SELECT c.centername,b.$opts{samples_pkey},b.state_arrive$s " .
             "FROM $opts{samples_table} AS b " .
-            "JOIN $opts{runs_table} AS r ON b.$opts{runs_pkey}=r.$opts{runs_pkey} " .
+            "JOIN $opts{runs_table} AS r " .
             "JOIN $opts{centers_table} AS c ON r.centerid = c.centerid " .
-            "WHERE r.$opts{runs_pkey}=$runid AND r.arrived!='Y'";
-        my $sth = DoSQL($sql);
+            "WHERE r.$opts{runs_pkey}=$runid AND b.state_arrive!=$COMPLETED";
+       my $sth = DoSQL($sql);
         my $rowsofdata = $sth->rows() || next;
         for (my $i=1; $i<=$rowsofdata; $i++) {
             my $href = $sth->fetchrow_hashref;
             #   Build path to sample manually
-            if ($opts{datatype} eq 'genome') {	# Check if file exists
-            	my $f = $opts{topdir} . "/$href->{centername}/$href->{$dir}/" . $href->{bamname};
-            	my @stats = stat($f);
-            	if (! @stats) { next; }     # No real data
-            	#   Check ownership of run. Things break if not owned by real owner
-            	my $owner = getpwuid($stats[4]);
-            	if ($owner ne $ENV{PROJECT}) {
-                	print "$nowdate Ignoring run '$runsref->{$runid}' owned by $owner\n";
-            	}
-            	#   If the mtime on the file is very recent, it might still be coming
-            	if ((time() - $stats[9]) < 3600) { next; }  # Catch it next time
-            }
             #   See if we should mark this as arrived
-            if ($href->{state_arrive} == $COMPLETED) { next; }
-            #   Run the command
-            my $rc = BatchSubmit("$opts{topmedarrive} $href->{$opts{samples_pkey}}");  # Not run in SLURM
-            if ($rc > 0) {          # Unable to submit, capture output
+            if ($href->{state_arrive} == $COMPLETED) { next; }  # Last sanity check
+            #   Run the command, not run in SLURM
+            my $rc = BatchSubmit("$opts{topmedarrive} $href->{$opts{samples_pkey}}");
+            if ($rc > 0) {          # Unable to submit, try to capture output
                 rename($opts{submitlog}, "$opts{consoledir}/$href->{$opts{samples_pkey}}-arrive.out")
             }
         }
@@ -522,8 +508,7 @@ sub BuildSQL {
 
 #==================================================================
 # Subroutine:
-#   GetUnArrivedRuns - Get list of all runs that have not arrived.
-#       Uses $opts{runs}
+#   GetUnArrivedRuns - Get list of all runs where a samples has not arrived.
 #
 # Returns:
 #   Reference to hash of run ids to run dirnames
@@ -531,8 +516,15 @@ sub BuildSQL {
 sub GetUnArrivedRuns {
     my %run2dir = ();
 
-    my $sql = "SELECT $opts{runs_pkey},dirname FROM $opts{runs_table}";
-    my $where = " WHERE arrived!='Y'";
+    #my $sql = "SELECT $opts{runs_pkey},dirname FROM $opts{runs_table}";
+    #my $where = " WHERE arrived!='Y'";
+    
+    #   No longer have runs arriving piecemeal. All the data is there
+    #   Just look for samples that have not completed.
+    #   There is a possible race condition here (maybe)
+    my $where = " WHERE b.state_arrive!=$COMPLETED";
+    my $sql = "SELECT DISTINCT r.$opts{runs_pkey},r.dirname FROM $opts{runs_table} AS r " .
+        "JOIN $opts{samples_table} AS b ON b.$opts{runs_pkey}=r.$opts{runs_pkey} ";
     #   Maybe want some runs
     if ($opts{runs}) { 
         $where .= " AND $opts{runs_pkey} IN ($opts{runs})";
