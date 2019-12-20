@@ -172,13 +172,8 @@ function ViewSamples($id, $maxdir) {
     $projectspkeynick = $projectstable . '_pkey';
  	$projectstable = $LDB[$projectstable];
     $projectspkey = $LDB[$projectspkeynick];
-    //  Get parent for this sample
-    $sql = "SELECT $projectspkey FROM $samplestable WHERE $samplespkey=$id";
-    $result = SQL_Query($sql, 0);
-    $row = SQL_Fetch($result);
-    $projectid = $row[$projectspkey];
-    //  From parent table get columns of interest and id of center
-    $sql = "SELECT centerid,dirname,count FROM $projectstable WHERE $projectspkey=$projectid";
+    //  Get columns of interest and id of center
+    $sql = "SELECT centerid,dirname,count FROM $projectstable WHERE $projectspkey=$id";
     $result = SQL_Query($sql, 0);
     $row = SQL_Fetch($result);
     $centerid = $row['centerid'];
