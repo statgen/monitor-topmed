@@ -86,7 +86,7 @@ function ViewRuns($center, $maxdir) {
 
     //  Show data for center by datayear
     $lineshown = 0;
-    for ($datayear=$yearstart; $datayear>$yearstop; $datayear--) {
+    for ($datayear=$yearstart; $datayear>=$yearstop; $datayear--) {
         //  For each center show details from database ($rows)
         foreach ($centers2show as $centr) {
             $cid = $GLOBS['centername2id'][$centr];
