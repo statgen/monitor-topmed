@@ -198,7 +198,7 @@ function ViewSamples($id, $maxdir) {
 ---------------------------------------------------------------*/
 function ViewFiles($id, $sample) {
     global $LDB, $GLOBS, $PARMS;
-    $hdrcols  = array('intar', 'checksum', 'filename' );
+    $hdrcols  = array('intar', 'txseqid', 'checksum', 'filename' );
     $filestable = 'files';
     $filespkey = $filestable . '_pkey';
     $filestable = $LDB[$filestable];
@@ -221,7 +221,7 @@ function ViewFiles($id, $sample) {
     $hdr = "<h3 align='center'>Files Associated with Sample '$sample' [$id] in center " .
         "<a href='$url'>$center</a></h3>\n";
 
-	return ShowSamples($sql, $hdrcols, 'samples', $hdr, 0);
+	return ShowSamples($sql, $hdrcols, 'files', $hdr, 2);
 }
 
 ?>
