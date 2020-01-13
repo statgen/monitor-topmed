@@ -78,7 +78,7 @@ if ($GLOBS['iammgr']) {
 print doheader($HDR['title'], 1);
 
 //  Real parameters for each form, default is ''
-//	Removed these Npv 30: 'desc', 'sample', 'pkey', 'runid', 'bamid', 'centerid', 'fetchpath', 'hostname',
+//	Removed these Nov 30: 'desc', 'sample', 'pkey', 'runid', 'bamid', 'centerid', 'fetchpath', 'hostname',
 $parmcols = array('fcn', 'maxdir', 's', 'col', 'center', 'datayear',   
     'table', 'op', 'id', 'samplestate', 'run');
 //	Capture $parmcols in hash $PARMS so we can access them from anywhere easily
@@ -93,12 +93,12 @@ if ($LDB['datatype'] == 'genome') {
 }
 if ($LDB['datatype'] == 'rnaseq') {
 	if ($PARMS['datayear'] == '')   { $PARMS['datayear'] = '2019'; }
-	if ($PARMS['center'] == '')     { $PARMS['center'] = 'uw'; }
+	if ($PARMS['center'] == '')     { $PARMS['center'] = ''; }
 	if ($PARMS['fcn'] == '' || $PARMS['fcn'] == 'runs')     { $PARMS['fcn'] = 'projects'; }
 }
 if ($LDB['datatype'] == 'methyl') {
 	if ($PARMS['datayear'] == '')   { $PARMS['datayear'] = '2019'; }
-	if ($PARMS['center'] == '')     { $PARMS['center'] = 'usc'; }
+	if ($PARMS['center'] == '')     { $PARMS['center'] = ''; }
 	if ($PARMS['fcn'] == '' || $PARMS['fcn'] == 'runs')     { $PARMS['fcn'] = 'projects'; }
 }
 
@@ -282,7 +282,7 @@ function ShowSamples($sql, $hdrcols, $tablenick, $hdr, $controls=1) {
 
         $html .= "<td align='center'>";
         if ($controls) {
-			if ($LDB['datatype'] == 'rnaseq') {
+			if ($controls != 2 && $LDB['datatype'] == 'rnaseq') {
 				$u = $_SERVER['SCRIPT_NAME'] . "?fcn=files&amp;id=" . $row[$pkey];
 				$html .= "<a href='$u' onclick='javascript:popup2(\"$u\",800,720); return false;'>" .
 				"<font color='green' size='-2'>Files</font></a>&nbsp;";
