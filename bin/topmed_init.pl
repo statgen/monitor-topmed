@@ -255,7 +255,7 @@ sub AddMethylBatches {
 		}
 		chop($values);
 		$values .= ")";
-		$sth = DoSQL($sql . $values);
+		$sth = DoSQLv($sql . $values);
 		if ($sth) { $methylbatchid  = SQL_Last_Insert($sth); }	# Index to this sample
 		if (! $methylbatchid) {
 			warn "$Script - INSERT for '$bname failed\n";
@@ -400,14 +400,14 @@ sub AddMethylBatches {
 		#	Update count of samples for this batch
 		my $sql = "UPDATE $opts{files_table} SET count=$samplecount WHERE $opts{files_pkey}=$batchnames{$bname}{id}";
 		if ($opts{verbose}) { print "SQL=$sql\n"; }
-		my $sth = DoSQL($sql);	
+		my $sth = DoSQLv($sql);	
 		$samplecount++;               # fix samplecount and/or totalsamples
 	}
 
 	#	Update count of samples for this project
 	my $sql = "UPDATE $opts{runs_table} SET arrived='Y' WHERE methylprojectid=$methylprojectid";
 	if ($opts{verbose}) { print "SQL=$sql\n"; }
-	my $sth = DoSQL($sql);
+	my $sth = DoSQLv($sql);
 	$sql = "UPDATE $opts{runs_table} SET count=$totalsamples WHERE methylprojectid=$methylprojectid";
 	if ($opts{verbose}) { print "SQL=$sql\n"; }
 	$sth = DoSQL($sql);
@@ -436,10 +436,10 @@ sub AddRNAProjects {
         return 0;
     }
    	if ($opts{verbose}) { warn "$Script - AddProjects($rnaprojectid, $d)\n"; }
-
-	my $tabref = ParseTab("$d/lookup.*.tab");
-	if (! $tabref) {
-		warn "$Script - Unable to parse tab file '$d/lookup.*.tab'\n";
+	if (! $rnaprojectid) { die "$Script - AddRNAProjects called without a valid rnaprojectid\n"; }
+	my $nwgcref = GetNWGC($d, 'lookup.*.tab', 'Manifest.txt');
+	if (! $nwgcref) {
+		warn "$Script - Unable to parse NWGC from data in '$d'\n";
 		return 0;
 	}
 
@@ -451,10 +451,11 @@ sub AddRNAProjects {
     my $manifestfile = "$d/Manifest.txt";
     my %expt_sampleids = ();
     my %fullfiletodata = ();
+    my $inputstyle = 'olduw';				# Which format is this Manifest
 	if (! open(IN, $manifestfile)) {
 		warn "$Script - Unable to read file '$manifestfile': $!\n";
 		return 0;
-	}	
+	}
 	while (my $l = <IN>) {          # Read md5 checksum file
 		chomp($l);
 		my ($fullfn, $check) = NormalizeMD5Line($l, $manifestfile, 1);
@@ -462,23 +463,26 @@ sub AddRNAProjects {
 			warn "$Script - Unable to parse checksum from '$manifestfile'\n";
 			return 0;
 		}
+		if ($fullfn =~ /^TOR/) { $inputstyle = 'broad'; }
+		if ($inputstyle eq 'broad' && $fullfn !~ /\.bam|\.bai$/) { next; }	# Ignore files we are not interested in
+
 		#	Until we know otherwise, assume first part of $fn is the sampleid
-		my $fileprefix = '';
-		if ($fullfn =~ /^(\w+)\./) { $fileprefix = $1; }
-		if (! $fileprefix) {
-			warn "$Script - Unable to parse out filename from '$manifestfile'  Line=$l\n";
+		#	Broad uses TOR + sampleid
+		my $nwgc = '';
+		if ($fullfn =~ /^(\w+)\./) { $nwgc = $1; }
+		if (! $nwgc) {
+			warn "$Script - Unable to parse filename from '$manifestfile'  Line=$l\n";
 			return 0;
 		}
-		#	Extract real sampleid from file based on TAB file
-		my $sampleid = $tabref->{$fileprefix}->{expt_sampleid};
+		my $sampleid = $nwgcref->{$nwgc}->{expt_sampleid};
 		if (! $sampleid) {
-			warn "$Script - Unable to find expt_sampleid for '$fileprefix' in '$manifestfile'\nLINE=$l\n";
+			warn "$Script - Unable to find expt_sampleid for '$nwgc' in '$manifestfile'\nLINE=$l\n";
 			return 0;
 		}
 
-		#	Save what we will need
-		$fullfiletodata{$fullfn} = $check . ' ' . $fileprefix . ' ' . $sampleid;
-		$expt_sampleids{$sampleid} = $tabref->{$fileprefix};	# Cheap way to get unique list
+		#	Save what we will need, list of all sampleids and all files for samples
+		$fullfiletodata{$fullfn} = $check . ' ' . $nwgc . ' ' . $sampleid;
+		$expt_sampleids{$sampleid} = $nwgcref->{$nwgc};	# Cheap way to get unique list
 	}
 	close(IN);
 
@@ -506,8 +510,8 @@ sub AddRNAProjects {
 			"VALUES($rnaprojectid,'$samp','$expt_sampleids{$samp}->{rnasubject}'," .
 			"'$expt_sampleids{$samp}->{fileprefix}'," .
 			"'$expt_sampleids{$samp}->{notes}',$nowdate)";
-		$sth = DoSQL($sql);
-		if ($sth) { $txseqid  = SQL_Last_Insert($sth); }	# Index to this sample
+		$sth = DoSQLv($sql);
+		if ($sth) { $txseqid = SQL_Last_Insert($sth); }		# Index to this sample
 		if (! $txseqid) {	#	Sample exists I hope. Need to know index for it
 			$sql = "SELECT txseqid FROM $opts{samples_table} " .
 				"WHERE expt_sampleid='$samp'";
@@ -524,7 +528,7 @@ sub AddRNAProjects {
 	#	Update count of samples for this project
 	my $sql = "UPDATE $opts{runs_table} SET count=$totalsamples WHERE rnaprojectid=$rnaprojectid";
 	if ($opts{verbose}) { print "SQL=$sql\n"; }
-	my $sth = DoSQL($sql);
+	my $sth = DoSQLv($sql);
 
 	#------------------------------------------------------------------
 	#	Create all file entries
@@ -540,14 +544,16 @@ sub AddRNAProjects {
 			if ($lasttxseqid) {				# Correct count for last sample
 				my $sql = "UPDATE $opts{samples_table} SET count=$samplefilecount WHERE txseqid=$lasttxseqid";
 				if ($opts{verbose}) { print "SQL=$sql\n"; }
-				my $sth = DoSQL($sql);
+				my $sth = DoSQLv($sql);
 				$samplefilecount = 0;
 			}
 		}
 		$lasttxseqid = $txseqid;
 
 		#	Now create database record in $opts{files_table} for this file
-		if (AddRNAFile($txseqid, $fullfn, 'N', $check)) { $samplefilecount++; $totalfilecount++; };
+		$samplefilecount++;
+		$totalfilecount++;
+		if (AddRNAFile($txseqid, $fullfn, 'N', $check)) { $samplefilecount--; $totalfilecount--; };
 		if ($fullfn !~ /\.tar/) { next; }
 
 		# 	This is a tar file, create records for each file in tar
@@ -568,43 +574,107 @@ sub AddRNAProjects {
 	#	Update count of files for last sample
 	$sql = "UPDATE $opts{runs_table} SET arrived='Y' WHERE rnaprojectid=$rnaprojectid";
 	if ($opts{verbose}) { print "SQL=$sql\n"; }
-	$sth = DoSQL($sql);
+	$sth = DoSQLv($sql);
 	$sql = "UPDATE $opts{samples_table} SET count=$samplefilecount WHERE txseqid=$txseqid";
 	if ($opts{verbose}) { print "SQL=$sql\n"; }
-	$sth = DoSQL($sql);
+	$sth = DoSQLv($sql);
 
 	#	Give summary of what happened
-	print "Created $totalsamples samples with $totalfilecount files\n";
+	print "Created $totalsamples samples with $totalfilecount files in project '$d'\n";
     return $totalsamples;
+}
+
+#==================================================================
+# Subroutine:
+#   GetNWGC - Parse tab file which maps NWGC ids to TOR ids
+#	Column names must map to our database columns
+#
+# Arguments:
+#   dir - directory to RNA data
+#   oldtabfile - tab file to parse  (probably early architecture)
+#	manifest - Manifest for data, infer NWGC from filename
+#
+# Returns:
+#   Reference to a hash of fileprefix to a hash of other column data
+#==================================================================
+sub GetNWGC {
+    my ($dir, $oldtabfile, $manifest) = @_;
+
+	my %arrayindex2dbcol = ();
+	#	Should only be one tab file if this is early architecture
+	my @file = split("\n", `/bin/ls $dir/$oldtabfile 2>&1`);
+	if ($#file == 0) {
+		if ($file[0] !~ /No such/) { return ParseTab($file[0]); }
+	}
+
+	#	Broad architecture is later and probably the one we'll use
+	return ParseBroad("$dir/$manifest");
+}
+
+#==================================================================
+# Subroutine:
+#   ParseBroad - Parse manifest extracting NWGC ids to TOR ids
+#
+# Arguments:
+#   file - file to parse (broad architecture)
+#
+# Returns:
+#   Reference to a hash of nwgc to a hash of other column data
+#==================================================================
+sub ParseBroad {
+    my ($file) = @_;
+	my %parsedfile = ();
+
+	#	This is Broad style input where the TOR name has the NWGC id in it
+	if (! open(IN, $file)) {
+		warn "$Script - Unable to read MANIFEST file '$file': $!\n";
+		return \%parsedfile;;
+	}
+	# 	Read tab delimited manifest e.g.   md5 TOR123456.stuff.bam
+	while (my $l = <IN>) {
+		chomp($l);
+		my ($md5, $f) = split(' ', $l);
+		my $nwgc;
+		if ($f =~ /\.bai|gz|tsv\s*$/) { next; }	# Ignore files we are not interested in
+		if ($f =~ /^(TOR\d+)\..+\.bam\s*$/) { $nwgc = $1; }
+		if (! $nwgc) {
+			warn "$Script - Ignoring parse of NWGC from '$file' line: $l\n";
+			next;
+		}
+		my %tabhash = (					# Hard code these, since not CSV input
+			notes => '',
+			fileprefix => 'bam_files',
+			rnasubject => '',
+			expt_sampleid => $nwgc,
+		);
+		$parsedfile{$nwgc} = \%tabhash;	# Save hash of this data
+	}
+	close(IN);
+	return \%parsedfile;				# Return reference of hash of hashes
 }
 
 #==================================================================
 # Subroutine:
 #   ParseTab - Parse tab file which maps NWGC ids to TOR ids
 #	Column names must map to our database columns
-#	This format will be very unstable and require lots of crude
-#	hardcoded things. Ugh
 #
 # Arguments:
-#   tabfilepath - path to tab file to parse
+#   tabfile - tab file to parse  (early architecture)
 #
 # Returns:
-#   Reference to a hash of fileprefix to a hash of other column data
+#   Reference to a hash of nwgc to a hash of other column data
 #==================================================================
 sub ParseTab {
-    my ($tabfilepath) = @_;
+    my ($tabfile) = @_;
+	my %parsedtabfile = ();
 
 	#------------------------------------------------------------------
     #	Figure out which columns map to which database columns
 	#------------------------------------------------------------------
-	my @file = split("\n", `/bin/ls $tabfilepath 2>&1`);
-	if ($#file != 0) {
-		warn "$Script - Unable to find a lone TAB file. FILES=$tabfilepath\n";
-		return 0;
-	}
-	if (! open(IN, $file[0])) {
-		warn "$Script - Unable to read TAB file '$file[0]': $!\n";
-		return 0;
+	my %arrayindex2dbcol = ();
+	if (! open(IN, $tabfile)) {
+		warn "$Script - Unable to read TAB file '$tabfile': $!\n";
+		return \%parsedtabfile;;
 	}
 	# First line is header which will vary by the whim of each project
 	my %tabcol2dbcol = (
@@ -613,25 +683,23 @@ sub ParseTab {
 		'investigator id' => 'rnasubject',
 		torid => 'expt_sampleid',
 	);
-	my %arrayindex2dbcol = ();
 	my $l = lc(<IN>);
 	chomp($l);
 	my @hdrcols = split("\t", $l);
 	for (my $i=0; $i<=$#hdrcols; $i++) {
 		if (! exists($tabcol2dbcol{$hdrcols[$i]})) {
-			warn "$Script - Ignoring column '$hdrcols[$i]' in TAB file '$file[0]' HDR='$l'\n";
+			warn "$Script - Ignoring column '$hdrcols[$i]' in TAB file '$tabfile' HDR='$l'\n";
 			next;
 		}
 		$arrayindex2dbcol{$i} = $tabcol2dbcol{$hdrcols[$i]};	# Index to db column name
 	}
 	if (scalar(keys %tabcol2dbcol) != scalar(keys %arrayindex2dbcol)) {
 		warn "$Script - Unable to which TAB file columns to map to which database " .
-				"columns. TAB file='$file[0]'. HDR=$l\n";
+				"columns. TAB file='$tabfile'. HDR=$l\n";
 	}
 
 	# 	Now we know which tab column maps to which database column
 	#	Save as hash of hashes.  fileprefix to hash of other fields
-	my %parsedtabfile = ();
 	while ($l = <IN>) {
 		chomp($l);
 		my @c = split("\t", $l);
@@ -679,7 +747,7 @@ sub AddRNAFile {
     	"(txseqid,filename,intar,checksum,dateinit) " .
        	"VALUES($txseqid,'$filename','$intar', '$checksum', $nowdate)";
    	if ($opts{verbose}) { print "SQL=$sql\n"; }
-   	$sth = DoSQL($sql);
+   	$sth = DoSQLv($sql);
     return 1;
 }
 
@@ -724,7 +792,7 @@ sub CreateRun {
     my $sql = "INSERT INTO $opts{runs_table} " .
         "(centerid,dirname,comments,count,dateinit) " .
         "VALUES($cid,'$d','',0,'$nowdate')";
-    my $sth = DoSQL($sql);
+    my $sth = DoSQLv($sql);
     my $runid = $sth->{mysql_insertid};
     print "$Script - Added run/project '$d' [ $runid ]\n";
     $opts{runcount}++;
@@ -811,7 +879,7 @@ sub AddBams {
                 "(runid,bamname,checksum,dateinit) " .
                 "VALUES($runid,'$fn','$checksum', $nowdate)";
             if ($opts{verbose}) { print "SQL=$sql\n"; }
-            $sth = DoSQL($sql);
+            $sth = DoSQLv($sql);
             $newbams++;
         }
         close(IN);
@@ -831,7 +899,7 @@ sub AddBams {
     $sth = DoSQL($sql);
     my $numbamrecords = $sth->rows();
     $sql = "UPDATE $opts{runs_table}  SET arrived='Y',count=$numbamrecords WHERE runid=$runid";
-    $sth = DoSQL($sql);
+    $sth = DoSQLv($sql);
 
     #   Last sanity check, see if number of BAM files matches records
     #   This might not always be accurate, but ...
@@ -859,7 +927,7 @@ sub AddBams {
     my $oldestbamdate = OldestBAM($d);
     if ((time() - $oldestbamdate) > $opts{arrivedsecs}) {
         $sql = "UPDATE $opts{runs_table}  SET arrived='Y' WHERE runid=$runid";
-        $sth = DoSQL($sql);
+        $sth = DoSQLv($sql);
         print "$Script - Run '$d' has finally arrived. Look at it no more\n";
     }
     return 1;
@@ -943,6 +1011,25 @@ sub GetDirs {
     my @dirlist = grep { (/^\w/ && -d "$d/$_") } readdir(DIR);
     closedir DIR;
     return \@dirlist;
+}
+
+#==================================================================
+# Subroutine:
+#   DoSQLv - Run SQL with verbose check
+#
+# Arguments:
+#   sql
+#
+# Returns:
+#   boolean if it worked
+#==================================================================
+sub DoSQLv {
+    my ($sql) = @_;
+    if ($opts{verbose}) {
+    	print "SQL: $sql\n";
+    	return 0;
+    }
+    return DoSQL($sql);
 }
 
 #==================================================================

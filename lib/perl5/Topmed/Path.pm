@@ -188,7 +188,8 @@ sub WherePath {
         	return $s;
         }
     	if ($set eq 'releasefiles') {
-        	my $s = AbsPath("$PATHOPTS{netdir}/$PATHOPTS{rnaseqdir}/$centername/$rundir/releaseFiles");
+    		my $s = AbsPath("$PATHOPTS{netdir}/$PATHOPTS{rnaseqdir}/$centername/$rundir/releaseFiles");
+    		if (-d "$s/bam_files") { return "$s/bam_files"; }	# Broad does it differently of course
         	return $s;
         }
     	if ($set eq 'fileprefix') {
