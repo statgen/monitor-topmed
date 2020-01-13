@@ -500,9 +500,9 @@ function SubmitJob {
     echo "No command to execute provided to SubmitJob"
     exit 3
   fi
-  l=(`$slurmpath/sbatch -p $slurmp $mem $r $t $cores $q --workdir=$console -J $bamid-$me --output=$console/$bamid-$me.out $cmdtorun`)
+  l=(`$slurmpath/sbatch -p $slurmp $mem $r $t $cores $q --chdir=$console -J $bamid-$me --output=$console/$bamid-$me.out $cmdtorun`)
   if [ "$?" != "0" ]; then
-    echo "CMD=$slurmpath/sbatch -p $slurmp $mem $r $cores $q --workdir=$console -J $bamid-$me --output=$console/$bamid-$me.out $cmdtorun" >> $console/$bamid-$me.out
+    echo "CMD=$slurmpath/sbatch -p $slurmp $mem $r $cores $q --chdir=$console -J $bamid-$me --output=$console/$bamid-$me.out $cmdtorun" >> $console/$bamid-$me.out
     Fail "Failed to submit command to SLURM - $l" | tee -a $console/$bamid-$me.out
     exit 1
   fi
@@ -546,7 +546,7 @@ function SubmitSRUN {
   cd $console || exit 5
   l=(`$slurmpath/srun -p $slurmp $mem $r $cores $q -J $bamid-$me --output=$console/$bamid-$me.out $cmdtorun`)
   if [ "$?" != "0" ]; then
-    echo "CMD=$slurmpath/sbatch -p $slurmp $mem $r $cores $q --workdir=$console -J $bamid-$me --output=$console/$bamid-$me.out $cmdtorun" >> $console/$bamid-$me.out
+    echo "CMD=$slurmpath/sbatch -p $slurmp $mem $r $cores $q --chdir=$console -J $bamid-$me --output=$console/$bamid-$me.out $cmdtorun" >> $console/$bamid-$me.out
     Fail "Failed to submit command to SLURM - $l" | tee -a $console/$bamid-$me.out
     exit 1
   fi
