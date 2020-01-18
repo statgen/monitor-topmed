@@ -66,6 +66,7 @@ if ($GLOBS['iammgr']) {
         // "<a href='https://www-inpsyght1.sph.umich.edu/inpsyght/' target='_blank'>Inpsyght</a> &nbsp;" .
         //"<a href='/topmed/origindex.php' target='_blank'>Orig_Index</a> &nbsp;" .
         "<a href='/topmed/rnaseq.php' target='_blank'>RNA_Seq</a> &nbsp;" .
+        "<a href='/topmed/methyl.php' target='_blank'>Methyl_Seq</a> &nbsp;" .
         "<a href='/topmed/genome.php' target='_blank'>Genome_Seq</a> &nbsp;";
     if ($LDB['datatype'] == 'genome') {
          $GLOBS['links'] .= "<a href='http://nhlbi.sph.umich.edu/report/monitor.php' " .
@@ -83,22 +84,16 @@ $parmcols = array('fcn', 'maxdir', 's', 'col', 'center', 'datayear',
     'table', 'op', 'id', 'samplestate', 'run');
 //	Capture $parmcols in hash $PARMS so we can access them from anywhere easily
 $PARMS = isolate_parms($parmcols);
-//extract (isolate_parms($parmcols));
 
 //	Set defaults
 if ($LDB['datatype'] == 'genome') {
-	//if ($PARMS['center'] == '') { $PARMS['center'] = 'year4'; }
 	if ($PARMS['fcn'] == '')    { $PARMS['fcn'] = 'runs'; }
 	if ($PARMS['maxdir'] == '') { $PARMS['maxdir'] = 0; }
 }
 if ($LDB['datatype'] == 'rnaseq') {
-	if ($PARMS['datayear'] == '')   { $PARMS['datayear'] = '2019'; }
-	if ($PARMS['center'] == '')     { $PARMS['center'] = ''; }
 	if ($PARMS['fcn'] == '' || $PARMS['fcn'] == 'runs')     { $PARMS['fcn'] = 'projects'; }
 }
 if ($LDB['datatype'] == 'methyl') {
-	if ($PARMS['datayear'] == '')   { $PARMS['datayear'] = '2019'; }
-	if ($PARMS['center'] == '')     { $PARMS['center'] = ''; }
 	if ($PARMS['fcn'] == '' || $PARMS['fcn'] == 'runs')     { $PARMS['fcn'] = 'projects'; }
 }
 
@@ -149,6 +144,12 @@ function GetChooseLines() {
 	if ($LDB['datatype'] == 'rnaseq') {
 		$html .= "&nbsp;&nbsp;<a href='" . $_SERVER['SCRIPT_NAME'] .
         "?datayear=2019&amp;maxdir=$maxdir'>2019</a>&nbsp;&nbsp;\n";
+    }
+	if ($LDB['datatype'] == 'methyl') {
+		$html .= "&nbsp;&nbsp;<a href='" . $_SERVER['SCRIPT_NAME'] .
+        "?datayear=2019&amp;maxdir=$maxdir'>2019</a>&nbsp;&nbsp;\n" .
+		"&nbsp;&nbsp;<a href='" . $_SERVER['SCRIPT_NAME'] .
+        "?datayear=2020&amp;maxdir=$maxdir'>2020</a>&nbsp;&nbsp;\n";
     }
     foreach ($GLOBS['centers'] as $c) {
         $html .= "<a href='" . $_SERVER['SCRIPT_NAME'] .
