@@ -65,13 +65,14 @@ function ViewProjects($center, $maxdir) {
     //  Get list of centers doing:  select distinct(project) from status;
     $html = "<h3 align='center'>Methylation Data Projects</h3>\n" .
         "<center>" . GetChooseLines() . "<br/>" . $GLOBS['links'] . "</center>\n";
-    $yearstart = 2019;
+    $yearstart = 2020;
     $yearstop = 2018;
     $centers2show = array();                // Get list of centers for this query
     if ($center) { array_push($centers2show, $center); }
     else { $centers2show = $GLOBS['centers']; }
 
     //  Show data for center by datayear
+    $showedsomething = 'N';
     for ($datayear=$yearstart; $datayear>$yearstop; $datayear--) {
         //  For each center show details from database ($rows)
         foreach ($centers2show as $centr) {
@@ -80,9 +81,10 @@ function ViewProjects($center, $maxdir) {
             if (! $h) { continue; }
             $html .= "<br><div class='indent'><b>" . strtoupper($centr) .
                 ", Year $datayear</b></div>$h\n";
+            $showedsomething = 'Y';
         }
         $html .= "<br>";
-        if ($datayear > 1) { $html .= "<hr width='80%' class='separator'>\n"; }
+        if ($showedsomething == 'Y') { $html .= "<hr width='80%' class='separator'>\n"; }
     }
     
     $html .= "<div class='indent'>\n" . $GLOBS['statusruns'] . "</div>\n";
@@ -186,10 +188,11 @@ function ViewSamples($id, $maxdir) {
     $batchname = $row['batchname'];
     $count = $row['count'];
     //  From grandparent table get center
-    $sql = "SELECT centerid FROM $projectstable WHERE $projectspkey=$projectspkey";
+    $sql = "SELECT centerid,dirname FROM $projectstable WHERE $projectspkey=$projectspkey";
     $result = SQL_Query($sql, 0);
     $row = SQL_Fetch($result);
     $centerid = $row['centerid'];
+    $dirname = $row['dirname'];
     $sql = "SELECT centername FROM " . $LDB['centers'] . " WHERE " . $LDB['centers_pkey'] . "=$centerid";
     $result = SQL_Query($sql, 0);
     $row = SQL_Fetch($result);
