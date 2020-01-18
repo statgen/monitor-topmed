@@ -85,6 +85,8 @@ our %opts = (
     datatype => 'genome',
     verbose => 0,
 );
+if ($Script =~ /rnaseq/) { $opts{datatype} = 'rnaseq'; }
+if ($Script =~ /methyl/) { $opts{datatype} = 'methyl'; }
 
 Getopt::Long::GetOptions( \%opts,qw(
     help realm=s verbose center=s runs=s project=s datatype=s
