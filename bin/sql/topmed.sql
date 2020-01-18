@@ -277,7 +277,7 @@ CREATE TABLE methyl_projects (
    centerid     INT,
    dirname      VARCHAR(256) NOT NULL,   	/* Path to where batch directies can be found */
    count        INT,                        /* Count of methyl samples in this project */
-   datayear     INT DEFAULT 2019,           /* Year when data arrived, cannot use YEAR(NOW()) */
+   datayear     INT DEFAULT 2020,           /* Year when data arrived, cannot use YEAR(NOW()) */
    status       VARCHAR(256),
    arrived      CHAR(1) DEFAULT 'N',        /* Y or N that all files arrived */
    dateinit     VARCHAR(12),
