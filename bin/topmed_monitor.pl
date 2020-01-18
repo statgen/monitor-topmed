@@ -104,6 +104,8 @@ my %validverbs = (              # List of valid directives
     awscopy => 1,
     fix => 1,
 );
+if ($Script =~ /rnaseq/) { $opts{datatype} = 'rnaseq'; }
+if ($Script =~ /methyl/) { $opts{datatype} = 'methyl'; }
 
 Getopt::Long::GetOptions( \%opts,qw(
     help verbose topdir=s center=s runs=s piname=s studyname=s maxjobs=i random
@@ -270,8 +272,7 @@ sub Submit_generic {
         }
 		#	Deal with special cases that don't use normal process
 		if ($name eq 'awscopy') {
-        	if ($href->{state_aws38copy} != $NOTSET && 
-        		$href->{state_aws38copy} != $REQUESTED) { next; }
+        	if ($href->{state_aws38copy} != $REQUESTED) { next; }
 		}
         #	Ignore anything not requested
         if ($href->{$state2run} != $NOTSET && $href->{$state2run} != $REQUESTED) { next; }
