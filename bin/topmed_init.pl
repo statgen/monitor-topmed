@@ -62,6 +62,8 @@ our %opts = (
     ignorearrived => 0,     	# If set, ignored arrived database field
     verbose => 0,
 );
+if ($Script =~ /rnaseq/) { $opts{datatype} = 'rnaseq'; }
+if ($Script =~ /methyl/) { $opts{datatype} = 'methyl'; }
 Getopt::Long::GetOptions( \%opts,qw(
     help realm=s verbose center=s run=s ignorearrived project=s datatype=s
     )) || die "Failed to parse options\n";
@@ -207,7 +209,7 @@ sub AddMethylBatches {
 			return 0;
 		}
 
-		#	Save the important stuff
+		#	Save the important stuff  e.g. FHS-B0004m fileX name, size, checksum
 		my $k = 'file' . $n; 
 		$batchnames{$bname}{$k}{filename} = $name;
 		$batchnames{$bname}{$k}{checksum} = $checksum;
@@ -230,16 +232,21 @@ sub AddMethylBatches {
 	}
 	my $methylbatchid;
 	foreach my $bname (keys %batchnames) {
-		#   This needs to be restartable, so I must first check if this file already exists
-		my $sql = "SELECT $opts{files_pkey} from $opts{files_table} WHERE " .
-		    "methylprojectid='$methylprojectid' AND batchname='$bname'";
+		#   This needs to be restartable, so I must check if this file already exists
+		my $sql = "SELECT $opts{files_pkey},methylprojectid from $opts{files_table} WHERE batchname='$bname'";
 		my $sth = DoSQL($sql);
 		my $href = $sth->fetchrow_hashref;
-		my $x = $href->{$opts{files_pkey}};
-		if ($x) {
-		    if ($opts{verbose}) { warn "$Script - Ignoring existing file '$bname' [$x]\n"; }
-		    next;
+		if ($href->{$opts{files_pkey}}) {
+			#	Batchname already exists, dup?
+			if ($href->{methylprojectid} eq $methylprojectid) {	# No dup, just already exists
+				warn "$Script - Ignoring existing batchname '$bname'\n";
+		    	#	Save index to entry so we can create samples
+		    	$batchnames{$bname}{id} = $href->{methylbatchid};
+		    	next;
+		    }
+		    die "$Script - duplicate batchname '$bname' found. methylprojectid=$methylprojectid\n";
         }
+		#	Does not exist, create it
 		$sql = "INSERT INTO $opts{files_table} " .
 			"(methylprojectid,batchname,count,dateinit, " .
 			"file0, file0checksum, file0size," .
@@ -258,27 +265,30 @@ sub AddMethylBatches {
 		$sth = DoSQLv($sql . $values);
 		if ($sth) { $methylbatchid  = SQL_Last_Insert($sth); }	# Index to this sample
 		if (! $methylbatchid) {
-			warn "$Script - INSERT for '$bname failed\n";
-			return 0;
+			die "$Script - INSERT for '$bname failed.  SQL=$sql\n";
 		}
 		#	Save index to entry so we can create samples
-		$batchnames{$bname}{id} = $methylbatchid
+		$batchnames{$bname}{id} = $methylbatchid;
 	}
 
 	#------------------------------------------------------------------
 	#	Batch entries created, Create samples by tearing apart LEVEL0 zip
+	#	LEVEL0 has 'manifest', a tab delimited file with a fixed set of
+	#	columnar data. For each sample we collect some of these columns
+	#	and save them in the database
 	#------------------------------------------------------------------
 	my $tmpdir = "/run/shm/$$";
 	mkdir $tmpdir;
 	my $totalsamples = 0;
 	foreach my $bname (keys %batchnames) {
+		# 	Tear level0 zip apart getting the Manifest file
 		my $cmd = "unzip -d $tmpdir $d/$batchnames{$bname}{file0}{filename} '*/Manifest*.txt'";
 		my $manfile;
 		foreach my $l (split("\n", `$cmd`)) {
 			if ($l =~ /inflating:\s+(\S+)/) { $manfile = $1; last; }
 		}
-		#	Be sure to remove DOS \r characters. Some files have them, some not
-		#	Some files have NO \n, only \r !  Piece of crap data !
+		#	Clean up the file, removing DOS \r characters. Some files have them, some not
+		#	Some files have NO \n, only \r !  Piece of crap for data !
 		if (! open(IN, $manfile)) {
 			warn "$Script - Unable to read LEVEL0 Manifest file '$manfile'\n";
 			return 0;
@@ -287,6 +297,7 @@ sub AddMethylBatches {
 		while (my $l = <IN>) { $l =~ s/\r/\n/g; print OUT $l; }
 		close(IN);
 		close(OUT);
+		#	Now read the cleaned file
 		if (! open(IN, $manfile . '.out')) {
 			warn "$Script - Unable to read LEVEL0 Manifest file '$manfile'\n";
 			return 0;
@@ -344,7 +355,7 @@ sub AddMethylBatches {
 			}
 		}
 		#------------------------------------------------------------------
-		#	Manifest hdr parsed. Create samples entries
+		#	Manifest hdr parsed. Create methylation samples entries
 		#------------------------------------------------------------------
 		my $methylid;
 		my $samplecount = 0;
@@ -353,21 +364,33 @@ sub AddMethylBatches {
 			if ($l !~ /\S/) { next; }	# and blank lines
 			chomp($l);
 			my @c = split("\t", $l);
-			if ($c[$cols{'grn.idat'}] !~ /^\S+\-(\S+)\-(\S{3})_(\S{6})/) {
-				warn "$Script - Unable to parse grn.idat column '" . $c[$cols{'grn.idat'}] .
-					"' from:\nLINE=$l\n";
-				if ($c[$cols{'grn.idat'}] !~ /Failure/) { return 0; }
-				next;
-			}
-		    #   This needs to be restartable, so I must first check if this sample already exists
-		    my $sql = "SELECT $opts{files_pkey} from $opts{files_table} WHERE " .
-		        "methylprojectid=$batchnames{$bname}{id} AND expt_sampleid='" . $c[$cols{'sampleid'}] . "'";
-		    my $sth = DoSQL($sql);
-		    if ($sth) {
-		        if ($opts{verbose}) { warn "$Script - Ignoring existing sample '" . $c[$cols{'sampleid'}] . "'\n"; }
-		        next;
+			#   Watch for failures which we report, but ignore				
+    		if ($c[$cols{'grn.idat'}] =~ /failure/i) {
+                die "$Script - Unable to parse grn.idat column '" . $c[$cols{'grn.idat'}] . "' from:\nLINE=$l\n";
             }
-			my ($type, $version, $rowcol) = ($1, $2, $3);
+			# 	The 'grn.idat' column looks like TOE114524-BIS-v01_R01C01_Grn.idat
+			#	Pick out the type, version and rowcol fields
+			if ($c[$cols{'grn.idat'}] !~ /^\S+\-(\S{3})\-(\S{3})_(\S{6})/) {
+      			die "$Script - Unable to parse grn.idat column '" . $c[$cols{'grn.idat'}] . "' from:\nLINE=$l\n";
+          	}
+			my ($type, $version, $rowcol) = ($1, $2, $3);	# E.g.  BIS  v01  and R01C01
+   			$totalsamples++;
+			$samplecount++;
+
+		    #   This needs to be restartable, so I must check if this sample already exists
+            my $sql = "SELECT $opts{files_pkey},methylbatchid FROM $opts{samples_table} WHERE expt_sampleid='" . $c[$cols{'sampleid'}] . "'";
+		    my $sth = DoSQL($sql);
+		    my $href = $sth->fetchrow_hashref;
+		    if (exists($href->{$opts{files_pkey}})) {
+		    	#	Sample already exists, dup?
+				if ($href->{methylbatchid} eq $batchnames{$bname}{id}) {	# No dup, just already exists
+					warn "$Script - Ignoring existing sample '" . $c[$cols{'sampleid'}] . " in '$bname'\n";
+		    		next;
+		    	}
+		    	die "$Script - duplicate sample " . $c[$cols{'sampleid'}] . " found. methylbatchid=$href->{methylbatchid}\n";
+        	}
+
+			#	Insert this sample
 			$sql = "INSERT INTO $opts{samples_table} " .
 				"(methylbatchid,expt_sampleid,array,p05,p01,type,version,rowcol,";
 			my $values .= "VALUES(" . $batchnames{$bname}{id} . "," .
@@ -376,7 +399,7 @@ sub AddMethylBatches {
 				"$c[$cols{'p05'}]," .
 				"$c[$cols{'p01'}]," .
 				"'$type', '$version', '$rowcol',";
-			foreach my $k (keys %cols){
+			foreach my $k (keys %cols) {
 				if ($cols{$k} <= 4) { next; }
 				#	Mismatch between %cols index and SQL column name :-(
 				$sql .= $cols2dbcol{$k} . ',';	# Get DB column
@@ -389,11 +412,7 @@ sub AddMethylBatches {
 			$values .= ')';
 			$sth = DoSQL($sql . $values);
 			$methylid  = SQL_Last_Insert($sth);
-			if (! $methylid) {	#	Sample exists I hope. Need to know index for it
-				warn "$Script - No database record created for '$c[$cols{'sampleid'}]'\n";
-				return 0;
-			}
-			$totalsamples++;
+			if (! $methylid) { die "$Script - No database record created for '$c[$cols{'sampleid'}]'\n"; }
 		}
 		close(IN);
 
@@ -401,14 +420,14 @@ sub AddMethylBatches {
 		my $sql = "UPDATE $opts{files_table} SET count=$samplecount WHERE $opts{files_pkey}=$batchnames{$bname}{id}";
 		if ($opts{verbose}) { print "SQL=$sql\n"; }
 		my $sth = DoSQLv($sql);	
-		$samplecount++;               # fix samplecount and/or totalsamples
+		$samplecount++;
 	}
 
 	#	Update count of samples for this project
 	my $sql = "UPDATE $opts{runs_table} SET arrived='Y' WHERE methylprojectid=$methylprojectid";
 	if ($opts{verbose}) { print "SQL=$sql\n"; }
 	my $sth = DoSQLv($sql);
-	$sql = "UPDATE $opts{runs_table} SET count=$totalsamples WHERE methylprojectid=$methylprojectid";
+	$sql = "UPDATE $opts{runs_table} SET count=$totalbatch WHERE methylprojectid=$methylprojectid";
 	if ($opts{verbose}) { print "SQL=$sql\n"; }
 	$sth = DoSQL($sql);
 
@@ -494,17 +513,21 @@ sub AddRNAProjects {
 	foreach my $samp (sort keys %expt_sampleids) {
 		$totalsamples++;
 		#   This needs to be restartable, so I must first check if this sample already exists
-		my $sql = "SELECT $opts{samples_pkey} from $opts{samples_table} WHERE " .
-		    "rnaprojectid=$rnaprojectid AND expt_sampleid='$samp'";
+		my $sql = "SELECT $opts{samples_pkey},rnaprojectid from $opts{samples_table} WHERE expt_sampleid='$samp'";
 		my $sth = DoSQL($sql);
 		my $href = $sth->fetchrow_hashref;
 		$txseqid = $href->{txseqid};
-		if ($txseqid) {
-		    if ($opts{verbose}) { warn "$Script - Ignoring existing sample '$samp' [$txseqid]\n"; }
-		    $expt_sampleids{$samp}{txseqid} = $txseqid;
-		    next;
-        }
-		#   Create database record for this sample. It might already exist
+		if (exists($href->{$opts{samples_pkey}})) {
+			#	Sample already exists, dup?
+			if ($href->{rnaprojectid} eq $rnaprojectid) {	# No dup, just already exists
+				warn "$Script - Ignoring existing sample '$samp' in rnaprojectid=$rnaprojectid\n";
+			    $expt_sampleids{$samp}{txseqid} = $txseqid;
+	    		next;
+	    	}
+	    	die "$Script - duplicate sample '$samp' found. rnaprojectid=$rnaprojectid\n";
+       	}
+
+		#   Create database record for this sample
 		$sql = "INSERT INTO $opts{samples_table} " .
 			"(rnaprojectid,expt_sampleid,rnasubject,fileprefix,notes,dateinit) " .
 			"VALUES($rnaprojectid,'$samp','$expt_sampleids{$samp}->{rnasubject}'," .
@@ -520,8 +543,7 @@ sub AddRNAProjects {
 			$txseqid = $href->{txseqid};
 		}
 		if (! $txseqid) {
-			warn "$Script - No database record created for '$samp'\n";
-			return 0;
+			die "$Script - No database record created for '$samp'  SQL=$sql\n";
 		}
 		$expt_sampleids{$samp}{txseqid} = $txseqid;
 	}
