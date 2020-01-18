@@ -66,13 +66,14 @@ function ViewProjects($center, $maxdir) {
     //  Get list of centers doing:  select distinct(project) from status;
     $html = "<h3 align='center'>RNA Sequence Data Projects</h3>\n" .
         "<center>" . GetChooseLines() . "<br/>" . $GLOBS['links'] . "</center>\n";
-    $yearstart = 2019;
+    $yearstart = 2020;
     $yearstop = 2018;
     $centers2show = array();                // Get list of centers for this query
     if ($center) { array_push($centers2show, $center); }
     else { $centers2show = $GLOBS['centers']; }
 
     //  Show data for center by datayear
+    $showedsomething = 'N';
     for ($datayear=$yearstart; $datayear>$yearstop; $datayear--) {
         //  For each center show details from database ($rows)
         foreach ($centers2show as $centr) {
@@ -81,9 +82,10 @@ function ViewProjects($center, $maxdir) {
             if (! $h) { continue; }
             $html .= "<br><div class='indent'><b>" . strtoupper($centr) .
                 ", Year $datayear</b></div>$h\n";
+            $showedsomething = 'Y';
         }
         $html .= "<br>";
-        if ($datayear > 1) { $html .= "<hr width='80%' class='separator'>\n"; }
+        if ($showedsomething == 'Y') { $html .= "<hr width='80%' class='separator'>\n"; }
     }
     
     $html .= "<div class='indent'>\n" . $GLOBS['statusruns'] . "</div>\n";
