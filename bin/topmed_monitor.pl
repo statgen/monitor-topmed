@@ -131,12 +131,14 @@ if ($opts{datatype} eq 'rnaseq') {
     $opts{topmedbackup} = $Bin . "/rnaseq_backup.sh";
     $opts{topmedawscopy} = $Bin . "/rnaseq_awscopy.sh";
     $opts{topmedfix} = $Bin . "/rnaseq_fix.sh";
+    $opts{topmedqplot} = $Bin . "/rnaseq_qplot.sh";
 	%validverbs = (
 		arrive => 1,
 		verify => 1,
 		backup => 1,
 		awscopy => 1,
-		fix => 1,
+		qplot   => 1,
+		fix    => 1,
 	);
 }
 if ($opts{datatype} eq 'methyl') {
@@ -151,12 +153,14 @@ if ($opts{datatype} eq 'methyl') {
     $opts{topmedbackup} = $Bin . "/methyl_backup.sh";
     $opts{topmedawscopy} = $Bin . "/methyl_awscopy.sh";
     $opts{topmedfix} = $Bin . "/methyl_fix.sh";
+    $opts{topmedqplot} = $Bin . "/methyl_qplot.sh";
 	%validverbs = (
 		arrive => 1,
 		verify => 1,
 		backup => 1,
 		awscopy => 1,
-		fix => 1,
+		qlpot  => 1,
+		fix    => 1,
 	);
 }
 
@@ -273,6 +277,9 @@ sub Submit_generic {
 		#	Deal with special cases that don't use normal process
 		if ($name eq 'awscopy') {
         	if ($href->{state_aws38copy} != $REQUESTED) { next; }
+		}
+		if ($opts{datatype} eq 'rnaseq' || $opts{datatype} eq 'methyl') {
+			if ($name eq 'qplot' && $href->{state_qplot} != $REQUESTED) { next; }
 		}
         #	Ignore anything not requested
         if ($href->{$state2run} != $NOTSET && $href->{$state2run} != $REQUESTED) { next; }

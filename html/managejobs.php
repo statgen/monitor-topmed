@@ -44,6 +44,7 @@ function JOBFunctions($fcn) {
 		if ($samplestate == 'G') { $s = 'gcecopy'; }
 		if ($samplestate == 'g') { $s = 'gcecpbcf'; }
 		if ($samplestate == 'x') { $s = 'cleanup'; }
+		if ($samplestate == 'q') { $s = 'qc'; }
 		// Hardcoded path cause mario won't play with topmedpath.pl
 		$f = '/net/topmed/working/topmed-output/' . $PARMS['id'] . "-$s.out";
 		print "<h4 align='center'>SLURM console log for '$s' Sample=$id [" . $PARMS['table'] . "]</h4>\n" .
@@ -309,6 +310,7 @@ function RestartJobs($h) {
         "<option value='gce38cpbcf'>gcecpbcf</option>" .
         "<option value='gcecleanup'>gcecleanup</option>" .
         "<option value='aws38copy'>awscopy</option>" .
+        "<option value='qc'>qc</option>" .
         "</select></td>" .
         "<td><font color='green'>&nbsp; </font></td>" .
         "<td>&nbsp;</td>" .

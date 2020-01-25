@@ -13,7 +13,7 @@
 #################################################################*/
 $statusletters = "<i><b>a</b>=File Arrived, <b>5</b>=MD5 Verified, <b>B</b>=Local Backup Done, " .
     //"<b>A</b></b>=Upload data to AWS,<br/>" .
-    "<b>F</b>=FIX";
+    "<b>Q</b>=QC Done, <b>F</b>=FIX";
 if ($LDB['datatype'] == 'genome') {
 	$statusletters = "<i><b>a</b>=File Arrived, <b>5</b>=MD5 Verified, <b>B</b>=Local Backup of CRAM, <b>C</b>=BAM=>CRAM, <b>Q</b>=qplot run,<br/>" .
     	"<b>7</b>=Remapped Build=37, " .
@@ -51,12 +51,14 @@ $quickcols = array(                     // Map of status column to topmedcmd ver
     'state_arrive'   => 'arrived',
     'state_verify'   => 'verify',
     'state_backup'   => 'backup',
+    'state_qplot'    => 'qplot',
     'state_aws38copy'=> 'awscopy'
 );
 $quickletter = array(                	// Map of status column to letter we see
 	'state_arrive'   => 'a',
 	'state_verify'   => '5',
 	'state_backup'   => 'B',
+	'state_qplot'    => 'Q',
 	'state_aws38copy'=> 'A'
 );
 $separator_actions = array();

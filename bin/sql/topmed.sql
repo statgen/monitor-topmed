@@ -242,6 +242,7 @@ CREATE TABLE tx_samples (
    state_arrive   INT DEFAULT 0,
    state_verify   INT DEFAULT 0,
    state_backup   INT DEFAULT 0,
+   state_qplot    INT DEFAULT 0,    		/* Quality control */
    state_aws38copy INT DEFAULT 0,    		/* Copy local data to AWS bucket */
    state_fix INT DEFAULT 0,          		/* Track efforts to fix screwups */
 
@@ -315,6 +316,7 @@ CREATE TABLE methyl_batch (
    state_arrive   INT DEFAULT 0,
    state_verify   INT DEFAULT 0,
    state_backup   INT DEFAULT 0,
+   state_qplot    INT DEFAULT 0,    		/* Quality control */
    state_aws38copy INT DEFAULT 0,    		/* Copy local data to AWS bucket */
    state_fix INT DEFAULT 0,          		/* Track efforts to fix screwups */
    status       VARCHAR(256),

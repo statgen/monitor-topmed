@@ -100,22 +100,20 @@ if ($opts{datatype} eq 'rnaseq') {
     	'state_arrive'    => 'a',
     	'state_verify'    => '5',
     	'state_backup'    => 'B',
+    	'state_qplot'     => 'Q',
     	'state_aws38copy' => 'A',
 	);
 }
 if ($opts{datatype} eq 'methyl') {		    	# This is not really used for methyl
 	$opts{state_table} = 'methyl_batch';		# Table of rows with state_ flags
 	$opts{state_pkey} = 'methylbatchid';
-
-	#$opts{status_table} = 'methyl_batch';		# Table of rows with status column
-	#$opts{status_pkey} = 'methylbatchid';
-
 	$opts{status_table} = 'methyl_projects';		# Table of rows with status column  ??
 	$opts{status_pkey} = 'methylprojectid';
 	%attributes2letter = (
     	'state_arrive'    => 'a',
     	'state_verify'    => '5',
     	'state_backup'    => 'B',
+    	'state_qplot'     => 'Q',
     	'state_aws38copy' => 'A',
 	);
 }
