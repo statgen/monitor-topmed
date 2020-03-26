@@ -226,27 +226,33 @@ sub Submit_arrive {
     foreach my $runid (keys %{$runsref}) {
         my $dir = $runsref->{$runid};       # We know name of run and runid
         #   Get list of all samples not arrived for this run
-        my $s = '';
-         my $sql = "SELECT c.centername,b.$opts{samples_pkey},b.state_arrive$s " .
-            "FROM $opts{samples_table} AS b " .
-            "JOIN $opts{runs_table} AS r " .
-            "JOIN $opts{centers_table} AS c ON r.centerid = c.centerid " .
-            "WHERE r.$opts{runs_pkey}=$runid AND b.state_arrive!=$COMPLETED";
-       my $sth = DoSQL($sql);
+        my $sql = "SELECT $opts{samples_pkey} from $opts{samples_table} " .
+            "WHERE state_arrive!=$COMPLETED AND $opts{runs_pkey}=$runid";
+        my $sth = DoSQL($sql);
         my $rowsofdata = $sth->rows() || next;
         for (my $i=1; $i<=$rowsofdata; $i++) {
             my $href = $sth->fetchrow_hashref;
-            #   Build path to sample manually
-            #   See if we should mark this as arrived
-            if ($href->{state_arrive} == $COMPLETED) { next; }  # Last sanity check
             #   Run the command, not run in SLURM
             my $rc = BatchSubmit("$opts{topmedarrive} $href->{$opts{samples_pkey}}");
             if ($rc > 0) {          # Unable to submit, try to capture output
-                rename($opts{submitlog}, "$opts{consoledir}/$href->{$opts{samples_pkey}}-arrive.out")
+                rename($opts{submitlog},
+                    "$opts{consoledir}/$href->{$opts{samples_pkey}}-arrive.out")
             }
+        }
+        #   Check if all the samples have arrived successfully
+        $sql = "SELECT $opts{samples_pkey} from $opts{samples_table} " .
+            "WHERE $opts{runs_pkey}=$runid AND state_arrive!=$COMPLETED";
+        $sth = DoSQL($sql);
+        $rowsofdata = $sth->rows();
+        if (! defined($rowsofdata) || $rowsofdata==0) {
+            $sql = "UPDATE $opts{runs_table} SET arrived='Y' " .
+                "WHERE $opts{runs_pkey}=$runid";
+            $sth = DoSQL($sql);
+            if ($sth) { print "All samples arrived for '$runid'\n"; }
         }
     }
     ShowSummary('Samples arrived');
+
 }
 
 #==================================================================
@@ -530,12 +536,12 @@ sub GetUnArrivedRuns {
     #   No longer have runs arriving piecemeal. All the data is there
     #   Just look for samples that have not completed.
     #   There is a possible race condition here (maybe)
-    my $where = " WHERE b.state_arrive!=$COMPLETED";
+    my $where = " WHERE r.arrived!='Y' AND b.state_arrive!=$COMPLETED";
     my $sql = "SELECT DISTINCT r.$opts{runs_pkey},r.dirname FROM $opts{runs_table} AS r " .
         "JOIN $opts{samples_table} AS b ON b.$opts{runs_pkey}=r.$opts{runs_pkey} ";
     #   Maybe want some runs
     if ($opts{runs}) { 
-        $where .= " AND $opts{runs_pkey} IN ($opts{runs})";
+        $where .= " AND b.$opts{runs_pkey} IN ($opts{runs})";
     }
     $sql .= $where;
     my $sth = DoSQL($sql);
