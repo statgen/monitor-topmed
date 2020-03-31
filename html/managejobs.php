@@ -76,11 +76,6 @@ function JOBFunctions($fcn) {
 		print dofooter($HDR['footer']);
 		exit;
 	}
-	if ($fcn == 'runstatus') {
-		system("/usr/cluster/topmed/bin/topmed_status.pl -project topmed runstatus");
-		print "<p>Status of gen_seq runs was refreshed</p>\n";
-		$fcn = 'restartjobs';
-	}
 	if ($fcn == 'restartjobs') {
 		$h = HandleRestartJobs($PARMS['run'],$PARMS['samplestate'],$PARMS['op']);
 		if ($h != "") {
@@ -270,8 +265,6 @@ function RestartJobs($h) {
         "samples in the selected state for the specified run.</h4>\n";
             $html .= $GLOBS['showstatus'] . "</center><br/>\n";
     if ($h) { $html .= "<div class='indent'><span class='surprise'>$h</span></div>\n"; }
-
-    $html .= "<center><a href=" . $_SERVER['PHP_SELF'] . "?fcn=runstatus> Update the status of the monitor display</a><br/><br/></center>";    
 
     //  Prompt for classes of jobs to be restarted
     $html .= "<form action='$url' method='post'>\n" .

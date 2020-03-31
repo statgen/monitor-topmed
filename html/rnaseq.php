@@ -57,7 +57,9 @@ if (in_array($_SERVER['REMOTE_USER'], $MGRS)) { $GLOBS['iammgr'] = 1; }
 if (in_array($_SERVER['REMOTE_USER'], $REQMGRS)) { $GLOBS['iammgr'] = 1; }
 //  If a manager, allow them to control job submission
 if ($GLOBS['iammgr']) {
-    $GLOBS['links'] .= "<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=control' " .
+    $GLOBS['links'] .= 
+        "<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=runstatus'>Run_Status</a> &nbsp;" .
+        "<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=control' " .
         "onclick='javascript:popup2(\"" . $_SERVER['SCRIPT_NAME'] . "?fcn=control\",680,720); " .
         "return false;'>Control_Jobs</a> &nbsp;" .
         "<a href='" . $_SERVER['SCRIPT_NAME'] . "?fcn=restart' " .
@@ -84,9 +86,7 @@ $parmcols = array('fcn', 'maxdir', 's', 'col', 'center', 'datayear',
     'table', 'op', 'id', 'samplestate', 'run');
 //	Capture $parmcols in hash $PARMS so we can access them from anywhere easily
 $PARMS = isolate_parms($parmcols);
-
-//	Set defaults
-if ($LDB['datatype'] == 'genome') {
+if ($LDB['datatype'] == 'genome') {         // Set defaults
 	if ($PARMS['fcn'] == '')    { $PARMS['fcn'] = 'runs'; }
 	if ($PARMS['maxdir'] == '') { $PARMS['maxdir'] = 0; }
 }
@@ -101,8 +101,15 @@ DB_Connect($LDB['realm']);
 GetCenters();                       // Get maps to identify centers
 $HTML = '';
 
-//	Figure out what we're supposed to do   Useful data is in $PARMS and $GLOBS
+//	Handle function for all datatypes
 $fcn = $PARMS['fcn'];
+if ($fcn == 'runstatus') {
+	system("/usr/cluster/topmed/bin/topmed_status.pl -project topmed runstatus");
+	print "<p><font color='blue'><b>Status of " . $LDB['datatype'] . " runs was refreshed</b></font></p>\n";
+	$fcn = 'runs';
+}
+
+//	Figure out what we're supposed to do   Useful data is in $PARMS and $GLOBS
 if ($LDB['datatype'] == 'rnaseq') {
 	RNAFunctions($fcn);
 }
@@ -110,9 +117,11 @@ if ($LDB['datatype'] == 'rnaseq') {
 if ($LDB['datatype'] == 'genome') {
 	GENFunctions($fcn);
 }
+
 if ($LDB['datatype'] == 'methyl') {
 	MethylFunctions($fcn);
 }
+
 JOBFunctions($fcn);		// Handle JOBs
 if ($GLOBS['iammgr']) { ImmgrFunctions($fcn);  }	// Handle functions for managers
 
