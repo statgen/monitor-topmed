@@ -297,20 +297,19 @@ function RestartJobs($h) {
         "<td>&nbsp;</td>";
     $html .= "<td><select name='op'>" .
         "<option value='none'>none</option>" .
-        "<option value='arrive'>arrive</option>" .
-        "<option value='verify'>verify</option>" .
-        "<option value='cram'>cram</option>" .
-        "<option value='backup'>backup</option>" .
-        "<option value='qplot'>qplot</option>" .
-        "<option value='gce38push'>gcepush</option>" .
-        "<option value='gce38pull'>gcepull</option>" .
+        "<option value='arrive'>arrive - a</option>" .
+        "<option value='verify'>verify - 5</option>" .
+        "<option value='cram'>cram - C</option>" .
+        "<option value='backup'>backup - B</option>" .
+        "<option value='qplot'>qplot - Q</option>" .
+        "<option value='gce38push'>gcepush - s</option>" .
+        "<option value='gce38pull'>gcepull- r</option>" .
         "<option value='gce38post'>post</option>" .
-        "<option value='gce38bcf'>bcf</option>" .
-        "<option value='gce38copy'>gcecopy</option>" .
-        "<option value='gce38cpbcf'>gcecpbcf</option>" .
-        "<option value='gcecleanup'>gcecleanup</option>" .
-        "<option value='aws38copy'>awscopy</option>" .
-        "<option value='qc'>qc</option>" .
+        "<option value='gce38bcf'>bcf - V</option>" .
+        "<option value='gce38copy'>gcecopy - G</option>" .
+        "<option value='gce38cpbcf'>gcecpbcf - g</option>" .
+        "<option value='gcecleanup'>gcecleanup - x</option>" .
+        "<option value='aws38copy'>awscopy - A</option>" .
         "</select></td>" .
         "<td><font color='green'>&nbsp; </font></td>" .
         "<td>&nbsp;</td>" .
