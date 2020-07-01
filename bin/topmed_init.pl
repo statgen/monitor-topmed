@@ -849,6 +849,7 @@ sub AddBams {
     my $rowsofdata = $sth->rows();
     my %knownbams = ();
     my %knownorigbam = ();
+    my $bamcount = 0;
     for (my $i=1; $i<=$rowsofdata; $i++) {
         foreach my $href ($sth->fetchrow_hashref) {
             $knownbams{$href->{bamname}} = 1;
@@ -893,8 +894,8 @@ sub AddBams {
             ($fn, $checksum) = NormalizeMD5Line($l, $f);
             if (! $checksum) { $badmd5++; next; }
             #   Don't make duplicate records
-            if (exists($knownbams{$fn})) { next; }       # Skip known bams
-            if (exists($knownorigbam{$fn})) { next; }    # Skip known original bams
+            if (exists($knownbams{$fn})) { $bamcount++; next; }       # Skip known bams
+            if (exists($knownorigbam{$fn})) { $bamcount++; next; }    # Skip known original bams
 
             #   New BAM, create database record for it. Actual BAM may not exist yet
             $sql = "INSERT INTO $opts{samples_table} " .
@@ -903,6 +904,7 @@ sub AddBams {
             if ($opts{verbose}) { print "SQL=$sql\n"; }
             $sth = DoSQLv($sql);
             $newbams++;
+            $bamcount++;
         }
         close(IN);
         if ($badmd5) { next; }              # This MD5 was in error
@@ -913,24 +915,18 @@ sub AddBams {
         print "$Script - $newbams new bams found in '$d'\n";
         $opts{count} += $newbams;            # Stats for ending msg
         $opts{countruns} .= $d . ' ';
-    }
 
-    #   Get number of database records
-   	#	We no longer have data arriving piecemeal - set arrived
-    $sql = "SELECT $opts{samples_pkey} FROM $opts{samples_table} WHERE $opts{runs_pkey}=$runid";
-    $sth = DoSQL($sql);
-    my $numbamrecords = $sth->rows();
-    $sql = "UPDATE $opts{runs_table}  SET arrived='Y',count=$numbamrecords WHERE runid=$runid";
-    $sth = DoSQLv($sql);
+   	    #	We no longer have data arriving piecemeal - set count. arrived set by topmed_monitor
+        $sql = "UPDATE $opts{runs_table} SET count=$bamcount WHERE runid=$runid";
+        $sth = DoSQLv($sql);
 
-    #   Last sanity check, see if number of BAM files matches records
-    #   This might not always be accurate, but ...
-    if ($newbams) {
+        #   Last sanity check, see if number of BAM files matches records
+        #   This might not always be accurate, but ...
         my $n = `ls $d/N*.bam $d/N*.cram 2>/dev/null | wc -l`;
         chomp($n);
-        if ($n eq $numbamrecords) { print "$Script - Congratulations, # bams = # database records\n"; }
+        if ($n eq $newbams) { print "$Script - Congratulations, # bams = # database records\n"; }
         else {
-            print "$Script - Warning, # bams [$n] != # database records [$numbamrecords].  " .
+            print "$Script - Warning, # bams [$n] != # database records [$newbams 912].  " .
             "If data is incoming, this might be OK\n";
         }
     }
