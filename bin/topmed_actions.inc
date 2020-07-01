@@ -486,7 +486,8 @@ function SubmitJob {
   fi
   # Job was submitted, save job details
   if [ "${l[0]}" = "Submitted" ]; then      
-    echo `date` $me ${l[3]} $slurmp $qos $mem >> $console/$bamid.jobids
+    #echo `date` $me ${l[3]} $slurmp $qos $mem >> $console/$bamid.jobids
+    echo `date` "$me - $l -  $slurmp $qos $mem" >> $console/$bamid.jobids
   fi
   if [ "$markverb" != "" ]; then
     $topmedcmd mark $bamid $markverb submitted
