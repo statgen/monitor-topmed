@@ -137,6 +137,16 @@ foreach my $centerid (keys %{$centersref}) {
     my $runid;
     foreach my $d (@{$dirsref}) {
     	if ($opts{verbose}) { warn "$Script - checking '$d'\n"; }
+    	#	It's too easy to 'detect' a run in the incoming directory which
+    	#	is not really a run.  Pretend the run must have a Manifest.txt file
+    	#	If not, refuse to make it a run and warn to delete in database
+    	if (! -f "$d/Manifest.txt") {
+    		warn "$Script - Ignoring '$d' with no Manifest.txt file\n";
+    		$runid = $knownruns{$d}{$opts{runs_pkey}};
+    		if ($runid) { warn "$Script - '$d' exists in runs table [$runid] and should be deleted\n"; }
+    		next;
+    	}
+    	#	Get index for this run or make it
         $runid = $knownruns{$d}{$opts{runs_pkey}} || CreateRun($centerid, $d);
         if (! defined($runid)) {
             if ($opts{verbose}) { warn "$Script ID not defined for dir=$d\n"; }
@@ -815,7 +825,12 @@ sub CreateRun {
         "(centerid,dirname,comments,count,dateinit) " .
         "VALUES($cid,'$d','',0,'$nowdate')";
     my $sth = DoSQLv($sql);
-    my $runid = $sth->{mysql_insertid};
+    my $runid = 0;
+  	if ($sth) { $runid = SQL_Last_Insert($sth); }	# Index to this run
+	if (! $runid) {
+		warn "$Script - Insert '$d' into table $opts{runs_table} FAILED\n";
+     	return undef();
+    }
     print "$Script - Added run/project '$d' [ $runid ]\n";
     $opts{runcount}++;
     return $runid;
@@ -924,7 +939,13 @@ sub AddBams {
         #   This might not always be accurate, but ...
         my $n = `ls $d/N*.bam $d/N*.cram 2>/dev/null | wc -l`;
         chomp($n);
-        if ($n eq $newbams) { print "$Script - Congratulations, # bams = # database records\n"; }
+        if ($n eq $newbams) {
+        	print "$Script - Congratulations, # bams = # database records\n";
+        	#	Always treat run as arrived
+        	$sql = "UPDATE $opts{runs_table}  SET arrived='Y' WHERE runid=$runid";
+        	$sth = DoSQLv($sql);
+        	print "$Script - Run '$d' has finally arrived. Look at it no more\n";
+        }
         else {
             print "$Script - Warning, # bams [$n] != # database records [$newbams 912].  " .
             "If data is incoming, this might be OK\n";
@@ -932,7 +953,7 @@ sub AddBams {
     }
     return 1;								# No need to check/set arrived
 
-    #   If ALL the samples has been processed as arrived, maybe we do not
+    #   If ALL the samples have been processed as arrived, maybe we do not
     #   need to look at this run any more.
     $sql = "SELECT $opts{samples_pkey} FROM $opts{samples_table} WHERE state_arrive!=$NOTSET";
     $sth = DoSQL($sql);
@@ -1044,7 +1065,7 @@ sub GetDirs {
 sub DoSQLv {
     my ($sql) = @_;
     if ($opts{verbose}) {
-    	print "SQL: $sql\n";
+    	print "Not done, SQL: $sql\n";
     	return 0;
     }
     return DoSQL($sql);
