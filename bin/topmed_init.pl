@@ -941,10 +941,10 @@ sub AddBams {
         chomp($n);
         if ($n eq $newbams) {
         	print "$Script - Congratulations, # bams = # database records\n";
-        	#	Always treat run as arrived
-        	$sql = "UPDATE $opts{runs_table}  SET arrived='Y' WHERE runid=$runid";
-        	$sth = DoSQLv($sql);
-        	print "$Script - Run '$d' has finally arrived. Look at it no more\n";
+        	#	Set arrived flag in the arrive function
+        	#$sql = "UPDATE $opts{runs_table}  SET arrived='Y' WHERE runid=$runid";
+        	#$sth = DoSQLv($sql);
+        	#print "$Script - Run '$d' has finally arrived. Look at it no more\n";
         }
         else {
             print "$Script - Warning, # bams [$n] != # database records [$newbams 912].  " .
