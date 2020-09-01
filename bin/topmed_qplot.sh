@@ -128,9 +128,8 @@ echo "Running qplot for build '$build' extension '$extension'"
 
 #  Define shell variables for Qplot and Fan Zhang's new VerifyBamId
 gcref=/net/mario/nodeDataMaster/local/ref/gotcloud.ref
-fixverifybamid=/usr/cluster/topmed/bin/nhlbi.1648.vbid.rewrite.awk
-verifybamid_dir=/usr/cluster/software/trusty/verify-bam-id
-verifybamid=$verifybamid_dir/1.0.0-b38/bin/VerifyBamID
+verifybamid_dir=/usr/cluster/topmed/bin/verifybamid
+verifybamid=/usr/cluster/topmed/bin/VerifyBamID
 qplotnew=/usr/cluster/topmed/bin/qplot	 	# <== New qplot from Tom
 
 #   Assign resource variables specific to each build
@@ -141,13 +140,15 @@ qplotnew=/usr/cluster/topmed/bin/qplot	 	# <== New qplot from Tom
 if [ "$build" = "37" ]; then
    reference=${gcref}/hs37d5.fa
    qplot_snp=${gcref}/dbsnp_142.b37.vcf.gz
-   resources=$verifybamid_dir/1.0.0-b38/resource/1000g.100k.b37.vcf.gz.dat
+   #resources=$verifybamid_dir/1.0.0-b38/resource/1000g.100k.b37.vcf.gz.dat
+   resources=$verifybamid_dir/resource/1000g.100k.b37.vcf.gz.dat
    region="-"
    b37_sites=${gcref}/hapmap_3.3.b37.sites.vcf.gz
 elif [ "$build" = "38" ]; then
    reference=${gcref}/hg38/hs38DH.fa
    qplot_snp=${gcref}/hg38/dbsnp_142.b38.vcf.gz
-   resources=$verifybamid_dir/1.0.0-b38/resource/1000g.100k.b38.vcf.gz.dat
+   #resources=$verifybamid_dir/1.0.0-b38/resource/1000g.100k.b38.vcf.gz.dat
+   resources=$verifybamid_dir/resource/1000g.100k.b38.vcf.gz.dat
    region=/net/topmed/incoming/study.reference/study.reference/nhlbi.3066.hs38DH.autosome.list
 else
   Fail "Unknown build '$build', cannot continue with qplot for '$bamfile'"
@@ -179,9 +180,17 @@ if [ "$extension" = "cram" -o "$build" = "38" ]; then	#  Run Fan Zhang's VerifyB
      --BamFile $bamfile > $nwdid.vb ) 2>/run/shm/$nwdid.vb.log
   RC_Check $? $nwdid "VerifyBAMID failed for '$bamfile'"
 
-  #  Convert this into standard verifybamid output ( $basebam.vb.selfSM ).
-  awk -f $fixverifybamid  $nwdid.vb	    # Do not pass NWD identifier
-  RC_Check $? $nwdid "$fixverifybamid failed for '$bamfile'"
+  #  Convert this into standard verifybamid output ( $basebam.vb.selfSM )
+  # e.g. FREEMIX(Alpha):4.82382e-09
+  freemix=`grep Alpha $nwdid.vb | sed -e 's/://' | sed -e 's/Alpha//' | sed -e 's/FREEMIX(//' | sed -e 's/)//'` 
+  if [ "$freemix" = "" ]; then
+    x=`cat $nwdid.vb`
+    RC_Check 2 $nwdid "Unable to parse VerifyBAMID $nwdid.vb = $x"
+  fi
+  #	Now create $nwdid.vb.selfSM   Beware, tabs in this file
+  /bin/echo -e "#SEQ_ID\tRG\tCHIP_ID\t#SNPS\t#READS\tAVG_DP\tFREEMIX\tFREELK1\tFREELK0\tFREE_RH\tFREE_RA\tCHIPMIX\tCHIPLK1\tCHIPLK0\tCHIP_RH\tCHIP_RA\tDPREF\tRDPHET\tRDPALT" > $nwdid.vb.selfSM
+  /bin/echo -e "$nwdid\t-\t-\t-\t-\t-\t$freemix\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-" >> $nwdid.vb.selfSM
+  echo "Created $nwdid.vb.selfSM from $nwdid.vb  [$nwdid $freemix]"
 elif [ "$extension" = "bam" -a "$build" = "37" ]; then	#  Run Goo Jun's old code
   /net/mario/gotcloud/bin/verifyBamID --bam  $bamfile --vcf $b37_sites	 	 	\
     --site --free-full --chip-none --ignoreRG --precise --maxDepth 80	\
