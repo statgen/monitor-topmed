@@ -65,25 +65,29 @@ fi
 #======================================================================
 copyuri=`$topmedpath wherepath $nwdid gceupload`
 gcecramname=$nwdid.b${build}.irc.v1.cram
+lockdir=/run/shm/$$.$nwdid
+mkdir -p $lockdir
+gsutil="$gsutil -o GSUtil:state_dir=$lockdir"
 
 $gsutil $gsshareoption cp $recabcram $copyuri/$gcecramname
 if [ "$?" != "0" ]; then
   Fail "Failed to copy $recabcram to GCE as $gcecramname"
 fi
 echo "Copied CRAM to $copyuri"
-gsutil $gsshareoption cp $recabcrai $copyuri/$gcecramname.crai
+$gsutil $gsshareoption cp $recabcrai $copyuri/$gcecramname.crai
 if [ "$?" != "0" ]; then
   Fail "Failed to copy $recabcrai to GCE as $gcecramname.crai"
 fi
 echo "Copied CRAI to $copyuri"
 
 echo "GCE SHARE files for $bamid $nwdid"
-gsutil $gsshareoption ls -l $copyuri/${nwdid}\*
+$gsutil $gsshareoption ls -l $copyuri/${nwdid}\*
 
 etime=`date +%s`
 etime=`expr $etime - $stime`
 
 echo "Copy of CRAM files to GCE completed in $etime seconds"
 Successful
+rm -rf $lockdir
 Log $etime
 exit

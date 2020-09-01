@@ -49,6 +49,9 @@ recabcsi=$recabbcf.csi
 #   Copy is very fast to GCE, so don't try to be too clever
 #======================================================================
 copyuri=`$topmedpath wherepath $nwdid gcebcfupload`
+lockdir=/run/shm/$$.$nwdid
+mkdir -p $lockdir
+gsutil="$gsutil -o GSUtil:state_dir=$lockdir"
 $gsutil cp $recabbcf $recabcsi $copyuri 
 if [ "$?" != "0" ]; then
   Fail "Failed to copy files to GCE as $gcefile"
@@ -65,5 +68,6 @@ etime=`expr $etime - $stime`
 
 echo "Copy of BCF files to GCE completed in $etime seconds"
 Successful
+rm -rf $lockdir
 Log $etime
 exit
