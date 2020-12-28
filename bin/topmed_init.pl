@@ -7,7 +7,7 @@
 #   Use this program to check for files that are arriving
 #   and initialize the NHLBI TOPMED database
 #   This program can work with topmed and inpsyght genome data
-#	as well as RNS sequence and methylation data
+#	as well as RNA sequence and methylation data
 #
 # ChangeLog:
 #   $Log: topmed_init.pl,v $
@@ -107,7 +107,7 @@ chdir($opts{topdir}) ||
     die "$Script Unable to CD to '$opts{topdir}': $!\n";
 
 #--------------------------------------------------------------
-#   For each center watch for a new data to arrive
+#   For each center watch for new data to arrive
 #--------------------------------------------------------------
 my $centersref = GetCenters();
 foreach my $centerid (keys %{$centersref}) {
@@ -167,7 +167,7 @@ foreach my $centerid (keys %{$centersref}) {
 
 $nowdate = strftime('%Y/%m/%d %H:%M', localtime);
 if ($opts{runcount}) { print "$nowdate  Added $opts{runcount} runs\n"; }
-if ($opts{count})    { print "$nowdate  Added $opts{count} samlpes from: $opts{countruns}\n"; }
+if ($opts{count})    { print "$nowdate  Added $opts{count} samples from: $opts{countruns}\n"; }
 exit;
 
 #==================================================================
@@ -859,7 +859,7 @@ sub AddBams {
    	if ($opts{verbose}) { warn "$Script - AddBams($runid, $d)\n"; }
 
     #   Get all the known bams for this directory/run   Get NWD name and original name
-    my $sql = "SELECT bamname,bamname_orig FROM $opts{samples_table} WHERE $opts{samples_pkey}=$runid";
+    my $sql = "SELECT bamname,bamname_orig FROM $opts{samples_table} WHERE $opts{runs_pkey}=$runid";
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
     my %knownbams = ();
