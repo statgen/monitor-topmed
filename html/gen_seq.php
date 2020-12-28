@@ -69,7 +69,7 @@ function ViewRuns($center, $maxdir) {
     //  Get list of centers doing:  select distinct(project) from status;
     $html = "<h3 align='center'>Summary of Genome Sequence Data</h3>\n" .
         "<center>" . GetChooseLines() . "<br/>" . $GLOBS['links'] . "</center>\n";
-    $yearstart = 5;
+    $yearstart = 6;
     $yearstop = 1;
     $centers2show = array();                // Get list of centers for this query
     //	For some reason we're using center to spcify year. That's dumb

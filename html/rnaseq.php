@@ -140,6 +140,8 @@ function GetChooseLines() {
 	$html = 'Choose: '; 		// Ain't consistency great?
 	if ($LDB['datatype'] == 'genome') {
 		$html .= "&nbsp;&nbsp;<a href='" . $_SERVER['SCRIPT_NAME'] .
+			"?center=year6&amp;maxdir=$maxdir'>Year 6</a>&nbsp;&nbsp;\n" .
+			"<a href='" . $_SERVER['SCRIPT_NAME'] .
 			"?center=year5&amp;maxdir=$maxdir'>Year 5</a>&nbsp;&nbsp;\n" .
 			"<a href='" . $_SERVER['SCRIPT_NAME'] .
 			"?center=year4&amp;maxdir=$maxdir'>Year 4</a>&nbsp;&nbsp;\n" .
