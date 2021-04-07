@@ -1090,7 +1090,11 @@ sub Check_NFSMounts {
     if (! $errs) {
 	if ($opts{verbose}) { print "NFS mounts on '$h' seem to be okay  (found $success files)\n"; }
     }
-    else { print "NFS mounts on '$h' found $success files, failed to find $errs files\n"; }
+    else {
+    	if ("$h" ne "topmed3") {
+    		print "NFS mounts on '$h' found $success files, failed to find $errs files\n";
+    	}
+    }
     exit($errs);
 }
 
