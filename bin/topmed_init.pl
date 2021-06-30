@@ -4,10 +4,19 @@
 # Name:	topmed_init.pl
 #
 # Description:
-#   Use this program to check for files that are arriving
-#   and initialize the NHLBI TOPMED database
-#   This program can work with topmed and inpsyght genome data
-#	as well as RNA sequence and methylation data
+#   Use this program to check for files that are arriving and initialize 
+#   the NHLBI TOPMED database.  This program can work with topmed and 
+#   inpsyght genome data as well as RNA sequence and methylation data.
+#
+#   Either the environment variable 'PROJECT' or argument '-project' 
+#   plus the name that this script is called with or '-datatype' specifies 
+#   which set of database tables to operate on.  Argument '-center' is 
+#   interpreted by subroutine GetCenters() from Get.pm.  The command line 
+#   must end with 'updatedb'.
+#
+#   Substantial clarification of Terry's comments, February 2021, only 
+#   for the whole genome sequence portions of this script.  The RNA-seq 
+#   and methylation subroutines are untouched.
 #
 # ChangeLog:
 #   $Log: topmed_init.pl,v $
@@ -18,7 +27,7 @@
 ###################################################################
 use strict;
 use warnings;
-use FindBin qw($Bin $Script);
+use FindBin qw($Bin $Script);	#  "$Script" gives the name this script was called with
 use lib (
   qq($FindBin::Bin),
   qq($FindBin::Bin/../lib),
@@ -47,7 +56,7 @@ if (! -d "/usr/cluster/$ENV{PROJECT}") { die "$Script - Environment variable PRO
 my $NOTSET = 0;
 
 our %opts = (
-	datatype => 'genome',		# What kind of data we are handling
+    datatype => 'genome',		# What kind of data we are handling
     realm => "/usr/cluster/$ENV{PROJECT}/etc/.db_connections/$ENV{PROJECT}",
     centers_table => 'centers',
     runs_table => 'runs',
@@ -57,10 +66,10 @@ our %opts = (
     topdir => "/net/$ENV{PROJECT}/incoming/$ENV{PROJECT}",
     runcount => 0,
     count => 0,
-    countruns => '',
+    countruns => '',	 	# 86400 seconds in a day.
     arrivedsecs => 86400*21,	# If no new files in a bit, stop looking at run
-    ignorearrived => 0,     	# If set, ignored arrived database field
-    verbose => 0,
+    ignorearrived => 0,     	# If set, ignored arrived database field and look 
+    verbose => 0,	 	# at ALL runs.
 );
 if ($Script =~ /rnaseq/) { $opts{datatype} = 'rnaseq'; }
 if ($Script =~ /methyl/) { $opts{datatype} = 'methyl'; }
@@ -98,7 +107,7 @@ if ($#ARGV < 0 || $opts{help}) {
     if ($opts{help}) { system("perldoc $0"); }
     exit 1;
 }
-my $fcn = shift @ARGV;
+my $fcn = shift @ARGV;	#  The single non-option argument to this script must be 'updatedb'.
 
 my $dbh = DBConnect($opts{realm});
 my $nowdate = time();
@@ -107,17 +116,24 @@ chdir($opts{topdir}) ||
     die "$Script Unable to CD to '$opts{topdir}': $!\n";
 
 #--------------------------------------------------------------
-#   For each center watch for new data to arrive
+#   For each center watch for new data to arrive  -  main execution loop begins here
 #--------------------------------------------------------------
 my $centersref = GetCenters();
-foreach my $centerid (keys %{$centersref}) {
+foreach my $centerid (keys %{$centersref}) {	#  Begin a loop over centers which ends next page.
     my $c = $centersref->{$centerid};
-    my $d = $opts{topdir} . '/' . $c;
+    my $d = $opts{topdir} . '/' . $c;	 	#  Temporary variable, will be overwritten below.
+
+    #  $d names a directory of symbolic links to the actual storage locations of data received from 
+    #  this sequencing center for this data type.
+
     if (! chdir($d)) {
         #warn "$Script Unable to CD to '$d': $!\n";
         next;
     }
-    #   Get all the known batch data for this center that are not fully arrived
+
+    #  For this center, compare the directory names already in the database to those found in the file system.
+    #  %knownruns will list all previous incoming directories in the database from this center.
+
     my $sql = "SELECT $opts{runs_pkey},dirname,arrived FROM $opts{runs_table} WHERE centerid=$centerid";
     my $sth = DoSQL($sql);
     my $rowsofdata = $sth->rows();
@@ -131,41 +147,47 @@ foreach my $centerid (keys %{$centersref}) {
             if ($opts{ignorearrived}) { $knownruns{$dir}{arrived} = 'N'; }
         }
     }
-    #   Get list of all runs for this center
-    #   Find new ones and add details to database
+    #  $dirsref lists the names of incoming directories found in the file system.
+    #  Find new ones and add details to database.
     my $dirsref = GetDirs('.');
-    my $runid;
-    foreach my $d (@{$dirsref}) {
+    my $runid; 	 	 	 	#  Begin a loop over directories in the file system.
+    foreach my $d (@{$dirsref}) {	#  overwrites the previous value of $d -- this is okay.
     	if ($opts{verbose}) { warn "$Script - checking '$d'\n"; }
     	#	It's too easy to 'detect' a run in the incoming directory which
     	#	is not really a run.  Pretend the run must have a Manifest.txt file
-    	#	If not, refuse to make it a run and warn to delete in database
+    	#	If not, refuse to make it a run and warn to delete in database.
+
+    #  The ways that we obtain the sequencing center's md5 checksum for each incoming data file 
+    #  have changed over the years.  There are a lot of UW directories from 2016 and 2017 where 
+    #  we used to read the checksum from single sample .md5 files.  The code below no longer 
+    #  supports this.  However, Terry is being too draconian when he insists that all of these 
+    #  existing data directories should be deleted from the database.
+
     	if (! -f "$d/Manifest.txt") {
     		warn "$Script - Ignoring '$d' with no Manifest.txt file\n";
     		$runid = $knownruns{$d}{$opts{runs_pkey}};
-    		if ($runid) { warn "$Script - '$d' exists in runs table [$runid] and should be deleted\n"; }
+    		if ($opts{verbose} && $runid) { warn "$Script - '$d' with no file Manifest.txt exists in\n" .
+	 	 	 "runs table [$runid] and should be deleted from the database\n"; }
     		next;
     	}
-    	#	Get index for this run or make it
+    	#  Get database index for this run or make it.
         $runid = $knownruns{$d}{$opts{runs_pkey}} || CreateRun($centerid, $d);
         if (! defined($runid)) {
-            if ($opts{verbose}) { warn "$Script ID not defined for dir=$d\n"; }
+            if ($opts{verbose}) { warn "$Script $opts{runs_pkey} not defined for dir=$d\n"; }
             next;
         }
-        if ($opts{run} && $opts{run} ne $d) { next; }
+        if ($opts{run} && $opts{run} ne $d) { next; }	#  $opts{run} can be set with a command line flag.
         #   Check if this run has arrived, no need to look at it further
         if (defined($knownruns{$d}{arrived}) && $knownruns{$d}{arrived} eq 'Y') { next; }
-
-		#warn "$Script - d=$d $opts{datatype} would have been called. arrived='$knownruns{$d}{arrived}'<br>\n"; next;
-        #	Add database entries for each sample in this set
+        #   Add database entries for each sample in this set
         if ($opts{datatype} eq 'genome') { AddBams($runid, $d); next;}
         if ($opts{datatype} eq 'rnaseq') { AddRNAProjects($runid, $d); next;}
         if ($opts{datatype} eq 'methyl') { AddMethylBatches($runid, $d); next;}
         warn "$Script Unable to process data '$opts{datatype}' for dir=$d\n";
-    }
-}
+    }	 	 	 	 	#  End loop over directories in the file system
+}	 	 	 	 	#  End loop over sequencing centers
 
-$nowdate = strftime('%Y/%m/%d %H:%M', localtime);
+$nowdate = strftime('%Y/%m/%d %H:%M', localtime);	#  Report what was done
 if ($opts{runcount}) { print "$nowdate  Added $opts{runcount} runs\n"; }
 if ($opts{count})    { print "$nowdate  Added $opts{count} samples from: $opts{countruns}\n"; }
 exit;
@@ -399,7 +421,6 @@ sub AddMethylBatches {
 		    	}
 		    	die "$Script - duplicate sample " . $c[$cols{'sampleid'}] . " found. methylbatchid=$href->{methylbatchid}\n";
         	}
-
 			#	Insert this sample
 			$sql = "INSERT INTO $opts{samples_table} " .
 				"(methylbatchid,expt_sampleid,array,p05,p01,type,version,rowcol,";
@@ -508,7 +529,6 @@ sub AddRNAProjects {
 			warn "$Script - Unable to find expt_sampleid for '$nwgc' in '$manifestfile'\nLINE=$l\n";
 			return 0;
 		}
-
 		#	Save what we will need, list of all sampleids and all files for samples
 		$fullfiletodata{$fullfn} = $check . ' ' . $nwgc . ' ' . $sampleid;
 		$expt_sampleids{$sampleid} = $nwgcref->{$nwgc};	# Cheap way to get unique list
@@ -536,7 +556,6 @@ sub AddRNAProjects {
 	    	}
 	    	die "$Script - duplicate sample '$samp' found. rnaprojectid=$rnaprojectid\n";
        	}
-
 		#   Create database record for this sample
 		$sql = "INSERT INTO $opts{samples_table} " .
 			"(rnaprojectid,expt_sampleid,rnasubject,fileprefix,notes,dateinit) " .
@@ -754,17 +773,16 @@ sub ParseTab {
 #
 # Arguments:
 #   txseqid - index to a sampleid
-#	filename - name of file for sample
-#	intar - flag if this file is in a tar
-#	checksum - checksum for this file
+#   filename - name of file for sample
+#   intar - flag if this file is in a tar
+#   checksum - checksum for this file
 #
 # Returns:
 #   Boolean INSERT was successful
 #==================================================================
 sub AddRNAFile {
     my ($txseqid, $filename, $intar, $checksum) = @_;
-
-	#	This filename may not even be in the database yet
+	#   This filename may not even be in the database yet
     my $sql = "SELECT fileid,txseqid FROM $opts{files_table} " .
     	"WHERE filename='$filename'";
     my $sth = DoSQL($sql,0);
@@ -774,7 +792,6 @@ sub AddRNAFile {
     		"txsequid=$href->{txseqid})\n";
     	return 0;
     }
-
    	$sql = "INSERT INTO $opts{files_table} " .
     	"(txseqid,filename,intar,checksum,dateinit) " .
        	"VALUES($txseqid,'$filename','$intar', '$checksum', $nowdate)";
@@ -789,8 +806,8 @@ sub AddRNAFile {
 #   Make sure this directory is runnable. If not, no new runid
 #
 # Arguments:
-#   d - directory (e.g. run name)
 #   cid - center id
+#   d - directory (e.g. run name)
 #
 # Returns:
 #   runid or undef
@@ -836,12 +853,22 @@ sub CreateRun {
     return $runid;
 }
 
+
+
+
+
+
+
+
+
+
+
 #==================================================================
 # Subroutine:
 #   AddBams - Add details for bams in this directory to the database
-#       In order to know if we've found all the bam files, we look
+#       [ In order to know if we've found all the bam files, we look
 #       for any BAMs older than the MD5 files. If so, we parse the
-#       md5 files again.
+#       md5 files again.  -  This check no longer done, Feb 2021. ]
 #
 # Arguments:
 #   runid - run id
@@ -864,7 +891,6 @@ sub AddBams {
     my $rowsofdata = $sth->rows();
     my %knownbams = ();
     my %knownorigbam = ();
-    my $bamcount = 0;
     for (my $i=1; $i<=$rowsofdata; $i++) {
         foreach my $href ($sth->fetchrow_hashref) {
             $knownbams{$href->{bamname}} = 1;
@@ -889,24 +915,23 @@ sub AddBams {
         closedir $dh;
     }
     if (! @md5files) {
-        if ($opts{verbose}) { print "$Script - No new MD5 files found in $d\n"; }
+        if ($opts{verbose}) { print "$Script - No MD5 files found in $d\n"; }
         return 0;
     }
 
-    #   There is no consistency what people do here.
     #   Foreach md5 file, get the BAM name and create the bamfiles record
-    #   and rename the md5 file so we do not process it again
     my $newbams = 0;
+    my $bamcount = 0;
     my ($fn, $checksum);
     foreach my $origf (@md5files) {
-        my $f = "$d/$origf";
-        if (! open(IN, $f)) {
-            warn "$Script - Unable to read MD5 file '$f': $!\n";
+        my $mdfile = "$d/$origf";
+        if (! open(IN, $mdfile)) {
+            warn "$Script - Unable to read MD5 file '$mdfile': $!\n";
             next;
         }
         my $badmd5 = 0;
         while (my $l = <IN>) {          # Read md5 checksum file
-            ($fn, $checksum) = NormalizeMD5Line($l, $f);
+            ($fn, $checksum) = NormalizeMD5Line($l, $origf);
             if (! $checksum) { $badmd5++; next; }
             #   Don't make duplicate records
             if (exists($knownbams{$fn})) { $bamcount++; next; }       # Skip known bams
@@ -925,14 +950,14 @@ sub AddBams {
         if ($badmd5) { next; }              # This MD5 was in error
     }
 
-    #   If we added bams, change the count
+    #   If we added bams, change the count in the database
     if ($newbams) {
         print "$Script - $newbams new bams found in '$d'\n";
         $opts{count} += $newbams;            # Stats for ending msg
         $opts{countruns} .= $d . ' ';
 
-   	    #	We no longer have data arriving piecemeal - set count. arrived set by topmed_monitor
-        $sql = "UPDATE $opts{runs_table} SET count=$bamcount WHERE runid=$runid";
+   	    #   We no longer have data arriving piecemeal - set the count for this run.
+        $sql = "UPDATE $opts{runs_table} SET count=$bamcount WHERE $opts{runs_pkey}=$runid";
         $sth = DoSQLv($sql);
 
         #   Last sanity check, see if number of BAM files matches records
@@ -940,18 +965,24 @@ sub AddBams {
         my $n = `ls $d/N*.bam $d/N*.cram 2>/dev/null | wc -l`;
         chomp($n);
         if ($n eq $newbams) {
-        	print "$Script - Congratulations, # bams = # database records\n";
-        	#	Set arrived flag in the arrive function
-        	#$sql = "UPDATE $opts{runs_table}  SET arrived='Y' WHERE runid=$runid";
-        	#$sth = DoSQLv($sql);
-        	#print "$Script - Run '$d' has finally arrived. Look at it no more\n";
+            print "$Script - Congratulations, # bams = # database records\n";
+	    #   Set arrived flag for this run in the database
+	    # $sql = "UPDATE $opts{runs_table}  SET arrived='Y' WHERE $opts{runs_pkey}=$runid";
+	    # $sth = DoSQLv($sql);
+	    # print "$Script - Run '$d' has finally arrived. Look at it no more\n";
+	    #   Terry has the code above commented out.  Turns out, he's correct.
         }
         else {
             print "$Script - Warning, # bams [$n] != # database records [$newbams 912].  " .
-            "If data is incoming, this might be OK\n";
+            "If data is incoming, this might be OK\n";	     #  Don't know where '912' comes from.
         }
     }
-    return 1;								# No need to check/set arrived
+	 	#  Terry's comment here is:  "No need to check/set arrived".  
+	 	#  See  topmed_monitor.pl  line 248 to see how "arrived" is set.
+	 	#  and lines 522 - 556 to see how it is used in some insane SQL.
+
+    return 1;	#  Because of this return statement, I think everything that follows 
+	 	#  is old code no longer used.
 
     #   If ALL the samples have been processed as arrived, maybe we do not
     #   need to look at this run any more.
@@ -961,16 +992,20 @@ sub AddBams {
     if (! $numberarrived) { return 1; }         # No sample processed, keep looking
 
     #   At least one sample was marked as arrived, see if there has been little changed
-    #   in this directory in a long time, then make this run as 'arrived' so we'll
-    #   look at this run again
+    #   in this directory in a long time, then mark this run as 'arrived' so we won't
+    #   look at this run again.
     my $oldestbamdate = OldestBAM($d);
     if ((time() - $oldestbamdate) > $opts{arrivedsecs}) {
-        $sql = "UPDATE $opts{runs_table}  SET arrived='Y' WHERE runid=$runid";
+       	#  Set arrived flag for this run in the database
+        $sql = "UPDATE $opts{runs_table}  SET arrived='Y' WHERE $opts{runs_pkey}=$runid";
         $sth = DoSQLv($sql);
         print "$Script - Run '$d' has finally arrived. Look at it no more\n";
     }
     return 1;
 }
+
+
+
 
 #==================================================================
 # Subroutine:
@@ -1002,15 +1037,15 @@ sub OldestBAM {
 #   NormalizeMD5Line - Return filename and checksum
 #
 # Arguments:
-#   l - line from an md5 file (well, what they pretend is an md5 file)
-#   f - name of file (for error msgs only)
-#	nocheck - boolean to avoid checking filetype
+#    l - line from an md5 file (well, what they pretend is an md5 file)
+#   origf - name of file (for error msgs only)
+#   nocheck - boolean to avoid checking filetype
 #
 # Returns:
 #   array of filename and checksum or NULL
 #==================================================================
 sub NormalizeMD5Line {
-    my ($l, $f, $nocheck) = @_;
+    my ($l, $origf, $nocheck) = @_;
     if (! defined($nocheck)) { $nocheck = 0; }
     my @retvals = ();
     if ($l =~ /^#/) { return @retvals; }
@@ -1019,13 +1054,18 @@ sub NormalizeMD5Line {
     #   Do sanity check trying to guess the format of their md5 file
     if ($checksum =~ /\./) { ($fn, $checksum) = ($checksum, $fn); }
     if (length($checksum) != 32) {
-        print "$Script - Invalid checksum '$checksum' in '$f'. Line: $l";
+        print "$Script - Invalid checksum '$checksum' in '$origf'. Line: $l";
         return @retvals;
     }
-    if ($fn =~ /\//) { $fn = basename($fn); }   # Path should not be qualified, but ...
-    if ((! $nocheck) && $fn !~ /bam$/ && $fn !~ /cram$/) {	# File better be a bam or cram
+    #   Broad now sends files containing one md5 checksum and no file name.
+    #   The following single line WOULD handle this -- but this perl script would never 
+    #   get that far because there would be no file  Manifest.txt  yet in the directory.
+
+    if (! length($fn)) { ($fn = $origf) =~ s/.md5//g; }	#  New hack for Broad md5 files
+    if ($fn =~ /\//) { $fn = basename($fn); }	 	 	#  Path should not be qualified, but ...
+    if ((! $nocheck) && $fn !~ /bam$/ && $fn !~ /cram$/) {	#  File better be a bam or cram
         #   Only generate error message for true errors, not dumb ones :-(
-        if ($fn !~ /bai$/) { print "$Script - Invalid BAM name '$fn' in '$f'. Line: $l"; }
+        if ($fn !~ /bai$/) { print "$Script - Invalid BAM name '$fn' in '$origf'. Line: $l"; }
         return @retvals;
     }
     @retvals = ($fn, $checksum);
@@ -1097,7 +1137,7 @@ creates records for new run directories and/or new BAMs
 =item B<-center NAME>
 
 Specifies a specific center name on which to run the action, e.g. B<uw>.
-This is useful for testing.
+This is useful for testing -- but it seems to be no longer implemented.
 The default is to run against all centers.
 
 =item B<-datatype TYPE>

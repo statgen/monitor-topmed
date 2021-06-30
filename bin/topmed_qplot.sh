@@ -2,7 +2,7 @@
 #
 #   topmed_qplot.sh [-submit ] bamid
 #
-#	Run QPLOT on a BAM file
+#	Run QPLOT and VerifyBamID on a BAM file
 #
 . /usr/cluster/$PROJECT/bin/topmed_actions.inc
 me=qplot
@@ -28,9 +28,9 @@ function QplotCheck {
   tr=`perl -E "print $tr*1000000"`    # Man, is it hard to do mutiply of float in shell!
   tr=`expr $tr + 5001`
   if [ "$tr" -lt "$bamflagstat" ]; then
-    Fail "QPLOT data must have been truncated. TotalReads=$tr Flagstat=$bamflagstat"
+    Fail "QPLOT data must have been truncated. QPlotReport=$tr Flagstat=$bamflagstat"
   fi
-  echo "Qplot output seems reasonable: TotalReads=$tr Flagstat=$bamflagstat"
+  echo "Qplot output seems reasonable: QPlotReport=$tr Flagstat=$bamflagstat"
 }
 
 #------------------------------------------------------------------
@@ -42,14 +42,14 @@ function RC_Check {
   local basenam=$2
   local msg=$3
 
-  if [ "$rc" != "0" ]; then
-      rm -f $basenam.*	 	#  we're in $outdir, so this will remove 
-      Fail $msg	 	 	    #  bad Qplot or verifyBamId output files
+  if [ "$rc" != "0" ]; then	#  we're in $outdir, so this will remove 
+#     rm -f $basenam.*	 	#  don't literally remove ...
+      Fail $msg	 	 	#  bad Qplot or verifyBamId output files
   fi
 }  
 
 if [ "$1" = "-submit" ]; then	#  subroutine SubmitJob will run sbatch
-  shift	 	 	 	            #  with the current shell script and args
+  shift	 	 	 	#  with the current shell script and args
   bamid=`GetDB $1 bamid`
   timeout="12:00:00"
   #   Figure out index file name
@@ -59,10 +59,12 @@ if [ "$1" = "-submit" ]; then	#  subroutine SubmitJob will run sbatch
   fi
   filesize=`stat --printf=%s $srcfile`
   #   Large files can take a lot more time
-  if [ "$filesize" -gt "40255183256" ]; then
-    timeout="28:00:00"
+  if [ "$filesize" -gt "70255183256" ]; then
+    timeout="48:00:00"	 	 	#  new category
+  elif [ "$filesize" -gt "40255183256" ]; then
+    timeout="30:00:00"	 	 	#  was "28:00:00"
   elif [ "$filesize" -gt "35044692321" ]; then
-    timeout="24:00:00"
+    timeout="24:00:00"	 	 	# "15:00:00" okay up to 35 Gb.
   elif [ "$filesize" -gt "23023087355" ]; then
     timeout="20:00:00"
   fi
@@ -70,12 +72,13 @@ if [ "$1" = "-submit" ]; then	#  subroutine SubmitJob will run sbatch
     echo "Forcing SLURM timeout to '$timeout'"
   fi
   #timeout="28:00:00"  # This stinks. J takes the entire cluster, our work runs 5 times slower
- RandomRealHost $bamid
+
+  RandomRealHost $bamid
   MayIRun $me $bamid $realhost
   SubmitJob $bamid "$PROJECT-qplot" '12G' "$0 $*"
   exit
-fi
 
+fi
 if [ "$1" = "" ]; then	 	#  if no arguments, print usage note
   me=`basename $0`
   echo "Usage: $me [-submit] bamid"
@@ -114,11 +117,14 @@ outdir=`$topmedpath wherepath $bamid qcresults`
 if [ "$outdir" = "" ]; then
   Fail "Unable to get QCRESULTS directory for '$bamid' - $outdir"
 fi
+
 mkdir -p $outdir
 cd $outdir
+
 if [ "$?" != "0" ]; then
   Fail "Unable to CD to qplot output directory for '$bamid' - $outdir"
 fi
+
 echo "Files will be created in $outdir"
 stime=`date +%s`
 
@@ -126,36 +132,38 @@ extension="${bamfile##*.}"
 basebam=`basename $bamfile .$extension`
 echo "Running qplot for build '$build' extension '$extension'"
 
-#  Define shell variables for Qplot and Fan Zhang's new VerifyBamId
-gcref=/net/mario/nodeDataMaster/local/ref/gotcloud.ref
-verifybamid_dir=/usr/cluster/topmed/bin/verifybamid
-verifybamid=/usr/cluster/topmed/bin/VerifyBamID
-qplotnew=/usr/cluster/topmed/bin/qplot	 	# <== New qplot from Tom
+
 
 #   Assign resource variables specific to each build
+
 #   The logic here is that we set shell variables specific to build 37 or build 38, then 
 #   the same command will run the new qplot for either build and either file format.
 #   VerifyBamID requires an 'if-elif-fi' construction, since I want to preserve exactly 
 #   the old behavior with Goo Jun's code for any build 37 .bam files that we might re-run.
+
+#   Define shell variables for Qplot and Fan Zhang's new VerifyBamId
+
+gcref=/net/mario/nodeDataMaster/local/ref/gotcloud.ref
+qplotnew=/usr/cluster/topmed/bin/qplot	 	 	  # <== New qplot from Tom
+verifybamid=/net/topmed/working/software/verifyBamID/src  # recompiled VerifyBamID
+	 	 	 	 	 	 	  # as of Feb 18 2021
 if [ "$build" = "37" ]; then
    reference=${gcref}/hs37d5.fa
    qplot_snp=${gcref}/dbsnp_142.b37.vcf.gz
-   #resources=$verifybamid_dir/1.0.0-b38/resource/1000g.100k.b37.vcf.gz.dat
-   resources=$verifybamid_dir/resource/1000g.100k.b37.vcf.gz.dat
-   region="-"
+   resources=/usr/cluster/topmed/bin/verifybamid/resource/1000g.100k.b37.vcf.gz.dat
+   region="-"	 	 	 	 	 	  # June 5 2017 resource files
    b37_sites=${gcref}/hapmap_3.3.b37.sites.vcf.gz
 elif [ "$build" = "38" ]; then
    reference=${gcref}/hg38/hs38DH.fa
    qplot_snp=${gcref}/hg38/dbsnp_142.b38.vcf.gz
-   #resources=$verifybamid_dir/1.0.0-b38/resource/1000g.100k.b38.vcf.gz.dat
-   resources=$verifybamid_dir/resource/1000g.100k.b38.vcf.gz.dat
+   resources=${verifybamid}/resource/hgdp.100k.b38.vcf.gz.dat
    region=/net/topmed/incoming/study.reference/study.reference/nhlbi.3066.hs38DH.autosome.list
 else
   Fail "Unknown build '$build', cannot continue with qplot for '$bamfile'"
 fi
-
 #   Run qplot, either build, output written to current working directory.
 #   Same code works for either .bam or .cram
+
    rm $nwdid.*                          # Remove existing files (not all nicely named)
    $samtools view  -u -T $reference  $bamfile |	 	\
    $qplotnew --reference $reference --dbsnp $qplot_snp	\
@@ -171,26 +179,18 @@ fi
 #   That writes output file  NWD*.vb.selfSM  directly.  No need 
 #   for an awk script.  I don't expect ever to see a .bam format 
 #   file on build 38, but Fan's new code will handle it.
-if [ "$extension" = "cram" -o "$build" = "38" ]; then	#  Run Fan Zhang's VerifyBamId
-  ( $verifybamid	 	 \
-     --UDPath ${resources}.UD	 \
-     --BedPath ${resources}.bed  \
-     --MeanPath ${resources}.mu  \
-     --Reference $reference	 \
-     --BamFile $bamfile > $nwdid.vb ) 2>/run/shm/$nwdid.vb.log
-  RC_Check $? $nwdid "VerifyBAMID failed for '$bamfile'"
 
-  #  Convert this into standard verifybamid output ( $basebam.vb.selfSM )
-  # e.g. FREEMIX(Alpha):4.82382e-09
-  freemix=`grep Alpha $nwdid.vb | sed -e 's/://' | sed -e 's/Alpha//' | sed -e 's/FREEMIX(//' | sed -e 's/)//'` 
-  if [ "$freemix" = "" ]; then
-    x=`cat $nwdid.vb`
-    RC_Check 2 $nwdid "Unable to parse VerifyBAMID $nwdid.vb = $x"
-  fi
-  #	Now create $nwdid.vb.selfSM   Beware, tabs in this file
-  /bin/echo -e "#SEQ_ID\tRG\tCHIP_ID\t#SNPS\t#READS\tAVG_DP\tFREEMIX\tFREELK1\tFREELK0\tFREE_RH\tFREE_RA\tCHIPMIX\tCHIPLK1\tCHIPLK0\tCHIP_RH\tCHIP_RA\tDPREF\tRDPHET\tRDPALT" > $nwdid.vb.selfSM
-  /bin/echo -e "$nwdid\t-\t-\t-\t-\t-\t$freemix\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-" >> $nwdid.vb.selfSM
-  echo "Created $nwdid.vb.selfSM from $nwdid.vb  [$nwdid $freemix]"
+if [ "$extension" = "cram" -o "$build" = "38" ]; then	#  Run Fan Zhang's VerifyBamId
+  ${verifybamid}/bin/VerifyBamID \
+     --SVDPrefix $resources	 \
+     --Reference $reference	 \
+     --NumPC 4	 	 	 \
+     --BamFile $bamfile	 	 \
+     --Output  $nwdid.vb > /run/shm/$nwdid.vb.log 2>&1
+  RC_Check $? $nwdid "VerifyBamID failed for '$bamfile'"
+#    With argument --Output, Fan Zhang's VerifyBamID will write two output files:
+#    NWD*.vb.Ancestry  and  NWD*.vb.selfSM.  No further conversion necessary.
+
 elif [ "$extension" = "bam" -a "$build" = "37" ]; then	#  Run Goo Jun's old code
   /net/mario/gotcloud/bin/verifyBamID --bam  $bamfile --vcf $b37_sites	 	 	\
     --site --free-full --chip-none --ignoreRG --precise --maxDepth 80	\
@@ -198,11 +198,9 @@ elif [ "$extension" = "bam" -a "$build" = "37" ]; then	#  Run Goo Jun's old code
   RC_Check $? $nwdid "VerifyBAMID failed for '$bamfile'"
 fi
 rm /run/shm/$nwdid.??.log       # Get rid of unused logs
-
 etime=`date +%s`
 etime=`expr $etime - $stime`
 echo "QPLOT on '$bamfile' successful (at second $etime)"
-
 echo "Created files:"
 ls -la $nwdid.*
 
