@@ -126,7 +126,7 @@ etime=`date +%s`
 etime=`expr $etime - $stime`
 LogMsg "Copy of CRAMS and Manifest.txt completed in $etime seconds"
 #   Partial check of results:
-numa=`wc -l Manifest.txt`
+numa=`cat Manifest.txt | wc -l`
 numc=`ls *.cram | wc -l`
 if [ "$numc" != "$numa" -o "$numc" = "0" ]; then
   LogMsg "$me - something went wrong, no CRAMS found or Manifest incomplete"
@@ -134,14 +134,14 @@ if [ "$numc" != "$numa" -o "$numc" = "0" ]; then
 else
 #   Clean out cruft from the Broad (Terry's former action)
 #   rm -rf incoming	#  leave the empty Broad directory tree.
-ls . | wd	 	#  have to DO something inside the "else"
+ls . | wc	 	#  have to DO something inside the "else"
 fi
 #   Insure the CRAI files are younger than the source file. Avoid re-making indexes. Correct permissions
 touch *.crai
 chmod 0640 *.cram *.crai
 
-LogMsg "SUCCESSFUL  Fetched $n $uri files to $dir"
-LogMsg "Manifest.txt shows `wc -l Manifest.txt` .cram files"
+LogMsg "SUCCESSFUL  Fetched $numc $uri files to $dir"
+LogMsg "Manifest.txt shows  $numa  .cram files"
 
 #   Register this new run in the monitor database
 #   This part of the code is hard-wired with center = broad
