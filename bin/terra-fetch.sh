@@ -8,13 +8,14 @@
 #         https://app.terra.bio/#workspaces/broad-genomics-delivery/...
 #         Using a browser to visit this URL, find Files where the Google bucket 
 #         URI can be seen.  Copy the bucket URI into the command line above.
-#         Should look like  gs://fc-c41c35f9-a9a0-4f34-9783-31be6b07487e/
+#         Should look like  gs://fc-c41c35f9-a9a0-4f34-9783-31be6b07487e
 #         and it can include directory levels inside the bucket.
 #   localdir  is either an intended directory name on 
 #         /net/ddn/incoming/topmed/broad or else an absolute 
 #         pathname to somewhere else
 #   This is not interactive, so this can be run in the background
 #
+
 me=`basename $0`
 convert_checksums=/net/topmed/incoming/study.reference/study.reference/nhlbi.4275.gsutil.checksums.awk
 export PROJECT=topmed
@@ -65,6 +66,7 @@ if [ "$abs" != "/" ]; then
 else
   dir=$localdir
 fi
+
 mkdir -p $dir
 chmod 0770 $dir || exit 5       # Be sure permissions are set properly
 cd $dir || exit 4
@@ -75,16 +77,20 @@ LogMsg "$me"
 LogMsg $localdir
 LogMsg "Using Google Store $uri"
 
-#   Get Google data to build the file Manifest.txt
-#   Checksums are space-separated, but 'cut -f' looks for tab.
-LogMsg "Building Manifest.txt"
+#   As of February 2021, Google evidently no longer guarantees to provide md5 
+#   checksums as part of its "-L" long file listing.  So instead we must use 
+#   the files "NWD*.cram.md5" provided by Broad to construct "Manifest.txt" 
+#   at the end, after all of the files have been downloaded.
+
+#   Old version -- Get Google data to build the file Manifest.txt
+LogMsg "Retrieve Google file lists"
 gsutil ls -r -l ${uri}/'**' > gsutil.file.list
 gsutil ls -r -L ${uri}/'**' > gsutil.complete
 awk -f $convert_checksums  gsutil.complete > gsutil.checksums
-grep -v cram.crai gsutil.checksums | grep -v cram.md5 | cut -f 1 > Manifest.txt
+#   grep -v cram.crai gsutil.checksums | grep -v cram.md5 | cut -f 1 > Manifest.txt
+#   Checksums are space-separated, but 'cut -f' looks for tab.
 echo `date` >> $logfile
-rm -f gsutil.checksums
-LogMsg "Manifest created"
+LogMsg "File lists retrieved"
 
 #   Finally know what we are supposed to do
 mkdir incoming
@@ -103,8 +109,9 @@ etime=`expr $etime - $stime`
 LogMsg "Fetch of CRAMS completed in $etime seconds"
 
 #   Files are in holding directory 'incoming' - copy the stuff we want to $dir
-#   This script already copies files directly from the bucket to DDN.
 #   Using 'find' below makes this independent of the Broad directory structure.
+#   Usually, this script has already copied files directly from the bucket into DDN.
+
 cd ..
 stime=`date +%s`
 LogMsg "Now copying files of interest into $dir"
@@ -112,20 +119,26 @@ for f in `find . -name \*.cram -print`; do
     nwd=${f%.*}
     mv ${nwd}.* .
 done
+for file in `ls NWD*.md5`; do
+    echo `cat $file` ' '`echo $file | sed -e 's/.md5//'` >> Manifest.txt
+done
 etime=`date +%s`
 etime=`expr $etime - $stime`
-LogMsg "Copy of CRAMS to DDN completed in $etime seconds"
-n=`ls *.cram|wc -l`
-if [ "$n" = "0" ]; then
-  LogMsg "$me - something went wrong, no CRAMS found"
+LogMsg "Copy of CRAMS and Manifest.txt completed in $etime seconds"
+#   Partial check of results:
+numa=`wc -l Manifest.txt`
+numc=`ls *.cram | wc -l`
+if [ "$numc" != "$numa" -o "$numc" = "0" ]; then
+  LogMsg "$me - something went wrong, no CRAMS found or Manifest incomplete"
   exit 9
 else
-#   Clean out cruft from the Broad
-  rm -rf incoming
+#   Clean out cruft from the Broad (Terry's former action)
+#   rm -rf incoming	#  leave the empty Broad directory tree.
+ls . | wd	 	#  have to DO something inside the "else"
 fi
 #   Insure the CRAI files are younger than the source file. Avoid re-making indexes. Correct permissions
 touch *.crai
-chmod 0660 *.cram *.crai
+chmod 0640 *.cram *.crai
 
 LogMsg "SUCCESSFUL  Fetched $n $uri files to $dir"
 LogMsg "Manifest.txt shows `wc -l Manifest.txt` .cram files"
