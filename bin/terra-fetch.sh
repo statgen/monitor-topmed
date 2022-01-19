@@ -96,17 +96,20 @@ LogMsg "File lists retrieved"
 mkdir incoming
 cd    incoming || exit 5
 
+#	Set the Boto values to meet your needs
 stime=`date +%s`
+opts="-o Boto:parallel_process_count=10 -o Boto:parallel_thread_count=60"
 LogMsg "Fetching bucket $uri to `pwd`"
-echo "This will take quite some time"
-gsutil -m -q rsync -r $uri . >> $logfile 2>&1
+echo "This will take quite some time. Using $opts"
+gsutil -m $opts -q rsync -r $uri . >> $logfile 2>&1
 if [ "$?" != "0" ]; then
-  LogMsg "$me -FAILED to fetch all the data from $uri"
+  LogMsg "$me -FAILED to fetch all the data from $uri - See $logfile"
   exit 6
 fi
 etime=`date +%s`
 etime=`expr $etime - $stime`
 LogMsg "Fetch of CRAMS completed in $etime seconds"
+echo "See files in `pwd` and $logfile"
 
 #   Files are in holding directory 'incoming' - copy the stuff we want to $dir
 #   Using 'find' below makes this independent of the Broad directory structure.
